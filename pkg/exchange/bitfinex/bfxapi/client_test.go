@@ -2,8 +2,6 @@ package bfxapi
 
 import (
 	"context"
-	"net/http"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,45 +10,13 @@ import (
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
-const AlwaysRecord = true
-const RecordIfFileNotFound = false
-
-func RunHttpTestWithRecorder(t *testing.T, client *http.Client, recordFile string) (bool, func()) {
-	mockTransport := &httptesting.MockTransport{}
-	recorder := httptesting.NewRecorder(http.DefaultTransport)
-
-	_, fErr := os.Stat(recordFile)
-	notFound := fErr != nil && os.IsNotExist(fErr)
-	shouldRecord := RecordIfFileNotFound && notFound
-
-	if os.Getenv("TEST_HTTP_RECORD") == "1" || shouldRecord || AlwaysRecord {
-		client.Transport = recorder
-		return true, func() {
-			if err := recorder.Save(recordFile); err != nil {
-				t.Errorf("failed to save recorded requests: %v", err)
-			}
-		}
-	} else {
-		if err := recorder.Load(recordFile); err != nil {
-			t.Fatalf("failed to load recorded requests: %v", err)
-		}
-
-		if err := mockTransport.LoadFromRecorder(recorder); err != nil {
-			t.Fatalf("failed to load recordings: %v", err)
-		}
-
-		client.Transport = mockTransport
-		return false, func() {}
-	}
-}
-
 func TestClient_privateApis(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	client := NewClient()
 
-	isRecording, saveRecord := RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
 	defer saveRecord()
 
 	key, secret, ok := testutil.IntegrationTestConfigured(t, "BITFINEX")
@@ -146,7 +112,7 @@ func TestClient(t *testing.T) {
 
 	client := NewClient()
 
-	isRecording, saveRecord := RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
 	defer saveRecord()
 
 	key, secret, ok := testutil.IntegrationTestConfigured(t, "BITFINEX")
