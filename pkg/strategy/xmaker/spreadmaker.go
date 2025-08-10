@@ -204,7 +204,10 @@ func (c *SpreadMaker) placeOrder(ctx context.Context, submitOrder *types.SubmitO
 	c.order = createdOrder
 	c.mu.Unlock()
 
-	c.orderStore.Add(*createdOrder)
+	if createdOrder != nil {
+		c.orderStore.Add(*createdOrder)
+	}
+
 	return createdOrder, nil
 }
 
