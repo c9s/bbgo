@@ -20,7 +20,7 @@ type GetOrderHistoryRequest struct {
 	orderId []int64 `param:"id,omitempty"` // Order ID to filter results
 }
 
-// NewGetOrderHistoryRequest 创建一个新的订单历史请求。
+// NewGetOrderHistoryRequest creates a new GetOrderHistoryRequest.
 func (c *Client) NewGetOrderHistoryRequest() *GetOrderHistoryRequest {
 	return &GetOrderHistoryRequest{client: c}
 }
