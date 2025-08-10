@@ -146,7 +146,7 @@ func TestClient(t *testing.T) {
 
 	client := NewClient()
 
-	isRecording, saveRecord := RunHttpTestWithRecorder(t, client.HttpClient, "testdata/test_client_requests.json")
+	isRecording, saveRecord := RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
 	defer saveRecord()
 
 	key, secret, ok := testutil.IntegrationTestConfigured(t, "BITFINEX")
