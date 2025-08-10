@@ -9,7 +9,7 @@ import (
 // GetOrderHistoryBySymbolRequest retrieves all user's closed/cancelled orders up to 2 weeks in the past by trading pair symbol (e.g. tBTCUSD, tLTCBTC, ...).
 // API: https://docs.bitfinex.com/reference/rest-auth-orders-history-by-symbol
 //
-//go:generate requestgen -type GetOrderHistoryBySymbolRequest -method POST -url "/v2/auth/r/orders/:symbol/hist" -responseType []OrderData
+//go:generate requestgen -type GetOrderHistoryBySymbolRequest -method POST -url "/v2/auth/r/orders/:symbol/hist" -responseType []Order
 type GetOrderHistoryBySymbolRequest struct {
 	client requestgen.AuthenticatedAPIClient
 

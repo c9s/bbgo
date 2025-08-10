@@ -42,14 +42,14 @@ type SubmitOrderResponse struct {
 	MessageID *int // Unique notification's ID
 
 	_      any // unused field
-	Data   []OrderData
+	Data   []Order
 	Code   *int64 // W.I.P. (work in progress)
 	Status string
 	Text   string // Additional notification description
 }
 
-// OrderData represents a single order in the response DATA array.
-type OrderData struct {
+// Order represents a single order in the response DATA array.
+type Order struct {
 	OrderID       int64
 	GroupOrderID  *int64
 	ClientOrderID *int64
@@ -92,13 +92,13 @@ func (r *SubmitOrderResponse) UnmarshalJSON(data []byte) error {
 	return parseJsonArray(data, r, 0)
 }
 
-// UnmarshalJSON parses the Bitfinex OrderData JSON array.
-func (o *OrderData) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON parses the Bitfinex Order JSON array.
+func (o *Order) UnmarshalJSON(data []byte) error {
 	return parseJsonArray(data, o, 0)
 }
 
 // String returns a human readable summary of the order data, skipping nil or empty fields.
-func (o *OrderData) String() string {
+func (o *Order) String() string {
 	var buf []string
 
 	buf = append(buf, fmt.Sprintf("#%d %s %s %s", o.OrderID, o.Symbol, o.OrderType, o.Status))

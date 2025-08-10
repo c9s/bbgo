@@ -11,16 +11,19 @@ import (
 	"regexp"
 )
 
+// Length sets
 func (g *GetBookRequest) Length(length int) *GetBookRequest {
 	g.length = length
 	return g
 }
 
+// Symbol sets
 func (g *GetBookRequest) Symbol(symbol string) *GetBookRequest {
 	g.symbol = symbol
 	return g
 }
 
+// Precision sets
 func (g *GetBookRequest) Precision(precision string) *GetBookRequest {
 	g.precision = precision
 	return g

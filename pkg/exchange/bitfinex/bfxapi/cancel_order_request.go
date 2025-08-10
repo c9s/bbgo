@@ -38,7 +38,7 @@ type CancelOrderResponse struct {
 	Type      string
 	MessageID *int
 	_         any
-	Data      OrderData
+	Data      Order
 	Code      *int64
 	Status    string
 	Text      string
