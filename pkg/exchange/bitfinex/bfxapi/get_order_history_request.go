@@ -9,7 +9,7 @@ import (
 // GetOrderHistoryRequest used to retrieve the order history for a specific trading pair on Bitfinex.
 // API: https://docs.bitfinex.com/reference/rest-auth-orders-history
 //
-//go:generate requestgen -type GetOrderHistoryRequest -method POST -url "/v2/auth/r/orders" -responseType []OrderData
+//go:generate requestgen -type GetOrderHistoryRequest -method POST -url "/v2/auth/r/orders/hist" -responseType []OrderData
 type GetOrderHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
