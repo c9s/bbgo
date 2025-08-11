@@ -35,8 +35,9 @@ const (
 type OrderType string
 
 const (
-	OrderTypeLimit                OrderType = "LIMIT"                  // limit order
-	OrderTypeExchangeLimit        OrderType = "EXCHANGE LIMIT"         // exchange limit order
+	OrderTypeLimit         OrderType = "LIMIT"          // limit order
+	OrderTypeExchangeLimit OrderType = "EXCHANGE LIMIT" // exchange limit order
+
 	OrderTypeMarket               OrderType = "MARKET"                 // market order
 	OrderTypeExchangeMarket       OrderType = "EXCHANGE MARKET"        // exchange market order
 	OrderTypeStop                 OrderType = "STOP"                   // stop order

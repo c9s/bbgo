@@ -6,42 +6,48 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/url"
 	"reflect"
 	"regexp"
 )
 
+// Symbol sets
 func (s *SubmitOrderRequest) Symbol(symbol string) *SubmitOrderRequest {
 	s.symbol = symbol
 	return s
 }
 
+// Amount sets
 func (s *SubmitOrderRequest) Amount(amount string) *SubmitOrderRequest {
 	s.amount = amount
 	return s
 }
 
+// Price sets
 func (s *SubmitOrderRequest) Price(price string) *SubmitOrderRequest {
 	s.price = &price
 	return s
 }
 
+// OrderType sets
 func (s *SubmitOrderRequest) OrderType(orderType OrderType) *SubmitOrderRequest {
 	s.orderType = orderType
 	return s
 }
 
+// GroupId sets
 func (s *SubmitOrderRequest) GroupId(groupId int64) *SubmitOrderRequest {
 	s.groupId = &groupId
 	return s
 }
 
+// ClientOrderId sets
 func (s *SubmitOrderRequest) ClientOrderId(clientOrderId int64) *SubmitOrderRequest {
 	s.clientOrderId = &clientOrderId
 	return s
 }
 
+// Flags sets
 func (s *SubmitOrderRequest) Flags(flags OrderFlag) *SubmitOrderRequest {
 	s.flags = &flags
 	return s
@@ -276,13 +282,10 @@ func (s *SubmitOrderRequest) Do(ctx context.Context) (*SubmitOrderResponse, erro
 
 	apiURL = s.GetPath()
 
-	log.Printf("API Request: %s %v %v", apiURL, query, params)
 	req, err := s.client.NewAuthenticatedRequest(ctx, "POST", apiURL, query, params)
 	if err != nil {
 		return nil, err
 	}
-
-	log.Printf("API Request: %s %s %+v", req.Method, req.URL.String(), req.Header)
 
 	response, err := s.client.SendRequest(req)
 	if err != nil {

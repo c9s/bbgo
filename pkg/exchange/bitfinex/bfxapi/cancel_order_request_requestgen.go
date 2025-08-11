@@ -11,21 +11,25 @@ import (
 	"regexp"
 )
 
+// OrderID sets orderID is the order ID to cancel
 func (c *CancelOrderRequest) OrderID(orderID int64) *CancelOrderRequest {
 	c.orderID = &orderID
 	return c
 }
 
+// GroupID sets groupID is the group ID to cancel
 func (c *CancelOrderRequest) GroupID(groupID int64) *CancelOrderRequest {
 	c.groupID = &groupID
 	return c
 }
 
+// ClientOrderID sets clientOrderID is the client order ID to cancel
 func (c *CancelOrderRequest) ClientOrderID(clientOrderID int64) *CancelOrderRequest {
 	c.clientOrderID = &clientOrderID
 	return c
 }
 
+// ClientOrderIDDate sets cid_date is required if cid is used, format: "YYYY-MM-DD"
 func (c *CancelOrderRequest) ClientOrderIDDate(clientOrderIDDate string) *CancelOrderRequest {
 	c.clientOrderIDDate = clientOrderIDDate
 	return c

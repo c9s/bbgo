@@ -33,7 +33,7 @@ func (c *Client) NewRetrieveOrderRequest() *RetrieveOrderRequest {
 
 // RetrieveOrderResponse represents the response from Bitfinex order retrieval.
 type RetrieveOrderResponse struct {
-	Orders []OrderData
+	Orders []Order
 }
 
 // UnmarshalJSON parses the Bitfinex array response into RetrieveOrderResponse.
@@ -44,7 +44,7 @@ func (r *RetrieveOrderResponse) UnmarshalJSON(data []byte) error {
 	}
 
 	for _, raw := range raws {
-		var order OrderData
+		var order Order
 
 		if err := parseJsonArray(raw, &order, 0); err != nil {
 			return err

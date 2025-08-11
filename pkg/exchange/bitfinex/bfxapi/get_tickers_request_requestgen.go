@@ -11,6 +11,7 @@ import (
 	"regexp"
 )
 
+// Symbols sets
 func (g *GetTickersRequest) Symbols(symbols string) *GetTickersRequest {
 	g.symbols = symbols
 	return g
@@ -21,6 +22,11 @@ func (g *GetTickersRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
 	// check symbols field -> json key symbols
 	symbols := g.symbols
+
+	// TEMPLATE check-required
+	if len(symbols) == 0 {
+	}
+	// END TEMPLATE check-required
 
 	// assign parameter of symbols
 	params["symbols"] = symbols

@@ -48,7 +48,7 @@ func (r *Ticker) UnmarshalJSON(data []byte) error {
 
 // API: https://api-pub.bitfinex.com/v2/ticker/{symbol}
 //
-//go:generate requestgen -type GetTickerRequest -method GET -url "/v2/ticker/:symbol" -responseType .TickerResponse
+//go:generate requestgen -type GetTickerRequest -method GET -url "/v2/ticker/:symbol" -responseType .Ticker
 type GetTickerRequest struct {
 	client requestgen.APIClient
 
