@@ -2,8 +2,6 @@ package bfxapi
 
 import (
 	"context"
-	"net/http"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,28 +10,187 @@ import (
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
-func RunHttpTestWithRecorder(t *testing.T, client *http.Client, recordFile string) (bool, func()) {
-	mockTransport := &httptesting.MockTransport{}
-	recorder := httptesting.NewRecorder(http.DefaultTransport)
-	if os.Getenv("TEST_HTTP_RECORD") == "1" {
-		client.Transport = recorder
-		return true, func() {
-			if err := recorder.Save(recordFile); err != nil {
-				t.Errorf("failed to save recorded requests: %v", err)
+func TestClient_privateApis(t *testing.T) {
+	// You can enable recording for updating the test data
+	// httptesting.AlwaysRecord = true
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client := NewClient()
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "BITFINEX")
+	if ok {
+		client.Auth(key, secret)
+	}
+
+	if isRecording && !ok {
+		t.Skipf("BITFINEX api key is not configured, skipping integration test")
+	}
+
+	t.Run("SubmitOrderRequest", func(t *testing.T) {
+		// submit a small test order, e.g. limit order for BTCUSD
+		req := client.NewSubmitOrderRequest()
+		req.Symbol("tBTCUST")
+		req.Amount("0.001")  // small amount for test
+		req.Price("10500.0") // far from market price to avoid execution
+		req.OrderType(OrderTypeExchangeLimit)
+
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("submit order response: %+v", resp)
+			assert.NotNil(t, resp.Data, "expected order data in response")
+		} else {
+			return
+		}
+
+		// retrieve the submitted order by ID
+		orderID := resp.Data[0].OrderID
+
+		defer func() {
+			// cancel the submitted order to clean up
+			cancelReq := client.NewCancelOrderRequest()
+			cancelReq.OrderID(orderID)
+			cancelResp, err := cancelReq.Do(ctx)
+			assert.NoError(t, err)
+			t.Logf("cancel order response: %+v", cancelResp)
+		}()
+
+		retrieveReq := client.NewRetrieveOrderRequest()
+		retrieveReq.AddId(orderID)
+		retrieveResp, err := retrieveReq.Do(ctx)
+		if assert.NoError(t, err) {
+			assert.NotEmpty(t, retrieveResp.Orders, "expected non-empty orders response")
+			for _, order := range retrieveResp.Orders {
+				t.Logf("retrieved order: %+v", order)
 			}
 		}
-	} else {
-		if err := recorder.Load(recordFile); err != nil {
-			t.Fatalf("failed to load recorded requests: %v", err)
+	})
+
+	t.Run("GetWalletsRequest", func(t *testing.T) {
+		req := client.NewGetWalletsRequest()
+		resp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("wallets response: %+v", resp)
+		assert.NotEmpty(t, resp, "expected non-empty wallets response")
+	})
+
+	t.Run("GetOrderHistoryRequest", func(t *testing.T) {
+		req := client.NewGetOrderHistoryRequest()
+		req.Limit(5) // limit to 5 orders for testing
+		resp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("order history response: %+v", resp)
+
+		if assert.NotEmpty(t, resp, "expected non-empty order history") {
+			for _, order := range resp {
+				t.Logf("order: %+v", order.String())
+			}
+		}
+	})
+
+	t.Run("GetOrderHistoryBySymbolRequest", func(t *testing.T) {
+		req := client.NewGetOrderHistoryBySymbolRequest()
+		req.Symbol("tBTCUST")
+		req.Limit(10) // limit to 5 orders for testing
+
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("order history by symbol response: %+v", resp)
+			if assert.NotEmpty(t, resp, "expected non-empty order history by symbol") {
+				for _, order := range resp {
+					t.Log(order.String())
+				}
+			}
+		}
+	})
+
+	// Test GetOrderTradesRequest
+	t.Run("GetOrderTradesRequest", func(t *testing.T) {
+		submitOrder := func() {
+			submitOrderReq := client.NewSubmitOrderRequest()
+			submitOrderReq.Symbol("tBTCUST").Amount("0.001").OrderType(OrderTypeExchangeMarket)
+			submitOrderResp, err := submitOrderReq.Do(ctx)
+			if assert.NoError(t, err) {
+				t.Logf("submit order response: %+v", submitOrderResp)
+				assert.NotNil(t, submitOrderResp.Data, "expected order data in response")
+			} else {
+				return
+			}
 		}
 
-		if err := mockTransport.LoadFromRecorder(recorder); err != nil {
-			t.Fatalf("failed to load recordings: %v", err)
+		var orders []Order
+
+		getOrderHistory := func() {
+			var err error
+			// For testing, we need a valid symbol and order ID. Use order history to get one.
+			orderHistoryReq := client.NewGetOrderHistoryRequest()
+			orderHistoryReq.Limit(10)
+			orders, err = orderHistoryReq.Do(ctx)
+			if assert.NoError(t, err) {
+				if len(orders) == 0 {
+					t.Skip("no orders found for order trades test")
+				} else {
+					t.Logf("found %d orders in history", len(orders))
+				}
+			}
+
+			assert.NotEmpty(t, orders, "expected non-empty order history")
 		}
 
-		client.Transport = mockTransport
-		return false, func() {}
-	}
+		getOrderHistory()
+
+		if len(orders) == 0 {
+			submitOrder()
+			getOrderHistory()
+		}
+
+		foundExecOrder := false
+		order := orders[0]
+
+		// find filled order
+		findExecOrder := func() {
+			for _, o := range orders {
+				if o.Amount.Compare(o.AmountOrig) != 0 {
+					order = o
+					foundExecOrder = true
+					return
+				}
+			}
+		}
+		findExecOrder()
+
+		if !foundExecOrder {
+			submitOrder()
+			getOrderHistory()
+			findExecOrder()
+		}
+
+		t.Logf("using order: %+v for trades test", order)
+
+		if order.OrderID == 0 || order.Symbol == "" {
+			t.Skip("no valid order found for order trades test")
+		}
+
+		if !order.Amount.IsZero() {
+			t.Skipf("order %d has zero amount, skipping order trades test", order.OrderID)
+		}
+
+		tradesReq := client.NewGetOrderTradesRequest()
+		tradesReq.Symbol(order.Symbol)
+		tradesReq.Id(order.OrderID)
+		trades, err := tradesReq.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("order trades response: %+v", trades)
+		if assert.NotEmpty(t, trades, "expected non-empty order trades response") {
+			for _, trade := range trades {
+				t.Logf("trade: %+v", trade)
+			}
+		}
+	})
 }
 
 func TestClient(t *testing.T) {
@@ -42,7 +199,7 @@ func TestClient(t *testing.T) {
 
 	client := NewClient()
 
-	isRecording, saveRecord := RunHttpTestWithRecorder(t, client.HttpClient, "testdata/test_client_requests.json")
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
 	defer saveRecord()
 
 	key, secret, ok := testutil.IntegrationTestConfigured(t, "BITFINEX")
@@ -96,14 +253,6 @@ func TestClient(t *testing.T) {
 		t.Logf("tickers response: %+v", resp)
 	})
 
-	t.Run("GetWalletsRequest", func(t *testing.T) {
-		req := client.NewGetWalletsRequest()
-		resp, err := req.Do(ctx)
-		assert.NoError(t, err)
-		t.Logf("wallets response: %+v", resp)
-		assert.NotEmpty(t, resp, "expected non-empty wallets response")
-	})
-
 	t.Run("GetBookRequest", func(t *testing.T) {
 		req := client.NewGetBookRequest()
 		req.Symbol("tBTCUSD")
@@ -111,44 +260,5 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("book response: %+v", resp)
 		assert.NotEmpty(t, resp.BookEntries, "expected non-empty book entries")
-	})
-
-	t.Run("SubmitOrderRequest", func(t *testing.T) {
-		// submit a small test order, e.g. limit order for BTCUSD
-		req := client.NewSubmitOrderRequest()
-		req.Symbol("tBTCUST")
-		req.Amount("0.001")  // small amount for test
-		req.Price("10500.0") // far from market price to avoid execution
-		req.OrderType(OrderTypeExchangeLimit)
-
-		resp, err := req.Do(ctx)
-		if assert.NoError(t, err) {
-			t.Logf("submit order response: %+v", resp)
-			assert.NotNil(t, resp.Data, "expected order data in response")
-		} else {
-			return
-		}
-
-		// retrieve the submitted order by ID
-		orderID := resp.Data[0].OrderID
-
-		defer func() {
-			// cancel the submitted order to clean up
-			cancelReq := client.NewCancelOrderRequest()
-			cancelReq.OrderID(orderID)
-			cancelResp, err := cancelReq.Do(ctx)
-			assert.NoError(t, err)
-			t.Logf("cancel order response: %+v", cancelResp)
-		}()
-
-		retrieveReq := client.NewRetrieveOrderRequest()
-		retrieveReq.AddId(orderID)
-		retrieveResp, err := retrieveReq.Do(ctx)
-		if assert.NoError(t, err) {
-			assert.NotEmpty(t, retrieveResp.Orders, "expected non-empty orders response")
-			for _, order := range retrieveResp.Orders {
-				t.Logf("retrieved order: %+v", order)
-			}
-		}
 	})
 }

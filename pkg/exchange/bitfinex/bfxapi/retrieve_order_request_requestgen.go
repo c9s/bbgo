@@ -11,6 +11,7 @@ import (
 	"regexp"
 )
 
+// Id sets id allows retrieving specific orders by order ID
 func (r *RetrieveOrderRequest) Id(id []int64) *RetrieveOrderRequest {
 	r.id = id
 	return r
@@ -21,16 +22,19 @@ func (r *RetrieveOrderRequest) AddId(id ...int64) *RetrieveOrderRequest {
 	return r
 }
 
+// Gid sets gid filters results based on Group ID
 func (r *RetrieveOrderRequest) Gid(gid int64) *RetrieveOrderRequest {
 	r.gid = gid
 	return r
 }
 
+// Cid sets cid filters based on Client ID (requires cid_date)
 func (r *RetrieveOrderRequest) Cid(cid string) *RetrieveOrderRequest {
 	r.cid = cid
 	return r
 }
 
+// CidDate sets cid_date must be provided with cid, format: "YYYY-MM-DD"
 func (r *RetrieveOrderRequest) CidDate(cidDate string) *RetrieveOrderRequest {
 	r.cidDate = cidDate
 	return r

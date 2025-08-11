@@ -6,7 +6,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
-type TradeDetail struct {
+type WalletTradeDetail struct {
 	Reason      string           `json:"reason"`
 	OrderId     int64            `json:"order_id"`
 	OrderIdOppo int64            `json:"order_id_oppo"`
@@ -35,7 +35,7 @@ type WalletResponse struct {
 	UnsettledInterest fixedpoint.Value // Unsettled interest
 	AvailableBalance  fixedpoint.Value // Available balance
 	LastChange        string
-	TradeDetail       *TradeDetail
+	TradeDetail       *WalletTradeDetail
 }
 
 // UnmarshalJSON maps the JSON array response to the WalletResponse struct fields.
