@@ -15,7 +15,7 @@ func convertOrder(o bfxapi.Order) (*types.Order, error) {
 			Symbol:   o.Symbol,
 			Price:    o.Price,
 			Quantity: o.AmountOrig,
-			Type:     types.OrderType(o.OrderType),
+			Type:     convertOrderType(o.OrderType),
 
 			AveragePrice: o.PriceAvg,
 		},
@@ -77,4 +77,40 @@ func convertTrade(trade bfxapi.OrderTradeDetail) (*types.Trade, error) {
 		FeeCurrency: trade.FeeCurrency,
 		// ClientOrderID is not present in types.Trade, so skip
 	}, nil
+}
+
+// convertTicker converts bfxapi.Ticker to types.Ticker.
+// It maps Bitfinex ticker fields to the standard types.Ticker fields.
+func convertTicker(t bfxapi.Ticker) (*types.Ticker, error) {
+	return &types.Ticker{
+		Volume: t.Volume,
+		Last:   t.LastPrice,
+		High:   t.High,
+		Low:    t.Low,
+		Buy:    t.Bid,
+		Sell:   t.Ask,
+	}, nil
+}
+
+// convertOrderType maps bfxapi.OrderType to types.OrderType.
+// It normalizes Bitfinex order type string to bbgo's types.OrderType.
+func convertOrderType(t bfxapi.OrderType) types.OrderType {
+	switch t {
+	case bfxapi.OrderTypeLimit, bfxapi.OrderTypeExchangeLimit:
+		return types.OrderTypeLimit
+	case bfxapi.OrderTypeMarket, bfxapi.OrderTypeExchangeMarket:
+		return types.OrderTypeMarket
+	case bfxapi.OrderTypeStopLimit, bfxapi.OrderTypeExchangeStopLimit:
+		return types.OrderTypeStopLimit
+	case bfxapi.OrderTypeStop, bfxapi.OrderTypeExchangeStop:
+		return types.OrderTypeStopMarket
+	case bfxapi.OrderTypeTrailingStop, bfxapi.OrderTypeExchangeTrailingStop:
+		return types.OrderTypeStopMarket // fallback to stop market
+	case bfxapi.OrderTypeFOK, bfxapi.OrderTypeExchangeFOK:
+		return types.OrderTypeLimit // fallback to limit
+	case bfxapi.OrderTypeIOC, bfxapi.OrderTypeExchangeIOC:
+		return types.OrderTypeLimit // fallback to limit
+	default:
+		return types.OrderTypeLimit // fallback to limit
+	}
 }

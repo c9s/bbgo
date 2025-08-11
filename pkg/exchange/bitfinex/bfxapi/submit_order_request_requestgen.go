@@ -35,6 +35,18 @@ func (s *SubmitOrderRequest) OrderType(orderType OrderType) *SubmitOrderRequest 
 	return s
 }
 
+// PriceAuxLimit sets
+func (s *SubmitOrderRequest) PriceAuxLimit(priceAuxLimit string) *SubmitOrderRequest {
+	s.priceAuxLimit = &priceAuxLimit
+	return s
+}
+
+// PriceOcoStop sets
+func (s *SubmitOrderRequest) PriceOcoStop(priceOcoStop string) *SubmitOrderRequest {
+	s.priceOcoStop = &priceOcoStop
+	return s
+}
+
 // GroupId sets
 func (s *SubmitOrderRequest) GroupId(groupId int64) *SubmitOrderRequest {
 	s.groupId = &groupId
@@ -50,6 +62,18 @@ func (s *SubmitOrderRequest) ClientOrderId(clientOrderId int64) *SubmitOrderRequ
 // Flags sets
 func (s *SubmitOrderRequest) Flags(flags OrderFlag) *SubmitOrderRequest {
 	s.flags = &flags
+	return s
+}
+
+// Tif sets Time-In-Force: datetime for automatic order cancellation (e.g. 2020-01-15 10:45:23).
+func (s *SubmitOrderRequest) Tif(tif string) *SubmitOrderRequest {
+	s.tif = &tif
+	return s
+}
+
+// Meta sets
+func (s *SubmitOrderRequest) Meta(meta Meta) *SubmitOrderRequest {
+	s.meta = &meta
 	return s
 }
 
@@ -131,6 +155,32 @@ func (s *SubmitOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// assign parameter of orderType
 	params["type"] = orderType
+	// check priceAuxLimit field -> json key price_aux_limit
+	if s.priceAuxLimit != nil {
+		priceAuxLimit := *s.priceAuxLimit
+
+		// TEMPLATE check-required
+		if len(priceAuxLimit) == 0 {
+		}
+		// END TEMPLATE check-required
+
+		// assign parameter of priceAuxLimit
+		params["price_aux_limit"] = priceAuxLimit
+	} else {
+	}
+	// check priceOcoStop field -> json key price_oco_stop
+	if s.priceOcoStop != nil {
+		priceOcoStop := *s.priceOcoStop
+
+		// TEMPLATE check-required
+		if len(priceOcoStop) == 0 {
+		}
+		// END TEMPLATE check-required
+
+		// assign parameter of priceOcoStop
+		params["price_oco_stop"] = priceOcoStop
+	} else {
+	}
 	// check groupId field -> json key gid
 	if s.groupId != nil {
 		groupId := *s.groupId
@@ -179,6 +229,30 @@ func (s *SubmitOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of flags
 		params["flags"] = flags
+	} else {
+	}
+	// check tif field -> json key tif
+	if s.tif != nil {
+		tif := *s.tif
+
+		// TEMPLATE check-required
+		if len(tif) == 0 {
+		}
+		// END TEMPLATE check-required
+
+		// assign parameter of tif
+		params["tif"] = tif
+	} else {
+	}
+	// check meta field -> json key meta
+	if s.meta != nil {
+		meta := *s.meta
+
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
+
+		// assign parameter of meta
+		params["meta"] = meta
 	} else {
 	}
 
