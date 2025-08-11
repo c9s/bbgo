@@ -12,6 +12,13 @@ import (
 	"github.com/c9s/requestgen"
 )
 
+// Meta defines optional metadata for Bitfinex order submission.
+type Meta struct {
+	AffCode          string `json:"aff_code,omitempty"`          // affiliate code
+	MakeVisible      int    `json:"make_visible,omitempty"`      // 1 to make visible on hit for hidden orders
+	ProtectSelfMatch int    `json:"protect_selfmatch,omitempty"` // 1 to cancel submitted order if it would match with own order
+}
+
 // API: https://docs.bitfinex.com/reference/rest-auth-submit-order
 //go:generate requestgen -type SubmitOrderRequest -method POST -url "/v2/auth/w/order/submit" -responseType .SubmitOrderResponse
 
@@ -24,9 +31,17 @@ type SubmitOrderRequest struct {
 	price     *string   `param:"price"`
 	orderType OrderType `param:"type" default:"EXCHANGE LIMIT"`
 
+	priceAuxLimit *string `param:"price_aux_limit"`
+	priceOcoStop  *string `param:"price_oco_stop"`
+
 	groupId       *int64     `param:"gid,omitempty"`
 	clientOrderId *int64     `param:"cid,omitempty"`
 	flags         *OrderFlag `param:"flags,omitempty"`
+
+	// Time-In-Force: datetime for automatic order cancellation (e.g. 2020-01-15 10:45:23).
+	tif *string `param:"tif"`
+
+	meta *Meta `param:"meta"`
 }
 
 // NewSubmitOrderRequest creates a new SubmitOrderRequest.
@@ -59,7 +74,7 @@ type Order struct {
 	Amount        fixedpoint.Value
 	AmountOrig    fixedpoint.Value
 
-	OrderType string
+	OrderType OrderType
 	TypePrev  *string
 
 	// MtsTif - Millisecond epoch timestamp for TIF (Time-In-Force)

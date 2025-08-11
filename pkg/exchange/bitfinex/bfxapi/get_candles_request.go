@@ -34,3 +34,23 @@ func (c *Client) NewGetCandlesRequest() *GetCandlesRequest {
 
 // CandlesResponse represents multiple candles response.
 type CandlesResponse []Candle
+
+// CandleTimeFrames defines available Bitfinex candle time frames.
+//
+//go:generate mapgen -type TimeFrame
+type TimeFrame string
+
+const (
+	TimeFrame1m  TimeFrame = "1m"
+	TimeFrame5m  TimeFrame = "5m"
+	TimeFrame15m TimeFrame = "15m"
+	TimeFrame30m TimeFrame = "30m"
+	TimeFrame1h  TimeFrame = "1h"
+	TimeFrame3h  TimeFrame = "3h"
+	TimeFrame6h  TimeFrame = "6h"
+	TimeFrame12h TimeFrame = "12h"
+	TimeFrame1D  TimeFrame = "1D"
+	TimeFrame1W  TimeFrame = "1W"
+	TimeFrame14D TimeFrame = "14D"
+	TimeFrame1M  TimeFrame = "1M"
+)
