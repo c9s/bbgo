@@ -26,7 +26,7 @@ var RecordIfFileNotFound = false
 // Environment variable settings:
 //
 //	TEST_HTTP_RECORD=1   # enable recording mode
-//	TEST_HTTP_LIVE=1     # enable live mode (recording)
+//	TEST_HTTP_LIVE=1     # enable live mode (no recording)
 //
 // The variable httptesting.AlwaysRecord can also be set directly in your test case to force recording mode.
 // If recording is enabled, HTTP requests are captured and saved to the specified file.
@@ -39,8 +39,15 @@ func RunHttpTestWithRecorder(t *testing.T, client *http.Client, recordFile strin
 	notFound := fErr != nil && os.IsNotExist(fErr)
 	shouldRecord := RecordIfFileNotFound && notFound
 
-	if os.Getenv("TEST_HTTP_RECORD") == "1" || os.Getenv("TEST_HTTP_LIVE") == "1" || shouldRecord || AlwaysRecord {
+	isLive := os.Getenv("TEST_HTTP_LIVE") == "1"
+
+	if os.Getenv("TEST_HTTP_RECORD") == "1" || isLive || shouldRecord || AlwaysRecord {
 		client.Transport = recorder
+
+		if isLive {
+			return true, func() {}
+		}
+
 		return true, func() {
 			if err := recorder.Save(recordFile); err != nil {
 				t.Errorf("failed to save recorded requests: %v", err)
