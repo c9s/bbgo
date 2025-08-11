@@ -12,7 +12,7 @@ import (
 
 func TestClient_privateApis(t *testing.T) {
 	// You can enable recording for updating the test data
-	// httptesting.AlwaysRecord = true
+	httptesting.AlwaysRecord = true
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -122,22 +122,6 @@ func TestClient_privateApis(t *testing.T) {
 		}
 	})
 
-	t.Run("GetTradeHistoryBySymbolRequest", func(t *testing.T) {
-		req := client.NewGetTradeHistoryBySymbolRequest()
-		req.Symbol("tBTCUST")
-		req.Limit(5) // limit to 5 trades for testing
-
-		resp, err := req.Do(ctx)
-		if assert.NoError(t, err) {
-			t.Logf("trade history response: %+v", resp)
-			if assert.NotEmpty(t, resp, "expected non-empty trade history") {
-				for _, trade := range resp {
-					t.Logf("trade: %+v", trade)
-				}
-			}
-		}
-	})
-
 	// Test GetOrderTradesRequest
 	t.Run("GetOrderTradesRequest", func(t *testing.T) {
 		submitOrder := func() {
@@ -218,6 +202,37 @@ func TestClient_privateApis(t *testing.T) {
 		if assert.NotEmpty(t, trades, "expected non-empty order trades response") {
 			for _, trade := range trades {
 				t.Logf("trade: %+v", trade)
+			}
+		}
+	})
+
+	t.Run("GetTradeHistoryBySymbolRequest", func(t *testing.T) {
+		req := client.NewGetTradeHistoryBySymbolRequest()
+		req.Symbol("tBTCUST")
+		req.Limit(5) // limit to 5 trades for testing
+
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("trade history response: %+v", resp)
+			if assert.NotEmpty(t, resp, "expected non-empty trade history") {
+				for _, trade := range resp {
+					t.Logf("trade: %+v", trade)
+				}
+			}
+		}
+	})
+
+	t.Run("GetTradeHistoryRequest", func(t *testing.T) {
+		req := client.NewGetTradeHistoryRequest()
+		req.Limit(5) // limit to 5 trades for testing
+
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("trade history response: %+v", resp)
+			if assert.NotEmpty(t, resp, "expected non-empty trade history") {
+				for _, trade := range resp {
+					t.Logf("trade: %+v", trade)
+				}
 			}
 		}
 	})

@@ -9,6 +9,28 @@ import (
 var AlwaysRecord = false
 var RecordIfFileNotFound = false
 
+// RunHttpTestWithRecorder sets up HTTP recording or playback for integration tests.
+// It configures the provided http.Client to either record live HTTP requests to a file,
+// or replay them from a file for deterministic testing. The function returns a boolean
+// indicating whether recording is enabled, and a cleanup function to save recordings.
+//
+// Usage example:
+//
+//	// Enable recording for this test case
+//	httptesting.AlwaysRecord = true
+//	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, client.HttpClient, "testdata/record.json")
+//	defer saveRecord()
+//
+//	// ... run your test logic ...
+//
+// Environment variable settings:
+//
+//	TEST_HTTP_RECORD=1   # enable recording mode
+//	TEST_HTTP_LIVE=1     # enable live mode (recording)
+//
+// The variable httptesting.AlwaysRecord can also be set directly in your test case to force recording mode.
+// If recording is enabled, HTTP requests are captured and saved to the specified file.
+// If not, requests are replayed from the file for fast, repeatable tests.
 func RunHttpTestWithRecorder(t *testing.T, client *http.Client, recordFile string) (bool, func()) {
 	mockTransport := &MockTransport{}
 	recorder := NewRecorder(http.DefaultTransport)
@@ -17,7 +39,7 @@ func RunHttpTestWithRecorder(t *testing.T, client *http.Client, recordFile strin
 	notFound := fErr != nil && os.IsNotExist(fErr)
 	shouldRecord := RecordIfFileNotFound && notFound
 
-	if os.Getenv("TEST_HTTP_RECORD") == "1" || shouldRecord || AlwaysRecord {
+	if os.Getenv("TEST_HTTP_RECORD") == "1" || os.Getenv("TEST_HTTP_LIVE") == "1" || shouldRecord || AlwaysRecord {
 		client.Transport = recorder
 		return true, func() {
 			if err := recorder.Save(recordFile); err != nil {
