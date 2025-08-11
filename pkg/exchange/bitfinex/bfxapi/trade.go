@@ -18,6 +18,7 @@ type OrderTradeDetail struct {
 	_ any
 	_ any
 
+	// Maker field: 1 if true, -1 if false
 	Maker         int              // maker flag
 	Fee           fixedpoint.Value // fee amount
 	FeeCurrency   string           // fee currency
