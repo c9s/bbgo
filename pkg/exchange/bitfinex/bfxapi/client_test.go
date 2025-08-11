@@ -31,6 +31,19 @@ func TestClient_privateApis(t *testing.T) {
 		t.Skipf("BITFINEX api key is not configured, skipping integration test")
 	}
 
+	t.Run("RetrieveOrderRequest", func(t *testing.T) {
+		req := client.NewRetrieveOrderRequest()
+		// Optionally, you can add filters like ID, GID, CID, etc.
+		// req.AddId(123456789) // example order ID
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("active order response: %+v", resp)
+			for _, order := range resp.Orders {
+				t.Logf("active order: %+v", order)
+			}
+		}
+	})
+
 	t.Run("SubmitOrderRequest", func(t *testing.T) {
 		// submit a small test order, e.g. limit order for BTCUSD
 		req := client.NewSubmitOrderRequest()
@@ -50,14 +63,15 @@ func TestClient_privateApis(t *testing.T) {
 		// retrieve the submitted order by ID
 		orderID := resp.Data[0].OrderID
 
-		defer func() {
+		t.Cleanup(func() {
+			t.Logf("test case %s cleaning up", t.Name())
 			// cancel the submitted order to clean up
 			cancelReq := client.NewCancelOrderRequest()
 			cancelReq.OrderID(orderID)
 			cancelResp, err := cancelReq.Do(ctx)
 			assert.NoError(t, err)
 			t.Logf("cancel order response: %+v", cancelResp)
-		}()
+		})
 
 		retrieveReq := client.NewRetrieveOrderRequest()
 		retrieveReq.AddId(orderID)
@@ -103,6 +117,22 @@ func TestClient_privateApis(t *testing.T) {
 			if assert.NotEmpty(t, resp, "expected non-empty order history by symbol") {
 				for _, order := range resp {
 					t.Log(order.String())
+				}
+			}
+		}
+	})
+
+	t.Run("GetTradeHistoryBySymbolRequest", func(t *testing.T) {
+		req := client.NewGetTradeHistoryBySymbolRequest()
+		req.Symbol("tBTCUST")
+		req.Limit(5) // limit to 5 trades for testing
+
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("trade history response: %+v", resp)
+			if assert.NotEmpty(t, resp, "expected non-empty trade history") {
+				for _, trade := range resp {
+					t.Logf("trade: %+v", trade)
 				}
 			}
 		}

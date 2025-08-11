@@ -7,7 +7,7 @@ import (
 )
 
 // API: https://docs.bitfinex.com/reference/rest-auth-retrieve-orders
-// RetrieveOrderRequest represents a Bitfinex order retrieval request.
+// RetrieveOrderRequest gets all the current user's active orders.
 //
 //go:generate requestgen -type RetrieveOrderRequest -method POST -url "/v2/auth/r/orders" -responseType .RetrieveOrderResponse
 type RetrieveOrderRequest struct {
