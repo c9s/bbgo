@@ -24,6 +24,7 @@ const (
 	ExchangeBacktest ExchangeName = "backtest"
 	ExchangeBybit    ExchangeName = "bybit"
 	ExchangeCoinBase ExchangeName = "coinbase"
+	ExchangeBitfinex ExchangeName = "bitfinex"
 )
 
 var SupportedExchanges = map[ExchangeName]struct{}{
