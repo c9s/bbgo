@@ -74,6 +74,7 @@ func (r *TickerResponse) UnmarshalJSON(data []byte) error {
 
 - `fixedpoint.Value` is in: `github.com/c9s/bbgo/pkg/fixedpoint`
 - `requestgen` package: `github.com/c9s/requestgen`
+- For millisecond timestamps, use `types.MillisecondTimestamp` to convert from Unix timestamps, which can be found in `github.com/c9s/bbgo/pkg/types`.
 
 ## Parsing Helpers
 
