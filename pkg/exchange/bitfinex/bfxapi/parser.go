@@ -68,9 +68,8 @@ func parseRawArray(arr []json.RawMessage, object any, skipFields int, va ...int)
 			}
 
 			if err := json.Unmarshal(raw, field.Interface()); err != nil {
-				logrus.Errorf("failed to unmarshal pointer element %d into field %s: %v", i, structField.Name, err)
+				logrus.Errorf("failed to unmarshal pointer element %d %q into field %s: %v", i, raw, structField.Name, err)
 				return err
-
 			}
 
 			continue
@@ -96,14 +95,15 @@ func parseRawArray(arr []json.RawMessage, object any, skipFields int, va ...int)
 
 		if target.IsValid() {
 			if err := json.Unmarshal(raw, target.Interface()); err != nil {
-				logrus.Errorf("failed to unmarshal element %d into field %s: %v", i, structField.Name, err)
+				logrus.Errorf("failed to unmarshal element %d %q into field %s: %v", i, raw, structField.Name, err)
 				return err
 			}
 			continue
 		}
+
 		// Fallback: unmarshal into the field pointer.
 		if err := json.Unmarshal(raw, field.Addr().Interface()); err != nil {
-			logrus.Errorf("failed to unmarshal element %d into field %s: %v", i, structField.Name, err)
+			logrus.Errorf("failed to unmarshal element %d %q into field %s: %v", i, raw, structField.Name, err)
 			return err
 		}
 	}
