@@ -11,33 +11,33 @@ import (
 	"regexp"
 )
 
-// SetStatus sets Status - 1 to activate, 0 to deactivate
-func (a *AutoRenewFundingRequest) SetStatus(Status int32) *AutoRenewFundingRequest {
-	a.Status = Status
+// Status sets status - 1 to activate, 0 to deactivate
+func (a *AutoRenewFundingRequest) Status(status int32) *AutoRenewFundingRequest {
+	a.status = status
 	return a
 }
 
-// SetCurrency sets Currency is required, Defaults to USD
-func (a *AutoRenewFundingRequest) SetCurrency(Currency string) *AutoRenewFundingRequest {
-	a.Currency = Currency
+// Currency sets currency is required, Defaults to USD
+func (a *AutoRenewFundingRequest) Currency(currency string) *AutoRenewFundingRequest {
+	a.currency = currency
 	return a
 }
 
-// SetAmount sets Amount is the amount to be auto-renewed (Minimum 50 USD equivalent). Defaultst to the amount currently provided if omitted.
-func (a *AutoRenewFundingRequest) SetAmount(Amount string) *AutoRenewFundingRequest {
-	a.Amount = &Amount
+// Amount sets amount is the amount to be auto-renewed (Minimum 50 USD equivalent). Defaultst to the amount currently provided if omitted.
+func (a *AutoRenewFundingRequest) Amount(amount string) *AutoRenewFundingRequest {
+	a.amount = &amount
 	return a
 }
 
-// SetRate sets Rate is the percentage rate at which to auto-renew. (rate == 0 to renew at FRR). Defaults to FRR if omitted
-func (a *AutoRenewFundingRequest) SetRate(Rate string) *AutoRenewFundingRequest {
-	a.Rate = &Rate
+// Rate sets rate is the percentage rate at which to auto-renew. (rate == 0 to renew at FRR). Defaults to FRR if omitted
+func (a *AutoRenewFundingRequest) Rate(rate string) *AutoRenewFundingRequest {
+	a.rate = &rate
 	return a
 }
 
-// SetPeriod sets Period Defaults to 2
-func (a *AutoRenewFundingRequest) SetPeriod(Period int) *AutoRenewFundingRequest {
-	a.Period = &Period
+// Period sets period Defaults to 2
+func (a *AutoRenewFundingRequest) Period(period int) *AutoRenewFundingRequest {
+	a.period = &period
 	return a
 }
 
@@ -62,65 +62,65 @@ func (a *AutoRenewFundingRequest) GetQueryParameters() (url.Values, error) {
 // GetParameters builds and checks the parameters and return the result in a map object
 func (a *AutoRenewFundingRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
-	// check Status field -> json key status
-	Status := a.Status
+	// check status field -> json key status
+	status := a.status
 
 	// TEMPLATE check-required
-	if Status == 0 {
+	if status == 0 {
 		return nil, fmt.Errorf("status is required, 0 given")
 	}
 	// END TEMPLATE check-required
 
-	// assign parameter of Status
-	params["status"] = Status
-	// check Currency field -> json key currency
-	Currency := a.Currency
+	// assign parameter of status
+	params["status"] = status
+	// check currency field -> json key currency
+	currency := a.currency
 
 	// TEMPLATE check-required
-	if len(Currency) == 0 {
+	if len(currency) == 0 {
 		return nil, fmt.Errorf("currency is required, empty string given")
 	}
 	// END TEMPLATE check-required
 
-	// assign parameter of Currency
-	params["currency"] = Currency
-	// check Amount field -> json key amount
-	if a.Amount != nil {
-		Amount := *a.Amount
+	// assign parameter of currency
+	params["currency"] = currency
+	// check amount field -> json key amount
+	if a.amount != nil {
+		amount := *a.amount
 
 		// TEMPLATE check-required
-		if len(Amount) == 0 {
+		if len(amount) == 0 {
 		}
 		// END TEMPLATE check-required
 
-		// assign parameter of Amount
-		params["amount"] = Amount
+		// assign parameter of amount
+		params["amount"] = amount
 	} else {
 	}
-	// check Rate field -> json key rate
-	if a.Rate != nil {
-		Rate := *a.Rate
+	// check rate field -> json key rate
+	if a.rate != nil {
+		rate := *a.rate
 
 		// TEMPLATE check-required
-		if len(Rate) == 0 {
+		if len(rate) == 0 {
 		}
 		// END TEMPLATE check-required
 
-		// assign parameter of Rate
-		params["rate"] = Rate
+		// assign parameter of rate
+		params["rate"] = rate
 	} else {
 	}
-	// check Period field -> json key period
-	if a.Period != nil {
-		Period := *a.Period
+	// check period field -> json key period
+	if a.period != nil {
+		period := *a.period
 
 		// TEMPLATE check-required
-		if Period == 0 {
+		if period == 0 {
 		}
 		// END TEMPLATE check-required
 
-		// assign parameter of Period
-		params["period"] = Period
+		// assign parameter of period
+		params["period"] = period
 	} else {
 	}
 

@@ -10,6 +10,40 @@ import (
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
+func TestClient_movementHistory(t *testing.T) {
+	// You can enable recording for updating the test data
+	// httptesting.AlwaysRecord = true
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client := NewClient()
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "BITFINEX")
+	if ok {
+		client.Auth(key, secret)
+	}
+
+	if isRecording && !ok {
+		t.Skipf("BITFINEX api key is not configured, skipping integration test")
+	}
+
+	t.Run("GetMovementHistoryRequest", func(t *testing.T) {
+		req := client.NewGetMovementHistoryRequest()
+		req.Currency("UST")
+
+		// Optionally, you can add filters like ID, GID, CID, etc.
+		// req.AddId(123456789) // example order ID
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("response: %+v", resp)
+		}
+	})
+}
+
 func TestClient_userApis(t *testing.T) {
 	// You can enable recording for updating the test data
 	// httptesting.AlwaysRecord = true
@@ -351,7 +385,7 @@ func TestClient(t *testing.T) {
 
 func TestClient_fundingApis(t *testing.T) {
 	// Enable recording for updating the test data
-	httptesting.AlwaysRecord = true
+	// httptesting.AlwaysRecord = true
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -387,10 +421,10 @@ func TestClient_fundingApis(t *testing.T) {
 
 	t.Run("AutoRenewFundingRequest", func(t *testing.T) {
 		t.Cleanup(func() {
-			_, _ = client.NewAutoRenewFundingRequest().SetStatus(0).SetCurrency("fUST").Do(ctx)
+			_, _ = client.NewAutoRenewFundingRequest().Status(0).Currency("fUST").Do(ctx)
 		})
 
-		if req, err := client.NewAutoRenewFundingRequest().SetStatus(1).SetCurrency("fUST").Do(ctx); err == nil {
+		if req, err := client.NewAutoRenewFundingRequest().Status(1).Currency("fUST").Do(ctx); err == nil {
 			t.Logf("auto renew funding response: %+v", req)
 			assert.NotNil(t, req.Offer, "expected non-nil auto-renew offer")
 			assert.Equal(t, "UST", req.Offer.Currency, "expected currency to be UST")

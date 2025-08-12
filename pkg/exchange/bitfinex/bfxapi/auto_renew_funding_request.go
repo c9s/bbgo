@@ -21,20 +21,20 @@ import (
 type AutoRenewFundingRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	// Status - 1 to activate, 0 to deactivate
-	Status int32 `param:"status,required" json:"status"`
+	// status - 1 to activate, 0 to deactivate
+	status int32 `param:"status,required" json:"status"`
 
-	// Currency is required, Defaults to USD
-	Currency string `param:"currency,required" json:"currency"`
+	// currency is required, Defaults to USD
+	currency string `param:"currency,required" json:"currency"`
 
-	// Amount is the amount to be auto-renewed (Minimum 50 USD equivalent). Defaultst to the amount currently provided if omitted.
-	Amount *string `param:"amount,omitempty" json:"amount,omitempty"`
+	// amount is the amount to be auto-renewed (Minimum 50 USD equivalent). Defaultst to the amount currently provided if omitted.
+	amount *string `param:"amount,omitempty" json:"amount,omitempty"`
 
-	// Rate is the percentage rate at which to auto-renew. (rate == 0 to renew at FRR). Defaults to FRR if omitted
-	Rate *string `param:"rate,omitempty" json:"rate,omitempty"`
+	// rate is the percentage rate at which to auto-renew. (rate == 0 to renew at FRR). Defaults to FRR if omitted
+	rate *string `param:"rate,omitempty" json:"rate,omitempty"`
 
-	// Period Defaults to 2
-	Period *int `param:"period,omitempty" json:"period,omitempty"`
+	// period Defaults to 2
+	period *int `param:"period,omitempty" json:"period,omitempty"`
 }
 
 // NewAutoRenewFundingRequest creates a new AutoRenewFundingRequest.
