@@ -10,7 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
-func TestClient_privateApis(t *testing.T) {
+func TestClient_orderApis(t *testing.T) {
 	// You can enable recording for updating the test data
 	// httptesting.AlwaysRecord = true
 
@@ -31,6 +31,19 @@ func TestClient_privateApis(t *testing.T) {
 		t.Skipf("BITFINEX api key is not configured, skipping integration test")
 	}
 
+	t.Run("RetrieveOrderRequest", func(t *testing.T) {
+		req := client.NewRetrieveOrderRequest()
+		// Optionally, you can add filters like ID, GID, CID, etc.
+		// req.AddId(123456789) // example order ID
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("active order response: %+v", resp)
+			for _, order := range resp.Orders {
+				t.Logf("active order: %+v", order)
+			}
+		}
+	})
+
 	t.Run("SubmitOrderRequest", func(t *testing.T) {
 		// submit a small test order, e.g. limit order for BTCUSD
 		req := client.NewSubmitOrderRequest()
@@ -50,14 +63,15 @@ func TestClient_privateApis(t *testing.T) {
 		// retrieve the submitted order by ID
 		orderID := resp.Data[0].OrderID
 
-		defer func() {
+		t.Cleanup(func() {
+			t.Logf("test case %s cleaning up", t.Name())
 			// cancel the submitted order to clean up
 			cancelReq := client.NewCancelOrderRequest()
 			cancelReq.OrderID(orderID)
 			cancelResp, err := cancelReq.Do(ctx)
 			assert.NoError(t, err)
 			t.Logf("cancel order response: %+v", cancelResp)
-		}()
+		})
 
 		retrieveReq := client.NewRetrieveOrderRequest()
 		retrieveReq.AddId(orderID)
@@ -191,6 +205,37 @@ func TestClient_privateApis(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("GetTradeHistoryBySymbolRequest", func(t *testing.T) {
+		req := client.NewGetTradeHistoryBySymbolRequest()
+		req.Symbol("tBTCUST")
+		req.Limit(5) // limit to 5 trades for testing
+
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("trade history response: %+v", resp)
+			if assert.NotEmpty(t, resp, "expected non-empty trade history") {
+				for _, trade := range resp {
+					t.Logf("trade: %+v", trade)
+				}
+			}
+		}
+	})
+
+	t.Run("GetTradeHistoryRequest", func(t *testing.T) {
+		req := client.NewGetTradeHistoryRequest()
+		req.Limit(5) // limit to 5 trades for testing
+
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("trade history response: %+v", resp)
+			if assert.NotEmpty(t, resp, "expected non-empty trade history") {
+				for _, trade := range resp {
+					t.Logf("trade: %+v", trade)
+				}
+			}
+		}
+	})
 }
 
 func TestClient(t *testing.T) {
@@ -260,5 +305,67 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("book response: %+v", resp)
 		assert.NotEmpty(t, resp.BookEntries, "expected non-empty book entries")
+	})
+}
+
+func TestClient_fundingApis(t *testing.T) {
+	// Enable recording for updating the test data
+	// httptesting.AlwaysRecord = true
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client := NewClient()
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "BITFINEX")
+	if ok {
+		client.Auth(key, secret)
+	}
+
+	if isRecording && !ok {
+		t.Skipf("BITFINEX api key is not configured, skipping integration test")
+	}
+
+	t.Run("SubmitFundingOfferRequest", func(t *testing.T) {
+		req := client.NewSubmitFundingOfferRequest()
+		req.Symbol("fUST").
+			Amount("150").
+			Rate("0.0002").
+			Period(2).
+			OfferType(FundingOfferTypeLimit)
+
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("submit funding offer response: %+v", resp)
+			assert.NotNil(t, resp.FundingOffer.ID, "expected funding offer ID in response")
+
+			id := resp.FundingOffer.ID
+			t.Logf("canceling funding offer with ID: %d", id)
+
+			cancelReq := client.NewCancelFundingOfferRequest()
+			cancelReq.Id(id)
+			cancelResp, err := cancelReq.Do(ctx)
+			assert.NoError(t, err)
+			t.Logf("cancel funding offer response: %+v", cancelResp)
+			assert.Equal(t, id, cancelResp.FundingOffer.ID, "expected matching funding offer ID in cancel response")
+		}
+	})
+
+	t.Run("GetActiveFundingOffersRequest", func(t *testing.T) {
+		req := client.NewGetActiveFundingOffersRequest()
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("active funding offers response: %+v", resp)
+			for _, offer := range resp {
+				cancelReq := client.NewCancelFundingOfferRequest()
+				cancelReq.Id(offer.ID)
+				cancelResp, err := cancelReq.Do(ctx)
+				assert.NoError(t, err)
+				t.Logf("cancel funding offer response: %+v", cancelResp)
+			}
+		}
 	})
 }
