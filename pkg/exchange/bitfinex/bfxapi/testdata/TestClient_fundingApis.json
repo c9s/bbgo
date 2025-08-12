@@ -1,0 +1,179 @@
+[
+  {
+    "timestamp": "2025-08-11T16:00:21.523537+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/w/funding/offer/submit",
+      "header": {
+        "Bfx-Signature": [
+          "40254e0b773053d12ec831c2d93c40e0e92b6347cc9a5f2dc005b198e167af51e870781417cee2dace8830fe2f9e480f"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96d632e40faaa9cd-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Mon, 11 Aug 2025 08:00:21 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[1754899221507,\"fon-req\",null,null,[4241433622,\"fUST\",1754899221500,1754899221500,150,150,\"LIMIT\",null,null,null,\"ACTIVE\",null,null,null,0.0002,2,false,0,null,false,null],null,\"SUCCESS\",\"Submitting funding offer of 150.0 UST at 0.02000 for 2 days.\"]"
+    }
+  },
+  {
+    "timestamp": "2025-08-11T16:00:21.767258+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/w/funding/offer/cancel",
+      "header": {
+        "Bfx-Signature": [
+          "4beb7aeedf259a8a700956f3dcdd8501fdd59baa5a7ca35a80cec8a32852aada7a7f3025bfbf39cb3000fadf7538cc88"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96d632e73af8a9cd-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Mon, 11 Aug 2025 08:00:21 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[1754899221777,\"foc-req\",null,null,[4241433622,\"fUST\",1754899222000,1754899222000,150,150,\"LIMIT\",null,null,null,\"ACTIVE\",null,null,null,0.0002,2,false,0,null,false,null],null,\"SUCCESS\",null]"
+    }
+  },
+  {
+    "timestamp": "2025-08-11T16:00:22.114897+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/r/funding/offers/",
+      "header": {
+        "Bfx-Signature": [
+          "253fc6d3d126b826d554b82259e6fa21b7ea43405e0459d4c710fa68832ed6a7cc951c864e2ec0d9559da93aae2e9ef3"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96d632e8cc66a9cd-TPE"
+        ],
+        "Content-Length": [
+          "2"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Mon, 11 Aug 2025 08:00:22 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[]"
+    }
+  }
+]
