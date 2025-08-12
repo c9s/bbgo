@@ -1,0 +1,118 @@
+[
+  {
+    "timestamp": "2025-08-12T13:24:16.219998+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/r/info/user",
+      "header": {
+        "Bfx-Signature": [
+          "e31463129bec174f2a65558b42644856204879f38b841f9d087ad249e740d91b244a52e5c2740c3b0a7b191ee560e265"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96dd8b9f6ae78085-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 12 Aug 2025 05:24:16 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[123123,\"dev\",\"dev\",1754461613000,1,3,null,\"Taipei\",\"zh-TW\",\"bitfinex\",1,null,null,null,1416292961000,74,123412,1,0,0,null,null,0,null,null,null,[\"u2f\"],null,null,null,null,null,null,null,1,null,null,null,0,0,null,null,null,null,\"2025-08-11T07:27:05.645Z\",null,null,3,null,[\"TW\",\"US\",\"TW_Taiwan\",\"ECP\"],[\"TW\",\"TW_Taiwan\",\"ECP\"],\"corporate\",null,null,0]"
+    }
+  },
+  {
+    "timestamp": "2025-08-12T13:24:16.576428+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/r/summary",
+      "header": {
+        "Bfx-Signature": [
+          "3138fd72a78bd24aa3fc9b780c681cf1fb610c0ee713ba12945648b6d3257367f0bd8cf507342c71d19d0ffe7dd55782"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96dd8ba16cbc8085-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 12 Aug 2025 05:24:16 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[null,null,null,null,[[0,0,0,null,null,0.0002],[0.0006,0.0006,0.0006,null,null,0.00065]],[[{\"curr\":\"BTC\",\"vol\":0.005},{\"curr\":\"Total (USD)\",\"vol\":599.40627884,\"vol_safe\":599.40627884,\"vol_maker\":0,\"vol_BFX\":599.40627884,\"vol_BFX_safe\":599.40627884,\"vol_BFX_maker\":0}],{\"UST\":0.14615448,\"BTC\":0.0000018},0.36028017],[null,{},0],null,null,{\"leo_lev\":0,\"leo_amount_avg\":0}]"
+    }
+  }
+]

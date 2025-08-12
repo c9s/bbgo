@@ -64,6 +64,10 @@ func (r *TickerResponse) UnmarshalJSON(data []byte) error {
 }
 ```
 
+- For the response struct field, please start with upper case letter to export the fields.
+- For floating value please use fixedpoint.Value from `github.com/c9s/bbgo/pkg/fixedpoint` to handle precision correctly
+- For optional fields or nullable fields, use pointer types. e.g., *int, *string, *fixedpoint.Value... etc.
+
 7. **Add go:generate annotation** above the request definition for requestgen:
 
 ```go
