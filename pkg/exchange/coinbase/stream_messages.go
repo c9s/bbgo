@@ -234,6 +234,7 @@ type MatchMessage struct {
 // https://help.coinbase.com/en/exchange/trading-and-funding/exchange-fees
 func (msg *MatchMessage) Trade() types.Trade {
 	var side types.SideType
+	// NOTE: the message side is the maker side
 	switch msg.Side {
 	case "buy":
 		side = types.SideTypeBuy
@@ -250,6 +251,7 @@ func (msg *MatchMessage) Trade() types.Trade {
 		case msg.TakerUserID:
 			// the user is the taker
 			orderUUID = msg.TakerOrderID
+			side = side.Reverse() // the user is on the reverse side of the maker side
 		case msg.MakerUserID:
 			// the user is the maker
 			orderUUID = msg.MakerOrderID
