@@ -378,7 +378,6 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		SubmitOrder:      order,
 		Exchange:         types.ExchangeBitget,
 		OrderID:          intOrderId,
-		UUID:             res.OrderId,
 		Status:           types.OrderStatusNew,
 		ExecutedQuantity: fixedpoint.Zero,
 		IsWorking:        true,
