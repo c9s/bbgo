@@ -331,7 +331,6 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		SubmitOrder:      order,
 		Exchange:         types.ExchangeBybit,
 		OrderID:          intOrderId,
-		UUID:             res.OrderId,
 		Status:           types.OrderStatusNew,
 		ExecutedQuantity: fixedpoint.Zero,
 		IsWorking:        true,
@@ -352,8 +351,8 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 		switch {
 		// use the OrderID first, then the ClientOrderID
 		case order.OrderID > 0:
-			req.OrderId(order.UUID)
-			reqId = order.UUID
+			reqId = strconv.FormatUint(order.OrderID, 10)
+			req.OrderId(reqId)
 
 		case len(order.ClientOrderID) != 0:
 			req.OrderLinkId(order.ClientOrderID)
