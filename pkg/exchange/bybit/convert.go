@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
-	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi/v3"
+	v3 "github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi/v3"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -96,7 +96,6 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 		},
 		Exchange:         types.ExchangeBybit,
 		OrderID:          orderIdNum,
-		UUID:             order.OrderId,
 		Status:           status,
 		ExecutedQuantity: order.CumExecQty,
 		IsWorking:        status == types.OrderStatusNew || status == types.OrderStatusPartiallyFilled,
