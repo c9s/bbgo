@@ -1,7 +1,6 @@
 package bitget
 
 import (
-	"strconv"
 	"testing"
 	"time"
 
@@ -243,7 +242,6 @@ func Test_unfilledOrderToGlobalOrder(t *testing.T) {
 			},
 			Exchange:         types.ExchangeBitget,
 			OrderID:          uint64(orderId),
-			UUID:             strconv.FormatInt(int64(orderId), 10),
 			Status:           types.OrderStatusNew,
 			ExecutedQuantity: fixedpoint.NewFromFloat(0),
 			IsWorking:        true,
@@ -274,7 +272,6 @@ func Test_unfilledOrderToGlobalOrder(t *testing.T) {
 			},
 			Exchange:         types.ExchangeBitget,
 			OrderID:          uint64(orderId),
-			UUID:             strconv.FormatInt(int64(orderId), 10),
 			Status:           types.OrderStatusNew,
 			ExecutedQuantity: fixedpoint.Zero,
 			IsWorking:        true,
@@ -304,7 +301,6 @@ func Test_unfilledOrderToGlobalOrder(t *testing.T) {
 			},
 			Exchange:         types.ExchangeBitget,
 			OrderID:          uint64(orderId),
-			UUID:             strconv.FormatInt(int64(orderId), 10),
 			Status:           types.OrderStatusNew,
 			ExecutedQuantity: fixedpoint.Zero,
 			IsWorking:        true,
@@ -374,7 +370,6 @@ func Test_toGlobalOrder(t *testing.T) {
 			},
 			Exchange:         types.ExchangeBitget,
 			OrderID:          uint64(orderId),
-			UUID:             strconv.FormatInt(int64(orderId), 10),
 			Status:           types.OrderStatusFilled,
 			ExecutedQuantity: fixedpoint.NewFromFloat(5),
 			IsWorking:        false,
@@ -447,7 +442,6 @@ func Test_toGlobalOrder(t *testing.T) {
 			},
 			Exchange:         types.ExchangeBitget,
 			OrderID:          uint64(orderId),
-			UUID:             strconv.FormatInt(int64(orderId), 10),
 			Status:           types.OrderStatusFilled,
 			ExecutedQuantity: fixedpoint.NewFromFloat(5),
 			IsWorking:        false,
@@ -887,7 +881,6 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 			},
 			Exchange:         types.ExchangeBitget,
 			OrderID:          uint64(newO.OrderId),
-			UUID:             strconv.FormatInt(int64(newO.OrderId), 10),
 			Status:           types.OrderStatusPartiallyFilled,
 			ExecutedQuantity: newO.AccBaseVolume,
 			IsWorking:        newO.Status.IsWorking(),
@@ -944,7 +937,6 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 			},
 			Exchange:         types.ExchangeBitget,
 			OrderID:          uint64(newO.OrderId),
-			UUID:             strconv.FormatInt(int64(newO.OrderId), 10),
 			Status:           types.OrderStatusPartiallyFilled,
 			ExecutedQuantity: newO.AccBaseVolume,
 			IsWorking:        newO.Status.IsWorking(),
@@ -1003,7 +995,6 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 			},
 			Exchange:         types.ExchangeBitget,
 			OrderID:          uint64(newO.OrderId),
-			UUID:             strconv.FormatInt(int64(newO.OrderId), 10),
 			Status:           types.OrderStatusPartiallyFilled,
 			ExecutedQuantity: newO.AccBaseVolume,
 			IsWorking:        newO.Status.IsWorking(),
@@ -1062,7 +1053,6 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 			},
 			Exchange:         types.ExchangeBitget,
 			OrderID:          uint64(newO.OrderId),
-			UUID:             strconv.FormatInt(int64(newO.OrderId), 10),
 			Status:           types.OrderStatusPartiallyFilled,
 			ExecutedQuantity: newO.AccBaseVolume,
 			IsWorking:        newO.Status.IsWorking(),

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strconv"
 	"time"
 
 	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
@@ -231,7 +230,6 @@ func unfilledOrderToGlobalOrder(order v2.UnfilledOrder) (*types.Order, error) {
 		},
 		Exchange:         types.ExchangeBitget,
 		OrderID:          uint64(order.OrderId),
-		UUID:             strconv.FormatInt(int64(order.OrderId), 10),
 		Status:           status,
 		ExecutedQuantity: order.BaseVolume,
 		IsWorking:        order.Status.IsWorking(),
@@ -282,7 +280,6 @@ func toGlobalOrder(order v2.OrderDetail) (*types.Order, error) {
 		},
 		Exchange:         types.ExchangeBitget,
 		OrderID:          uint64(order.OrderId),
-		UUID:             strconv.FormatInt(int64(order.OrderId), 10),
 		Status:           status,
 		ExecutedQuantity: order.BaseVolume,
 		IsWorking:        order.Status.IsWorking(),
@@ -470,7 +467,6 @@ func (o *Order) toGlobalOrder() (types.Order, error) {
 		},
 		Exchange:         types.ExchangeBitget,
 		OrderID:          uint64(o.OrderId),
-		UUID:             strconv.FormatInt(int64(o.OrderId), 10),
 		Status:           status,
 		ExecutedQuantity: o.AccBaseVolume,
 		IsWorking:        o.Status.IsWorking(),
