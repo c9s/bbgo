@@ -62,8 +62,6 @@ github.com/bytedance/sonic/loader v0.2.0 h1:zNprn+lsIP06C/IqCHs3gPQIvnvpKbbxyXQP
 github.com/bytedance/sonic/loader v0.2.0/go.mod h1:ncP89zfokxS5LZrJxl5z0UJcsk4M4yY2JpfqGeCtNLU=
 github.com/c-bata/goptuna v0.8.1 h1:25+n1MLv0yvCsD56xv4nqIus3oLHL9GuPAZDLIqmX1U=
 github.com/c-bata/goptuna v0.8.1/go.mod h1:knmS8+Iyq5PPy1YUeIEq0pMFR4Y6x7z/CySc9HlZTCY=
-github.com/c9s/requestgen v1.4.3 h1:0QZ27RVBLb9QuBKfiSBTOB5zSUuasrJm2p6/GZZHZZw=
-github.com/c9s/requestgen v1.4.3/go.mod h1:3gk1M2ihvNU2wWl7WLUc09myp7XpHMP33Dx96+Vr8A0=
 github.com/c9s/requestgen v1.4.4 h1:/Dhm1D2dEibZM4bFciXYq6XsCX5fSeEZQeDDp3ieoQs=
 github.com/c9s/requestgen v1.4.4/go.mod h1:3gk1M2ihvNU2wWl7WLUc09myp7XpHMP33Dx96+Vr8A0=
 github.com/c9s/requestgen v1.4.6 h1:QcEVQFusJMawlnyOBOj7etqvylggFICmpsIIjEniQB4=
