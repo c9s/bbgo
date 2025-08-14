@@ -164,14 +164,12 @@ func (s *Strategy) selectSessionForCurrency(
 	ctx context.Context, sessions map[string]*bbgo.ExchangeSession, currency string, changeQuantity fixedpoint.Value,
 ) (*bbgo.ExchangeSession, *types.SubmitOrder) {
 	var taker = s.UseTakerOrder
-	var side types.SideType
+	var side types.SideType = s.selectAdjustmentOrderSide(changeQuantity)
 	var quoteCurrencies []string
 	if changeQuantity.Sign() > 0 {
 		quoteCurrencies = s.PreferredQuoteCurrencies.Buy
-		side = types.SideTypeBuy
 	} else {
 		quoteCurrencies = s.PreferredQuoteCurrencies.Sell
-		side = types.SideTypeSell
 	}
 
 	for _, sessionName := range s.PreferredSessions {
@@ -346,6 +344,15 @@ func (s *Strategy) selectSessionForCurrency(
 	}
 
 	return nil, nil
+}
+
+func (s *Strategy) selectAdjustmentOrderSide(changeQuantity fixedpoint.Value) (side types.SideType) {
+	if changeQuantity.Sign() > 0 {
+		side = types.SideTypeBuy
+	} else {
+		side = types.SideTypeSell
+	}
+	return side
 }
 
 func (s *Strategy) CrossRun(
@@ -582,6 +589,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 							BaseCurrency:      currency,
 							SustainedDuration: sustainedDuration,
 
+							Side:     s.selectAdjustmentOrderSide(q),
 							Price:    price,
 							Delta:    q,
 							Quantity: quantity,
@@ -609,11 +617,13 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 					QuoteCurrency:     s.LargeAmountAlert.QuoteCurrency,
 					AlertAmount:       s.LargeAmountAlert.Amount,
 					BaseCurrency:      currency,
-					Delta:             q,
 					SustainedDuration: s.Duration.Duration(),
-					Price:             price,
-					Quantity:          quantity,
-					Amount:            amount,
+
+					Side:     s.selectAdjustmentOrderSide(q),
+					Price:    price,
+					Delta:    q,
+					Quantity: quantity,
+					Amount:   amount,
 				}
 				bbgo.PostLiveNote(
 					cbd,
