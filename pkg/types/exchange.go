@@ -13,6 +13,7 @@ import (
 
 const DateFormat = "2006-01-02"
 
+//go:generate mapgen -type ExchangeName
 type ExchangeName string
 
 const (
@@ -35,6 +36,7 @@ var SupportedExchanges = map[ExchangeName]struct{}{
 	ExchangeBitget:   struct{}{},
 	ExchangeBybit:    struct{}{},
 	ExchangeCoinBase: struct{}{},
+	ExchangeBitfinex: struct{}{},
 	// note: we are not using "backtest"
 }
 
