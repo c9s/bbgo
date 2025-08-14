@@ -2,8 +2,6 @@ package bfxapi
 
 import (
 	"github.com/c9s/requestgen"
-
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 // GetFundingInfoRequest represents a Bitfinex funding info request.
@@ -17,7 +15,7 @@ type GetFundingInfoRequest struct {
 }
 
 // NewGetFundingInfoRequest creates a new GetFundingInfoRequest.
-func (c *Client) NewGetFundingInfoRequest() *GetFundingInfoRequest {
+func (c *FundingService) NewGetFundingInfoRequest() *GetFundingInfoRequest {
 	return &GetFundingInfoRequest{client: c}
 }
 
@@ -28,19 +26,7 @@ type FundingInfoResponse struct {
 	Details FundingInfoDetails
 }
 
-type FundingInfoDetails struct {
-	YieldLoan    fixedpoint.Value
-	YieldLend    fixedpoint.Value
-	DurationLoan float64
-	DurationLend float64
-}
-
 // UnmarshalJSON parses the JSON array into the FundingInfoResponse struct fields.
 func (r *FundingInfoResponse) UnmarshalJSON(data []byte) error {
 	return parseJsonArray(data, r, 0)
-}
-
-// UnmarshalJSON parses the JSON array into the FundingInfoDetails struct fields.
-func (d *FundingInfoDetails) UnmarshalJSON(data []byte) error {
-	return parseJsonArray(data, d, 0)
 }

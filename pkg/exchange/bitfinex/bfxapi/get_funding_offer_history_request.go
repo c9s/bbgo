@@ -14,7 +14,7 @@ type GetFundingOfferHistoryRequest struct {
 }
 
 // NewGetFundingOfferHistoryRequest creates a new GetFundingOfferHistoryRequest.
-func (c *Client) NewGetFundingOfferHistoryRequest() *GetFundingOfferHistoryRequest {
+func (c *FundingService) NewGetFundingOfferHistoryRequest() *GetFundingOfferHistoryRequest {
 	return &GetFundingOfferHistoryRequest{client: c}
 }
 

@@ -18,7 +18,7 @@ type CloseFundingRequest struct {
 }
 
 // NewCloseFundingRequest creates a new CloseFundingRequest.
-func (c *Client) NewCloseFundingRequest() *CloseFundingRequest {
+func (c *FundingService) NewCloseFundingRequest() *CloseFundingRequest {
 	return &CloseFundingRequest{client: c}
 }
 

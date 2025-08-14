@@ -38,7 +38,7 @@ type AutoRenewFundingRequest struct {
 }
 
 // NewAutoRenewFundingRequest creates a new AutoRenewFundingRequest.
-func (c *Client) NewAutoRenewFundingRequest() *AutoRenewFundingRequest {
+func (c *FundingService) NewAutoRenewFundingRequest() *AutoRenewFundingRequest {
 	return &AutoRenewFundingRequest{client: c}
 }
 
