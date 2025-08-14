@@ -10,6 +10,81 @@ import (
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
+func TestClient_movementHistory(t *testing.T) {
+	// You can enable recording for updating the test data
+	// httptesting.AlwaysRecord = true
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client := NewClient()
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "BITFINEX")
+	if ok {
+		client.Auth(key, secret)
+	}
+
+	if isRecording && !ok {
+		t.Skipf("BITFINEX api key is not configured, skipping integration test")
+	}
+
+	t.Run("GetMovementHistoryRequest", func(t *testing.T) {
+		req := client.NewGetMovementHistoryRequest()
+		req.Currency("UST")
+
+		// Optionally, you can add filters like ID, GID, CID, etc.
+		// req.AddId(123456789) // example order ID
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("response: %+v", resp)
+		}
+	})
+}
+
+func TestClient_userApis(t *testing.T) {
+	// You can enable recording for updating the test data
+	// httptesting.AlwaysRecord = true
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client := NewClient()
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "BITFINEX")
+	if ok {
+		client.Auth(key, secret)
+	}
+
+	if isRecording && !ok {
+		t.Skipf("BITFINEX api key is not configured, skipping integration test")
+	}
+
+	t.Run("GetUserInfoRequest", func(t *testing.T) {
+		req := client.NewGetUserInfoRequest()
+		// Optionally, you can add filters like ID, GID, CID, etc.
+		// req.AddId(123456789) // example order ID
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("response: %+v", resp)
+		}
+	})
+
+	t.Run("GetSummaryRequest", func(t *testing.T) {
+		req := client.NewGetSummaryRequest()
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("summary response: %+v", resp)
+			assert.NotNil(t, resp, "expected non-nil summary response")
+		}
+	})
+}
+
 func TestClient_orderApis(t *testing.T) {
 	// You can enable recording for updating the test data
 	// httptesting.AlwaysRecord = true
@@ -329,6 +404,35 @@ func TestClient_fundingApis(t *testing.T) {
 		t.Skipf("BITFINEX api key is not configured, skipping integration test")
 	}
 
+	t.Run("GetActiveFundingOffersRequest", func(t *testing.T) {
+		req := client.NewGetActiveFundingOffersRequest()
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("active funding offers response: %+v", resp)
+			for _, offer := range resp {
+				cancelReq := client.NewCancelFundingOfferRequest()
+				cancelReq.Id(offer.ID)
+				cancelResp, err := cancelReq.Do(ctx)
+				assert.NoError(t, err)
+				t.Logf("cancel funding offer response: %+v", cancelResp)
+			}
+		}
+	})
+
+	t.Run("AutoRenewFundingRequest", func(t *testing.T) {
+		t.Cleanup(func() {
+			_, _ = client.NewAutoRenewFundingRequest().Status(0).Currency("fUST").Do(ctx)
+		})
+
+		if req, err := client.NewAutoRenewFundingRequest().Status(1).Currency("fUST").Do(ctx); err == nil {
+			t.Logf("auto renew funding response: %+v", req)
+			assert.NotNil(t, req.Offer, "expected non-nil auto-renew offer")
+			assert.Equal(t, "UST", req.Offer.Currency, "expected currency to be UST")
+		} else {
+			t.Logf("failed to auto-renew funding offer: %v", err)
+		}
+	})
+
 	t.Run("SubmitFundingOfferRequest", func(t *testing.T) {
 		req := client.NewSubmitFundingOfferRequest()
 		req.Symbol("fUST").
@@ -343,6 +447,7 @@ func TestClient_fundingApis(t *testing.T) {
 			assert.NotNil(t, resp.FundingOffer.ID, "expected funding offer ID in response")
 
 			id := resp.FundingOffer.ID
+
 			t.Logf("canceling funding offer with ID: %d", id)
 
 			cancelReq := client.NewCancelFundingOfferRequest()
@@ -354,17 +459,14 @@ func TestClient_fundingApis(t *testing.T) {
 		}
 	})
 
-	t.Run("GetActiveFundingOffersRequest", func(t *testing.T) {
-		req := client.NewGetActiveFundingOffersRequest()
+	t.Run("GetFundingOfferHistoryRequest", func(t *testing.T) {
+		req := client.NewGetFundingOfferHistoryRequest()
 		resp, err := req.Do(ctx)
 		if assert.NoError(t, err) {
-			t.Logf("active funding offers response: %+v", resp)
+			t.Logf("funding offer history response: %+v", resp)
+			assert.NotEmpty(t, resp, "expected non-empty funding offer history response")
 			for _, offer := range resp {
-				cancelReq := client.NewCancelFundingOfferRequest()
-				cancelReq.Id(offer.ID)
-				cancelResp, err := cancelReq.Do(ctx)
-				assert.NoError(t, err)
-				t.Logf("cancel funding offer response: %+v", cancelResp)
+				t.Logf("funding offer: %+v", offer)
 			}
 		}
 	})
