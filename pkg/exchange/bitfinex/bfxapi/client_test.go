@@ -390,7 +390,7 @@ func TestClient_fundingApis(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client := NewClient()
+	client := NewClient().Funding()
 
 	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
 	defer saveRecord()
