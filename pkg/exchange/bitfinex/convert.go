@@ -7,12 +7,15 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+//go:generate go run generate_symbol_map.go
+
 // convertOrder converts bfxapi.Order to types.Order
 func convertOrder(o bfxapi.Order) (*types.Order, error) {
+
 	// map bfxapi.Order to types.Order using struct literal
 	order := &types.Order{
 		SubmitOrder: types.SubmitOrder{
-			Symbol:   o.Symbol,
+			Symbol:   toGlobalSymbol(o.Symbol),
 			Price:    o.Price,
 			Quantity: o.AmountOrig,
 			Type:     convertOrderType(o.OrderType),
@@ -70,7 +73,7 @@ func convertTrade(trade bfxapi.OrderTradeDetail) (*types.Trade, error) {
 		Exchange:    types.ExchangeBitfinex,
 		Price:       trade.ExecPrice,
 		Quantity:    trade.ExecAmount,
-		Symbol:      trade.Symbol,
+		Symbol:      toGlobalSymbol(trade.Symbol),
 		IsMaker:     trade.Maker == 1,
 		Time:        types.Time(trade.Time),
 		Fee:         trade.Fee,

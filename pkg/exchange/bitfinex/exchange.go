@@ -85,19 +85,21 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 }
 
 // QueryTickers queries tickers for multiple symbols from Bitfinex.
-func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
+func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[string]types.Ticker, error) {
 	req := e.client.NewGetTickersRequest()
-	if len(symbol) == 0 {
+	if len(symbols) == 0 {
 		req.Symbols("ALL")
 	} else {
-		req.Symbols(strings.Join(symbol, ","))
+		req.Symbols(strings.Join(MapSlice[string, string](symbols, func(s string) string {
+			return toLocalSymbol(s)
+		}), ","))
 	}
 
 	resp, err := req.Do(ctx)
 	if err != nil {
-		logrus.WithError(err).Error("failed to query tickers from bitfinex")
-		return nil, err
+		return nil, fmt.Errorf("failed to query tickers from bitfinex: %w", err)
 	}
+
 	result := make(map[string]types.Ticker)
 	for _, t := range resp.TradingTickers {
 		ticker, err := convertTicker(t)
@@ -107,6 +109,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 
 		result[t.Symbol] = *ticker
 	}
+
 	return result, nil
 }
 
@@ -174,8 +177,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 				Interest:  w.UnsettledInterest,
 			})
 		}
-
 	}
+
 	return account, nil
 }
 
@@ -203,7 +206,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
 	req := e.client.NewSubmitOrderRequest()
-	req.Symbol(order.Symbol)
+	req.Symbol(toLocalSymbol(order.Symbol))
 
 	switch order.Side {
 	case types.SideTypeBuy:
@@ -282,6 +285,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 			return fmt.Errorf("failed to cancel order %d: %w", order.OrderID, err)
 		}
 	}
+
 	return nil
 }
 
@@ -316,4 +320,12 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 		result = append(result, *trade)
 	}
 	return result, nil
+}
+
+func MapSlice[T, M any](input []T, f func(T) M) []M {
+	result := make([]M, len(input))
+	for i, v := range input {
+		result[i] = f(v)
+	}
+	return result
 }
