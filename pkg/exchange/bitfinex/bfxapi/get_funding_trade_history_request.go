@@ -1,8 +1,6 @@
 package bfxapi
 
 import (
-	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 )
 
@@ -17,24 +15,6 @@ type GetFundingTradeHistoryRequest struct {
 }
 
 // NewGetFundingTradeHistoryRequest creates a new GetFundingTradeHistoryRequest.
-func (c *Client) NewGetFundingTradeHistoryRequest() *GetFundingTradeHistoryRequest {
+func (c *FundingService) NewGetFundingTradeHistoryRequest() *GetFundingTradeHistoryRequest {
 	return &GetFundingTradeHistoryRequest{client: c}
-}
-
-// FundingTrade represents a single funding trade returned by Bitfinex.
-type FundingTrade struct {
-	ID        int64
-	Currency  string
-	CreatedAt types.MillisecondTimestamp
-	OfferID   int64
-	Amount    fixedpoint.Value
-	Rate      fixedpoint.Value
-	Period    int
-	// Placeholder field for the last element, nullable
-	Placeholder any
-}
-
-// UnmarshalJSON parses the JSON array into the FundingTrade struct fields.
-func (t *FundingTrade) UnmarshalJSON(data []byte) error {
-	return parseJsonArray(data, t, 0)
 }

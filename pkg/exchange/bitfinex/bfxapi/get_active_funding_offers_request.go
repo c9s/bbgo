@@ -15,6 +15,6 @@ type GetActiveFundingOffersRequest struct {
 }
 
 // NewGetActiveFundingOffersRequest creates a new GetActiveFundingOffersRequest instance.
-func (c *Client) NewGetActiveFundingOffersRequest() *GetActiveFundingOffersRequest {
+func (c *FundingService) NewGetActiveFundingOffersRequest() *GetActiveFundingOffersRequest {
 	return &GetActiveFundingOffersRequest{client: c}
 }
