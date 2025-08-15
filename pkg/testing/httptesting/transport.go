@@ -156,6 +156,10 @@ func filterCredentials(header http.Header) {
 		`(?i)cookie`,
 		`(?i)access[-_]token`,
 		`(?i)secret`,
+		`(?i)access[-_]key`,
+		`(?i)access[-_]passphrase`,
+		`(?i)access[-_]sign`,
+		`(?i)access[-_]timestamp`,
 	}
 	var regexps []*regexp.Regexp
 	for _, p := range patterns {
