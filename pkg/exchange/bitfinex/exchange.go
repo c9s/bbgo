@@ -78,7 +78,7 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 	if err != nil {
 		return nil, err
 	} else if resp != nil {
-		return convertTicker(*resp)
+		return convertTicker(*resp), nil
 	}
 
 	return nil, fmt.Errorf("ticker not found for symbol %s", symbol)
@@ -102,11 +102,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 
 	result := make(map[string]types.Ticker)
 	for _, t := range resp.TradingTickers {
-		ticker, err := convertTicker(t)
-		if err != nil {
-			return nil, err
-		}
-
+		ticker := convertTicker(t)
 		result[t.Symbol] = *ticker
 	}
 
@@ -247,7 +243,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		return nil, fmt.Errorf("no order data returned from bitfinex")
 	}
 
-	return convertOrder(resp.Data[0])
+	return convertOrder(resp.Data[0]), nil
 }
 
 // QueryOpenOrders queries open orders for a symbol from Bitfinex.
@@ -260,10 +256,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	}
 
 	for _, o := range resp.Orders {
-		order, err := convertOrder(o)
-		if err != nil {
-			return nil, err
-		}
+		order := convertOrder(o)
 
 		if symbol != "" && order.Symbol != symbol {
 			// If a symbol is specified, filter out orders that do not match
@@ -312,11 +305,7 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 
 	var result []types.Trade
 	for _, t := range trades {
-		trade, err := convertTrade(t)
-		if err != nil {
-			return nil, err
-		}
-
+		trade := convertTrade(t)
 		result = append(result, *trade)
 	}
 	return result, nil
