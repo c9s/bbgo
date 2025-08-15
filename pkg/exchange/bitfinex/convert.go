@@ -10,7 +10,7 @@ import (
 //go:generate go run generate_symbol_map.go
 
 // convertOrder converts bfxapi.Order to types.Order
-func convertOrder(o bfxapi.Order) (*types.Order, error) {
+func convertOrder(o bfxapi.Order) *types.Order {
 
 	// map bfxapi.Order to types.Order using struct literal
 	order := &types.Order{
@@ -39,7 +39,7 @@ func convertOrder(o bfxapi.Order) (*types.Order, error) {
 	// set IsWorking based on status
 	order.IsWorking = order.Status == types.OrderStatusNew || order.Status == types.OrderStatusPartiallyFilled
 
-	return order, nil
+	return order
 }
 
 // convertOrderStatus maps bfxapi.OrderStatus to types.OrderStatus
@@ -65,7 +65,7 @@ func convertOrderStatus(status bfxapi.OrderStatus) types.OrderStatus {
 }
 
 // convertTrade converts bfxapi.OrderTradeDetail to types.Trade
-func convertTrade(trade bfxapi.OrderTradeDetail) (*types.Trade, error) {
+func convertTrade(trade bfxapi.OrderTradeDetail) *types.Trade {
 	// map bfxapi.OrderTradeDetail to types.Trade using struct literal
 	return &types.Trade{
 		ID:          uint64(trade.TradeID),
@@ -79,12 +79,12 @@ func convertTrade(trade bfxapi.OrderTradeDetail) (*types.Trade, error) {
 		Fee:         trade.Fee,
 		FeeCurrency: trade.FeeCurrency,
 		// ClientOrderID is not present in types.Trade, so skip
-	}, nil
+	}
 }
 
 // convertTicker converts bfxapi.Ticker to types.Ticker.
 // It maps Bitfinex ticker fields to the standard types.Ticker fields.
-func convertTicker(t bfxapi.Ticker) (*types.Ticker, error) {
+func convertTicker(t bfxapi.Ticker) *types.Ticker {
 	return &types.Ticker{
 		Volume: t.Volume,
 		Last:   t.LastPrice,
@@ -92,7 +92,7 @@ func convertTicker(t bfxapi.Ticker) (*types.Ticker, error) {
 		Low:    t.Low,
 		Buy:    t.Bid,
 		Sell:   t.Ask,
-	}, nil
+	}
 }
 
 // convertOrderType maps bfxapi.OrderType to types.OrderType.
