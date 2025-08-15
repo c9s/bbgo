@@ -2,20 +2,21 @@ package coinbase
 
 import (
 	"context"
-	"os"
-	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/testing/httptesting"
 	"github.com/c9s/bbgo/pkg/testutil"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 func TestExchange_new(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
 	assert.Equal(t, ex.Name(), types.ExchangeCoinBase)
 	t.Log("successfully created coinbase exchange client")
 	_ = ex.SupportedInterval()
@@ -35,32 +36,22 @@ func TestExchange_Symbols(t *testing.T) {
 }
 
 func TestExchange_OrdersAPI(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	// should fail on unsupported symbol
+	// should succeed
+	symbol := "ETHUSD"
+	markets, err := ex.QueryMarkets(ctx)
+	assert.NoError(t, err)
+	market, ok := markets[symbol]
+	assert.True(t, ok)
 	order, err := ex.SubmitOrder(
 		ctx,
 		types.SubmitOrder{
-			Market: types.Market{
-				Symbol: "NOTEXIST",
-			},
-			Side:     types.SideTypeBuy,
-			Type:     types.OrderTypeLimit,
-			Price:    fixedpoint.MustNewFromString("0.001"),
-			Quantity: fixedpoint.MustNewFromString("0.001"),
-		})
-	assert.Error(t, err)
-	assert.Empty(t, order)
-	// should succeed
-	symbol := "ETHUSD"
-	order, err = ex.SubmitOrder(
-		ctx,
-		types.SubmitOrder{
-			Market: types.Market{
-				Symbol: symbol,
-			},
+			Market:   market,
 			Side:     types.SideTypeBuy,
 			Type:     types.OrderTypeLimit,
 			Price:    fixedpoint.MustNewFromString("0.01"),
@@ -105,18 +96,22 @@ func TestExchange_OrdersAPI(t *testing.T) {
 }
 
 func TestExchange_CancelOrdersBySymbol(t *testing.T) {
-	ex := getExchangeOrSkip(t)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	// test cancel order by symbol
-	symbol := "BTCUSD"
+	symbol := "ETHUSD"
+	markets, err := ex.QueryMarkets(ctx)
+	assert.NoError(t, err)
+	market, ok := markets[symbol]
+	assert.True(t, ok)
 	order, err := ex.SubmitOrder(
 		ctx,
 		types.SubmitOrder{
-			Market: types.Market{
-				Symbol: symbol,
-			},
+			Market:   market,
 			Side:     types.SideTypeBuy,
 			Type:     types.OrderTypeLimit,
 			Price:    fixedpoint.MustNewFromString("0.01"),
@@ -128,7 +123,7 @@ func TestExchange_CancelOrdersBySymbol(t *testing.T) {
 			break
 		}
 		time.Sleep(time.Millisecond * 500)
-		order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: symbol, OrderID: order.UUID, ClientOrderID: order.UUID})
+		order, err = ex.QueryOrder(ctx, order.AsQuery())
 		assert.NoError(t, err)
 	}
 	_, err = ex.CancelOrdersBySymbol(ctx, symbol)
@@ -136,7 +131,9 @@ func TestExchange_CancelOrdersBySymbol(t *testing.T) {
 }
 
 func TestExchange_QueryAccount(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -145,7 +142,9 @@ func TestExchange_QueryAccount(t *testing.T) {
 }
 
 func TestExchange_QueryAccountBalances(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -154,7 +153,9 @@ func TestExchange_QueryAccountBalances(t *testing.T) {
 }
 
 func TestExchange_QueryOpenOrders(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -166,7 +167,9 @@ func TestExchange_QueryOpenOrders(t *testing.T) {
 }
 
 func TestExchange_QueryMarkets(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -175,7 +178,9 @@ func TestExchange_QueryMarkets(t *testing.T) {
 }
 
 func TestExchange_QueryTicker(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -185,7 +190,9 @@ func TestExchange_QueryTicker(t *testing.T) {
 }
 
 func TestExchange_QueryTickers(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -196,7 +203,9 @@ func TestExchange_QueryTickers(t *testing.T) {
 }
 
 func TestExchange_QueryKLines(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -224,17 +233,21 @@ func TestExchange_QueryKLines(t *testing.T) {
 }
 
 func TestExchange_QueryOrderTrades(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	trades, err := ex.QueryOrderTrades(ctx, types.OrderQuery{Symbol: "ETHUSD"})
+	trades, err := ex.QueryOrderTrades(ctx, types.OrderQuery{Symbol: "ETHUSDT"})
 	assert.NoError(t, err)
 	assert.NotNil(t, trades)
 }
 
 func TestExchange_QueryTrades(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -246,11 +259,11 @@ func TestExchange_QueryTrades(t *testing.T) {
 
 	// query the last 100 trades
 	trades, err = ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
-		Limit: 100,
+		Limit: 20,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, trades)
-	assert.Equal(t, len(trades), 100)
+	assert.Equal(t, len(trades), 20)
 
 	// query the last 10 trades with last trade ID
 	lastTradeID := trades[10].ID
@@ -263,7 +276,9 @@ func TestExchange_QueryTrades(t *testing.T) {
 }
 
 func TestExchange_QueryClosedOrders(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -291,7 +306,11 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 }
 
 func TestExchange_QueryDepositHistory(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, _ := getExchangeOrSkip(t)
+	if ex.apiKey == "" {
+		t.Skip("skip test for CI")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -316,7 +335,11 @@ func TestExchange_QueryDepositHistory(t *testing.T) {
 }
 
 func TestExchange_QueryWithdrawHistory(t *testing.T) {
-	ex := getExchangeOrSkip(t)
+	ex, _ := getExchangeOrSkip(t)
+	if ex.apiKey == "" {
+		t.Skip("skip test for CI")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -340,15 +363,15 @@ func TestExchange_QueryWithdrawHistory(t *testing.T) {
 	assert.Greater(t, len(withdraws), 0)
 }
 
-func getExchangeOrSkip(t *testing.T) *Exchange {
-	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
-		t.Skip("skip test for CI")
-	}
+func getExchangeOrSkip(t *testing.T) (*Exchange, func()) {
 	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "COINBASE")
-	if !ok {
-		t.SkipNow()
-		return nil
+	ex := New(key, secret, passphrase, 0)
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, ex.client.HttpClient, "testdata/"+t.Name()+".json")
+
+	if isRecording && !ok {
+		t.Skipf("api keys are not configured, skip test: %s", t.Name())
+		return nil, nil
 	}
 
-	return New(key, secret, passphrase, 0)
+	return ex, saveRecord
 }

@@ -231,6 +231,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		IsWorking:        !res.Settled,
 		CreationTime:     res.CreatedAt,
 		UpdateTime:       res.CreatedAt,
+		OriginalStatus:   string(res.Status),
 	}
 
 	return createdOrder, nil
@@ -563,7 +564,7 @@ func (e *Exchange) queryProductTradesByPagination(
 	ctx context.Context, symbol string, options *types.TradeQueryOptions,
 ) (cbTrades api.TradeSnapshot, err error) {
 	defer func() {
-		if err == nil && options.Limit > 0 {
+		if err == nil && options.Limit > 0 && len(cbTrades) >= int(options.Limit) {
 			cbTrades = cbTrades[:options.Limit]
 		}
 	}()

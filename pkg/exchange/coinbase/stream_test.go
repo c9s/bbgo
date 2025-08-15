@@ -57,7 +57,7 @@ func Test_SubCmdString(t *testing.T) {
 }
 
 func TestStreamBasic(t *testing.T) {
-	productIDs := []string{"BTC-USD", "ETH-USD"}
+	productIDs := []string{"BTCUSD", "ETHUSD"}
 
 	t.Run("Test Status", func(t *testing.T) {
 		stream := getTestStreamOrSkip(t)
@@ -142,7 +142,7 @@ func TestStreamBasic(t *testing.T) {
 
 func TestStreamFull(t *testing.T) {
 	t.Run("Run Full", func(t *testing.T) {
-		productIDs := []string{"BTC-USD", "ETH-USD"}
+		productIDs := []string{"BTCUSD", "ETHUSD"}
 		c := make(chan struct{}, 10)
 		stream := getTestStreamOrSkip(t)
 		stream.SetPublicOnly()
@@ -200,7 +200,7 @@ func TestLevel2(t *testing.T) {
 		stream := getTestStreamOrSkip(t)
 		stream.SetPublicOnly()
 		c := make(chan string, 2)
-		productIDs := []string{"BTC-USD"}
+		productIDs := []string{"BTCUSD"}
 		getSnapshot := false
 		getUpdate := false
 
