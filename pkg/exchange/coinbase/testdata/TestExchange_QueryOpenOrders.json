@@ -1,0 +1,275 @@
+[
+  {
+    "timestamp": "2025-08-15T16:07:14.188611+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.exchange.coinbase.com/orders?limit=100\u0026product_id=BTC-USD\u0026sortedBy=created_at\u0026sorting=desc\u0026status%5B%5D=open",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Accept-Ranges": [
+          "bytes"
+        ],
+        "Access-Control-Allow-Headers": [
+          "Content-Type, Accept, cb-session, cb-fp, cb-form-factor"
+        ],
+        "Access-Control-Allow-Methods": [
+          "GET,POST,DELETE,PUT"
+        ],
+        "Access-Control-Allow-Origin": [
+          "*"
+        ],
+        "Access-Control-Expose-Headers": [
+          "cb-before, cb-after, cb-gdpr"
+        ],
+        "Access-Control-Max-Age": [
+          "7200"
+        ],
+        "Cache-Control": [
+          "no-store"
+        ],
+        "Cf-Cache-Status": [
+          "MISS"
+        ],
+        "Cf-Ray": [
+          "96f73277ca96a3ab-TPE"
+        ],
+        "Content-Length": [
+          "2"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 15 Aug 2025 08:07:14 GMT"
+        ],
+        "Etag": [
+          "W/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\""
+        ],
+        "Nel": [
+          "{\"success_fraction\":0.01,\"report_to\":\"cf-nel\",\"max_age\":604800}"
+        ],
+        "Report-To": [
+          "{\"endpoints\":[{\"url\":\"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=bQ5pI%2FuRQX2LnOMkqW0wp34YdDeMaOFF57lRSaEHdxmOXBLoxE6hQvEOzCysOfNHjmkmV3KY%2FB%2FNXs%2FRLq56xGNs%2BQD0DjDSPKYDYvW2NDvXCP1VIFVr5dsz774V1EsH%2BEt7F3x5tmEg2Hw%3D\"}],\"group\":\"cf-nel\",\"max_age\":604800}"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Set-Cookie": [
+          "__cf_bm=j.xrgBVtFSoPH7psQSkWk3yBRB_OkzOaRW79CKDvOCE-1755245234-1.0.1.1-dxALKOCq7XY2d5byCSjsW5SAt1rFCxkeKt9UfYBLDKggAdLLbMZvkei4MNT_38xr1Dl4.v6fvghS08mRmWss.ta08milMbJspeEWtcaDX0A; path=/; expires=Fri, 15-Aug-25 08:37:14 GMT; domain=.exchange.coinbase.com; HttpOnly; Secure; SameSite=None"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=15552000; includeSubDomains"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Dns-Prefetch-Control": [
+          "off"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[]"
+    }
+  },
+  {
+    "timestamp": "2025-08-15T16:07:14.509453+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.exchange.coinbase.com/orders?limit=100\u0026product_id=ETH-USD\u0026sortedBy=created_at\u0026sorting=desc\u0026status%5B%5D=open",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Accept-Ranges": [
+          "bytes"
+        ],
+        "Access-Control-Allow-Headers": [
+          "Content-Type, Accept, cb-session, cb-fp, cb-form-factor"
+        ],
+        "Access-Control-Allow-Methods": [
+          "GET,POST,DELETE,PUT"
+        ],
+        "Access-Control-Allow-Origin": [
+          "*"
+        ],
+        "Access-Control-Expose-Headers": [
+          "cb-before, cb-after, cb-gdpr"
+        ],
+        "Access-Control-Max-Age": [
+          "7200"
+        ],
+        "Cache-Control": [
+          "no-store"
+        ],
+        "Cf-Cache-Status": [
+          "MISS"
+        ],
+        "Cf-Ray": [
+          "96f73279bc78a3ab-TPE"
+        ],
+        "Content-Length": [
+          "2"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 15 Aug 2025 08:07:14 GMT"
+        ],
+        "Etag": [
+          "W/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\""
+        ],
+        "Nel": [
+          "{\"success_fraction\":0.01,\"report_to\":\"cf-nel\",\"max_age\":604800}"
+        ],
+        "Report-To": [
+          "{\"endpoints\":[{\"url\":\"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=AxodgqAv34MyU%2Fr5WLDvEvvFSnee8FuSK1%2BChZ%2BJiOmt6tpBWzqF3VYnJ%2BcvUVhjOubkvlHDxSCgxchYYg84jJaB8l5XuSjCszen1Dpmb4Hi%2FbugDTJ35g4JWfzD9s4JuGT4OEuocm%2BgcrY%3D\"}],\"group\":\"cf-nel\",\"max_age\":604800}"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Set-Cookie": [
+          "__cf_bm=YMGsU1xYzbmFe0829hyHWQawnkQWymVlwmwNtNOmiUM-1755245234-1.0.1.1-HD9Tnjjd8RnyQBPsNZsuvCv6OBuFv4V1iu07cS50Jg.jTc6H.pHU3uFwqJHvqsrxCOET4bk6MTNbocJ33YcGZlN5aK49bQUAvcJ6Y71sUeI; path=/; expires=Fri, 15-Aug-25 08:37:14 GMT; domain=.exchange.coinbase.com; HttpOnly; Secure; SameSite=None"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=15552000; includeSubDomains"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Dns-Prefetch-Control": [
+          "off"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[]"
+    }
+  },
+  {
+    "timestamp": "2025-08-15T16:07:14.810589+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.exchange.coinbase.com/orders?limit=100\u0026product_id=ETH-BTC\u0026sortedBy=created_at\u0026sorting=desc\u0026status%5B%5D=open",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Accept-Ranges": [
+          "bytes"
+        ],
+        "Access-Control-Allow-Headers": [
+          "Content-Type, Accept, cb-session, cb-fp, cb-form-factor"
+        ],
+        "Access-Control-Allow-Methods": [
+          "GET,POST,DELETE,PUT"
+        ],
+        "Access-Control-Allow-Origin": [
+          "*"
+        ],
+        "Access-Control-Expose-Headers": [
+          "cb-before, cb-after, cb-gdpr"
+        ],
+        "Access-Control-Max-Age": [
+          "7200"
+        ],
+        "Cache-Control": [
+          "no-store"
+        ],
+        "Cf-Cache-Status": [
+          "MISS"
+        ],
+        "Cf-Ray": [
+          "96f7327bbe78a3ab-TPE"
+        ],
+        "Content-Length": [
+          "2"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 15 Aug 2025 08:07:14 GMT"
+        ],
+        "Etag": [
+          "W/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\""
+        ],
+        "Nel": [
+          "{\"success_fraction\":0.01,\"report_to\":\"cf-nel\",\"max_age\":604800}"
+        ],
+        "Report-To": [
+          "{\"endpoints\":[{\"url\":\"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=h7xkNNIcMgEywXNksoh6o7NzBXJzmzW2%2B%2F7ZW1m1%2BdJBLGvgtVk%2F787l4G78Y5gqntm5%2FKOwgWoma4Cqmt5WXQ%2FQ7stZjVyoTb0hLY9gZ4FhqdviCoIlzugwLlJNxEvSK1TCX1TbRnltFZA%3D\"}],\"group\":\"cf-nel\",\"max_age\":604800}"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Set-Cookie": [
+          "__cf_bm=9et8ZlbAFf60pdosqJtZjDPKQkc18LhxjrnRrybBA0M-1755245234-1.0.1.1-fXe2aC71iHL79ceR2s774I7CuSlvLSsauOEdLXBxTKCTqpUtCCGacPJ4XHyRozaOl4ft_zYIwCTp3Kihf9_yWBOP2YgPYzjFMMHxy1pU4HE; path=/; expires=Fri, 15-Aug-25 08:37:14 GMT; domain=.exchange.coinbase.com; HttpOnly; Secure; SameSite=None"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=15552000; includeSubDomains"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Dns-Prefetch-Control": [
+          "off"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[]"
+    }
+  }
+]
