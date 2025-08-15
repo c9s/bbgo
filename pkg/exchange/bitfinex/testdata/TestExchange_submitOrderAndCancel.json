@@ -1,0 +1,118 @@
+[
+  {
+    "timestamp": "2025-08-13T17:37:34.77857+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/w/order/submit",
+      "header": {
+        "Bfx-Signature": [
+          "67d56866e95a60e26bfb0b33663473c04def2679cf882d944b82d0010c2a787f16a96e79c65ae5ce9557c9207afdd404"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96e73c0fc9fc4a86-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Wed, 13 Aug 2025 09:37:34 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[1755077854,\"on-req\",null,null,[[214604224150,null,1755077854822,\"tBTCUST\",1755077854822,1755077854822,0.0001,0.0001,\"EXCHANGE LIMIT\",null,null,null,0,\"ACTIVE\",null,null,10000,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}]],null,\"SUCCESS\",\"Submitting 1 orders.\"]"
+    }
+  },
+  {
+    "timestamp": "2025-08-13T17:37:35.017811+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/w/order/cancel",
+      "header": {
+        "Bfx-Signature": [
+          "5e7fca4005d548d95ce306d6451bbf1b9aa5a9263dcf98966898fd6dad9e35ed6525d1e3067b12da1d78cc18289031db"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96e73c115c724a86-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Wed, 13 Aug 2025 09:37:35 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[1755077855064,\"oc-req\",null,null,[214604224150,null,1755077854822,\"tBTCUST\",1755077854822,1755077854824,0.0001,0.0001,\"EXCHANGE LIMIT\",null,null,null,0,\"ACTIVE\",null,null,10000,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}],null,\"SUCCESS\",\"Submitted for cancellation; waiting for confirmation (ID: 214604224150).\"]"
+    }
+  }
+]

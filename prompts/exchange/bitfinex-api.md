@@ -19,7 +19,7 @@ Because of this, we cannot directly unmarshal the response using standard Go str
 ## Convention for Adding a New Endpoint
 
 1. **Define the request struct** using the naming format `{Verb}{Resource}Request`. Example: `GetTickerRequest`.
-2. **File location**: Create a new file in `pkg/exchange/bitfinex`, using snake_case for the filename. Example: `get_ticker_request.go`.
+2. **File location**: Create a new file in `pkg/exchange/bitfinex/bfxapi`, using snake_case for the filename. Example: `get_ticker_request.go`.
 3. **Request Struct**:
 
 ```go
@@ -30,6 +30,9 @@ type GetTickerRequest struct {
 ```
 
 Parameters needs to be defined in lower case, and the `param` tag specifies how to format the parameter in the URL.
+
+"slug" means the parameter will be formatted as a slug, which is typically used for identifiers in URLs (e.g., tBTCUSD).
+
 
 4. **Client method** to create the request:
 
@@ -60,7 +63,7 @@ type TickerResponse struct {
 }
 
 func (r *TickerResponse) UnmarshalJSON(data []byte) error {
-    return parseJsonArray(data, r)
+    return parseJsonArray(data, r, 0)
 }
 ```
 
