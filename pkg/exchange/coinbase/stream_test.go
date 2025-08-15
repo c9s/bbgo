@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/testutil"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -378,7 +377,7 @@ func getTestStreamOrSkip(t *testing.T) *Stream {
 		t.Skip("skip test for CI")
 	}
 
-	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "COINBASE")
+	key, secret, passphrase, ok := IntegrationTestWithPassphraseConfigured(t, "COINBASE")
 	if !ok {
 		t.Skip("COINBASE_* env vars not set")
 	}
