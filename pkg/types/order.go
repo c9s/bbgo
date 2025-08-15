@@ -140,15 +140,12 @@ func (o OrderStatus) Closed() bool {
 type SubmitOrder struct {
 	ClientOrderID string `json:"clientOrderID,omitempty" db:"client_order_id"`
 
-	// QuoteID is for OTC exchange
-	QuoteID string `json:"quoteID,omitempty" db:"quote_id"`
-
 	Symbol string    `json:"symbol" db:"symbol"`
 	Side   SideType  `json:"side" db:"side"`
 	Type   OrderType `json:"orderType" db:"order_type"`
 
-	Quantity fixedpoint.Value `json:"quantity" db:"quantity"`
 	Price    fixedpoint.Value `json:"price" db:"price"`
+	Quantity fixedpoint.Value `json:"quantity" db:"quantity"`
 
 	// AveragePrice is only used in back-test currently
 	AveragePrice fixedpoint.Value `json:"averagePrice,omitempty"`
@@ -161,11 +158,16 @@ type SubmitOrder struct {
 
 	GroupID uint32 `json:"groupID,omitempty"`
 
+	// QuoteID is for OTC exchange
+	QuoteID string `json:"quoteID,omitempty" db:"quote_id"`
+
+	// MarginSideEffect is used for margin orders, it can be NO_SIDE_EFFECT, AUTO_BORROW_REPAY, AUTO_REPAY, MARGIN_BUY
 	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect,omitempty"` // AUTO_BORROW_REPAY = borrowrepay, AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
 
+	// ReduceOnly is used for futures orders, it means the order is only used to reduce the position size.
 	ReduceOnly bool `json:"reduceOnly,omitempty" db:"reduce_only"`
 
-	// this is mostly designed for binance: true, false；Close-All，used with STOP_MARKET or TAKE_PROFIT_MARKET.
+	// ClosePosition this is mostly designed for binance: true, false；Close-All，used with STOP_MARKET or TAKE_PROFIT_MARKET.
 	ClosePosition bool `json:"closePosition,omitempty" db:"close_position"`
 
 	Tag string `json:"tag,omitempty" db:"-"`

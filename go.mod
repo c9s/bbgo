@@ -23,6 +23,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/gofrs/flock v0.8.1
+	github.com/golang/mock v1.3.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/pyroscope-go v1.2.0
