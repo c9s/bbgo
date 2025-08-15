@@ -59,11 +59,13 @@ func TestExchange_OrdersAPI(t *testing.T) {
 		})
 	assert.NoError(t, err)
 	assert.NotEmpty(t, order)
+	t.Logf("created order: %+v", order)
 
 	// test query open orders
 	order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: symbol, OrderID: order.UUID, ClientOrderID: order.UUID})
 	assert.NoError(t, err)
 	assert.NotNil(t, order)
+	t.Logf("queried order: %+v", order)
 
 	// the status might be pending at the beginning. Wait until it is open
 	// only retry 5 times
@@ -77,6 +79,7 @@ func TestExchange_OrdersAPI(t *testing.T) {
 	}
 
 	orders, err := ex.QueryOpenOrders(ctx, symbol)
+	t.Logf("queried open orders: %+v", orders)
 	assert.NoError(t, err)
 	found := false
 	for _, o := range orders {
@@ -108,6 +111,8 @@ func TestExchange_CancelOrdersBySymbol(t *testing.T) {
 	assert.NoError(t, err)
 	market, ok := markets[symbol]
 	assert.True(t, ok)
+	t.Logf("market: %+v", market)
+	assert.NotEmpty(t, market)
 	order, err := ex.SubmitOrder(
 		ctx,
 		types.SubmitOrder{
@@ -118,6 +123,9 @@ func TestExchange_CancelOrdersBySymbol(t *testing.T) {
 			Quantity: fixedpoint.MustNewFromString("100"), // min funds is $1
 		})
 	assert.NoError(t, err)
+	assert.NotEmpty(t, order)
+	t.Logf("created order: %+v", order)
+
 	for i := 0; i < 5; i++ {
 		if order.OriginalStatus == "open" {
 			break
@@ -126,8 +134,13 @@ func TestExchange_CancelOrdersBySymbol(t *testing.T) {
 		order, err = ex.QueryOrder(ctx, order.AsQuery())
 		assert.NoError(t, err)
 	}
-	_, err = ex.CancelOrdersBySymbol(ctx, symbol)
+	canceledOrders, err := ex.CancelOrdersBySymbol(ctx, symbol)
+	t.Logf("canceled orders: %+v", canceledOrders)
+
 	assert.NoError(t, err)
+	for _, order := range canceledOrders {
+		assert.NotEmpty(t, order)
+	}
 }
 
 func TestExchange_QueryAccount(t *testing.T) {
@@ -137,7 +150,9 @@ func TestExchange_QueryAccount(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	_, err := ex.QueryAccount(ctx)
+	account, err := ex.QueryAccount(ctx)
+	t.Logf("queried account: %+v", account)
+	assert.NotEmpty(t, account)
 	assert.NoError(t, err)
 }
 
@@ -148,7 +163,9 @@ func TestExchange_QueryAccountBalances(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	_, err := ex.QueryAccountBalances(ctx)
+	bm, err := ex.QueryAccountBalances(ctx)
+	t.Logf("queried account balances: %+v", bm)
+	assert.NotEmpty(t, bm)
 	assert.NoError(t, err)
 }
 
@@ -173,7 +190,13 @@ func TestExchange_QueryMarkets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	_, err := ex.QueryMarkets(ctx)
+	mm, err := ex.QueryMarkets(ctx)
+	t.Logf("queried markets: %+v", mm)
+	for symbol, market := range mm {
+		assert.NotEmpty(t, symbol)
+		assert.NotEmpty(t, market)
+	}
+
 	assert.NoError(t, err)
 }
 
@@ -185,8 +208,10 @@ func TestExchange_QueryTicker(t *testing.T) {
 	defer cancel()
 
 	ticker, err := ex.QueryTicker(ctx, "BTCUSD")
+	t.Logf("queried ticker: %+v", ticker)
 	assert.NoError(t, err)
 	assert.NotNil(t, ticker)
+	assert.NotEmpty(t, ticker)
 }
 
 func TestExchange_QueryTickers(t *testing.T) {
@@ -198,8 +223,13 @@ func TestExchange_QueryTickers(t *testing.T) {
 
 	symbols := []string{"BTCUSD", "ETHUSD", "ETHBTC"}
 	tickers, err := ex.QueryTickers(ctx, symbols...)
+	t.Logf("queried tickers: %+v", tickers)
 	assert.NoError(t, err)
 	assert.NotNil(t, tickers)
+	for symbol, ticker := range tickers {
+		assert.NotEmpty(t, symbol)
+		assert.NotEmpty(t, ticker)
+	}
 }
 
 func TestExchange_QueryKLines(t *testing.T) {
@@ -214,11 +244,15 @@ func TestExchange_QueryKLines(t *testing.T) {
 	assert.Error(t, err)
 
 	klines, err := ex.QueryKLines(ctx, "BTCUSD", types.Interval1m, types.KLineQueryOptions{})
+	t.Logf("queried 1m klines: %+v", klines)
 	assert.NoError(t, err)
 	assert.NotNil(t, klines)
+	for _, kline := range klines {
+		assert.NotEmpty(t, kline)
+	}
 
 	endTime := time.Now()
-	startTime := endTime.Add(-time.Hour * 5)
+	startTime := endTime.Add(-time.Minute * 5)
 	klines, err = ex.QueryKLines(
 		ctx,
 		"BTCUSD",
@@ -228,8 +262,12 @@ func TestExchange_QueryKLines(t *testing.T) {
 			EndTime:   &endTime,
 		},
 	)
+	t.Logf("queried 1m klines (%s~%s): %+v", startTime, endTime, klines)
 	assert.NoError(t, err)
 	assert.NotNil(t, klines)
+	for _, kline := range klines {
+		assert.NotEmpty(t, kline.Symbol)
+	}
 }
 
 func TestExchange_QueryOrderTrades(t *testing.T) {
@@ -239,9 +277,14 @@ func TestExchange_QueryOrderTrades(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	trades, err := ex.QueryOrderTrades(ctx, types.OrderQuery{Symbol: "ETHUSDT"})
+	trades, err := ex.QueryOrderTrades(ctx, types.OrderQuery{Symbol: "BTCUSDT"})
+	t.Logf("queried trades: %+v", trades)
 	assert.NoError(t, err)
 	assert.NotNil(t, trades)
+	assert.Greater(t, len(trades), 0)
+	for _, trade := range trades {
+		assert.NotEmpty(t, trade)
+	}
 }
 
 func TestExchange_QueryTrades(t *testing.T) {
@@ -253,26 +296,38 @@ func TestExchange_QueryTrades(t *testing.T) {
 
 	symbol := "BTCUSDT"
 	trades, err := ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{})
+	t.Logf("queried trades: %+v", trades)
 	assert.NoError(t, err)
 	assert.NotNil(t, trades)
 	assert.Greater(t, len(trades), 0)
+	for _, trade := range trades {
+		assert.NotEmpty(t, trade)
+	}
 
-	// query the last 100 trades
+	// query the last 20 trades
 	trades, err = ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
 		Limit: 20,
 	})
+	t.Logf("queried last 20 trades: %+v", trades)
 	assert.NoError(t, err)
 	assert.NotNil(t, trades)
 	assert.Equal(t, len(trades), 20)
+	for _, trade := range trades {
+		assert.NotEmpty(t, trade)
+	}
 
 	// query the last 10 trades with last trade ID
 	lastTradeID := trades[10].ID
 	trades, err = ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
 		LastTradeID: lastTradeID,
 	})
+	t.Logf("queried trades after last trade ID %d: %+v", lastTradeID, trades)
 	assert.NoError(t, err)
 	assert.NotNil(t, trades)
 	assert.Equal(t, len(trades), 10)
+	for _, trade := range trades {
+		assert.NotEmpty(t, trade)
+	}
 }
 
 func TestExchange_QueryClosedOrders(t *testing.T) {
@@ -292,17 +347,25 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 		"2025-06-20T06:11:10Z",
 	)
 	orders, err := ex.QueryClosedOrders(ctx, symbol, startTime, endTime, 0)
+	t.Logf("queried closed orders (%s~%s): %+v", startTime, endTime, orders)
 	assert.NoError(t, err)
 	assert.NotNil(t, orders)
 	assert.Greater(t, len(orders), 0)
+	for _, order := range orders {
+		assert.NotEmpty(t, order)
+	}
 
 	// startTime and endTime are inclusive
 	startTime = orders[15].CreationTime.Time()
 	endTime = orders[10].CreationTime.Time()
 	orders, err = ex.QueryClosedOrders(ctx, symbol, startTime, endTime, 0)
+	t.Logf("queried closed orders (%s~%s): %+v", startTime, endTime, orders)
 	assert.NoError(t, err)
 	assert.NotNil(t, orders)
 	assert.Equal(t, len(orders), 6)
+	for _, order := range orders {
+		assert.NotEmpty(t, order)
+	}
 }
 
 func TestExchange_QueryDepositHistory(t *testing.T) {
