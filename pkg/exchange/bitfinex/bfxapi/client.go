@@ -42,6 +42,12 @@ func NewClient() *Client {
 	}
 }
 
+func (c *Client) Funding() *FundingService {
+	return &FundingService{
+		Client: c,
+	}
+}
+
 func (c *Client) Auth(key string, secret string) *Client {
 	c.apiKey = key
 	c.apiSecret = secret

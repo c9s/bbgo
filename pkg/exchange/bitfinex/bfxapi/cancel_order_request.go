@@ -1,8 +1,9 @@
 package bfxapi
 
 import (
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 // API: https://docs.bitfinex.com/reference/rest-auth-cancel-order

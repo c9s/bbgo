@@ -17,7 +17,7 @@ type CancelFundingOfferRequest struct {
 }
 
 // NewCancelFundingOfferRequest creates a new CancelFundingOfferRequest instance.
-func (c *Client) NewCancelFundingOfferRequest() *CancelFundingOfferRequest {
+func (c *FundingService) NewCancelFundingOfferRequest() *CancelFundingOfferRequest {
 	return &CancelFundingOfferRequest{client: c}
 }
 
