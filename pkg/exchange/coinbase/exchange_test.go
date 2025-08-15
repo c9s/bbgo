@@ -2,6 +2,9 @@ package coinbase
 
 import (
 	"context"
+	"os"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -9,7 +12,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testing/httptesting"
-	"github.com/c9s/bbgo/pkg/testutil"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -427,7 +429,7 @@ func TestExchange_QueryWithdrawHistory(t *testing.T) {
 }
 
 func getExchangeOrSkip(t *testing.T) (*Exchange, func()) {
-	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "COINBASE")
+	key, secret, passphrase, ok := IntegrationTestWithPassphraseConfigured(t, "COINBASE")
 	ex := New(key, secret, passphrase, 0)
 	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, ex.client.HttpClient, "testdata/"+t.Name()+".json")
 
@@ -437,4 +439,25 @@ func getExchangeOrSkip(t *testing.T) (*Exchange, func()) {
 	}
 
 	return ex, saveRecord
+}
+
+// copied from testutil, or tests for other exchanges will fail
+func IntegrationTestWithPassphraseConfigured(t *testing.T, prefix string) (key, secret, passphrase string, ok bool) {
+	var hasKey, hasSecret, hasPassphrase bool
+
+	prefix = strings.ToUpper(prefix)
+	key, hasKey = os.LookupEnv(prefix + "_API_KEY")
+	secret, hasSecret = os.LookupEnv(prefix + "_API_SECRET")
+	passphrase, hasPassphrase = os.LookupEnv(prefix + "_API_PASSPHRASE")
+	ok = hasKey && hasSecret && hasPassphrase && os.Getenv("TEST_"+prefix) == "1"
+	if ok {
+		t.Logf(prefix+" api integration test enabled, key = %s, secret = %s, passphrase= %s", maskSecret(key), maskSecret(secret), maskSecret(passphrase))
+	}
+	return key, secret, passphrase, ok
+}
+
+func maskSecret(s string) string {
+	re := regexp.MustCompile(`\b(\w{4})\w+\b`)
+	s = re.ReplaceAllString(s, "$1******")
+	return s
 }
