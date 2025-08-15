@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/testutil"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -57,7 +56,7 @@ func Test_SubCmdString(t *testing.T) {
 }
 
 func TestStreamBasic(t *testing.T) {
-	productIDs := []string{"BTC-USD", "ETH-USD"}
+	productIDs := []string{"BTCUSD", "ETHUSD"}
 
 	t.Run("Test Status", func(t *testing.T) {
 		stream := getTestStreamOrSkip(t)
@@ -142,7 +141,7 @@ func TestStreamBasic(t *testing.T) {
 
 func TestStreamFull(t *testing.T) {
 	t.Run("Run Full", func(t *testing.T) {
-		productIDs := []string{"BTC-USD", "ETH-USD"}
+		productIDs := []string{"BTCUSD", "ETHUSD"}
 		c := make(chan struct{}, 10)
 		stream := getTestStreamOrSkip(t)
 		stream.SetPublicOnly()
@@ -200,7 +199,7 @@ func TestLevel2(t *testing.T) {
 		stream := getTestStreamOrSkip(t)
 		stream.SetPublicOnly()
 		c := make(chan string, 2)
-		productIDs := []string{"BTC-USD"}
+		productIDs := []string{"BTCUSD"}
 		getSnapshot := false
 		getUpdate := false
 
@@ -378,7 +377,7 @@ func getTestStreamOrSkip(t *testing.T) *Stream {
 		t.Skip("skip test for CI")
 	}
 
-	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "COINBASE")
+	key, secret, passphrase, ok := IntegrationTestWithPassphraseConfigured(t, "COINBASE")
 	if !ok {
 		t.Skip("COINBASE_* env vars not set")
 	}
