@@ -196,14 +196,18 @@ func (s *StandardStream) GetPublicOnly() bool {
 	return s.PublicOnly
 }
 
+// SetEndpointCreator sets the endpoint creator function to create the websocket endpoint URL.
+// This is useful when the endpoint URL is dynamic or needs to be created based on some context.
 func (s *StandardStream) SetEndpointCreator(creator EndpointCreator) {
 	s.endpointCreator = creator
 }
 
+// SetDispatcher sets the dispatcher function to dispatch the parsed websocket message.
 func (s *StandardStream) SetDispatcher(dispatcher Dispatcher) {
 	s.dispatcher = dispatcher
 }
 
+// SetParser sets the parser function to parse the websocket message.
 func (s *StandardStream) SetParser(parser Parser) {
 	s.parser = parser
 }
