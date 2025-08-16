@@ -558,7 +558,6 @@ func TestToGlobalOrder(t *testing.T) {
 		},
 		Exchange:         types.ExchangeBybit,
 		OrderID:          orderIdNum,
-		UUID:             openOrder.OrderId,
 		Status:           status,
 		ExecutedQuantity: openOrder.CumExecQty,
 		IsWorking:        status == types.OrderStatusNew || status == types.OrderStatusPartiallyFilled,
