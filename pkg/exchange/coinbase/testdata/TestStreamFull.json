@@ -1,0 +1,160 @@
+[
+  {
+    "type": "subscriptions",
+    "channels": [
+      {
+        "name": "full",
+        "product_ids": ["ETH-USD", "BTC-USD"]
+      }
+    ]
+  },
+  {
+    "type": "received",
+    "product_id": "ETH-USD",
+    "sequence": 85426490662,
+    "client-oid": "",
+    "order_id": "4a9a9a1e-ae1e-4374-ba3c-dd861e45e414",
+    "order_type": "limit",
+    "side": "sell",
+    "time": "2025-08-18T07:46:46.482242Z",
+    "size": 0.03148378,
+    "price": 4263.3
+  },
+  {
+    "type": "open",
+    "product_id": "ETH-USD",
+    "sequence": 85426490663,
+    "time": "2025-08-18T07:46:46.482242Z",
+    "order_id": "4a9a9a1e-ae1e-4374-ba3c-dd861e45e414",
+    "price": 4263.3,
+    "remaining_size": 0.03148378,
+    "side": "sell"
+  },
+  {
+    "type": "change",
+    "product_id": "ETH-USD",
+    "sequence": 85426490664,
+    "reason": "modify_order",
+    "time": "2025-08-18T07:46:46.484116Z",
+    "order_id": "2ebc94da-02f5-47fb-b427-934effed756f",
+    "side": "sell",
+    "old_size": 4.42691425,
+    "new_size": 4.42746443,
+    "old_price": 4265.05,
+    "new_price": 4264.52
+  },
+  {
+    "type": "received",
+    "product_id": "ETH-USD",
+    "sequence": 85426490665,
+    "client-oid": "",
+    "order_id": "f4a551e2-089c-4ff9-9f88-0989f84624a4",
+    "order_type": "limit",
+    "side": "buy",
+    "time": "2025-08-18T07:46:46.485351Z",
+    "size": 0.1173,
+    "price": 4259.9
+  },
+  {
+    "type": "open",
+    "product_id": "ETH-USD",
+    "sequence": 85426490666,
+    "time": "2025-08-18T07:46:46.485351Z",
+    "order_id": "f4a551e2-089c-4ff9-9f88-0989f84624a4",
+    "price": 4259.9,
+    "remaining_size": 0.1173,
+    "side": "buy"
+  },
+  {
+    "type": "received",
+    "product_id": "ETH-USD",
+    "sequence": 85426490667,
+    "client-oid": "",
+    "order_id": "4cb0946f-0bbd-4e56-a018-1856bc639e1a",
+    "order_type": "limit",
+    "side": "buy",
+    "time": "2025-08-18T07:46:46.485351Z",
+    "size": 0.2346,
+    "price": 4258.19
+  },
+  {
+    "type": "open",
+    "product_id": "ETH-USD",
+    "sequence": 85426490668,
+    "time": "2025-08-18T07:46:46.485351Z",
+    "order_id": "4cb0946f-0bbd-4e56-a018-1856bc639e1a",
+    "price": 4258.19,
+    "remaining_size": 0.2346,
+    "side": "buy"
+  },
+  {
+    "type": "received",
+    "product_id": "ETH-USD",
+    "sequence": 85426490669,
+    "client-oid": "",
+    "order_id": "e46f9b77-05f5-4bfc-ab76-27ecdc9b3ee0",
+    "order_type": "limit",
+    "side": "buy",
+    "time": "2025-08-18T07:46:46.485351Z",
+    "size": 0.352,
+    "price": 4256.49
+  },
+  {
+    "type": "open",
+    "product_id": "ETH-USD",
+    "sequence": 85426490670,
+    "time": "2025-08-18T07:46:46.485351Z",
+    "order_id": "e46f9b77-05f5-4bfc-ab76-27ecdc9b3ee0",
+    "price": 4256.49,
+    "remaining_size": 0.352,
+    "side": "buy"
+  },
+  {
+    "type": "change",
+    "product_id": "ETH-USD",
+    "sequence": 85426490671,
+    "reason": "modify_order",
+    "time": "2025-08-18T07:46:46.485992Z",
+    "order_id": "cae3c363-5850-49ce-91b0-3d6e6530e560",
+    "side": "buy",
+    "old_size": 12.79912104,
+    "new_size": 12.80074419,
+    "old_price": 4258.63,
+    "new_price": 4258.09
+  },
+  {
+    "type": "done",
+    "product_id": "ETH-USD",
+    "sequence": 85426490672,
+    "time": "2025-08-18T07:46:46.486201Z",
+    "price": 4256.7,
+    "order_id": "611b1f10-40c0-4d25-a94d-e3fb6d7f9842",
+    "reason": "canceled",
+    "side": "buy",
+    "remaining_size": 2.37372589
+  },
+  {
+    "type": "change",
+    "product_id": "ETH-USD",
+    "sequence": 85426490673,
+    "reason": "modify_order",
+    "time": "2025-08-18T07:46:46.48719Z",
+    "order_id": "447158cc-6a5c-4ed9-b347-17a02433561e",
+    "side": "buy",
+    "old_size": 5.47117693,
+    "new_size": 5.47187065,
+    "old_price": 4259.38,
+    "new_price": 4258.84
+  },
+  {
+    "type": "done",
+    "product_id": "ETH-USD",
+    "sequence": 85426490674,
+    "time": "2025-08-18T07:46:46.488541Z",
+    "price": 4261.7,
+    "order_id": "73460b36-ce40-4d10-8b9d-e4938806b982",
+    "reason": "canceled",
+    "side": "sell",
+    "remaining_size": 0.01376
+  }
+]
