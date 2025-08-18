@@ -37,6 +37,15 @@ func NewMillisecondTimestampFromInt(i int64) MillisecondTimestamp {
 	return MillisecondTimestamp(time.Unix(0, i*int64(time.Millisecond)))
 }
 
+func ParseMillisecondTimestamp(a string) (ts MillisecondTimestamp, err error) {
+	m, err := strconv.ParseInt(a, 10, 64) // startTime
+	if err != nil {
+		return ts, err
+	}
+
+	return NewMillisecondTimestampFromInt(m), nil
+}
+
 func MustParseMillisecondTimestamp(a string) MillisecondTimestamp {
 	m, err := strconv.ParseInt(a, 10, 64) // startTime
 	if err != nil {
