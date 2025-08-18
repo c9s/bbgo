@@ -7,6 +7,7 @@ import (
 	"runtime/pprof"
 	"strings"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/heroku/rollrus"
 	"github.com/joho/godotenv"
@@ -17,12 +18,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/util"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
 var cpuProfileFile *os.File
@@ -37,7 +35,7 @@ var RootCmd = &cobra.Command{
 	SilenceUsage: true,
 
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if err := cobraLoadDotenv(cmd, args); err != nil {
+		if err := cobraLoadDotenv(cmd); err != nil {
 			return err
 		}
 
@@ -46,10 +44,7 @@ var RootCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		env := os.Getenv("BBGO_ENV")
-		if env == "" {
-			env = "development"
-		}
+		env := bbgo.GetCurrentEnv()
 
 		logFormatter, err := cmd.Flags().GetString("log-formatter")
 		if err != nil {
@@ -57,22 +52,11 @@ var RootCmd = &cobra.Command{
 		}
 
 		if len(logFormatter) == 0 {
-			switch env {
-			case "production", "prod", "stag", "staging":
-				// always use json formatter for production and staging
-				log.SetFormatter(&log.JSONFormatter{})
-			default:
-				log.SetFormatter(&prefixed.TextFormatter{})
-			}
+			formatter := bbgo.NewLogFormatterWithEnv(env)
+			log.SetFormatter(formatter)
 		} else {
-			switch logFormatter {
-			case "prefixed":
-				log.SetFormatter(&prefixed.TextFormatter{})
-			case "text":
-				log.SetFormatter(&log.TextFormatter{})
-			case "json":
-				log.SetFormatter(&log.JSONFormatter{})
-			}
+			formatter := bbgo.NewLogFormatter(bbgo.LogFormatterType(logFormatter))
+			log.SetFormatter(formatter)
 		}
 
 		if token := viper.GetString("rollbar-token"); token != "" {
@@ -96,6 +80,24 @@ var RootCmd = &cobra.Command{
 			}()
 		}
 
+		enableProfileServer, err := cmd.Flags().GetBool("enable-profile-server")
+		if err != nil {
+			return err
+		}
+
+		if enableProfileServer {
+			profileServerBind, err := cmd.Flags().GetString("profile-server-bind")
+			if err != nil {
+				return err
+			}
+
+			go func() {
+				if err := http.ListenAndServe(profileServerBind, nil); err != nil {
+					log.WithError(err).Errorf("profile server error")
+				}
+			}()
+		}
+
 		cpuProfile, err := cmd.Flags().GetString("cpu-profile")
 		if err != nil {
 			return err
@@ -114,7 +116,7 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		return cobraLoadConfig(cmd, args)
+		return cobraLoadConfig(cmd)
 	},
 	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
 		pprof.StopCPUProfile()
@@ -129,7 +131,7 @@ var RootCmd = &cobra.Command{
 	},
 }
 
-func cobraLoadDotenv(cmd *cobra.Command, args []string) error {
+func cobraLoadDotenv(cmd *cobra.Command) error {
 	disableDotEnv, err := cmd.Flags().GetBool("no-dotenv")
 	if err != nil {
 		return err
@@ -150,7 +152,7 @@ func cobraLoadDotenv(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func cobraLoadConfig(cmd *cobra.Command, args []string) error {
+func cobraLoadConfig(cmd *cobra.Command) error {
 	configFile, err := cmd.Flags().GetString("config")
 	if err != nil {
 		return errors.Wrapf(err, "failed to get the config flag")
@@ -210,6 +212,8 @@ func init() {
 	RootCmd.PersistentFlags().String("max-api-secret", "", "max api secret")
 
 	RootCmd.PersistentFlags().String("cpu-profile", "", "cpu profile")
+	RootCmd.PersistentFlags().Bool("enable-profile-server", false, "enable profile server binding")
+	RootCmd.PersistentFlags().String("profile-server-bind", "localhost:6060", "profile server binding")
 
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 

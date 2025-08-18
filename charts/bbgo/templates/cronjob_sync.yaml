@@ -1,0 +1,58 @@
+{{- if .Values.sync.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "bbgo.fullname" . }}-sync
+  {{- with .Values.deploymentAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "bbgo.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.sync.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: bbgo
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            imagePullPolicy: {{ .Values.image.pullPolicy }}
+            args:
+            {{- if .Values.metrics.enabled }}
+            - "--metrics"
+            - "--metrics-port"
+            - {{ .Values.metrics.port | quote }}
+            {{- end }}
+            - "sync"
+            - "--config"
+            - "/config/bbgo.yaml"
+            {{- if .Values.sync.since }}
+            - "--since"
+            - {{ .Values.sync.since | quote }}
+            {{- end }}
+            {{- if .Values.debug.enabled }}
+            - "--debug"
+            {{- end }}
+            resources:
+              {{- toYaml .Values.resources | nindent 14 }}
+            volumeMounts:
+            - name: config-volume
+              mountPath: /config
+            envFrom:
+            - secretRef:
+                name: {{ .Values.dotenv.secret | default .Release.Name }}
+          restartPolicy: OnFailure
+          volumes:
+          - name: config-volume
+            configMap:
+            {{- if .Values.existingConfigMap }}
+              name: {{ .Values.existingConfigMap }}
+            {{- else }}
+              name: {{ include "bbgo.fullname" . }}
+            {{- end }}
+{{- end -}}

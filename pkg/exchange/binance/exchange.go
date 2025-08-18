@@ -2,6 +2,7 @@ package binance
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
 	"os"
 	"strconv"
@@ -12,8 +13,6 @@ import (
 	"github.com/adshao/go-binance/v2"
 
 	"github.com/adshao/go-binance/v2/futures"
-	"github.com/spf13/viper"
-
 	"go.uber.org/multierr"
 
 	"golang.org/x/time/rate"
@@ -22,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -30,14 +30,28 @@ import (
 
 const BNB = "BNB"
 
+const DefaultDepthLimit = 5000
+const DefaultFuturesDepthLimit = 1000
+
 const BinanceUSBaseURL = "https://api.binance.us"
 const BinanceTestBaseURL = "https://testnet.binance.vision"
 const BinanceUSWebSocketURL = "wss://stream.binance.us:9443"
+
 const WebSocketURL = "wss://stream.binance.com:9443"
-const WebSocketTestURL = "wss://testnet.binance.vision"
-const FutureTestBaseURL = "https://testnet.binancefuture.com"
 const FuturesWebSocketURL = "wss://fstream.binance.com"
-const FuturesWebSocketTestURL = "wss://stream.binancefuture.com"
+const TestNetFuturesWebSocketURL = "wss://stream.binancefuture.com"
+
+// TestNet URLs
+const TestNetWebSocketURL = "wss://testnet.binance.vision"
+const TestNetFuturesBaseURL = "https://testnet.binancefuture.com"
+
+// New WebSocket API Endpoints
+// listenKey will be deprecated. Official recommendation is to use ws-api for user data stream
+const WsSpotWebSocketURL = "wss://ws-api.binance.com:443/ws-api/v3"
+const WsTestNetWebSocketURL = "wss://testnet.binance.vision/ws-api/v3"
+
+const WsFuturesWebSocketURL = "wss://ws-fapi.binance.com/ws-fapi/v1"
+const WsTestNetFuturesWebSocketURL = "wss://testnet.binancefuture.com/ws-fapi/v1"
 
 // orderLimiter - the default order limiter apply 5 requests per second and a 2 initial bucket
 // this includes SubmitOrder, CancelOrder and QueryClosedOrders
@@ -46,32 +60,51 @@ const FuturesWebSocketTestURL = "wss://stream.binancefuture.com"
 var orderLimiter = rate.NewLimiter(5, 2)
 var queryTradeLimiter = rate.NewLimiter(1, 2)
 
+var dualSidePosition = false
+
+var testNet = false
+
+var debugMode = false
+
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
 })
+
+func debugDummy(msg string, args ...any) {}
+
+var debug = debugDummy
 
 func init() {
 	_ = types.Exchange(&Exchange{})
 	_ = types.MarginExchange(&Exchange{})
 	_ = types.FuturesExchange(&Exchange{})
 
-	if n, ok := util.GetEnvVarInt("BINANCE_ORDER_RATE_LIMITER"); ok {
+	if v, ok := envvar.Bool("DEBUG_BINANCE", false); ok {
+		debugMode = v
+		debug = log.Infof
+	}
+
+	if n, ok := envvar.Int("BINANCE_ORDER_RATE_LIMITER"); ok {
 		orderLimiter = rate.NewLimiter(rate.Every(time.Duration(n)*time.Minute), 2)
 	}
 
-	if n, ok := util.GetEnvVarInt("BINANCE_QUERY_TRADES_RATE_LIMITER"); ok {
+	if n, ok := envvar.Int("BINANCE_QUERY_TRADES_RATE_LIMITER"); ok {
 		queryTradeLimiter = rate.NewLimiter(rate.Every(time.Duration(n)*time.Minute), 2)
 	}
+
+	dualSidePosition, _ = envvar.Bool("BINANCE_ENABLE_FUTURES_HEDGE_MODE", false)
+	testNet, _ = envvar.Bool("BINANCE_TESTNET", false)
 }
 
 func isBinanceUs() bool {
-	v, err := strconv.ParseBool(os.Getenv("BINANCE_US"))
-	return err == nil && v
+	v, ok := envvar.Bool("BINANCE_US")
+	return ok && v
 }
 
-func paperTrade() bool {
-	v, ok := util.GetEnvVarBool("PAPER_TRADE")
-	return ok && v
+type ed25519authentication struct {
+	privateKey ed25519.PrivateKey
+
+	usingEd25519 bool
 }
 
 type Exchange struct {
@@ -79,6 +112,9 @@ type Exchange struct {
 	types.FuturesSettings
 
 	key, secret string
+
+	ed25519authentication
+
 	// client is used for spot & margin
 	client *binance.Client
 
@@ -94,57 +130,91 @@ type Exchange struct {
 
 var timeSetterOnce sync.Once
 
-func New(key, secret string) *Exchange {
+func New(key, secret string, args ...string) *Exchange {
+	if util.IsPaperTrade() {
+		binance.UseTestnet = true
+	}
+
+	ed25519PKeyPEM := os.Getenv("BINANCE_API_PRIVATE_KEY")
+	if len(args) > 0 && len(args[0]) > 0 {
+		// override the global private key with args[0] is provided
+		if len(ed25519PKeyPEM) > 0 {
+			debug("binance exchange: ed25519 private key is set in both env and args, using args[0] instead")
+		}
+
+		ed25519PKeyPEM = args[0]
+	}
+
+	// parse ed25519 private key
+	var ed25519PrivateKey ed25519.PrivateKey
+	var err error
+	if len(ed25519PKeyPEM) > 0 {
+		ed25519PrivateKey, err = util.ParseEd25519PrivateKey(ed25519PKeyPEM)
+		if err != nil {
+			log.WithError(err).Warnf("binance exchange: failed to parse ed25519 private key, using default auth: %s", ed25519PKeyPEM)
+		}
+	}
+
+	// if parse is successful, we will use ed25519 auth
+	ed25519Auth := len(ed25519PKeyPEM) > 0 && len(ed25519PrivateKey) > 0 && err == nil
+	if ed25519Auth {
+		debug("binance exchange: using ed25519 private key for authentication")
+	}
+
 	var client = binance.NewClient(key, secret)
 	client.HTTPClient = binanceapi.DefaultHttpClient
-	client.Debug = viper.GetBool("debug-binance-client")
 
 	var futuresClient = binance.NewFuturesClient(key, secret)
 	futuresClient.HTTPClient = binanceapi.DefaultHttpClient
-	futuresClient.Debug = viper.GetBool("debug-binance-futures-client")
+
+	if v, ok := envvar.Bool("DEBUG_BINANCE_CLIENT", false); ok {
+		client.Debug = v
+		futuresClient.Debug = v
+	}
 
 	if isBinanceUs() {
 		client.BaseURL = BinanceUSBaseURL
-	}
-
-	if paperTrade() {
-		client.BaseURL = BinanceTestBaseURL
-		futuresClient.BaseURL = FutureTestBaseURL
 	}
 
 	client2 := binanceapi.NewClient(client.BaseURL)
 	futuresClient2 := binanceapi.NewFuturesRestClient(futuresClient.BaseURL)
 
 	ex := &Exchange{
-		key:            key,
-		secret:         secret,
+		key:    key,
+		secret: secret,
+
+		ed25519authentication: ed25519authentication{
+			privateKey:   ed25519PrivateKey,
+			usingEd25519: ed25519Auth,
+		},
+
 		client:         client,
 		futuresClient:  futuresClient,
 		client2:        client2,
 		futuresClient2: futuresClient2,
 	}
 
-	if len(key) > 0 && len(secret) > 0 {
-		client2.Auth(key, secret)
-		futuresClient2.Auth(key, secret)
-
-		ctx := context.Background()
-		go timeSetterOnce.Do(func() {
-			ex.setServerTimeOffset(ctx)
-
-			ticker := time.NewTicker(time.Hour)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-
-				case <-ticker.C:
-					ex.setServerTimeOffset(ctx)
-				}
-			}
-		})
+	if (len(key) > 0 && len(secret) > 0) || len(ed25519PrivateKey) > 0 {
+		client2.Auth(key, secret, ed25519PrivateKey)
+		futuresClient2.Auth(key, secret, ed25519PrivateKey)
 	}
+
+	ctx := context.Background()
+	go timeSetterOnce.Do(func() {
+		ex.setServerTimeOffset(ctx)
+
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case <-ticker.C:
+				ex.setServerTimeOffset(ctx)
+			}
+		}
+	})
 
 	return ex
 }
@@ -305,13 +375,40 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedp
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	stream := NewStream(e, e.client, e.futuresClient)
-	stream.MarginSettings = e.MarginSettings
-	stream.FuturesSettings = e.FuturesSettings
-	return stream
+	return NewStream(e, e.client, e.futuresClient)
 }
 
-func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error) {
+func (e *Exchange) QueryMarginFutureHourlyInterestRate(
+	ctx context.Context, assets []string,
+) (rates types.MarginNextHourlyInterestRateMap, err error) {
+
+	if len(assets) > 20 {
+		return nil, fmt.Errorf("assets length must be less than 20, got %d", len(assets))
+	}
+
+	req := e.client2.NewGetMarginFutureHourlyInterestRateRequest()
+	req.Assets(strings.Join(assets, ","))
+	req.IsIsolated("FALSE")
+	rateSlice, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rateMap := make(types.MarginNextHourlyInterestRateMap)
+	for _, entry := range rateSlice {
+		rateMap[entry.Asset] = &types.MarginNextHourlyInterestRate{
+			Asset:          entry.Asset,
+			HourlyRate:     entry.NextHourlyInterestRate,
+			AnnualizedRate: entry.GetAnnualizedInterestRate(),
+		}
+	}
+
+	return rateMap, nil
+}
+
+func (e *Exchange) QueryMarginAssetMaxBorrowable(
+	ctx context.Context, asset string,
+) (amount fixedpoint.Value, err error) {
 	req := e.client2.NewGetMarginMaxBorrowableRequest()
 	req.Asset(asset)
 	if e.IsIsolatedMargin {
@@ -326,43 +423,39 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset stri
 	return resp.Amount, nil
 }
 
-func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
-	req := e.client.NewMarginRepayService()
+func (e *Exchange) borrowRepayAsset(
+	ctx context.Context, asset string, amount fixedpoint.Value, marginType binanceapi.BorrowRepayType,
+) error {
+	req := e.client2.NewPlaceMarginOrderRequest()
 	req.Asset(asset)
-	req.Amount(amount.String())
+	req.Amount(amount)
+	req.SetBorrowRepayType(marginType)
 	if e.IsIsolatedMargin {
+		req.IsIsolated(e.IsIsolatedMargin)
 		req.Symbol(e.IsolatedMarginSymbol)
 	}
 
-	log.Infof("repaying margin asset %s amount %f", asset, amount.Float64())
+	log.Infof("%s margin asset %s amount %f", marginType, asset, amount.Float64())
 	resp, err := req.Do(ctx)
 	if err != nil {
 		return err
 	}
 
-	log.Debugf("margin repayed %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
+	log.Debugf("margin %s %f %s, transaction id = %d", marginType, amount.Float64(), asset, resp.TranId)
 	return err
+}
+
+func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+	return e.borrowRepayAsset(ctx, asset, amount, binanceapi.BorrowRepayTypeRepay)
 }
 
 func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
-	req := e.client.NewMarginLoanService()
-	req.Asset(asset)
-	req.Amount(amount.String())
-	if e.IsIsolatedMargin {
-		req.Symbol(e.IsolatedMarginSymbol)
-	}
-
-	log.Infof("borrowing margin asset %s amount %f", asset, amount.Float64())
-	resp, err := req.Do(ctx)
-	if err != nil {
-		return err
-	}
-	log.Debugf("margin borrowed %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
-	return err
+	return e.borrowRepayAsset(ctx, asset, amount, binanceapi.BorrowRepayTypeBorrow)
 }
 
 func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) error {
-	req := e.client.NewListMarginLoansService()
+	req := e.client2.NewGetMarginBorrowRepayHistoryRequest()
+	req.SetBorrowRepayType(binanceapi.BorrowRepayTypeBorrow)
 	req.Asset(asset)
 	history, err := req.Do(ctx)
 	if err != nil {
@@ -378,7 +471,9 @@ func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) e
 // types.TransferOut => Margin to Spot
 //
 // to call this method, you must set the IsMargin = true
-func (e *Exchange) TransferMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+func (e *Exchange) TransferMarginAccountAsset(
+	ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection,
+) error {
 	if e.IsIsolatedMargin {
 		return e.transferIsolatedMarginAccountAsset(ctx, asset, amount, io)
 	}
@@ -386,18 +481,20 @@ func (e *Exchange) TransferMarginAccountAsset(ctx context.Context, asset string,
 	return e.transferCrossMarginAccountAsset(ctx, asset, amount, io)
 }
 
-func (e *Exchange) transferIsolatedMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
-	req := e.client2.NewTransferIsolatedMarginAccountRequest()
-	req.Symbol(e.IsolatedMarginSymbol)
+func (e *Exchange) transferIsolatedMarginAccountAsset(
+	ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection,
+) error {
+	req := e.client2.NewTransferAssetRequest()
+	req.Asset(asset)
+	req.FromSymbol(e.IsolatedMarginSymbol)
+	req.ToSymbol(e.IsolatedMarginSymbol)
 
 	switch io {
 	case types.TransferIn:
-		req.TransFrom(binanceapi.AccountTypeSpot)
-		req.TransTo(binanceapi.AccountTypeIsolatedMargin)
+		req.TransferType(binanceapi.TransferAssetTypeMainToIsolatedMargin)
 
 	case types.TransferOut:
-		req.TransFrom(binanceapi.AccountTypeIsolatedMargin)
-		req.TransTo(binanceapi.AccountTypeSpot)
+		req.TransferType(binanceapi.TransferAssetTypeIsolatedMarginToMain)
 	}
 
 	req.Asset(asset)
@@ -407,15 +504,17 @@ func (e *Exchange) transferIsolatedMarginAccountAsset(ctx context.Context, asset
 }
 
 // transferCrossMarginAccountAsset transfer asset to the cross margin account or to the main account
-func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
-	req := e.client2.NewTransferCrossMarginAccountRequest()
+func (e *Exchange) transferCrossMarginAccountAsset(
+	ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection,
+) error {
+	req := e.client2.NewTransferAssetRequest()
 	req.Asset(asset)
 	req.Amount(amount.String())
 
 	if io == types.TransferIn {
-		req.TransferType(int(binance.MarginTransferTypeToMargin))
+		req.TransferType(binanceapi.TransferAssetTypeMainToMargin)
 	} else if io == types.TransferOut {
-		req.TransferType(int(binance.MarginTransferTypeToMain))
+		req.TransferType(binanceapi.TransferAssetTypeMarginToMain)
 	} else {
 		return fmt.Errorf("unexpected transfer direction: %d given", io)
 	}
@@ -433,11 +532,11 @@ func (e *Exchange) QueryCrossMarginAccount(ctx context.Context) (*types.Account,
 	marginLevel := fixedpoint.MustNewFromString(marginAccount.MarginLevel)
 	a := &types.Account{
 		AccountType:     types.AccountTypeMargin,
-		MarginInfo:      toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
+		MarginInfo:      toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which maintain []*AccountAsset and []*AccountPosition.
 		MarginLevel:     marginLevel,
-		MarginTolerance: calculateMarginTolerance(marginLevel),
-		BorrowEnabled:   marginAccount.BorrowEnabled,
-		TransferEnabled: marginAccount.TransferEnabled,
+		MarginTolerance: util.CalculateMarginTolerance(marginLevel),
+		BorrowEnabled:   types.BoolPtr(marginAccount.BorrowEnabled),
+		TransferEnabled: types.BoolPtr(marginAccount.TransferEnabled),
 	}
 
 	// convert cross margin user assets into balances
@@ -467,7 +566,7 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 
 	a := &types.Account{
 		AccountType:        types.AccountTypeIsolatedMargin,
-		IsolatedMarginInfo: toGlobalIsolatedMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
+		IsolatedMarginInfo: toGlobalIsolatedMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which maintain []*AccountAsset and []*AccountPosition.
 	}
 
 	if len(marginAccount.Assets) == 0 {
@@ -482,9 +581,9 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 	userAsset := marginAccount.Assets[0]
 	marginLevel := fixedpoint.MustNewFromString(userAsset.MarginLevel)
 	a.MarginLevel = marginLevel
-	a.MarginTolerance = calculateMarginTolerance(marginLevel)
+	a.MarginTolerance = util.CalculateMarginTolerance(marginLevel)
 	a.MarginRatio = fixedpoint.MustNewFromString(userAsset.MarginRatio)
-	a.BorrowEnabled = userAsset.BaseAsset.BorrowEnabled || userAsset.QuoteAsset.BorrowEnabled
+	a.BorrowEnabled = types.BoolPtr(userAsset.BaseAsset.BorrowEnabled || userAsset.QuoteAsset.BorrowEnabled)
 	a.LiquidationPrice = fixedpoint.MustNewFromString(userAsset.LiquidatePrice)
 	a.LiquidationRate = fixedpoint.MustNewFromString(userAsset.LiquidateRate)
 
@@ -512,7 +611,9 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 	return a, nil
 }
 
-func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
+func (e *Exchange) Withdraw(
+	ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions,
+) error {
 	req := e.client2.NewWithdrawRequest()
 	req.Coin(asset)
 	req.Address(address)
@@ -536,7 +637,9 @@ func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint
 	return nil
 }
 
-func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (withdraws []types.Withdraw, err error) {
+func (e *Exchange) QueryWithdrawHistory(
+	ctx context.Context, asset string, since, until time.Time,
+) (withdraws []types.Withdraw, err error) {
 	var emptyTime = time.Time{}
 	if since == emptyTime {
 		since, err = getLaunchDate()
@@ -573,6 +676,11 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			return nil, err
 		}
 
+		status, err := toGlobalWithdrawStatus(d.Status)
+		if err != nil {
+			return nil, err
+		}
+
 		withdraws = append(withdraws, types.Withdraw{
 			Exchange:        types.ExchangeBinance,
 			ApplyTime:       types.Time(applyTime),
@@ -583,14 +691,17 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			TransactionFee:  d.TransactionFee,
 			WithdrawOrderID: d.WithdrawOrderID,
 			Network:         d.Network,
-			Status:          d.Status.String(),
+			Status:          status,
+			OriginalStatus:  fmt.Sprintf("%s (%d)", d.Status.String(), int(d.Status)),
 		})
 	}
 
 	return withdraws, nil
 }
 
-func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
+func (e *Exchange) QueryDepositHistory(
+	ctx context.Context, asset string, since, until time.Time,
+) (allDeposits []types.Deposit, err error) {
 	if since.IsZero() {
 		since, err = getLaunchDate()
 		if err != nil {
@@ -618,12 +729,16 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 	}
 
 	for _, d := range records {
-		// 0(0:pending,6: credited but cannot withdraw, 1:success)
+		// 0(0:pending,6: credited but cannot withdraw, 7=Wrong Deposit,8=Waiting User confirm, 1:success)
 		// set the default status
 		status := types.DepositStatus(fmt.Sprintf("code: %d", d.Status))
 
 		// https://www.binance.com/en/support/faq/115003736451
 		switch d.Status {
+
+		case binanceapi.DepositStatusWrong:
+			status = types.DepositRejected
+
 		case binanceapi.DepositStatusPending:
 			status = types.DepositPending
 
@@ -643,8 +758,10 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			AddressTag:    d.AddressTag,
 			TransactionID: d.TxId,
 			Status:        status,
+			RawStatus:     strconv.Itoa(int(d.Status)),
 			UnlockConfirm: d.UnlockConfirm,
 			Confirmation:  d.ConfirmTimes,
+			Network:       d.Network,
 		})
 	}
 
@@ -652,6 +769,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
+
 	account, err := e.QueryAccount(ctx)
 	if err != nil {
 		return nil, err
@@ -747,47 +865,118 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 		return nil, errors.New("binance: symbol parameter is a mandatory parameter for querying order trades")
 	}
 
-	remoteTrades, err := e.client.NewListTradesService().Symbol(q.Symbol).OrderId(orderID).Do(ctx)
-	if err != nil {
-		return nil, err
+	var remoteTrades []binance.TradeV3
+	var trades []types.Trade
+
+	if e.IsMargin {
+		req := e.client2.NewGetMarginTradesRequest()
+		req.Symbol(q.Symbol).OrderID(uint64(orderID))
+
+		if e.IsIsolatedMargin {
+			req.IsIsolated(true)
+		}
+
+		remoteTrades, err = req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		req := e.client2.NewGetMyTradesRequest()
+		req.Symbol(q.Symbol).
+			OrderID(uint64(orderID))
+
+		remoteTrades, err = req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	var trades []types.Trade
 	for _, t := range remoteTrades {
-		localTrade, err := toGlobalTrade(*t, e.IsMargin)
+		localTrade, err := toGlobalTrade(t, e.IsMargin)
 		if err != nil {
-			log.WithError(err).Errorf("binance: can not convert trade: %+v", t)
+			log.WithError(err).Errorf("binance: unable to convert margin trade: %+v", t)
 			continue
 		}
 
 		trades = append(trades, *localTrade)
 	}
 
-	trades = types.SortTradesAscending(trades)
-	return trades, nil
+	return types.SortTradesAscending(trades), nil
 }
 
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
-	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
-	if err != nil {
-		return nil, err
+	if len(q.Symbol) == 0 {
+		return nil, errors.New("symbol parameter is a mandatory parameter for querying order")
+	}
+
+	var orderID int64
+	var err error
+	if len(q.OrderID) > 0 {
+		orderID, err = strconv.ParseInt(q.OrderID, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if e.IsMargin {
+		var order *binance.Order
+		req := e.client.NewGetMarginOrderService().Symbol(q.Symbol)
+
+		if len(q.OrderID) > 0 {
+			req.OrderID(orderID)
+		} else if len(q.ClientOrderID) > 0 {
+			req.OrigClientOrderID(q.ClientOrderID)
+		} else {
+			return nil, errors.New("empty order id")
+		}
+
+		order, err = req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return toGlobalOrder(order, e.IsMargin)
+	}
+
+	if e.IsFutures {
+		var order *futures.Order
+		req := e.futuresClient.NewGetOrderService().Symbol(q.Symbol)
+
+		if len(q.OrderID) > 0 {
+			req.OrderID(orderID)
+		} else if len(q.ClientOrderID) > 0 {
+			req.OrigClientOrderID(q.ClientOrderID)
+		} else {
+			return nil, errors.New("empty order id")
+		}
+
+		order, err = req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return toGlobalFuturesOrder(order, false)
 	}
 
 	var order *binance.Order
-	if e.IsMargin {
-		order, err = e.client.NewGetMarginOrderService().Symbol(q.Symbol).OrderID(orderID).Do(ctx)
+	req := e.client.NewGetOrderService().Symbol(q.Symbol)
+
+	if len(q.OrderID) > 0 {
+		req.OrderID(orderID)
+	} else if len(q.ClientOrderID) > 0 {
+		req.OrigClientOrderID(q.ClientOrderID)
 	} else {
-		order, err = e.client.NewGetOrderService().Symbol(q.Symbol).OrderID(orderID).Do(ctx)
+		return nil, errors.New("empty order id")
 	}
 
+	order, err = req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-
 	return toGlobalOrder(order, e.IsMargin)
 }
 
-func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+func (e *Exchange) QueryClosedOrders(
+	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
+) (orders []types.Order, err error) {
 	// we can only query orders within 24 hours
 	// if the until-since is more than 24 hours, we should reset the until to:
 	// new until = since + 24 hours - 1 millisecond
@@ -969,7 +1158,6 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 		}
 	}
 
-	// could be IOC or FOK
 	if len(order.TimeInForce) > 0 {
 		// TODO: check the TimeInForce value
 		req.TimeInForce(binance.TimeInForceType(order.TimeInForce))
@@ -1015,19 +1203,11 @@ func newSpotClientOrderID(originalID string) (clientOrderID string) {
 		return ""
 	}
 
-	prefix := "x-" + spotBrokerID
-	prefixLen := len(prefix)
-
 	if originalID != "" {
-		// try to keep the whole original client order ID if user specifies it.
-		if prefixLen+len(originalID) > 32 {
-			return originalID
-		}
-
-		clientOrderID = prefix + originalID
-		return clientOrderID
+		return originalID
 	}
 
+	prefix := "x-" + spotBrokerID
 	clientOrderID = uuid.New().String()
 	clientOrderID = prefix + clientOrderID
 	if len(clientOrderID) > 32 {
@@ -1147,7 +1327,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 //
 // the endTime of a binance kline, is the (startTime + interval time - 1 millisecond), e.g.,
 // millisecond unix timestamp: 1620172860000 and 1620172919999
-func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryKLines(
+	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
+) ([]types.KLine, error) {
 	if e.IsFutures {
 		return e.QueryFuturesKLines(ctx, symbol, interval, options)
 	}
@@ -1204,7 +1386,9 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	return kLines, nil
 }
 
-func (e *Exchange) queryMarginTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) queryMarginTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) (trades []types.Trade, err error) {
 	var remoteTrades []*binance.TradeV3
 	req := e.client.NewListMarginTradesService().
 		IsIsolated(e.IsIsolatedMargin).
@@ -1253,7 +1437,9 @@ func (e *Exchange) queryMarginTrades(ctx context.Context, symbol string, options
 	return trades, nil
 }
 
-func (e *Exchange) querySpotTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) querySpotTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) (trades []types.Trade, err error) {
 	req := e.client2.NewGetMyTradesRequest()
 	req.Symbol(symbol)
 
@@ -1300,7 +1486,9 @@ func (e *Exchange) querySpotTrades(ctx context.Context, symbol string, options *
 	return trades, nil
 }
 
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
+func (e *Exchange) QueryTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) ([]types.Trade, error) {
 	if err := queryTradeLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
@@ -1331,20 +1519,45 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 }
 
 // QueryDepth query the order book depth of a symbol
-func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+func (e *Exchange) QueryDepth(
+	ctx context.Context, symbol string,
+) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
 	if e.IsFutures {
 		return e.queryFuturesDepth(ctx, symbol)
 	}
 
-	response, err := e.client.NewDepthService().Symbol(symbol).Do(ctx)
+	response, err := e.client2.NewGetDepthRequest().Symbol(symbol).Limit(DefaultDepthLimit).Do(ctx)
 	if err != nil {
 		return snapshot, finalUpdateID, err
 	}
 
-	return convertDepth(snapshot, symbol, finalUpdateID, response)
+	return convertDepth(symbol, response)
 }
 
-func convertDepth(snapshot types.SliceOrderBook, symbol string, finalUpdateID int64, response *binance.DepthResponse) (types.SliceOrderBook, int64, error) {
+func convertDepth(
+	symbol string, response *binanceapi.Depth,
+) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	snapshot.Symbol = symbol
+	snapshot.Time = time.Now()
+	snapshot.LastUpdateId = response.LastUpdateId
+	snapshot.Bids = make([]types.PriceVolume, 0, len(response.Bids))
+	snapshot.Asks = make([]types.PriceVolume, 0, len(response.Asks))
+
+	finalUpdateID = response.LastUpdateId
+	for _, entry := range response.Bids {
+		snapshot.Bids = append(snapshot.Bids, types.PriceVolume{Price: entry[0], Volume: entry[1]})
+	}
+
+	for _, entry := range response.Asks {
+		snapshot.Asks = append(snapshot.Asks, types.PriceVolume{Price: entry[0], Volume: entry[1]})
+	}
+
+	return snapshot, finalUpdateID, err
+}
+
+func convertDepthLegacy(
+	snapshot types.SliceOrderBook, symbol string, finalUpdateID int64, response *binance.DepthResponse,
+) (types.SliceOrderBook, int64, error) {
 	snapshot.Symbol = symbol
 	// empty time since the API does not provide time information.
 	snapshot.Time = time.Time{}
@@ -1414,18 +1627,8 @@ func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (
 	return &types.FundingRate{
 		FundingRate: fundingRate,
 		FundingTime: time.Unix(0, rate.FundingTime*int64(time.Millisecond)),
-		Time:        time.Unix(0, rate.Time*int64(time.Millisecond)),
+		Time:        time.Unix(0, rate.FundingTime*int64(time.Millisecond)),
 	}, nil
-}
-
-func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol string) (*types.PositionRisk, error) {
-	// when symbol is set, only one position risk will be returned.
-	risks, err := e.futuresClient.NewGetPositionRiskService().Symbol(symbol).Do(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return convertPositionRisk(risks[0])
 }
 
 // in seconds
@@ -1462,20 +1665,6 @@ func getLaunchDate() (time.Time, error) {
 	}
 
 	return time.Date(2017, time.July, 14, 0, 0, 0, 0, loc), nil
-}
-
-// Margin tolerance ranges from 0.0 (liquidation) to 1.0 (safest level of margin).
-func calculateMarginTolerance(marginLevel fixedpoint.Value) fixedpoint.Value {
-	if marginLevel.IsZero() {
-		// Although margin level shouldn't be zero, that would indicate a significant problem.
-		// In that case, margin tolerance should return 0.0 to also reflect that problem.
-		return fixedpoint.Zero
-	}
-
-	// Formula created by operations team for our binance code.  Liquidation occurs at 1.1,
-	// so when marginLevel equals 1.1, the formula becomes 1.0 - 1.0, or zero.
-	// = 1.0 - (1.1 / marginLevel)
-	return fixedpoint.One.Sub(fixedpoint.NewFromFloat(1.1).Div(marginLevel))
 }
 
 func logResponse(resp interface{}, err error, req interface{}) error {

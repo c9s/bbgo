@@ -7,9 +7,12 @@ import (
 	"github.com/leekchan/accounting"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types/currency"
 )
 
 type Market struct {
+	Exchange ExchangeName `json:"exchange,omitempty"`
+
 	Symbol string `json:"symbol"`
 
 	// LocalSymbol is used for exchange's API (exchange package internal)
@@ -52,9 +55,15 @@ type Market struct {
 
 	MinPrice fixedpoint.Value `json:"minPrice,omitempty"`
 	MaxPrice fixedpoint.Value `json:"maxPrice,omitempty"`
+
+	ContractValue fixedpoint.Value `json:"contractValue,omitempty"`
 }
 
 func (m Market) IsDustQuantity(quantity, price fixedpoint.Value) bool {
+	if quantity.Sign() <= 0 {
+		return true
+	}
+
 	return quantity.Compare(m.MinQuantity) <= 0 || quantity.Mul(price).Compare(m.MinNotional) <= 0
 }
 
@@ -90,7 +99,9 @@ func (m Market) TruncateQuoteQuantity(quantity fixedpoint.Value) fixedpoint.Valu
 // when side = buy, then available = quote balance
 // The balance will be truncated first in order to calculate the minimal notional and minimal quantity
 // The adjusted (truncated) order quantity will be returned
-func (m Market) GreaterThanMinimalOrderQuantity(side SideType, price, available fixedpoint.Value) (fixedpoint.Value, bool) {
+func (m Market) GreaterThanMinimalOrderQuantity(
+	side SideType, price, available fixedpoint.Value,
+) (fixedpoint.Value, bool) {
 	switch side {
 	case SideTypeSell:
 		available = m.TruncateQuantity(available)
@@ -173,13 +184,13 @@ func (m Market) FormatPriceCurrency(val fixedpoint.Value) string {
 	switch m.QuoteCurrency {
 
 	case "USD", "USDT":
-		return USD.FormatMoney(val)
+		return currency.USD.FormatMoney(val)
 
 	case "BTC":
-		return BTC.FormatMoney(val)
+		return currency.BTC.FormatMoney(val)
 
 	case "BNB":
-		return BNB.FormatMoney(val)
+		return currency.BNB.FormatMoney(val)
 
 	}
 
@@ -188,6 +199,10 @@ func (m Market) FormatPriceCurrency(val fixedpoint.Value) string {
 
 func (m Market) FormatPrice(val fixedpoint.Value) string {
 	// p := math.Pow10(m.PricePrecision)
+	if m.TickSize.IsZero() {
+		return val.String()
+	}
+
 	return FormatPrice(val, m.TickSize)
 }
 
@@ -215,24 +230,107 @@ func (m Market) CanonicalizeVolume(val fixedpoint.Value) float64 {
 	return math.Trunc(p*val.Float64()) / p
 }
 
+func (m Market) AdjustQuantityByMinQuantity(quantity fixedpoint.Value) fixedpoint.Value {
+	return fixedpoint.Max(quantity, m.MinQuantity)
+}
+
+func (m Market) RoundUpByStepSize(quantity fixedpoint.Value) fixedpoint.Value {
+	return m.RoundByStepSize(quantity, fixedpoint.Up)
+}
+
+func (m Market) RoundByStepSize(quantity fixedpoint.Value, mode fixedpoint.RoundingMode) fixedpoint.Value {
+	// if m.StepSize is not defined, return the quantity as is
+	if m.StepSize.IsZero() {
+		return quantity
+	}
+
+	ts := m.StepSize.Float64()
+	prec := int(math.Round(math.Log10(ts) * -1.0))
+	return quantity.Round(prec, mode)
+}
+
 // AdjustQuantityByMinNotional adjusts the quantity to make the amount greater than the given minAmount
 func (m Market) AdjustQuantityByMinNotional(quantity, currentPrice fixedpoint.Value) fixedpoint.Value {
 	// modify quantity for the min amount
+	if quantity.IsZero() && m.MinNotional.Sign() > 0 {
+		return m.RoundUpByStepSize(m.MinNotional.Div(currentPrice))
+	}
+
 	amount := currentPrice.Mul(quantity)
 	if amount.Compare(m.MinNotional) < 0 {
 		ratio := m.MinNotional.Div(amount)
 		quantity = quantity.Mul(ratio)
 
-		ts := m.StepSize.Float64()
-		prec := int(math.Round(math.Log10(ts) * -1.0))
-		return quantity.Round(prec, fixedpoint.Up)
+		return m.RoundUpByStepSize(quantity)
 	}
 
 	return quantity
 }
 
+// AdjustQuantityByMaxAmount adjusts the quantity to make the amount less than the given maxAmount
+func (m Market) AdjustQuantityByMaxAmount(quantity, currentPrice, maxAmount fixedpoint.Value) fixedpoint.Value {
+	// modify quantity for the min amount
+	amount := currentPrice.Mul(quantity)
+	if amount.Compare(maxAmount) < 0 {
+		return quantity
+	}
+
+	ratio := maxAmount.Div(amount)
+	quantity = quantity.Mul(ratio)
+	return m.TruncateQuantity(quantity)
+}
+
+// AdjustQuantityToContractSize adjusts the quantity to contract size
+func (m Market) AdjustQuantityToContractSize(quantity fixedpoint.Value) fixedpoint.Value {
+	if m.ContractValue.Sign() <= 0 || m.StepSize.Sign() <= 0 {
+		return quantity
+	}
+
+	contractQuantity := quantity.Div(m.ContractValue)
+	return m.RoundUpByStepSize(contractQuantity)
+}
+
 type MarketMap map[string]Market
 
-func (m MarketMap) Add(market Market) {
-	m[market.Symbol] = market
+func (m MarketMap) Add(markets ...Market) {
+	for _, market := range markets {
+		m[market.Symbol] = market
+	}
+}
+
+func (m MarketMap) Merge(marketMap MarketMap) {
+	for symbol, market := range marketMap {
+		m[symbol] = market
+	}
+}
+
+func (m MarketMap) Has(symbol string) bool {
+	_, ok := m[symbol]
+	return ok
+}
+
+func (m MarketMap) FindPair(asset, quote string) (Market, bool) {
+	symbol := asset + quote
+	if market, ok := m[symbol]; ok {
+		return market, true
+	}
+
+	reversedSymbol := asset + quote
+	if market, ok := m[reversedSymbol]; ok {
+		return market, true
+	}
+
+	return Market{}, false
+}
+
+// FindAssetMarkets returns the markets that contains the given asset
+func (m MarketMap) FindAssetMarkets(asset string) MarketMap {
+	var markets = make(MarketMap)
+	for symbol, market := range m {
+		if market.BaseCurrency == asset {
+			markets[symbol] = market
+		}
+	}
+
+	return markets
 }

@@ -3,6 +3,8 @@ package bbgo
 import (
 	"context"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/service"
 )
 
@@ -13,8 +15,10 @@ var defaultIsolation = NewDefaultIsolation()
 type Isolation struct {
 	gracefulShutdown         GracefulShutdown
 	persistenceServiceFacade *service.PersistenceServiceFacade
+	logger                   logrus.FieldLogger
 }
 
+// NewDefaultIsolation creates a new Isolation instance with the default persistence service facade
 func NewDefaultIsolation() *Isolation {
 	return &Isolation{
 		gracefulShutdown:         GracefulShutdown{},
@@ -22,11 +26,28 @@ func NewDefaultIsolation() *Isolation {
 	}
 }
 
+// NewIsolation creates a new Isolation instance with a custom persistence service facade
 func NewIsolation(persistenceFacade *service.PersistenceServiceFacade) *Isolation {
 	return &Isolation{
 		gracefulShutdown:         GracefulShutdown{},
 		persistenceServiceFacade: persistenceFacade,
 	}
+}
+
+func (i *Isolation) GetPersistenceService() service.PersistenceService {
+	return i.persistenceServiceFacade.Get()
+}
+
+func (i *Isolation) SetLogger(logger logrus.FieldLogger) {
+	i.logger = logger
+}
+
+func (i *Isolation) GetLogger() logrus.FieldLogger {
+	if i.logger == nil {
+		return logrus.StandardLogger()
+	}
+
+	return i.logger
 }
 
 func GetIsolationFromContext(ctx context.Context) *Isolation {

@@ -6,12 +6,12 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 )
 
-func (s *Stream) OnCandleEvent(cb func(candle Candle)) {
-	s.candleEventCallbacks = append(s.candleEventCallbacks, cb)
+func (s *Stream) OnKLineEvent(cb func(candle KLineEvent)) {
+	s.kLineEventCallbacks = append(s.kLineEventCallbacks, cb)
 }
 
-func (s *Stream) EmitCandleEvent(candle Candle) {
-	for _, cb := range s.candleEventCallbacks {
+func (s *Stream) EmitKLineEvent(candle KLineEvent) {
+	for _, cb := range s.kLineEventCallbacks {
 		cb(candle)
 	}
 }
@@ -26,16 +26,6 @@ func (s *Stream) EmitBookEvent(book BookEvent) {
 	}
 }
 
-func (s *Stream) OnEvent(cb func(event WebSocketEvent)) {
-	s.eventCallbacks = append(s.eventCallbacks, cb)
-}
-
-func (s *Stream) EmitEvent(event WebSocketEvent) {
-	for _, cb := range s.eventCallbacks {
-		cb(event)
-	}
-}
-
 func (s *Stream) OnAccountEvent(cb func(account okexapi.Account)) {
 	s.accountEventCallbacks = append(s.accountEventCallbacks, cb)
 }
@@ -46,24 +36,34 @@ func (s *Stream) EmitAccountEvent(account okexapi.Account) {
 	}
 }
 
-func (s *Stream) OnOrderDetailsEvent(cb func(orderDetails []okexapi.OrderDetails)) {
-	s.orderDetailsEventCallbacks = append(s.orderDetailsEventCallbacks, cb)
+func (s *Stream) OnOrderTradesEvent(cb func(orderTrades []OrderTradeEvent)) {
+	s.orderTradesEventCallbacks = append(s.orderTradesEventCallbacks, cb)
 }
 
-func (s *Stream) EmitOrderDetailsEvent(orderDetails []okexapi.OrderDetails) {
-	for _, cb := range s.orderDetailsEventCallbacks {
-		cb(orderDetails)
+func (s *Stream) EmitOrderTradesEvent(orderTrades []OrderTradeEvent) {
+	for _, cb := range s.orderTradesEventCallbacks {
+		cb(orderTrades)
+	}
+}
+
+func (s *Stream) OnMarketTradeEvent(cb func(tradeDetail []MarketTradeEvent)) {
+	s.marketTradeEventCallbacks = append(s.marketTradeEventCallbacks, cb)
+}
+
+func (s *Stream) EmitMarketTradeEvent(tradeDetail []MarketTradeEvent) {
+	for _, cb := range s.marketTradeEventCallbacks {
+		cb(tradeDetail)
 	}
 }
 
 type StreamEventHub interface {
-	OnCandleEvent(cb func(candle Candle))
+	OnKLineEvent(cb func(candle KLineEvent))
 
 	OnBookEvent(cb func(book BookEvent))
 
-	OnEvent(cb func(event WebSocketEvent))
-
 	OnAccountEvent(cb func(account okexapi.Account))
 
-	OnOrderDetailsEvent(cb func(orderDetails []okexapi.OrderDetails))
+	OnOrderTradesEvent(cb func(orderTrades []OrderTradeEvent))
+
+	OnMarketTradeEvent(cb func(tradeDetail []MarketTradeEvent))
 }

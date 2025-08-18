@@ -21,8 +21,8 @@ type GetWalletTradesRequest struct {
 	walletType WalletType `param:"walletType,slug,required"`
 
 	market    string     `param:"market,required"`
-	from      *uint64    `param:"from_id"`
-	startTime *time.Time `param:"start_time,milliseconds"`
-	endTime   *time.Time `param:"end_time,milliseconds"`
+	timestamp *time.Time `param:"timestamp,milliseconds,omitempty"`
+	fromID    *uint64    `param:"from_id,omitempty"`
+	order     *string    `param:"order,omitempty" validValues:"asc,desc"`
 	limit     *uint64    `param:"limit"`
 }

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -23,7 +24,8 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/envvar"
+	"github.com/c9s/bbgo/pkg/util/apikey"
 	"github.com/c9s/bbgo/pkg/util/backoff"
 	"github.com/c9s/bbgo/pkg/version"
 )
@@ -49,19 +51,19 @@ var disableUserAgentHeader = false
 
 func init() {
 
-	if val, ok := util.GetEnvVarInt("HTTP_TRANSPORT_MAX_IDLE_CONNS_PER_HOST"); ok {
+	if val, ok := envvar.Int("HTTP_TRANSPORT_MAX_IDLE_CONNS_PER_HOST"); ok {
 		httpTransportMaxIdleConnsPerHost = val
 	}
 
-	if val, ok := util.GetEnvVarInt("HTTP_TRANSPORT_MAX_IDLE_CONNS"); ok {
+	if val, ok := envvar.Int("HTTP_TRANSPORT_MAX_IDLE_CONNS"); ok {
 		httpTransportMaxIdleConns = val
 	}
 
-	if val, ok := util.GetEnvVarDuration("HTTP_TRANSPORT_IDLE_CONN_TIMEOUT"); ok {
+	if val, ok := envvar.Duration("HTTP_TRANSPORT_IDLE_CONN_TIMEOUT"); ok {
 		httpTransportIdleConnTimeout = val
 	}
 
-	if val, ok := util.GetEnvVarBool("DISABLE_MAX_USER_AGENT_HEADER"); ok {
+	if val, ok := envvar.Bool("DISABLE_MAX_USER_AGENT_HEADER"); ok {
 		disableUserAgentHeader = val
 	}
 }
@@ -117,6 +119,8 @@ type RestClient struct {
 	OrderService      *OrderService
 	RewardService     *RewardService
 	WithdrawalService *WithdrawalService
+
+	apiKeyRotator *apikey.RoundTripBalancer
 }
 
 func NewRestClient(baseURL string) *RestClient {
@@ -138,6 +142,23 @@ func NewRestClient(baseURL string) *RestClient {
 	client.OrderService = &OrderService{client}
 	client.RewardService = &RewardService{client}
 	client.WithdrawalService = &WithdrawalService{client}
+
+	if v, ok := envvar.Bool("MAX_ENABLE_API_KEY_ROTATION"); v && ok {
+		loader := apikey.NewEnvKeyLoader("MAX_API_", "", "KEY", "SECRET")
+
+		// this loads MAX_API_KEY_1, MAX_API_KEY_2, MAX_API_KEY_3, ...
+		source, err := loader.Load(os.Environ())
+		if err != nil {
+			panic(err)
+		}
+
+		// load the original one as index 0
+		if client.APIKey != "" && client.APISecret != "" {
+			source.Add(apikey.Entry{Index: 0, Key: client.APIKey, Secret: client.APISecret})
+		}
+
+		client.apiKeyRotator = apikey.NewRoundTripBalancer(source)
+	}
 
 	// defaultHttpClient.MaxTokenService = &MaxTokenService{defaultHttpClient}
 	client.initNonce()
@@ -264,18 +285,22 @@ func (c *RestClient) newAuthenticatedRequest(
 
 	encoded := base64.StdEncoding.EncodeToString(p)
 
+	apiKey := c.APIKey
+	apiSecret := c.APISecret
+	if c.apiKeyRotator != nil {
+		apiKey, apiSecret = c.apiKeyRotator.Next().GetKeySecret()
+	}
+
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-MAX-ACCESSKEY", c.APIKey)
+	req.Header.Add("X-MAX-ACCESSKEY", apiKey)
 	req.Header.Add("X-MAX-PAYLOAD", encoded)
-	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, c.APISecret))
+	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, apiSecret))
 
 	if disableUserAgentHeader {
 		req.Header.Set("USER-AGENT", "")
 	} else {
 		req.Header.Set("USER-AGENT", UserAgent)
 	}
-
-	req.Header.Set("USER-AGENT", "Go-http-client/1.1,bbgo/"+version.Version)
 
 	if false {
 		out, _ := httputil.DumpRequestOut(req, true)
@@ -285,13 +310,13 @@ func (c *RestClient) newAuthenticatedRequest(
 	return req, nil
 }
 
-// ErrorResponse is the custom error type that is returned if the API returns an
-// error.
 type ErrorField struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
+// ErrorResponse is the custom error type that is returned if the API returns an
+// error.
 type ErrorResponse struct {
 	*requestgen.Response
 	Err ErrorField `json:"error"`

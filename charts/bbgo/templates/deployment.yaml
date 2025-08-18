@@ -98,6 +98,18 @@ spec:
             mountPath: /config
 
           # the "env" entries will override the environment variables from envFrom.
+          env:
+          - name: USE_MARKETS_CACHE_IN_MEMORY
+            value: "true"
+          {{- if .Values.environment }}
+          - name: BBGO_ENV
+            value: {{ .Values.environment | quote }}
+          {{- end }}
+
+          {{- if .Values.rbTreeOrderbook.enabled }}
+          - name: ENABLE_RBT_ORDERBOOK
+            value: "true"
+          {{- end }}
           envFrom:
           - secretRef:
               name: {{ .Values.dotenv.secret | default .Release.Name }}

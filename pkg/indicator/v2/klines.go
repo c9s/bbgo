@@ -1,8 +1,35 @@
 package indicatorv2
 
-import "github.com/c9s/bbgo/pkg/types"
+import (
+	"github.com/c9s/bbgo/pkg/types"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/viper"
+)
 
-const MaxNumOfKLines = 4_000
+const MaxNumOfKLines = 5_000
+
+var (
+	metricsStreamKLinePrices = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_stream_kline_ohlc",
+			Help: "the open, high, low and close price of the kline",
+		}, []string{"exchange", "symbol", "interval", "type"},
+	)
+
+	metricsStreamKLineVolume = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_stream_kline_volume",
+			Help: "the volume of the kline",
+		}, []string{"exchange", "symbol", "interval"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(
+		metricsStreamKLinePrices,
+		metricsStreamKLineVolume,
+	)
+}
 
 //go:generate callbackgen -type KLineStream
 type KLineStream struct {
@@ -45,6 +72,21 @@ func (s *KLineStream) BackFill(kLines []types.KLine) {
 	}
 }
 
+func (s *KLineStream) metricsKLineUpdater(k types.KLine) {
+	labels := prometheus.Labels{
+		"exchange": k.Exchange.String(),
+		"symbol":   k.Symbol,
+		"interval": k.Interval.String(),
+	}
+
+	metricsStreamKLinePrices.MustCurryWith(labels).With(prometheus.Labels{"type": "open"}).Set(k.Open.Float64())
+	metricsStreamKLinePrices.MustCurryWith(labels).With(prometheus.Labels{"type": "close"}).Set(k.Close.Float64())
+	metricsStreamKLinePrices.MustCurryWith(labels).With(prometheus.Labels{"type": "high"}).Set(k.High.Float64())
+	metricsStreamKLinePrices.MustCurryWith(labels).With(prometheus.Labels{"type": "low"}).Set(k.Low.Float64())
+
+	metricsStreamKLineVolume.With(labels).Set(k.Volume.Float64())
+}
+
 // KLines creates a KLine stream that pushes the klines to the subscribers
 func KLines(source types.Stream, symbol string, interval types.Interval) *KLineStream {
 	s := &KLineStream{}
@@ -53,9 +95,11 @@ func KLines(source types.Stream, symbol string, interval types.Interval) *KLineS
 		s.kLines = append(s.kLines, k)
 		s.EmitUpdate(k)
 
-		if len(s.kLines) > MaxNumOfKLines {
-			s.kLines = s.kLines[len(s.kLines)-1-MaxNumOfKLines:]
+		if viper.GetBool("metrics") {
+			s.metricsKLineUpdater(k)
 		}
+
+		s.kLines = types.ShrinkSlice(s.kLines, MaxNumOfKLines, MaxNumOfKLines/5)
 	}))
 
 	return s

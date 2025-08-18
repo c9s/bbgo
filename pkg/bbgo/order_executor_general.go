@@ -14,7 +14,6 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/backoff"
 )
 
@@ -27,7 +26,9 @@ var quantityReduceDelta = fixedpoint.NewFromFloat(0.005)
 // This is for the maximum retries
 const submitOrderRetryLimit = 5
 
+// BaseOrderExecutor provides the common accessors for order executor
 type BaseOrderExecutor struct {
+	exchange          types.Exchange
 	session           *ExchangeSession
 	activeMakerOrders *ActiveOrderBook
 	orderStore        *core.OrderStore
@@ -43,8 +44,8 @@ func (e *BaseOrderExecutor) ActiveMakerOrders() *ActiveOrderBook {
 
 // GracefulCancel cancels all active maker orders if orders are not given, otherwise cancel all the given orders
 func (e *BaseOrderExecutor) GracefulCancel(ctx context.Context, orders ...types.Order) error {
-	if err := e.activeMakerOrders.GracefulCancel(ctx, e.session.Exchange, orders...); err != nil {
-		return errors.Wrap(err, "graceful cancel error")
+	if err := e.activeMakerOrders.GracefulCancel(ctx, e.exchange, orders...); err != nil {
+		return errors.Wrap(err, "graceful cancel order error")
 	}
 
 	return nil
@@ -68,8 +69,12 @@ type GeneralOrderExecutor struct {
 	disableNotify bool
 }
 
+// NewGeneralOrderExecutor allocates a GeneralOrderExecutor
+// which has its own order store, trade collector
 func NewGeneralOrderExecutor(
-	session *ExchangeSession, symbol, strategy, strategyInstanceID string, position *types.Position,
+	session *ExchangeSession,
+	symbol, strategy, strategyInstanceID string,
+	position *types.Position,
 ) *GeneralOrderExecutor {
 	// Always update the position fields
 	position.Strategy = strategy
@@ -80,6 +85,7 @@ func NewGeneralOrderExecutor(
 	executor := &GeneralOrderExecutor{
 		BaseOrderExecutor: BaseOrderExecutor{
 			session:           session,
+			exchange:          session.Exchange,
 			activeMakerOrders: NewActiveOrderBook(symbol),
 			orderStore:        orderStore,
 		},
@@ -90,9 +96,28 @@ func NewGeneralOrderExecutor(
 		position:           position,
 		tradeCollector:     core.NewTradeCollector(symbol, position, orderStore),
 	}
-
-	if session != nil && session.Margin {
-		executor.startMarginAssetUpdater(context.Background())
+	if session != nil && executor.position != nil {
+		session.OnMaxBorrowable(
+			func(asset string, maxBorrowable fixedpoint.Value) {
+				switch asset {
+				case executor.position.BaseCurrency:
+					log.Infof("updating margin base asset %s max borrowable amount: %f", asset, maxBorrowable.Float64())
+					executor.marginBaseMaxBorrowable = maxBorrowable
+				case executor.position.QuoteCurrency:
+					log.Infof("updating margin quote asset %s max borrowable amount: %f", asset, maxBorrowable.Float64())
+					executor.marginQuoteMaxBorrowable = maxBorrowable
+				default:
+					log.Warnf("unknown asset %s for margin base/quote", asset)
+				}
+			},
+		)
+		session.AddMarginAssets(
+			executor.position.BaseCurrency,
+			executor.position.QuoteCurrency,
+		)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+		defer cancel()
+		session.UpdateMaxBorrowable(ctx)
 	}
 
 	return executor
@@ -104,54 +129,6 @@ func (e *GeneralOrderExecutor) DisableNotify() {
 
 func (e *GeneralOrderExecutor) SetMaxRetries(maxRetries uint) {
 	e.maxRetries = maxRetries
-}
-
-func (e *GeneralOrderExecutor) startMarginAssetUpdater(ctx context.Context) {
-	marginService, ok := e.session.Exchange.(types.MarginBorrowRepayService)
-	if !ok {
-		log.Warnf("session %s (%T) exchange does not support MarginBorrowRepayService", e.session.Name, e.session.Exchange)
-		return
-	}
-
-	go e.marginAssetMaxBorrowableUpdater(ctx, 30*time.Minute, marginService, e.position.Market)
-}
-
-func (e *GeneralOrderExecutor) updateMarginAssetMaxBorrowable(
-	ctx context.Context, marginService types.MarginBorrowRepayService, market types.Market,
-) {
-	maxBorrowable, err := marginService.QueryMarginAssetMaxBorrowable(ctx, market.BaseCurrency)
-	if err != nil {
-		log.WithError(err).Errorf("can not query margin base asset %s max borrowable", market.BaseCurrency)
-	} else {
-		log.Infof("updating margin base asset %s max borrowable amount: %f", market.BaseCurrency, maxBorrowable.Float64())
-		e.marginBaseMaxBorrowable = maxBorrowable
-	}
-
-	maxBorrowable, err = marginService.QueryMarginAssetMaxBorrowable(ctx, market.QuoteCurrency)
-	if err != nil {
-		log.WithError(err).Errorf("can not query margin quote asset %s max borrowable", market.QuoteCurrency)
-	} else {
-		log.Infof("updating margin quote asset %s max borrowable amount: %f", market.QuoteCurrency, maxBorrowable.Float64())
-		e.marginQuoteMaxBorrowable = maxBorrowable
-	}
-}
-
-func (e *GeneralOrderExecutor) marginAssetMaxBorrowableUpdater(
-	ctx context.Context, interval time.Duration, marginService types.MarginBorrowRepayService, market types.Market,
-) {
-	t := time.NewTicker(util.MillisecondsJitter(interval, 500))
-	defer t.Stop()
-
-	e.updateMarginAssetMaxBorrowable(ctx, marginService, market)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-		case <-t.C:
-			e.updateMarginAssetMaxBorrowable(ctx, marginService, market)
-		}
-	}
 }
 
 func (e *GeneralOrderExecutor) BindEnvironment(environ *Environment) {
@@ -197,7 +174,6 @@ func (e *GeneralOrderExecutor) Bind() {
 		})
 
 		e.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-			log.Infof("position changed: %s", position)
 			Notify(position)
 		})
 	}
@@ -514,13 +490,17 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 				return fmt.Errorf("insufficient base balance, can not sell: %+v", submitOrder)
 			}
 		} else if e.position.IsShort() {
-			// TODO: check quote balance here, we also need the current price to validate, need to design.
-			/*
-				if quoteBalance, ok := e.session.Account.Balance(e.position.Market.QuoteCurrency); ok {
-					// AdjustQuantityByMaxAmount(submitOrder.Quantity, quoteBalance.Available)
-					// submitOrder.Quantity = fixedpoint.Min(submitOrder.Quantity,)
+			if quoteBalance, ok := e.session.Account.Balance(e.position.Market.QuoteCurrency); ok {
+				ticker, err := e.session.Exchange.QueryTicker(ctx, e.position.Symbol)
+				if err != nil {
+					return err
 				}
-			*/
+				currentPrice := ticker.Sell
+				submitOrder.Quantity = AdjustQuantityByMaxAmount(submitOrder.Quantity, currentPrice, quoteBalance.Available)
+				if submitOrder.Quantity.IsZero() {
+					return fmt.Errorf("insufficient quote balance, can not buy: %+v", submitOrder)
+				}
+			}
 		}
 	}
 
@@ -537,7 +517,7 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	if queryOrderService, ok := e.session.Exchange.(types.ExchangeOrderQueryService); ok && !IsBackTesting {
 		switch submitOrder.Type {
 		case types.OrderTypeMarket:
-			_, err2 := retry.QueryOrderUntilFilled(ctx, queryOrderService, createdOrders[0].Symbol, createdOrders[0].OrderID)
+			_, err2 := retry.QueryOrderUntilFilled(ctx, queryOrderService, createdOrders[0].AsQuery())
 			if err2 != nil {
 				log.WithError(err2).Errorf("unable to query order")
 			}

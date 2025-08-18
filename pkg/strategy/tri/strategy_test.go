@@ -30,11 +30,12 @@ func loadMarket(symbol string) types.Market {
 }
 
 func newArbMarket(symbol, base, quote string, askPrice, askVolume, bidPrice, bidVolume float64) *ArbMarket {
+	market := loadMarket(symbol)
 	return &ArbMarket{
 		Symbol:        symbol,
 		BaseCurrency:  base,
 		QuoteCurrency: quote,
-		market:        loadMarket(symbol),
+		market:        market,
 		book:          nil,
 		bestBid: types.PriceVolume{
 			Price:  fixedpoint.NewFromFloat(bidPrice),
@@ -44,9 +45,12 @@ func newArbMarket(symbol, base, quote string, askPrice, askVolume, bidPrice, bid
 			Price:  fixedpoint.NewFromFloat(askPrice),
 			Volume: fixedpoint.NewFromFloat(askVolume),
 		},
-		buyRate:  1.0 / askPrice,
-		sellRate: bidPrice,
+		buyRate:               1.0 / askPrice,
+		sellRate:              bidPrice,
+		truncateBaseQuantity:  createBaseQuantityTruncator(market),
+		truncateQuoteQuantity: createPricePrecisionBasedQuoteQuantityTruncator(market),
 	}
+
 }
 
 func TestPath_calculateBackwardRatio(t *testing.T) {

@@ -204,6 +204,12 @@ func (g *GetKLinesRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetKLinesRequest) GetPath() string {
+	return "/v5/market/kline"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetKLinesRequest) Do(ctx context.Context) (*KLinesResponse, error) {
 
 	// no body params
@@ -213,7 +219,9 @@ func (g *GetKLinesRequest) Do(ctx context.Context) (*KLinesResponse, error) {
 		return nil, err
 	}
 
-	apiURL := "/v5/market/kline"
+	var apiURL string
+
+	apiURL = g.GetPath()
 
 	req, err := g.client.NewRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
@@ -228,6 +236,16 @@ func (g *GetKLinesRequest) Do(ctx context.Context) (*KLinesResponse, error) {
 	var apiResponse APIResponse
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+	validator, ok := interface{}(apiResponse).(responseValidator)
+	if ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	var data KLinesResponse
 	if err := json.Unmarshal(apiResponse.Result, &data); err != nil {

@@ -19,6 +19,7 @@ const (
 
 	// SideTypeBoth is only used for the configuration context
 	SideTypeBoth = SideType("BOTH")
+	SideTypeNone = SideType("")
 )
 
 var ErrInvalidSideType = errors.New("invalid side type")
@@ -56,6 +57,18 @@ func (side *SideType) UnmarshalJSON(data []byte) error {
 
 	*side = ss
 	return nil
+}
+
+func (side SideType) Int() int {
+	switch side {
+	case SideTypeBuy:
+		return 1
+
+	case SideTypeSell:
+		return -1
+	}
+
+	return 0
 }
 
 func (side SideType) Reverse() SideType {

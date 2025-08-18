@@ -3,7 +3,6 @@ package autoborrow
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -12,7 +11,10 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/livenote"
+	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/currency"
 )
 
 const ID = "autoborrow"
@@ -43,42 +45,8 @@ func init() {
     maxQuantityPerBorrow: 100.0
     maxTotalBorrow: 10.0
 */
-type MarginAlert struct {
-	CurrentMarginLevel fixedpoint.Value
-	MinimalMarginLevel fixedpoint.Value
-	SlackMentions      []string
-	SessionName        string
-}
 
-func (m *MarginAlert) SlackAttachment() slack.Attachment {
-	return slack.Attachment{
-		Color: "red",
-		Title: fmt.Sprintf("Margin Level Alert: %s session - current margin level %f < required margin level %f",
-			m.SessionName, m.CurrentMarginLevel.Float64(), m.MinimalMarginLevel.Float64()),
-		Text: strings.Join(m.SlackMentions, " "),
-		Fields: []slack.AttachmentField{
-			{
-				Title: "Session",
-				Value: m.SessionName,
-				Short: true,
-			},
-			{
-				Title: "Current Margin Level",
-				Value: m.CurrentMarginLevel.String(),
-				Short: true,
-			},
-			{
-				Title: "Minimal Margin Level",
-				Value: m.MinimalMarginLevel.String(),
-				Short: true,
-			},
-		},
-		// Footer:     "",
-		// FooterIcon: "",
-	}
-}
-
-type MarginAsset struct {
+type MarginAssetConfig struct {
 	Asset                string           `json:"asset"`
 	Low                  fixedpoint.Value `json:"low"`
 	MaxTotalBorrow       fixedpoint.Value `json:"maxTotalBorrow"`
@@ -87,29 +55,70 @@ type MarginAsset struct {
 	DebtRatio            fixedpoint.Value `json:"debtRatio"`
 }
 
+type MarginRepayAlertConfig struct {
+	Slack *slackalert.SlackAlert `json:"slack,omitempty"`
+}
+
+type MarginHighInterestRateAlertConfig struct {
+	Slack *slackalert.SlackAlert `json:"slack,omitempty"`
+
+	Interval types.Duration `json:"interval"`
+
+	MinDebtAmount fixedpoint.Value `json:"minDebtAmount"`
+
+	MinAnnualInterestRate fixedpoint.Value `json:"minAnnualInterestRate"`
+}
+
 type Strategy struct {
 	Interval             types.Interval   `json:"interval"`
 	MinMarginLevel       fixedpoint.Value `json:"minMarginLevel"`
 	MaxMarginLevel       fixedpoint.Value `json:"maxMarginLevel"`
 	AutoRepayWhenDeposit bool             `json:"autoRepayWhenDeposit"`
 
-	MarginLevelAlertInterval      types.Duration   `json:"marginLevelAlertInterval"`
-	MarginLevelAlertMinMargin     fixedpoint.Value `json:"marginLevelAlertMinMargin"`
-	MarginLevelAlertSlackMentions []string         `json:"marginLevelAlertSlackMentions"`
+	MarginLevelAlert *MarginLevelAlertConfig `json:"marginLevelAlert"`
 
-	Assets []MarginAsset `json:"assets"`
+	MarginRepayAlert *MarginRepayAlertConfig `json:"marginRepayAlert"`
+
+	MarginHighInterestRateAlertConfig *MarginHighInterestRateAlertConfig `json:"marginHighInterestRateAlert"`
+
+	Assets []MarginAssetConfig `json:"assets"`
 
 	ExchangeSession *bbgo.ExchangeSession
 
 	marginBorrowRepay types.MarginBorrowRepayService
+	logger            logrus.FieldLogger
 }
 
 func (s *Strategy) ID() string {
 	return ID
 }
 
+func (s *Strategy) Initialize() error {
+	s.logger = logrus.WithFields(logrus.Fields{
+		"strategy": ID,
+	})
+	return nil
+}
+
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+	markets := session.Markets()
+	for _, asset := range s.Assets {
+		if currency.IsFiatCurrency(asset.Asset) {
+			continue
+		}
+
+		if market, ok := markets.FindPair(asset.Asset, currency.USDT); ok {
+			session.Subscribe(types.KLineChannel, market.Symbol, types.SubscribeOptions{Interval: types.Interval5m})
+		}
+	}
+}
+
+func (s *Strategy) getAssetStringSlice() []string {
+	var assets []string
+	for _, a := range s.Assets {
+		assets = append(assets, a.Asset)
+	}
+	return assets
 }
 
 func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
@@ -153,6 +162,15 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 		log.Infof("repaying %f %s", toRepay.Float64(), b.Currency)
 		if err := s.marginBorrowRepay.RepayMarginAsset(context.Background(), b.Currency, toRepay); err != nil {
 			log.WithError(err).Errorf("margin repay error")
+		}
+
+		if s.MarginRepayAlert != nil {
+			bbgo.Notify(&RepaidAlert{
+				SessionName:   s.ExchangeSession.Name,
+				Asset:         b.Currency,
+				Amount:        toRepay,
+				SlackMentions: s.MarginRepayAlert.Slack.Mentions,
+			})
 		}
 
 		return
@@ -253,6 +271,15 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 
 		if err := s.marginBorrowRepay.RepayMarginAsset(context.Background(), b.Currency, toRepay); err != nil {
 			log.WithError(err).Errorf("margin repay error")
+		}
+
+		if s.MarginRepayAlert != nil {
+			bbgo.Notify(&RepaidAlert{
+				SessionName:   s.ExchangeSession.Name,
+				Asset:         b.Currency,
+				Amount:        toRepay,
+				SlackMentions: s.MarginRepayAlert.Slack.Mentions,
+			})
 		}
 
 		if accountUpdate, err2 := s.ExchangeSession.UpdateAccount(ctx); err2 != nil {
@@ -356,7 +383,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 
 			maxBorrowable, err2 := s.marginBorrowRepay.QueryMarginAssetMaxBorrowable(ctx, marginAsset.Asset)
 			if err2 != nil {
-				log.WithError(err).Errorf("max borrowable query error")
+				s.logger.WithError(err2).Errorf("max borrowable query error")
 				continue
 			}
 
@@ -568,6 +595,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.ExchangeSession = session
 
+	s.logger = logrus.WithFields(logrus.Fields{
+		"strategy": ID,
+		"exchange": s.ExchangeSession.Name,
+	})
+
+	if !session.Margin {
+		log.Warnf("session %s is not margin enabled, skip autoborrow strategy", session.Name)
+		return nil
+	}
+
 	marginBorrowRepay, ok := session.Exchange.(types.MarginBorrowRepayService)
 	if !ok {
 		return fmt.Errorf("exchange %s does not implement types.MarginBorrowRepayService", session.Name)
@@ -584,39 +621,27 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	}
 
-	if !s.MarginLevelAlertMinMargin.IsZero() {
-		alertInterval := time.Minute * 5
-		if s.MarginLevelAlertInterval > 0 {
-			alertInterval = s.MarginLevelAlertInterval.Duration()
-		}
+	if s.MarginLevelAlert != nil && !s.MarginLevelAlert.MinMargin.IsZero() {
+		go s.marginLevelAlertWorker(ctx, s.MarginLevelAlert)
+	}
 
-		go s.marginAlertWorker(ctx, alertInterval)
+	if s.MarginHighInterestRateAlertConfig != nil {
+		go newMarginHighInterestRateWorker(s, s.MarginHighInterestRateAlertConfig).Run(ctx)
 	}
 
 	go s.run(ctx, s.Interval.Duration())
 	return nil
 }
 
-func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Duration) {
-	go func() {
-		ticker := time.NewTicker(alertInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				account := s.ExchangeSession.GetAccount()
-				if account.MarginLevel.Compare(s.MarginLevelAlertMinMargin) <= 0 {
-					bbgo.Notify(&MarginAlert{
-						CurrentMarginLevel: account.MarginLevel,
-						MinimalMarginLevel: s.MarginLevelAlertMinMargin,
-						SlackMentions:      s.MarginLevelAlertSlackMentions,
-						SessionName:        s.ExchangeSession.Name,
-					})
-					bbgo.Notify(account.Balances().Debts())
-				}
-			}
-		}
-	}()
+func (s *Strategy) postLiveNoteMessage(obj livenote.Object, alert *slackalert.SlackAlert, msgf string, args ...any) {
+	log.Infof(msgf, args...)
+
+	if alert == nil {
+		return
+	}
+
+	bbgo.PostLiveNote(obj,
+		livenote.Channel(alert.Channel),
+		livenote.Comment(fmt.Sprintf(msgf, args...)),
+	)
 }

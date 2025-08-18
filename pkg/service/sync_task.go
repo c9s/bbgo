@@ -3,13 +3,19 @@ package service
 import (
 	"context"
 	"reflect"
+	"regexp"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/c9s/bbgo/pkg/types"
+	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 // SyncTask defines the behaviors for syncing remote records
@@ -54,7 +60,11 @@ type SyncTask struct {
 	LogInsert bool
 }
 
-func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Time, args ...time.Time) error {
+func (sel SyncTask) execute(
+	ctx context.Context,
+	db *sqlx.DB, startTime time.Time, endTimeArgs ...time.Time,
+) error {
+	logger := util.GetLoggerFromCtx(ctx)
 	batchBufferRefVal := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(sel.Type)), 0, sel.BatchInsertBuffer)
 
 	// query from db
@@ -68,12 +78,21 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 		recordSliceRef = recordSliceRef.Elem()
 	}
 
-	logrus.Debugf("loaded %d %T records", recordSliceRef.Len(), sel.Type)
+	logger.Debugf("loaded %d %T records", recordSliceRef.Len(), sel.Type)
 
 	ids := buildIdMap(sel, recordSliceRef)
 
 	if err := sortRecordsAscending(sel, recordSliceRef); err != nil {
 		return err
+	}
+
+	// NOTE: `detectLastSelfTrade` assumes that the last record is the most recent one
+	useUpsert := false
+	switch sel.Type.(type) {
+	case types.Trade:
+		// use upsert if the last record is a self-trade
+		// or it will cause a duplicate key error
+		useUpsert = detectLastestSelfTrade(ctx, db, sel, recordSliceRef)
 	}
 
 	if sel.OnLoad != nil {
@@ -84,8 +103,8 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 	startTime = lastRecordTime(sel, recordSliceRef, startTime)
 
 	endTime := time.Now()
-	if len(args) > 0 {
-		endTime = args[0]
+	if len(endTimeArgs) > 0 {
+		endTime = endTimeArgs[0]
 	}
 
 	// asset "" means all assets
@@ -96,7 +115,7 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 		if sel.BatchInsert != nil && batchBufferRefVal.Len() > 0 {
 			slice := batchBufferRefVal.Interface()
 			if err := sel.BatchInsert(slice); err != nil {
-				logrus.WithError(err).Errorf("batch insert error: %+v", slice)
+				logger.WithError(err).Errorf("batch insert error: %+v", slice)
 			}
 		}
 	}()
@@ -104,7 +123,7 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 	for {
 		select {
 		case <-ctx.Done():
-			logrus.Warnf("context is cancelled, stop syncing")
+			logger.Warnf("context is cancelled, stop syncing")
 			return ctx.Err()
 
 		default:
@@ -117,19 +136,19 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 			obj := v.Interface()
 			id := sel.ID(obj)
 			if _, exists := ids[id]; exists {
-				logrus.Debugf("object %s already exists, skipping", id)
+				logger.Debugf("object %s already exists, skipping", id)
 				continue
 			}
 
 			tt := sel.Time(obj)
 			if tt.Before(startTime) || tt.After(endTime) {
-				logrus.Debugf("object %s time %s is outside of the time range", id, tt)
+				logger.Debugf("object %s time %s is outside of the time range", id, tt)
 				continue
 			}
 
 			if sel.Filter != nil {
 				if !sel.Filter(obj) {
-					logrus.Debugf("object %s is filtered", id)
+					logger.Debugf("object %s is filtered", id)
 					continue
 				}
 			}
@@ -138,9 +157,9 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 			if sel.BatchInsert != nil {
 				if batchBufferRefVal.Len() > sel.BatchInsertBuffer-1 {
 					if sel.LogInsert {
-						logrus.Infof("batch inserting %d %T", batchBufferRefVal.Len(), obj)
+						logger.Infof("batch inserting %d %T", batchBufferRefVal.Len(), obj)
 					} else {
-						logrus.Debugf("batch inserting %d %T", batchBufferRefVal.Len(), obj)
+						logger.Debugf("batch inserting %d %T", batchBufferRefVal.Len(), obj)
 					}
 
 					if err := sel.BatchInsert(batchBufferRefVal.Interface()); err != nil {
@@ -152,21 +171,24 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 				batchBufferRefVal = reflect.Append(batchBufferRefVal, v)
 			} else {
 				if sel.LogInsert {
-					logrus.Infof("inserting %T: %+v", obj, obj)
+					logger.Infof("inserting %T: %+v", obj, obj)
 				} else {
-					logrus.Debugf("inserting %T: %+v", obj, obj)
+					logger.Debugf("inserting %T: %+v", obj, obj)
 				}
+				var err error
 				if sel.Insert != nil {
 					// for custom insert
-					if err := sel.Insert(obj); err != nil {
-						logrus.WithError(err).Errorf("can not insert record: %v", obj)
-						return err
-					}
+					err = sel.Insert(obj)
 				} else {
-					if err := insertType(db, obj); err != nil {
-						logrus.WithError(err).Errorf("can not insert record: %v", obj)
-						return err
-					}
+					err = insertType(db, obj, useUpsert)
+				}
+				if isMysqlDuplicateError(err) {
+					// ignore duplicate error
+					logger.Warnf("duplicate entry for %T, skipped: %+v", obj, obj)
+					continue
+				} else if err != nil {
+					logger.WithError(err).Errorf("can not insert record: %+v", obj)
+					return err
 				}
 			}
 		}
@@ -205,6 +227,67 @@ func buildIdMap(sel SyncTask, recordSliceRef reflect.Value) map[string]struct{} 
 		id := sel.ID(entryRef.Interface())
 		ids[id] = struct{}{}
 	}
-
 	return ids
+}
+
+func detectLastestSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceRef reflect.Value) bool {
+	// address the issue if the last record is a self-trade
+	// detect self-trade by counting the number of trades with trade id as the lastest record
+	// if the number of trades is 2, then it's a self-trade
+	if recordSliceRef.Len() == 0 {
+		logrus.Warnf("empty record slice")
+		return false
+	}
+	// find the latest record by time
+	latestTrade := recordSliceRef.Index(0).Interface().(types.Trade)
+	latestTime := latestTrade.Time
+	for i := 0; i < recordSliceRef.Len(); i++ {
+		trade := recordSliceRef.Index(i).Interface().(types.Trade)
+		if trade.Time.After(latestTime.Time()) {
+			latestTime = trade.Time
+			latestTrade = trade
+		}
+	}
+	lastTradeId := strconv.FormatUint(latestTrade.ID, 10)
+	query := squirrel.Select("*").
+		From("trades").
+		Where(squirrel.Eq{"id": lastTradeId})
+	sql, args, err := query.ToSql()
+	if err != nil {
+		logrus.Warnf("can not build sql for self-trade records: %s", err)
+		return false
+	}
+	rows, err := db.QueryxContext(ctx, sql, args...)
+	if err != nil {
+		logrus.Warnf("can not query self-trade records: %s", err)
+		return false
+	}
+	defer rows.Close()
+
+	records, err := scanRowsOfType(rows, sel.Type)
+	if err != nil {
+		return false
+	}
+	recordsRef := reflect.ValueOf(records)
+	if recordsRef.Kind() == reflect.Ptr {
+		recordsRef = recordsRef.Elem()
+	}
+	return recordsRef.Len() == 2
+}
+
+var dupKeyErrPattern = regexp.MustCompile("Duplicate entry")
+
+func isMysqlDuplicateError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// check if it's a duplicate error:
+	//    "Error 1062 (23000): Duplicate entry"
+	if parentErr := errors.Unwrap(err); parentErr != nil {
+		if mysqlErr, ok := parentErr.(*mysql.MySQLError); ok {
+			return mysqlErr.Number == 1062
+		}
+	}
+
+	return dupKeyErrPattern.MatchString(err.Error())
 }

@@ -21,7 +21,7 @@ logging:
   trade: true
   order: true
   fields:
-    env: staging
+    env: local
 
 sessions:
   max:
@@ -59,6 +59,17 @@ crossExchangeStrategies:
     # 0.1 pip is 0.01, here we use 10, so we will get 18000.00, 18001.00 and
     # 18002.00
     pips: 10
-    persistence:
-      type: redis
-
+    ## profitFixer is used for fixing the profit stats and the position
+    # profitFixer:
+    #   tradesSince: "2024-08-01T15:00:00.000+08:00"
+    circuitBreaker:
+      enabled: true
+      maximumConsecutiveTotalLoss: 36.0
+      maximumConsecutiveLossTimes: 10
+      maximumLossPerRound: 15.0
+      maximumTotalLoss: 80.0
+      ignoreConsecutiveDustLoss: true
+      consecutiveDustLossThreshold: 0.003
+      haltDuration: "30m"
+      maximumHaltTimes: 2
+      maximumHaltTimesExceededPanic: true

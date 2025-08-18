@@ -1,3 +1,4 @@
+-- !txn
 -- +up
 -- +begin
 CREATE TABLE `nav_history_details`

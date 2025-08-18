@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
@@ -67,7 +67,7 @@ func Test_loadMarketsFromMem(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	mockEx := mocks.NewMockExchange(mockCtrl)
+	mockEx := mocks.NewMockExchangePublic(mockCtrl)
 	mockEx.EXPECT().Name().Return(types.ExchangeName("max")).AnyTimes()
 	mockEx.EXPECT().QueryMarkets(gomock.Any()).Return(nil, errors.New("faked")).Times(1)
 	mockEx.EXPECT().QueryMarkets(gomock.Any()).Return(types.MarketMap{

@@ -1,0 +1,23 @@
+{
+  "code":"00000",
+  "msg":"success",
+  "requestTime":1709632445201,
+  "data":[
+    {
+      "coin":"BTC",
+      "available":"0.00000690",
+      "limitAvailable":"0",
+      "frozen":"0.00000000",
+      "locked":"0.00000000",
+      "uTime":"1708658921000"
+    },
+    {
+      "coin":"USDT",
+      "available":"0.68360342",
+      "limitAvailable":"0",
+      "frozen":"9.08096000",
+      "locked":"0.00000000",
+      "uTime":"1708667916000"
+    }
+  ]
+}

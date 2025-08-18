@@ -10,8 +10,8 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 )
 
 func newStrategy(t *TestData) *Strategy {
@@ -114,7 +114,8 @@ func TestSyncActiveOrder(t *testing.T) {
 			OrderID: strconv.FormatUint(order.OrderID, 10),
 		}).Return(&updatedOrder, nil)
 
-		if !assert.NoError(syncActiveOrder(ctx, activeOrderbook, mockOrderQueryService, order.OrderID)) {
+		_, err := syncActiveOrder(ctx, activeOrderbook, mockOrderQueryService, order.OrderID, time.Now())
+		if !assert.NoError(err) {
 			return
 		}
 
@@ -144,7 +145,8 @@ func TestSyncActiveOrder(t *testing.T) {
 			OrderID: strconv.FormatUint(order.OrderID, 10),
 		}).Return(&updatedOrder, nil)
 
-		if !assert.NoError(syncActiveOrder(ctx, activeOrderbook, mockOrderQueryService, order.OrderID)) {
+		_, err := syncActiveOrder(ctx, activeOrderbook, mockOrderQueryService, order.OrderID, time.Now())
+		if !assert.NoError(err) {
 			return
 		}
 

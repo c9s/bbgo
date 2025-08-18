@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -76,12 +75,12 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	}
 
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
-	cancelTrading()
 
 	gracefulShutdownPeriod := 30 * time.Second
 	shtCtx, cancelShutdown := context.WithTimeout(bbgo.NewTodoContextWithExistingIsolation(ctx), gracefulShutdownPeriod)
 	bbgo.Shutdown(shtCtx)
 	cancelShutdown()
+	cancelTrading()
 
 	return nil
 }
@@ -163,6 +162,10 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 		return err
 	}
 
+	if err := trader.Initialize(tradingCtx); err != nil {
+		return err
+	}
+
 	if err := trader.LoadState(tradingCtx); err != nil {
 		return err
 	}
@@ -204,6 +207,12 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	gracefulShutdownPeriod := 30 * time.Second
 	shtCtx, cancelShutdown := context.WithTimeout(bbgo.NewTodoContextWithExistingIsolation(tradingCtx), gracefulShutdownPeriod)
 	bbgo.Shutdown(shtCtx)
+
+	if environ.ProfilingService != nil {
+		if err = environ.ProfilingService.Stop(); err != nil {
+			log.WithError(err).Errorf("profiling service stop error")
+		}
+	}
 
 	if err := trader.SaveState(shtCtx); err != nil {
 		log.WithError(err).Errorf("can not save strategy persistence states")
@@ -304,7 +313,7 @@ func runWrapperBinary(ctx context.Context, cmd *cobra.Command, userConfig *bbgo.
 
 // buildAndRun builds the package natively and run the binary with the given args
 func buildAndRun(ctx context.Context, userConfig *bbgo.Config, args ...string) (*exec.Cmd, error) {
-	packageDir, err := ioutil.TempDir("build", "bbgow")
+	packageDir, err := os.MkdirTemp("build", "bbgow")
 	if err != nil {
 		return nil, err
 	}

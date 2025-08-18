@@ -2,15 +2,30 @@ package binance
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginLoan, error) {
-	req := e.client2.NewGetMarginLoanHistoryRequest()
+type BorrowRepayType interface {
+	types.MarginLoan | types.MarginRepay
+}
+
+func queryBorrowRepayHistory[T BorrowRepayType](e *Exchange, ctx context.Context, asset string, startTime, endTime *time.Time) ([]T, error) {
+	req := e.client2.NewGetMarginBorrowRepayHistoryRequest()
 	req.Asset(asset)
 	req.Size(100)
+
+	switch v := any(T{}); v.(type) {
+	case types.MarginLoan:
+		req.SetBorrowRepayType(binanceapi.BorrowRepayTypeBorrow)
+	case types.MarginRepay:
+		req.SetBorrowRepayType(binanceapi.BorrowRepayTypeRepay)
+	default:
+		return nil, fmt.Errorf("T is other type")
+	}
 
 	if startTime != nil {
 		req.StartTime(*startTime)
@@ -42,52 +57,27 @@ func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime
 		return nil, err
 	}
 
-	var loans []types.MarginLoan
+	var borrowRepay []T
 	for _, record := range records {
-		loans = append(loans, toGlobalLoan(record))
+		borrowRepay = append(borrowRepay, T{
+			Exchange:       types.ExchangeBinance,
+			TransactionID:  record.TxId,
+			Asset:          record.Asset,
+			Principle:      record.Principal,
+			Time:           types.Time(record.Timestamp),
+			IsolatedSymbol: record.IsolatedSymbol,
+		})
 	}
 
-	return loans, err
+	return borrowRepay, nil
+}
+
+func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginLoan, error) {
+	return queryBorrowRepayHistory[types.MarginLoan](e, ctx, asset, startTime, endTime)
 }
 
 func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginRepay, error) {
-	req := e.client2.NewGetMarginRepayHistoryRequest()
-	req.Asset(asset)
-	req.Size(100)
-
-	if startTime != nil {
-		req.StartTime(*startTime)
-
-		// 6 months
-		if time.Since(*startTime) > time.Hour*24*30*6 {
-			req.Archived(true)
-		}
-	}
-
-	if startTime != nil && endTime != nil {
-		duration := endTime.Sub(*startTime)
-		if duration > time.Hour*24*30 {
-			t := startTime.Add(time.Hour * 24 * 30)
-			endTime = &t
-		}
-	}
-
-	if endTime != nil {
-		req.EndTime(*endTime)
-	}
-
-	if e.MarginSettings.IsIsolatedMargin {
-		req.IsolatedSymbol(e.MarginSettings.IsolatedMarginSymbol)
-	}
-
-	records, err := req.Do(ctx)
-
-	var repays []types.MarginRepay
-	for _, record := range records {
-		repays = append(repays, toGlobalRepay(record))
-	}
-
-	return repays, err
+	return queryBorrowRepayHistory[types.MarginRepay](e, ctx, asset, startTime, endTime)
 }
 
 func (e *Exchange) QueryLiquidationHistory(ctx context.Context, startTime, endTime *time.Time) ([]types.MarginLiquidation, error) {

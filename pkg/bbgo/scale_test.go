@@ -1,12 +1,31 @@
 package bbgo
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 const delta = 1e-9
+
+func TestLayerScale_UnmarshalJSON(t *testing.T) {
+	var s LayerScale
+	err := json.Unmarshal([]byte(`{
+		"byLayer": {
+			"linear": {
+				"domain": [ 1, 3 ],
+				"range": [ 10000.0, 30000.0 ]
+			}
+		}
+	}`), &s)
+	assert.NoError(t, err)
+
+	if assert.NotNil(t, s.LayerRule) {
+		assert.NotNil(t, s.LayerRule.LinearScale.Range)
+		assert.NotNil(t, s.LayerRule.LinearScale.Domain)
+	}
+}
 
 func TestExponentialScale(t *testing.T) {
 	// graph see: https://www.desmos.com/calculator/ip0ijbcbbf

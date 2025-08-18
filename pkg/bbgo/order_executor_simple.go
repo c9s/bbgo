@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 
-	log "github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/core"
@@ -14,14 +13,13 @@ import (
 // This order executor does not handle position and profit stats update
 type SimpleOrderExecutor struct {
 	BaseOrderExecutor
-
-	logger log.FieldLogger
 }
 
 func NewSimpleOrderExecutor(session *ExchangeSession) *SimpleOrderExecutor {
 	return &SimpleOrderExecutor{
 		BaseOrderExecutor: BaseOrderExecutor{
 			session:           session,
+			exchange:          session.Exchange,
 			activeMakerOrders: NewActiveOrderBook(""),
 			orderStore:        core.NewOrderStore(""),
 		},

@@ -6,10 +6,11 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types/asset"
+	currency2 "github.com/c9s/bbgo/pkg/types/currency"
 )
 
 type PriceMap map[string]fixedpoint.Value
@@ -23,10 +24,36 @@ type Balance struct {
 	Borrowed fixedpoint.Value `json:"borrowed,omitempty"`
 	Interest fixedpoint.Value `json:"interest,omitempty"`
 
+	// credit related fields
+	// long available in base currency amount for credit account
+	LongAvailableCredit fixedpoint.Value `json:"longAvailableCredit,omitempty"`
+	// short available in base currency amount for credit account
+	ShortAvailableCredit fixedpoint.Value `json:"shortAvailableCredit,omitempty"`
+
 	// NetAsset = (Available + Locked) - Borrowed - Interest
 	NetAsset fixedpoint.Value `json:"net,omitempty"`
 
 	MaxWithdrawAmount fixedpoint.Value `json:"maxWithdrawAmount,omitempty"`
+}
+
+func NewBalance(currency string, aval fixedpoint.Value) Balance {
+	b := NewZeroBalance(currency)
+	b.Available = aval
+	return b
+}
+
+func NewZeroBalance(currency string) Balance {
+	return Balance{
+		Currency:             currency,
+		Available:            fixedpoint.Zero,
+		Locked:               fixedpoint.Zero,
+		Borrowed:             fixedpoint.Zero,
+		Interest:             fixedpoint.Zero,
+		LongAvailableCredit:  fixedpoint.Zero,
+		ShortAvailableCredit: fixedpoint.Zero,
+		NetAsset:             fixedpoint.Zero,
+		MaxWithdrawAmount:    fixedpoint.Zero,
+	}
 }
 
 func (b Balance) Add(b2 Balance) Balance {
@@ -34,8 +61,15 @@ func (b Balance) Add(b2 Balance) Balance {
 	newB.Available = b.Available.Add(b2.Available)
 	newB.Locked = b.Locked.Add(b2.Locked)
 	newB.Borrowed = b.Borrowed.Add(b2.Borrowed)
-	newB.NetAsset = b.NetAsset.Add(b2.NetAsset)
 	newB.Interest = b.Interest.Add(b2.Interest)
+
+	if !b.NetAsset.IsZero() && !b2.NetAsset.IsZero() {
+		newB.NetAsset = b.NetAsset.Add(b2.NetAsset)
+	} else {
+		// do not use this field, reset it when any of the balance is zero
+		newB.NetAsset = fixedpoint.Zero
+	}
+
 	return newB
 }
 
@@ -45,8 +79,11 @@ func (b Balance) Total() fixedpoint.Value {
 
 // Net returns the net asset value (total - debt)
 func (b Balance) Net() fixedpoint.Value {
-	total := b.Total()
-	return total.Sub(b.Debt())
+	if !b.NetAsset.IsZero() {
+		return b.NetAsset
+	}
+
+	return b.Total().Sub(b.Debt())
 }
 
 func (b Balance) Debt() fixedpoint.Value {
@@ -175,21 +212,22 @@ func (m BalanceMap) Copy() (d BalanceMap) {
 }
 
 // Assets converts balances into assets with the given prices
-func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) AssetMap {
-	assets := make(AssetMap)
+func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) asset.Map {
+	assets := make(asset.Map)
 
 	_, btcInUSD, hasBtcPrice := findUSDMarketPrice("BTC", prices)
 
-	for currency, b := range m {
+	for cu, b := range m {
 		total := b.Total()
 		netAsset := b.Net()
+		debt := b.Debt()
 
-		if total.IsZero() && netAsset.IsZero() {
+		if total.IsZero() && netAsset.IsZero() && debt.IsZero() {
 			continue
 		}
 
-		asset := Asset{
-			Currency:  currency,
+		as := asset.Asset{
+			Currency:  cu,
 			Total:     total,
 			Time:      priceTime,
 			Locked:    b.Locked,
@@ -199,40 +237,40 @@ func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) AssetMap {
 			NetAsset:  netAsset,
 		}
 
-		if IsUSDFiatCurrency(currency) { // for usd
-			asset.InUSD = netAsset
-			asset.PriceInUSD = fixedpoint.One
-			if hasBtcPrice && !asset.InUSD.IsZero() {
-				asset.InBTC = asset.InUSD.Div(btcInUSD)
+		if currency2.IsUSDFiatCurrency(cu) { // for usd
+			as.NetAssetInUSD = netAsset
+			as.PriceInUSD = fixedpoint.One
+			if hasBtcPrice && !as.NetAssetInUSD.IsZero() {
+				as.NetAssetInBTC = as.NetAssetInUSD.Div(btcInUSD)
 			}
 		} else { // for crypto
-			if market, usdPrice, ok := findUSDMarketPrice(currency, prices); ok {
+			if market, usdPrice, ok := findUSDMarketPrice(cu, prices); ok {
 				// this includes USDT, USD, USDC and so on
 				if strings.HasPrefix(market, "USD") || strings.HasPrefix(market, "BUSD") { // for prices like USDT/TWD, BUSD/USDT
-					if !asset.NetAsset.IsZero() {
-						asset.InUSD = asset.NetAsset.Div(usdPrice)
+					if !as.NetAsset.IsZero() {
+						as.NetAssetInUSD = as.NetAsset.Div(usdPrice)
 					}
-					asset.PriceInUSD = fixedpoint.One.Div(usdPrice)
+					as.PriceInUSD = fixedpoint.One.Div(usdPrice)
 				} else { // for prices like BTC/USDT
-					if !asset.NetAsset.IsZero() {
-						asset.InUSD = asset.NetAsset.Mul(usdPrice)
+					if !as.NetAsset.IsZero() {
+						as.NetAssetInUSD = as.NetAsset.Mul(usdPrice)
 					}
-					asset.PriceInUSD = usdPrice
+					as.PriceInUSD = usdPrice
 				}
 
-				if hasBtcPrice && !asset.InUSD.IsZero() {
-					asset.InBTC = asset.InUSD.Div(btcInUSD)
+				if hasBtcPrice && !as.NetAssetInUSD.IsZero() {
+					as.NetAssetInBTC = as.NetAssetInUSD.Div(btcInUSD)
 				}
 			}
 		}
 
-		assets[currency] = asset
+		assets[cu] = as
 	}
 
 	return assets
 }
 
-func (m BalanceMap) Print() {
+func (m BalanceMap) Print(log LogFunc) {
 	for _, balance := range m {
 		if balance.Net().IsZero() {
 			continue
@@ -247,7 +285,7 @@ func (m BalanceMap) Print() {
 			o += fmt.Sprintf(" (borrowed %v)", balance.Borrowed)
 		}
 
-		log.Infoln(o)
+		log(o)
 	}
 }
 

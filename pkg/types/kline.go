@@ -54,7 +54,9 @@ type KLine struct {
 	Symbol string `json:"symbol" db:"symbol"`
 
 	StartTime Time `json:"startTime" db:"start_time"`
-	EndTime   Time `json:"endTime" db:"end_time"`
+	// EndTime follows the binance rule, to avoid endTime overlapping with the next startTime. So if your end time (2023-01-01 01:00:00)
+	// are overlapping with next start time interval (2023-01-01 01:00:00), you should subtract -1 time.millisecond on EndTime.
+	EndTime Time `json:"endTime" db:"end_time"`
 
 	Interval Interval `json:"interval" db:"interval"`
 
@@ -70,6 +72,10 @@ type KLine struct {
 	LastTradeID    uint64 `json:"lastTradeID" db:"last_trade_id"`
 	NumberOfTrades uint64 `json:"numberOfTrades" db:"num_trades"`
 	Closed         bool   `json:"closed" db:"closed"`
+}
+
+func (k *KLine) ObjectID() string {
+	return "kline-" + k.Symbol + k.Interval.String() + k.StartTime.Time().Format(time.RFC3339)
 }
 
 func (k *KLine) Set(o *KLine) {
@@ -278,8 +284,9 @@ func (k *KLine) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 		},
-		Footer:     "",
-		FooterIcon: "",
+
+		FooterIcon: ExchangeFooterIcon(k.Exchange),
+		Footer:     k.StartTime.String() + " ~ " + k.EndTime.String(),
 	}
 }
 
@@ -440,10 +447,7 @@ func (k *KLineWindow) Truncate(size int) {
 	}
 
 	end := len(*k)
-	start := end - size
-	if start < 0 {
-		start = 0
-	}
+	start := max(end-size, 0)
 	kn := (*k)[start:]
 	*k = kn
 }
@@ -687,4 +691,24 @@ func KLineLowPriceMapper(k KLine) float64 {
 
 func KLineHighPriceMapper(k KLine) float64 {
 	return k.High.Float64()
+}
+
+// ShrinkSlice shrinks the slice to the new size by removing the old klines
+func ShrinkSlice[S ~[]E, E comparable](slice S, thresholdLen, newSize int) S {
+	curLen := len(slice)
+	curCap := cap(slice)
+
+	// newSize can't be larger than half of the current capacity
+	if newSize > curCap/2 {
+		newSize = curCap / 2
+	}
+
+	if curLen < thresholdLen || curLen <= newSize {
+		return slice
+	}
+
+	start := curLen - newSize
+	newSlice := make(S, newSize)
+	copy(newSlice, slice[start:])
+	return newSlice
 }

@@ -70,14 +70,14 @@ type WalletBalances struct {
 	} `json:"coin"`
 }
 
-//go:generate GetRequest -url "/v5/account/wallet-balance" -type GetWalletBalancesRequest -responseDataType .WalletBalancesResponse
+//go:generate GetRequest -url "/v5/account/wallet-balance" -type GetWalletBalancesRequest -responseDataType .WalletBalancesResponse -rateLimiter 1+45/1s
 type GetWalletBalancesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	// Account type
 	// - Unified account: UNIFIED (trade spot/linear/options), CONTRACT(trade inverse)
 	// - Normal account: CONTRACT, SPOT
-	accountType AccountType `param:"accountType,query" validValues:"SPOT"`
+	accountType AccountType `param:"accountType,query" validValues:"UNIFIED"`
 	// Coin name
 	// - If not passed, it returns non-zero asset info
 	// - You can pass multiple coins to query, separated by comma. USDT,USDC
@@ -87,6 +87,6 @@ type GetWalletBalancesRequest struct {
 func (c *RestClient) NewGetWalletBalancesRequest() *GetWalletBalancesRequest {
 	return &GetWalletBalancesRequest{
 		client:      c,
-		accountType: AccountTypeSpot,
+		accountType: AccountTypeUnified,
 	}
 }

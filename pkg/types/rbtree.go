@@ -12,8 +12,8 @@ type RBTree struct {
 }
 
 func NewRBTree() *RBTree {
-	var root = NewNil()
-	root.parent = NewNil()
+	var root = newNilNode()
+	root.parent = newNilNode()
 	return &RBTree{
 		Root: root,
 	}
@@ -66,6 +66,10 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 	if y != deleting {
 		deleting.key = y.key
 		deleting.value = y.value
+		clearNode(y)
+	} else {
+		// clear the reference
+		clearNode(deleting)
 	}
 
 	if y.color == Black {
@@ -142,15 +146,15 @@ func (tree *RBTree) DeleteFixup(current *RBNode) {
 }
 
 func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
-	var y = NewNil()
+	var y *RBNode = nil
 	var x = tree.Root
 	var node = &RBNode{
 		key:    key,
 		value:  val,
 		color:  Red,
-		left:   NewNil(),
-		right:  NewNil(),
-		parent: NewNil(),
+		left:   newNilNode(),
+		right:  newNilNode(),
+		parent: newNilNode(),
 	}
 
 	for !x.isNil() {
@@ -167,29 +171,34 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 		}
 	}
 
-	node.parent = y
-
-	if y.isNil() {
+	if y == nil {
 		tree.Root = node
-	} else if node.key.Compare(y.key) < 0 {
-		y.left = node
+		node.parent = newNilNode()
 	} else {
-		y.right = node
+		node.parent = y
+
+		if node.key.Compare(y.key) < 0 {
+			y.left = node
+		} else {
+			y.right = node
+		}
 	}
+
+	tree.size++
 
 	tree.InsertFixup(node)
 }
 
 func (tree *RBTree) Insert(key, val fixedpoint.Value) {
-	var y = NewNil()
+	var y *RBNode
 	var x = tree.Root
 	var node = &RBNode{
 		key:    key,
 		value:  val,
 		color:  Red,
-		left:   NewNil(),
-		right:  NewNil(),
-		parent: NewNil(),
+		left:   newNilNode(),
+		right:  newNilNode(),
+		parent: newNilNode(),
 	}
 
 	for !x.isNil() {
@@ -202,14 +211,16 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 		}
 	}
 
-	node.parent = y
-
-	if y.isNil() {
+	if y == nil {
+		node.parent = newNilNode()
 		tree.Root = node
-	} else if node.key.Compare(y.key) < 0 {
-		y.left = node
 	} else {
-		y.right = node
+		node.parent = y
+		if node.key.Compare(y.key) < 0 {
+			y.left = node
+		} else {
+			y.right = node
+		}
 	}
 
 	tree.size++
@@ -218,7 +229,7 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 
 func (tree *RBTree) Search(key fixedpoint.Value) *RBNode {
 	var current = tree.Root
-	for !current.isNil() && key != current.key {
+	for !current.isNil() && key.Compare(current.key) != 0 {
 		if key.Compare(current.key) < 0 {
 			current = current.left
 		} else {
@@ -339,7 +350,7 @@ func (tree *RBTree) Rightmost() *RBNode {
 }
 
 func (tree *RBTree) RightmostOf(current *RBNode) *RBNode {
-	if current.isNil() || current == nil {
+	if current == nil || current.isNil() {
 		return nil
 	}
 
@@ -355,7 +366,7 @@ func (tree *RBTree) Leftmost() *RBNode {
 }
 
 func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
-	if current.isNil() || current == nil {
+	if current == nil || current.isNil() {
 		return nil
 	}
 
@@ -371,13 +382,13 @@ func (tree *RBTree) Successor(current *RBNode) *RBNode {
 		return tree.LeftmostOf(current.right)
 	}
 
-	var newNode = current.parent
-	for !newNode.isNil() && current == newNode.right {
-		current = newNode
-		newNode = newNode.parent
+	var suc = current.parent
+	for !suc.isNil() && current == suc.right {
+		current = suc
+		suc = suc.parent
 	}
 
-	return newNode
+	return suc
 }
 
 func (tree *RBTree) Preorder(cb func(n *RBNode)) {
@@ -385,7 +396,7 @@ func (tree *RBTree) Preorder(cb func(n *RBNode)) {
 }
 
 func (tree *RBTree) PreorderOf(current *RBNode, cb func(n *RBNode)) {
-	if !current.isNil() && current != nil {
+	if current != nil && !current.isNil() {
 		cb(current)
 		tree.PreorderOf(current.left, cb)
 		tree.PreorderOf(current.right, cb)
@@ -398,11 +409,12 @@ func (tree *RBTree) Inorder(cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) InorderOf(current *RBNode, cb func(n *RBNode) bool) {
-	if !current.isNil() && current != nil {
+	if current != nil && !current.isNil() {
 		tree.InorderOf(current.left, cb)
 		if !cb(current) {
 			return
 		}
+
 		tree.InorderOf(current.right, cb)
 	}
 }
@@ -413,7 +425,7 @@ func (tree *RBTree) InorderReverse(cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) InorderReverseOf(current *RBNode, cb func(n *RBNode) bool) {
-	if !current.isNil() && current != nil {
+	if current != nil && !current.isNil() {
 		tree.InorderReverseOf(current.right, cb)
 		if !cb(current) {
 			return
@@ -427,7 +439,7 @@ func (tree *RBTree) Postorder(cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) PostorderOf(current *RBNode, cb func(n *RBNode) bool) {
-	if !current.isNil() && current != nil {
+	if current != nil && !current.isNil() {
 		tree.PostorderOf(current.left, cb)
 		tree.PostorderOf(current.right, cb)
 		if !cb(current) {
@@ -437,33 +449,24 @@ func (tree *RBTree) PostorderOf(current *RBNode, cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) CopyInorderReverse(limit int) *RBTree {
-	cnt := 0
 	newTree := NewRBTree()
-	tree.InorderReverse(func(n *RBNode) bool {
-		if cnt >= limit {
-			return false
-		}
+	if limit == 0 {
+		tree.InorderReverse(copyNodeFast(newTree))
+		return newTree
+	}
 
-		newTree.Insert(n.key, n.value)
-		cnt++
-		return true
-	})
+	tree.InorderReverse(copyNodeLimit(newTree, limit))
 	return newTree
 }
 
 func (tree *RBTree) CopyInorder(limit int) *RBTree {
-	cnt := 0
 	newTree := NewRBTree()
-	tree.Inorder(func(n *RBNode) bool {
-		if limit > 0 && cnt >= limit {
-			return false
-		}
+	if limit == 0 {
+		tree.Inorder(copyNodeFast(newTree))
+		return newTree
+	}
 
-		newTree.Insert(n.key, n.value)
-		cnt++
-		return true
-	})
-
+	tree.Inorder(copyNodeLimit(newTree, limit))
 	return newTree
 }
 
@@ -472,4 +475,30 @@ func (tree *RBTree) Print() {
 		fmt.Printf("%v -> %v\n", n.key, n.value)
 		return true
 	})
+}
+
+func clearNode(deleting *RBNode) {
+	deleting.left = nil
+	deleting.right = nil
+	deleting.parent = nil
+}
+
+func copyNodeFast(newTree *RBTree) func(n *RBNode) bool {
+	return func(n *RBNode) bool {
+		newTree.Insert(n.key, n.value)
+		return true
+	}
+}
+
+func copyNodeLimit(newTree *RBTree, limit int) func(n *RBNode) bool {
+	cnt := 0
+	return func(n *RBNode) bool {
+		if limit > 0 && cnt >= limit {
+			return false
+		}
+
+		newTree.Insert(n.key, n.value)
+		cnt++
+		return true
+	}
 }

@@ -64,6 +64,13 @@ type Strategy struct {
 	activeWallOrders       *bbgo.ActiveOrderBook
 }
 
+func (s *Strategy) Initialize() error {
+	if s.Strategy == nil {
+		s.Strategy = &common.Strategy{}
+	}
+	return nil
+}
+
 func (s *Strategy) ID() string {
 	return ID
 }
@@ -235,7 +242,6 @@ func (s *Strategy) placeWallOrders(ctx context.Context, orderExecutor bbgo.Order
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.Strategy = &common.Strategy{}
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
 	// initial required information
@@ -329,6 +335,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		// check if there is a canceled order had partially filled.
 		s.OrderExecutor.TradeCollector().Process()
+
+		bbgo.Sync(ctx, s)
 	})
 
 	return nil

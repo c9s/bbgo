@@ -13,22 +13,18 @@ import (
 
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/interact"
+	"github.com/c9s/bbgo/pkg/types"
 )
-
-// Strategy method calls:
-// -> Defaults()   (optional method)
-// -> Initialize()   (optional method)
-// -> Validate()     (optional method)
-// -> Run()          (optional method)
-// -> Shutdown(shutdownCtx context.Context, wg *sync.WaitGroup)
-type StrategyID interface {
-	ID() string
-}
 
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {
-	StrategyID
+	types.StrategyID
 	Run(ctx context.Context, orderExecutor OrderExecutor, session *ExchangeSession) error
+}
+
+type CrossExchangeStrategy interface {
+	types.StrategyID
+	CrossRun(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 
 // StrategyInitializer's Initialize method is called before the Subscribe method call.
@@ -58,11 +54,6 @@ type CrossExchangeSessionSubscriber interface {
 	CrossSubscribe(sessions map[string]*ExchangeSession)
 }
 
-type CrossExchangeStrategy interface {
-	StrategyID
-	CrossRun(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
-}
-
 type Logging interface {
 	EnableLogging()
 	DisableLogging()
@@ -82,8 +73,6 @@ func (logger *SilentLogger) Errorf(string, ...interface{}) {}
 
 type Trader struct {
 	environment *Environment
-
-	riskControls *RiskControls
 
 	crossExchangeStrategies []CrossExchangeStrategy
 	exchangeStrategies      map[string][]SingleExchangeStrategy
@@ -112,8 +101,9 @@ func (trader *Trader) DisableLogging() {
 }
 
 func (trader *Trader) Configure(userConfig *Config) error {
-	if userConfig.RiskControls != nil {
-		trader.SetRiskControls(userConfig.RiskControls)
+	// config environment
+	if userConfig.Environment != nil && trader.environment != nil {
+		trader.environment.environmentConfig = userConfig.Environment
 	}
 
 	for _, entry := range userConfig.ExchangeStrategies {
@@ -162,21 +152,9 @@ func (trader *Trader) AttachCrossExchangeStrategy(strategy CrossExchangeStrategy
 	return trader
 }
 
-// SetRiskControls sets the risk controller
-// TODO: provide a more DSL way to configure risk controls
-func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
-	trader.riskControls = riskControls
-}
-
 func (trader *Trader) RunSingleExchangeStrategy(
 	ctx context.Context, strategy SingleExchangeStrategy, session *ExchangeSession, orderExecutor OrderExecutor,
 ) error {
-	if v, ok := strategy.(StrategyValidator); ok {
-		if err := v.Validate(); err != nil {
-			return fmt.Errorf("failed to validate the config: %w", err)
-		}
-	}
-
 	if shutdown, ok := strategy.(StrategyShutdown); ok {
 		trader.gracefulShutdown.OnShutdown(shutdown.Shutdown)
 	}
@@ -189,19 +167,6 @@ func (trader *Trader) getSessionOrderExecutor(sessionName string) OrderExecutor 
 
 	// default to base order executor
 	var orderExecutor OrderExecutor = session.OrderExecutor
-
-	// Since the risk controls are loaded from the config file
-	if trader.riskControls != nil && trader.riskControls.SessionBasedRiskControl != nil {
-		if control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]; ok {
-			control.SetBaseOrderExecutor(session.OrderExecutor)
-
-			// pick the wrapped order executor
-			if control.OrderExecutor != nil {
-				return control.OrderExecutor
-			}
-		}
-	}
-
 	return orderExecutor
 }
 
@@ -236,18 +201,6 @@ func (trader *Trader) injectFieldsAndSubscribe(ctx context.Context) error {
 
 			if err := trader.injectCommonServices(ctx, strategy); err != nil {
 				return err
-			}
-
-			if defaulter, ok := strategy.(StrategyDefaulter); ok {
-				if err := defaulter.Defaults(); err != nil {
-					panic(err)
-				}
-			}
-
-			if initializer, ok := strategy.(StrategyInitializer); ok {
-				if err := initializer.Initialize(); err != nil {
-					panic(err)
-				}
 			}
 
 			if subscriber, ok := strategy.(ExchangeSessionSubscriber); ok {
@@ -310,12 +263,6 @@ func (trader *Trader) injectFieldsAndSubscribe(ctx context.Context) error {
 			}
 		}
 
-		if initializer, ok := strategy.(StrategyInitializer); ok {
-			if err := initializer.Initialize(); err != nil {
-				return err
-			}
-		}
-
 		if subscriber, ok := strategy.(CrossExchangeSessionSubscriber); ok {
 			subscriber.CrossSubscribe(trader.environment.sessions)
 		} else {
@@ -362,24 +309,53 @@ func (trader *Trader) Run(ctx context.Context) error {
 	return trader.environment.Connect(ctx)
 }
 
+// Initialize initializes the strategies, this method is called before the Run method.
+// It sets the default values and validates the strategy configurations.
+// And calls the Initialize method if the strategy implements the Initialize method.
+func (trader *Trader) Initialize(ctx context.Context) error {
+	return trader.IterateStrategies(func(strategy types.StrategyID) error {
+		if defaulter, ok := strategy.(StrategyDefaulter); ok {
+			if err := defaulter.Defaults(); err != nil {
+				return err
+			}
+		}
+
+		if v, ok := strategy.(StrategyValidator); ok {
+			if err := v.Validate(); err != nil {
+				return fmt.Errorf("found invalid strategy config: %w", err)
+			}
+		}
+
+		if initializer, ok := strategy.(StrategyInitializer); ok {
+			return initializer.Initialize()
+		}
+
+		return nil
+	})
+}
+
 func (trader *Trader) LoadState(ctx context.Context) error {
 	if trader.environment.BacktestService != nil {
 		return nil
 	}
 
 	isolation := GetIsolationFromContext(ctx)
-
 	ps := isolation.persistenceServiceFacade.Get()
 
 	log.Infof("loading strategies states...")
-
-	return trader.IterateStrategies(func(strategy StrategyID) error {
+	return trader.IterateStrategies(func(strategy types.StrategyID) error {
 		id := dynamic.CallID(strategy)
+
+		if customSync, ok := strategy.(CustomSync); ok {
+			store := ps.NewStore(id)
+			return customSync.Load(ctx, store)
+		}
+
 		return loadPersistenceFields(strategy, id, ps)
 	})
 }
 
-func (trader *Trader) IterateStrategies(f func(st StrategyID) error) error {
+func (trader *Trader) IterateStrategies(f func(st types.StrategyID) error) error {
 	for _, strategies := range trader.exchangeStrategies {
 		for _, strategy := range strategies {
 			if err := f(strategy); err != nil {
@@ -408,7 +384,7 @@ func (trader *Trader) SaveState(ctx context.Context) error {
 	ps := isolation.persistenceServiceFacade.Get()
 
 	log.Debugf("saving strategy persistence states...")
-	return trader.IterateStrategies(func(strategy StrategyID) error {
+	return trader.IterateStrategies(func(strategy types.StrategyID) error {
 		id := dynamic.CallID(strategy)
 		if len(id) == 0 {
 			return nil

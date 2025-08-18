@@ -24,14 +24,15 @@ func init() {
 
 type Strategy struct {
 	*common.Strategy
+	*common.FeeBudget
 
 	Environment *bbgo.Environment
 	Market      types.Market
 
-	Symbol         string `json:"symbol"`
-	CronExpression string `json:"cronExpression"`
-	OnStart        bool   `json:"onStart"`
-	DryRun         bool   `json:"dryRun"`
+	Symbol   string `json:"symbol"`
+	Schedule string `json:"schedule"`
+	OnStart  bool   `json:"onStart"`
+	DryRun   bool   `json:"dryRun"`
 
 	bbgo.QuantityOrAmount
 	cron *cron.Cron
@@ -42,6 +43,13 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Initialize() error {
+	if s.Strategy == nil {
+		s.Strategy = &common.Strategy{}
+	}
+
+	if s.FeeBudget == nil {
+		s.FeeBudget = &common.FeeBudget{}
+	}
 	return nil
 }
 
@@ -54,8 +62,8 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if s.CronExpression == "" {
-		return fmt.Errorf("cronExpression is required")
+	if s.Schedule == "" {
+		return fmt.Errorf("schedule is required")
 	}
 
 	if err := s.QuantityOrAmount.Validate(); err != nil {
@@ -67,31 +75,49 @@ func (s *Strategy) Validate() error {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.Strategy = &common.Strategy{}
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, s.ID(), s.InstanceID())
+	s.FeeBudget.Initialize()
 
 	session.UserDataStream.OnStart(func() {
-		if s.OnStart {
-			s.placeOrder()
+		if !s.OnStart {
+			return
 		}
+
+		if !s.FeeBudget.IsBudgetAllowed() {
+			return
+		}
+
+		s.placeOrder(ctx)
+	})
+
+	session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+		if trade.Symbol != s.Symbol {
+			return
+		}
+		s.FeeBudget.HandleTradeUpdate(trade)
 	})
 
 	// the shutdown handler, you can cancel all orders
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		_ = s.OrderExecutor.GracefulCancel(ctx)
+		bbgo.Sync(ctx, s)
 	})
 
 	s.cron = cron.New()
-	s.cron.AddFunc(s.CronExpression, s.placeOrder)
+	s.cron.AddFunc(s.Schedule, func() {
+		if !s.FeeBudget.IsBudgetAllowed() {
+			return
+		}
+
+		s.placeOrder(ctx)
+	})
 	s.cron.Start()
 
 	return nil
 }
 
-func (s *Strategy) placeOrder() {
-	ctx := context.Background()
-
+func (s *Strategy) placeOrder(ctx context.Context) {
 	baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
 	if !ok {
 		log.Errorf("base balance not found")

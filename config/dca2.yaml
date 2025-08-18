@@ -1,0 +1,31 @@
+---
+backtest:
+  startTime: "2023-06-01"
+  endTime: "2023-07-01"
+  sessions:
+  - max
+  symbols:
+  - ETHUSDT
+  accounts:
+    binance:
+      balances:
+        USDT: 20_000.0
+
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+exchangeStrategies:
+
+- on: max
+  dca2:
+    symbol: ETHUSDT
+    quoteInvestment: "200"
+    maxOrderCount: 5
+    priceDeviation: "0.01"
+    takeProfitRatio: "0.002"
+    coolDownInterval: 180
+    recoverWhenStart: true
+    keepOrdersWhenShutdown: true

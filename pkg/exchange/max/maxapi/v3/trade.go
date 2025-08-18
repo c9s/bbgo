@@ -23,7 +23,7 @@ type Trade struct {
 	CreatedAt                 types.MillisecondTimestamp `json:"created_at"`
 	Side                      string                     `json:"side"`
 	OrderID                   uint64                     `json:"order_id"`
-	Fee                       fixedpoint.Value           `json:"fee"` // float number as string
+	Fee                       *fixedpoint.Value          `json:"fee"` // float number in string, could be optional
 	FeeCurrency               string                     `json:"fee_currency"`
 	FeeDiscounted             bool                       `json:"fee_discounted"`
 	Liquidity                 Liquidity                  `json:"liquidity"`

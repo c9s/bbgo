@@ -5,24 +5,34 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
-	"go.uber.org/multierr"
-
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 func toGlobalSymbol(symbol string) string {
+	symbol = strings.TrimSuffix(symbol, "-SWAP")
 	return strings.ReplaceAll(symbol, "-", "")
 }
 
-// //go:generate sh -c "echo \"package okex\nvar spotSymbolMap = map[string]string{\n\" $(curl -s -L 'https://okex.com/api/v5/public/instruments?instType=SPOT' | jq -r '.data[] | \"\\(.instId | sub(\"-\" ; \"\") | tojson ): \\( .instId | tojson),\n\"') \"\n}\" > symbols.go"
-//
 //go:generate go run gensymbols.go
-func toLocalSymbol(symbol string) string {
-	if s, ok := spotSymbolMap[symbol]; ok {
-		return s
+func toLocalSymbol(symbol string, instType ...okexapi.InstrumentType) string {
+	if len(instType) == 1 {
+		if instType[0] == okexapi.InstrumentTypeSwap {
+			if s, ok := swapSymbolSyncMap.Load(symbol); ok {
+				if localSymbol, ok := s.(string); ok {
+					return localSymbol
+				}
+			}
+		}
+	}
+
+	if s, ok := spotSymbolSyncMap.Load(symbol); ok {
+		if localSymbol, ok := s.(string); ok {
+			return localSymbol
+		}
+
+		log.Errorf("failed to convert symbol %s to local symbol, but found in spotSymbolSyncMap", symbol)
 	}
 
 	log.Errorf("failed to look up local symbol from %s", symbol)
@@ -44,20 +54,24 @@ func toGlobalTicker(marketTicker okexapi.MarketTicker) *types.Ticker {
 
 func toGlobalBalance(account *okexapi.Account) types.BalanceMap {
 	var balanceMap = types.BalanceMap{}
-	for _, balanceDetail := range account.Details {
-		balanceMap[balanceDetail.Currency] = types.Balance{
-			Currency:  balanceDetail.Currency,
-			Available: balanceDetail.CashBalance,
-			Locked:    balanceDetail.Frozen,
+	for _, detail := range account.Details {
+
+		balanceMap[detail.Currency] = types.Balance{
+			Currency:  detail.Currency,
+			Available: detail.Available,
+			Locked:    detail.FrozenBalance,
+			Interest:  detail.Interest,        // accrued interest
+			Borrowed:  detail.Liability.Abs(), // okx liability does not include the accrued interest
+			NetAsset:  detail.Equity,
 		}
 	}
 	return balanceMap
 }
 
 type WebsocketSubscription struct {
-	Channel        string `json:"channel"`
-	InstrumentID   string `json:"instId,omitempty"`
-	InstrumentType string `json:"instType,omitempty"`
+	Channel        Channel `json:"channel"`
+	InstrumentID   string  `json:"instId,omitempty"`
+	InstrumentType string  `json:"instType,omitempty"`
 }
 
 var CandleChannels = []string{
@@ -84,27 +98,48 @@ func convertIntervalToCandle(interval types.Interval) string {
 	return "candle" + s
 }
 
-func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
-	// binance uses lower case symbol name,
-	// for kline, it's "<symbol>@kline_<interval>"
-	// for depth, it's "<symbol>@depth OR <symbol>@depth@100ms"
+func convertSubscription(s types.Subscription, instType okexapi.InstrumentType) (WebsocketSubscription, error) {
 	switch s.Channel {
 	case types.KLineChannel:
 		// Channel names are:
 		return WebsocketSubscription{
-			Channel:      convertIntervalToCandle(s.Options.Interval),
-			InstrumentID: toLocalSymbol(s.Symbol),
+			Channel:      Channel(convertIntervalToCandle(s.Options.Interval)),
+			InstrumentID: toLocalSymbol(s.Symbol, instType),
 		}, nil
 
 	case types.BookChannel:
+		ch := ChannelBooks
+
+		switch s.Options.Depth {
+		case types.DepthLevelFull:
+			ch = ChannelBooks
+
+		case types.DepthLevelMedium:
+			ch = ChannelBooks50
+
+		case types.DepthLevel50:
+			ch = ChannelBooks50
+
+		case types.DepthLevel5:
+			ch = ChannelBooks5
+
+		case types.DepthLevel1:
+			ch = ChannelBooks1
+		}
+
 		return WebsocketSubscription{
-			Channel:      "books",
-			InstrumentID: toLocalSymbol(s.Symbol),
+			Channel:      ch,
+			InstrumentID: toLocalSymbol(s.Symbol, instType),
 		}, nil
 	case types.BookTickerChannel:
 		return WebsocketSubscription{
-			Channel:      "books5",
-			InstrumentID: toLocalSymbol(s.Symbol),
+			Channel:      ChannelBooks5,
+			InstrumentID: toLocalSymbol(s.Symbol, instType),
+		}, nil
+	case types.MarketTradeChannel:
+		return WebsocketSubscription{
+			Channel:      ChannelMarketTrades,
+			InstrumentID: toLocalSymbol(s.Symbol, instType),
 		}, nil
 	}
 
@@ -115,45 +150,104 @@ func toLocalSideType(side types.SideType) okexapi.SideType {
 	return okexapi.SideType(strings.ToLower(string(side)))
 }
 
-func segmentOrderDetails(orderDetails []okexapi.OrderDetails) (trades, orders []okexapi.OrderDetails) {
-	for _, orderDetail := range orderDetails {
-		if len(orderDetail.LastTradeID) > 0 {
-			trades = append(trades, orderDetail)
-		}
-		orders = append(orders, orderDetail)
+func toGlobalTrade(trade okexapi.Trade) types.Trade {
+	side := toGlobalSide(trade.Side)
+	return types.Trade{
+		ID:            uint64(trade.TradeId),
+		OrderID:       uint64(trade.OrderId),
+		Exchange:      types.ExchangeOKEx,
+		Price:         trade.FillPrice,
+		Quantity:      trade.FillSize,
+		QuoteQuantity: trade.FillPrice.Mul(trade.FillSize),
+		Symbol:        toGlobalSymbol(trade.InstrumentId),
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       trade.ExecutionType == okexapi.LiquidityTypeMaker,
+		Time:          types.Time(trade.Timestamp),
+		// The fees obtained from the exchange are negative, hence they are forcibly converted to positive.
+		Fee:         trade.Fee.Abs(),
+		FeeCurrency: trade.FeeCurrency,
+		IsMargin:    trade.InstrumentType == okexapi.InstrumentTypeMargin,
+		IsFutures: trade.InstrumentType == okexapi.InstrumentTypeFutures ||
+			trade.InstrumentType == okexapi.InstrumentTypeSwap,
+		IsIsolated: false,
 	}
-	return trades, orders
 }
 
-func toGlobalTrades(orderDetails []okexapi.OrderDetails) ([]types.Trade, error) {
-	var trades []types.Trade
-	var err error
-	for _, orderDetail := range orderDetails {
-		trade, err2 := toGlobalTrade(&orderDetail)
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-			continue
-		}
-		trades = append(trades, *trade)
-	}
+func processMarketBuySize(o *okexapi.OrderDetail) (fixedpoint.Value, error) {
+	switch o.State {
+	case okexapi.OrderStateLive, okexapi.OrderStateCanceled:
+		return fixedpoint.Zero, nil
 
-	return trades, nil
+	case okexapi.OrderStatePartiallyFilled:
+		if o.FillPrice.IsZero() {
+			return fixedpoint.Zero, fmt.Errorf("fillPrice for a partialFilled should not be zero")
+		}
+		return o.Size.Div(o.FillPrice), nil
+
+	case okexapi.OrderStateFilled:
+		return o.AccumulatedFillSize, nil
+
+	default:
+		return fixedpoint.Zero, fmt.Errorf("unexpected status: %s", o.State)
+	}
 }
 
-func toGlobalOrders(orderDetails []okexapi.OrderDetails) ([]types.Order, error) {
-	var orders []types.Order
-	var err error
-	for _, orderDetail := range orderDetails {
+func orderDetailToGlobalOrder(order *okexapi.OrderDetail) (*types.Order, error) {
+	side := toGlobalSide(order.Side)
 
-		o, err2 := toGlobalOrder(&orderDetail)
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-			continue
-		}
-		orders = append(orders, *o)
+	orderType, err := toGlobalOrderType(order.OrderType)
+	if err != nil {
+		return nil, err
 	}
 
-	return orders, err
+	timeInForce := types.TimeInForceGTC
+	switch order.OrderType {
+	case okexapi.OrderTypeFOK:
+		timeInForce = types.TimeInForceFOK
+	case okexapi.OrderTypeIOC:
+		timeInForce = types.TimeInForceIOC
+	}
+
+	orderStatus, err := toGlobalOrderStatus(order.State)
+	if err != nil {
+		return nil, err
+	}
+
+	size := order.Size
+	if order.Side == okexapi.SideTypeBuy &&
+		order.OrderType == okexapi.OrderTypeMarket &&
+		order.TargetCurrency == okexapi.TargetCurrencyQuote {
+
+		size, err = processMarketBuySize(order)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: order.ClientOrderId,
+			Symbol:        toGlobalSymbol(order.InstrumentID),
+			Side:          side,
+			Type:          orderType,
+			Price:         order.Price,
+			Quantity:      size,
+			AveragePrice:  order.AvgPrice,
+			TimeInForce:   timeInForce,
+		},
+		Exchange:         types.ExchangeOKEx,
+		OrderID:          uint64(order.OrderId),
+		Status:           orderStatus,
+		OriginalStatus:   string(order.State),
+		ExecutedQuantity: order.AccumulatedFillSize,
+		IsWorking:        order.State.IsWorking(),
+		CreationTime:     types.Time(order.CreatedTime),
+		UpdateTime:       types.Time(order.UpdatedTime),
+		IsMargin:         order.InstrumentType == okexapi.InstrumentTypeMargin,
+		IsFutures: order.InstrumentType == okexapi.InstrumentTypeFutures ||
+			order.InstrumentType == okexapi.InstrumentTypeSwap,
+	}, nil
 }
 
 func toGlobalOrderStatus(state okexapi.OrderState) (types.OrderStatus, error) {
@@ -172,34 +266,32 @@ func toGlobalOrderStatus(state okexapi.OrderState) (types.OrderStatus, error) {
 	return "", fmt.Errorf("unknown or unsupported okex order state: %s", state)
 }
 
+var localOrderTypeMap = map[types.OrderType]okexapi.OrderType{
+	types.OrderTypeMarket:     okexapi.OrderTypeMarket,
+	types.OrderTypeLimit:      okexapi.OrderTypeLimit,
+	types.OrderTypeLimitMaker: okexapi.OrderTypePostOnly,
+}
+
 func toLocalOrderType(orderType types.OrderType) (okexapi.OrderType, error) {
-	switch orderType {
-	case types.OrderTypeMarket:
-		return okexapi.OrderTypeMarket, nil
-
-	case types.OrderTypeLimit:
-		return okexapi.OrderTypeLimit, nil
-
-	case types.OrderTypeLimitMaker:
-		return okexapi.OrderTypePostOnly, nil
-
+	if ot, ok := localOrderTypeMap[orderType]; ok {
+		return ot, nil
 	}
 
 	return "", fmt.Errorf("unknown or unsupported okex order type: %s", orderType)
 }
 
+var globalOrderTypeMap = map[okexapi.OrderType]types.OrderType{
+	okexapi.OrderTypeMarket:   types.OrderTypeMarket,
+	okexapi.OrderTypeLimit:    types.OrderTypeLimit,
+	okexapi.OrderTypePostOnly: types.OrderTypeLimitMaker,
+	okexapi.OrderTypeFOK:      types.OrderTypeLimit,
+	okexapi.OrderTypeIOC:      types.OrderTypeLimit,
+}
+
 func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
 	// IOC, FOK are only allowed with limit order type, so we assume the order type is always limit order for FOK, IOC orders
-	switch orderType {
-	case okexapi.OrderTypeMarket:
-		return types.OrderTypeMarket, nil
-
-	case okexapi.OrderTypeLimit, okexapi.OrderTypeFOK, okexapi.OrderTypeIOC:
-		return types.OrderTypeLimit, nil
-
-	case okexapi.OrderTypePostOnly:
-		return types.OrderTypeLimitMaker, nil
-
+	if ot, ok := globalOrderTypeMap[orderType]; ok {
+		return ot, nil
 	}
 
 	return "", fmt.Errorf("unknown or unsupported okex order type: %s", orderType)
@@ -263,8 +355,14 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails) (*types.Order, error) {
 	}
 
 	isMargin := false
-	if okexOrder.InstrumentType == okexapi.InstrumentTypeMARGIN {
+	if okexOrder.InstrumentType == okexapi.InstrumentTypeMargin {
 		isMargin = true
+	}
+
+	isFutures := false
+	if okexOrder.InstrumentType == okexapi.InstrumentTypeFutures ||
+		okexOrder.InstrumentType == okexapi.InstrumentTypeSwap {
+		isFutures = true
 	}
 
 	return &types.Order{
@@ -287,46 +385,105 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails) (*types.Order, error) {
 		UpdateTime:       types.Time(okexOrder.UpdateTime),
 		IsMargin:         isMargin,
 		IsIsolated:       false,
+		IsFutures:        isFutures,
 	}, nil
 }
 
-func toGlobalTrade(orderDetail *okexapi.OrderDetails) (*types.Trade, error) {
-	// Should use tradeId, but okex use billId to perform pagination, so use billID as tradeID instead.
-	billID := orderDetail.BillID
+func toGlobalMarginLoan(record okexapi.MarginHistoryEntry) types.MarginLoan {
+	return types.MarginLoan{
+		Exchange:       types.ExchangeOKEx,
+		TransactionID:  uint64(record.Ts.Time().UnixMilli()),
+		Asset:          record.Currency,
+		Principle:      record.Amount,
+		Time:           types.Time(record.Ts.Time()),
+		IsolatedSymbol: "",
+	}
+}
 
-	orderID, err := strconv.ParseInt(orderDetail.OrderID, 10, 64)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing ordId value: %s", orderDetail.OrderID)
+func toGlobalMarginRepay(record okexapi.MarginHistoryEntry) types.MarginRepay {
+	return types.MarginRepay{
+		Exchange:       types.ExchangeOKEx,
+		TransactionID:  uint64(record.Ts.Time().UnixMilli()),
+		Asset:          record.Currency,
+		Principle:      record.Amount,
+		Time:           types.Time(record.Ts.Time()),
+		IsolatedSymbol: "",
+	}
+}
+
+// DepositRecord.state represents the deposit state
+/*
+Status of deposit
+0: Waiting for confirmation
+1: Deposit credited
+2: Deposit successful
+8: Pending due to temporary deposit suspension on this crypto currency
+11: Match the address blacklist
+12: Account or deposit is frozen
+13: Sub-account deposit interception
+14: KYC limit
+*/
+func toDepositStatusMessage(state int64) string {
+	switch state {
+	case 0:
+		return "Waiting for confirmation"
+	case 1:
+		return "Deposit credited"
+	case 2:
+		return "Deposit successful"
+	case 8:
+		return "Pending due to temporary deposit suspension on this crypto currency"
+	case 11:
+		return "Match the address blacklist"
+	case 12:
+		return "Account or deposit is frozen"
+	case 13:
+		return "Sub-account deposit interception"
+	case 14:
+		return "KYC limit"
 	}
 
-	side := toGlobalSide(orderDetail.Side)
+	return ""
+}
 
-	isMargin := false
-	if orderDetail.InstrumentType == okexapi.InstrumentTypeMARGIN {
-		isMargin = true
+func toGlobalDepositStatus(state int64) types.DepositStatus {
+	switch state {
+	case 0:
+		return types.DepositPending
+	case 1:
+		return types.DepositCredited
+	case 2:
+		return types.DepositSuccess
+	case 8:
+		return types.DepositPending
+	default:
+		return types.DepositRejected
 	}
+}
 
-	isFuture := false
-	if orderDetail.InstrumentType == okexapi.InstrumentTypeFutures {
-		isFuture = true
-	}
-
-	return &types.Trade{
-		ID:            uint64(billID),
-		OrderID:       uint64(orderID),
+func toGlobalDeposit(record okexapi.DepositRecord) types.Deposit {
+	return types.Deposit{
 		Exchange:      types.ExchangeOKEx,
-		Price:         orderDetail.LastFilledPrice,
-		Quantity:      orderDetail.LastFilledQuantity,
-		QuoteQuantity: orderDetail.LastFilledPrice.Mul(orderDetail.LastFilledQuantity),
-		Symbol:        toGlobalSymbol(orderDetail.InstrumentID),
-		Side:          side,
-		IsBuyer:       side == types.SideTypeBuy,
-		IsMaker:       orderDetail.ExecutionType == "M",
-		Time:          types.Time(orderDetail.LastFilledTime),
-		Fee:           orderDetail.LastFilledFee,
-		FeeCurrency:   orderDetail.LastFilledFeeCurrency,
-		IsMargin:      isMargin,
-		IsFutures:     isFuture,
-		IsIsolated:    false,
-	}, nil
+		Time:          types.Time(record.Ts),
+		Amount:        record.Amount,
+		Asset:         record.Currency,
+		Address:       record.To,
+		AddressTag:    "",
+		TransactionID: record.DepId,
+		Status:        toGlobalDepositStatus(int64(record.State)),
+		RawStatus:     fmt.Sprintf("%s (%s)", record.State.String(), toDepositStatusMessage(int64(record.State))),
+		UnlockConfirm: 0,
+		Confirmation:  record.ActualDepBlkConfirm.String(),
+		Network:       strings.ToUpper(record.Chain),
+	}
+
+}
+
+func toGlobalCurrency(record okexapi.InstrumentInfo) (baseCurrency, quoteCurrency string) {
+	baseCurrency, quoteCurrency = record.BaseCurrency, record.QuoteCurrency
+	if len(baseCurrency) == 0 && len(quoteCurrency) == 0 {
+		symbols := strings.Split(record.InstrumentID, "-")
+		baseCurrency, quoteCurrency = symbols[0], symbols[1]
+	}
+	return
 }

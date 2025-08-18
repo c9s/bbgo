@@ -1,3 +1,4 @@
+-- !txn
 -- +up
 CREATE TABLE `margin_liquidations`
 (

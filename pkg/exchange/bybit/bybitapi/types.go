@@ -127,4 +127,11 @@ const (
 
 type AccountType string
 
-const AccountTypeSpot AccountType = "SPOT"
+const AccountTypeUnified AccountType = "UNIFIED"
+
+type MarketUnit string
+
+const (
+	MarketUnitBase  MarketUnit = "baseCoin"
+	MarketUnitQuote MarketUnit = "quoteCoin"
+)

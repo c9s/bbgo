@@ -97,7 +97,7 @@ go run ./cmd/bbgo run
 You can also use the makefile to build bbgo:
 
 ```shell
-cd frontend && yarn install
+cd apps/frontend && yarn install
 make bbgo
 ```
 

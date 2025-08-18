@@ -3,10 +3,20 @@ package types
 import (
 	"sync"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 // OrderMap is used for storing orders by their order id
 type OrderMap map[uint64]Order
+
+func NewOrderMap(os ...Order) OrderMap {
+	m := OrderMap{}
+	if len(os) > 0 {
+		m.Add(os...)
+	}
+	return m
+}
 
 func (m OrderMap) Backup() (orderForms []SubmitOrder) {
 	for _, order := range m {
@@ -16,9 +26,11 @@ func (m OrderMap) Backup() (orderForms []SubmitOrder) {
 	return orderForms
 }
 
-// Add the order the the map
-func (m OrderMap) Add(o Order) {
-	m[o.OrderID] = o
+// Add the order the map
+func (m OrderMap) Add(os ...Order) {
+	for _, o := range os {
+		m[o.OrderID] = o
+	}
 }
 
 // Update only updates the order when the order ID exists in the map
@@ -41,6 +53,10 @@ func (m OrderMap) Lookup(f func(o Order) bool) *Order {
 
 func (m OrderMap) Remove(orderID uint64) {
 	delete(m, orderID)
+}
+
+func (m *OrderMap) Clear() {
+	*m = make(OrderMap, 10)
 }
 
 func (m OrderMap) IDs() (ids []uint64) {
@@ -109,6 +125,13 @@ func (m *SyncOrderMap) Backup() (orders []SubmitOrder) {
 	orders = m.orders.Backup()
 	m.Unlock()
 	return orders
+}
+
+func (m *SyncOrderMap) Clear() {
+	m.Lock()
+	m.orders.Clear()
+	m.pendingRemoval = make(map[uint64]time.Time, 10)
+	m.Unlock()
 }
 
 func (m *SyncOrderMap) Remove(orderID uint64) (exists bool) {
@@ -243,3 +266,64 @@ func (m *SyncOrderMap) Orders() (slice OrderSlice) {
 }
 
 type OrderSlice []Order
+
+func (s OrderSlice) FindByOrderID(id uint64) (Order, bool) {
+	for _, o := range s {
+		if o.OrderID == id {
+			return o, true
+		}
+	}
+
+	return Order{}, false
+}
+
+func (s *OrderSlice) Add(o Order) {
+	*s = append(*s, o)
+}
+
+// Map builds up an OrderMap by the order id
+func (s OrderSlice) Map() OrderMap {
+	return NewOrderMap(s...)
+}
+
+func (s OrderSlice) SeparateBySide() (buyOrders, sellOrders []Order) {
+	for _, o := range s {
+		switch o.Side {
+		case SideTypeBuy:
+			buyOrders = append(buyOrders, o)
+		case SideTypeSell:
+			sellOrders = append(sellOrders, o)
+		}
+	}
+
+	return buyOrders, sellOrders
+}
+
+func (s OrderSlice) ClassifyByStatus() (opened, cancelled, filled, unexpected []Order) {
+	for _, order := range s {
+		switch order.Status {
+		case OrderStatusNew, OrderStatusPartiallyFilled:
+			opened = append(opened, order)
+		case OrderStatusFilled:
+			filled = append(filled, order)
+		case OrderStatusCanceled:
+			cancelled = append(cancelled, order)
+		default:
+			unexpected = append(unexpected, order)
+		}
+	}
+	return opened, cancelled, filled, unexpected
+}
+
+func (s OrderSlice) Print() {
+	for _, o := range s {
+		logrus.Infof("%s", o)
+	}
+}
+
+func (s *OrderSlice) SubmitOrders() (submitOrders []SubmitOrder) {
+	for _, o := range *s {
+		submitOrders = append(submitOrders, o.SubmitOrder)
+	}
+	return submitOrders
+}

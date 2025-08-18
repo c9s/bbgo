@@ -6,13 +6,15 @@ import (
 	"os"
 	"sync"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/sirupsen/logrus"
 )
 
 const ID = "harmonic"
@@ -29,7 +31,7 @@ type Strategy struct {
 	Market      types.Market
 
 	types.IntervalWindow
-	//bbgo.OpenPositionOptions
+	// bbgo.OpenPositionOptions
 
 	// persistence fields
 	Position    *types.Position    `persistence:"position"`
@@ -239,7 +241,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Cancel active orders
 		_ = s.orderExecutor.GracefulCancel(ctx)
 		// Close 100% position
-		//_ = s.ClosePosition(ctx, fixedpoint.One)
+		// _ = s.ClosePosition(ctx, fixedpoint.One)
 	})
 
 	s.session = session
@@ -258,7 +260,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindTradeStats(s.TradeStats)
 
 	// AccountValueCalculator
-	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, s.Market.QuoteCurrency)
+	priceSolver := pricesolver.NewSimplePriceResolver(session.Markets())
+	priceSolver.BindStream(s.session.MarketDataStream)
+	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, priceSolver, s.Market.QuoteCurrency)
+	if err := s.AccountValueCalculator.UpdatePrices(ctx); err != nil {
+		return err
+	}
 
 	// Accumulated profit report
 	if bbgo.IsBackTesting {
@@ -440,9 +447,9 @@ for t in 1 .. n:
 return argmax(alpha[t,si] over si)
 */
 func hmm(y_t []float64, x_t []float64, l int) float64 {
-	al := make([]float64, l)
-	an := make([]float64, l)
-	as := make([]float64, l)
+	al := make([]float64, 0, l)
+	an := make([]float64, 0, l)
+	as := make([]float64, 0, l)
 	long := 0.
 	neut := 0.
 	short := 0.
@@ -453,9 +460,9 @@ func hmm(y_t []float64, x_t []float64, l int) float64 {
 			sin := make([]float64, 3)
 			sis := make([]float64, 3)
 			for i := -1; i <= 1; i++ {
-				sil = append(sil, x_t[n-1-1]*transitProbability(i, j))
-				sin = append(sin, x_t[n-1-1]*transitProbability(i, j))
-				sis = append(sis, x_t[n-1-1]*transitProbability(i, j))
+				sil = append(sil, 0, x_t[n-1-1]*transitProbability(i, j))
+				sin = append(sin, 0, x_t[n-1-1]*transitProbability(i, j))
+				sis = append(sis, 0, x_t[n-1-1]*transitProbability(i, j))
 			}
 			if j > 0 {
 				_, longArr := floats.MinMax(sil, 3)

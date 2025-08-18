@@ -42,7 +42,6 @@ func init() {
 
 	BacktestCmd.Flags().Bool("base-asset-baseline", false, "use base asset performance as the competitive baseline performance")
 	BacktestCmd.Flags().CountP("verbose", "v", "verbose level")
-	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
 	BacktestCmd.Flags().Bool("force", false, "force execution without confirm")
 	BacktestCmd.Flags().String("output", "", "the report output directory")
 	BacktestCmd.Flags().Bool("subdir", false, "generate report in the sub-directory of the output directory")
@@ -193,7 +192,7 @@ var BacktestCmd = &cobra.Command{
 			userConfig.Backtest.Sessions = []string{syncExchangeName}
 		} else if len(userConfig.Backtest.Sessions) == 0 {
 			log.Infof("backtest.sessions is not defined, using all supported exchanges: %v", types.SupportedExchanges)
-			for _, exName := range types.SupportedExchanges {
+			for exName, _ := range types.SupportedExchanges {
 				userConfig.Backtest.Sessions = append(userConfig.Backtest.Sessions, exName.String())
 			}
 		}
@@ -210,6 +209,16 @@ var BacktestCmd = &cobra.Command{
 				return err
 			}
 			sourceExchanges[exName] = publicExchange
+
+			// Set exchange to use futures
+			if userConfig.Sessions[exName.String()].Futures {
+				futuresExchange, ok := publicExchange.(types.FuturesExchange)
+				if !ok {
+					return fmt.Errorf("exchange %s does not support futures", publicExchange.Name())
+				}
+
+				futuresExchange.UseFutures()
+			}
 		}
 
 		var syncFromTime time.Time
@@ -287,6 +296,7 @@ var BacktestCmd = &cobra.Command{
 			exchangeFromConfig := userConfig.Sessions[name.String()]
 			if exchangeFromConfig != nil {
 				session.UseHeikinAshi = exchangeFromConfig.UseHeikinAshi
+				session.Futures = exchangeFromConfig.Futures
 			}
 		}
 
@@ -310,12 +320,19 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
+		if err := trader.Initialize(ctx); err != nil {
+			return err
+		}
+
 		if err := trader.Run(ctx); err != nil {
 			return err
 		}
 
 		allKLineIntervals, requiredInterval, backTestIntervals := backtest.CollectSubscriptionIntervals(environ)
-		exchangeSources, err := backtest.InitializeExchangeSources(environ.Sessions(), startTime, endTime, requiredInterval, backTestIntervals...)
+		exchangeSources, err := backtest.InitializeExchangeSources(environ.Sessions(),
+			startTime, endTime,
+			userConfig.Backtest.Symbols,
+			requiredInterval, backTestIntervals...)
 		if err != nil {
 			return err
 		}
@@ -382,7 +399,7 @@ var BacktestCmd = &cobra.Command{
 			}
 
 			stateRecorder := backtest.NewStateRecorder(reportDir)
-			err = trader.IterateStrategies(func(st bbgo.StrategyID) error {
+			err = trader.IterateStrategies(func(st types.StrategyID) error {
 				return stateRecorder.Scan(st.(backtest.Instance))
 			})
 			if err != nil {

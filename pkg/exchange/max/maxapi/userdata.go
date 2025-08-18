@@ -227,7 +227,9 @@ func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
 	case "trade_snapshot", "mwallet_trade_snapshot":
 		return parseTradeSnapshotEvent(v)
 
-	case "trade_update", "mwallet_trade_update":
+	// trade_fast_update and mwallet_trade_fast_update are deprecated
+	case "trade_update", "fast_trade_update", "trade_fast_update",
+		"mwallet_trade_update", "mwallet_trade_fast_update", "mwallet_fast_trade_update":
 		return parseTradeUpdateEvent(v)
 
 	case "ad_ratio_snapshot", "ad_ratio_update":

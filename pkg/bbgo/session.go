@@ -2,41 +2,111 @@ package bbgo
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
+	"os"
+	"slices"
+	"sort"
 	"sync"
 	"time"
 
-	"github.com/slack-go/slack"
-
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/cache"
-	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/envvar"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
+	"github.com/c9s/bbgo/pkg/metrics"
+	"github.com/c9s/bbgo/pkg/pricesolver"
+	currency2 "github.com/c9s/bbgo/pkg/types/currency"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
+
+const defaultMaxSessionTradeBufferSize = 3500
 
 var KLinePreloadLimit int64 = 1000
 
 var ErrEmptyMarketInfo = errors.New("market info should not be empty, 0 markets loaded")
 
-// ExchangeSession presents the exchange connection Session
-// It also maintains and collects the data returned from the stream.
-type ExchangeSession struct {
-	// ---------------------------
-	// Session config fields
-	// ---------------------------
+type ExchangeSessionMap map[string]*ExchangeSession
 
-	// Exchange Session name
+func (sessions ExchangeSessionMap) Filter(names []string) ExchangeSessionMap {
+	mm := ExchangeSessionMap{}
+
+	for _, name := range names {
+		if session, ok := sessions[name]; ok {
+			mm[name] = session
+		}
+	}
+
+	return mm
+}
+
+func (sessions ExchangeSessionMap) Names() (slice []string) {
+	for n := range sessions {
+		slice = append(slice, n)
+	}
+
+	return slice
+}
+
+// CollectMarkets collects all markets from the sessions
+//
+// markets.Merge override the previous defined markets
+// so we need to merge the markets in reverse order
+func (sessions ExchangeSessionMap) CollectMarkets(preferredSessions []string) types.MarketMap {
+	if len(preferredSessions) == 0 {
+		preferredSessions = sessions.Names()
+	}
+
+	allMarkets := types.MarketMap{}
+
+	sort.Sort(sort.Reverse(sort.StringSlice(preferredSessions)))
+	for _, sessionName := range preferredSessions {
+		if session, ok := sessions[sessionName]; ok {
+			allMarkets.Merge(session.Markets())
+		}
+	}
+
+	return allMarkets
+}
+
+func (sessions ExchangeSessionMap) AggregateBalances(
+	ctx context.Context, skipUpdate bool,
+) (types.BalanceMap, map[string]types.BalanceMap, error) {
+	totalBalances := make(types.BalanceMap)
+	sessionBalances := make(map[string]types.BalanceMap)
+
+	var err error
+
+	// iterate the sessions and record them
+	for sessionName, session := range sessions {
+		// update the account balances and the margin information
+		account := session.GetAccount()
+		if !skipUpdate {
+			account, err = session.UpdateAccount(ctx)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+
+		balances := account.Balances()
+
+		sessionBalances[sessionName] = balances
+		totalBalances = totalBalances.Add(balances)
+	}
+
+	return totalBalances, sessionBalances, nil
+}
+
+type ExchangeSessionConfig struct {
 	Name         string             `json:"name,omitempty" yaml:"name,omitempty"`
 	ExchangeName types.ExchangeName `json:"exchange" yaml:"exchange"`
 	EnvVarPrefix string             `json:"envVarPrefix" yaml:"envVarPrefix"`
@@ -45,18 +115,22 @@ type ExchangeSession struct {
 	Passphrase   string             `json:"passphrase,omitempty" yaml:"passphrase,omitempty"`
 	SubAccount   string             `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
 
-	// Withdrawal is used for enabling withdrawal functions
-	Withdrawal              bool             `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
-	MakerFeeRate            fixedpoint.Value `json:"makerFeeRate" yaml:"makerFeeRate"`
-	TakerFeeRate            fixedpoint.Value `json:"takerFeeRate" yaml:"takerFeeRate"`
-	ModifyOrderAmountForFee bool             `json:"modifyOrderAmountForFee" yaml:"modifyOrderAmountForFee"`
+	// Margin Assets Configs
+	MarginInfoUpdaterInterval types.Duration `json:"marginInfoUpdaterInterval" yaml:"marginInfoUpdaterInterval"`
+
+	MakerFeeRate fixedpoint.Value `json:"makerFeeRate" yaml:"makerFeeRate"`
+	TakerFeeRate fixedpoint.Value `json:"takerFeeRate" yaml:"takerFeeRate"`
 
 	// PublicOnly is used for setting the session to public only (without authentication, no private user data)
 	PublicOnly bool `json:"publicOnly,omitempty" yaml:"publicOnly"`
 
 	// PrivateChannels is used for filtering the private user data channel, .e.g, orders, trades, balances.. etc
-	// This option is exchange specific
+	// This option is exchange-specific, currently only MAX exchange reads this option
 	PrivateChannels []string `json:"privateChannels,omitempty" yaml:"privateChannels,omitempty"`
+
+	// PrivateChannelSymbols is used for filtering the private user data channel, .e.g, order symbol subscription.
+	// This option is exchange-specific, currently only Bitget exchange reads this option
+	PrivateChannelSymbols []string `json:"privateChannelSymbols,omitempty" yaml:"privateChannelSymbols,omitempty"`
 
 	Margin               bool   `json:"margin,omitempty" yaml:"margin"`
 	IsolatedMargin       bool   `json:"isolatedMargin,omitempty" yaml:"isolatedMargin,omitempty"`
@@ -65,6 +139,28 @@ type ExchangeSession struct {
 	Futures               bool   `json:"futures,omitempty" yaml:"futures"`
 	IsolatedFutures       bool   `json:"isolatedFutures,omitempty" yaml:"isolatedFutures,omitempty"`
 	IsolatedFuturesSymbol string `json:"isolatedFuturesSymbol,omitempty" yaml:"isolatedFuturesSymbol,omitempty"`
+
+	// Leverage is used for controlling the max leverage only if the exchange supports it
+	SymbolLeverage map[string]int `json:"symbolLeverage,omitempty" yaml:"symbolLeverage,omitempty"`
+
+	// AccountName is used for labeling the account name of the session
+	AccountName string `json:"accountName,omitempty" yaml:"accountName,omitempty"`
+
+	// AccountOwner is used for labeling the account owner of the session
+	AccountOwner string `json:"accountOwner,omitempty" yaml:"accountOwner,omitempty"`
+
+	// Withdrawal is used for enabling withdrawal functions
+	Withdrawal bool `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
+
+	UseHeikinAshi bool `json:"heikinAshi,omitempty" yaml:"heikinAshi,omitempty"`
+}
+
+// ExchangeSession presents the exchange connection Session
+// It also maintains and collects the data returned from the stream.
+//
+//go:generate callbackgen -type ExchangeSession
+type ExchangeSession struct {
+	ExchangeSessionConfig `yaml:",inline"`
 
 	// ---------------------------
 	// Runtime fields
@@ -76,38 +172,58 @@ type ExchangeSession struct {
 
 	IsInitialized bool `json:"-" yaml:"-"`
 
+	// OrderExecutor is the default order executor for the session
+	//
+	// Deprecated: use GeneralOrderExecutor instead
 	OrderExecutor *ExchangeOrderExecutor `json:"orderExecutor,omitempty" yaml:"orderExecutor,omitempty"`
 
-	// UserDataStream is the connection stream of the exchange
-	UserDataStream   types.Stream `json:"-" yaml:"-"`
+	// UserDataStream is the user data connection stream of the exchange
+	// This stream is used for managing user data, such as orders, trades, balances, etc.
+	UserDataStream types.Stream `json:"-" yaml:"-"`
+
+	// MarketDataStream is the market data connection stream of the exchange
+	// This stream is used for managing market data, such as klines, trades, order books, etc.
 	MarketDataStream types.Stream `json:"-" yaml:"-"`
 
-	// Subscriptions
-	// this is a read-only field when running strategy
+	// UserDataConnectivity is the connectivity of the user data stream
+	UserDataConnectivity *types.Connectivity `json:"-" yaml:"-"`
+
+	// MarketDataConnectivity is the connectivity of the market data stream
+	MarketDataConnectivity *types.Connectivity `json:"-" yaml:"-"`
+
+	// Connectivity is the group of connectivity of the session
+	// This is used for managing both user data and market data connectivity
+	Connectivity *types.ConnectivityGroup `json:"-" yaml:"-"`
+
+	// Subscriptions is the subscription list of the session
+	// This is a read-only field when running strategy
 	Subscriptions map[types.Subscription]types.Subscription `json:"-" yaml:"-"`
 
+	// Exchange is the exchange instance, it is used for querying the exchange data or submitting orders
 	Exchange types.Exchange `json:"-" yaml:"-"`
 
-	UseHeikinAshi bool `json:"heikinAshi,omitempty" yaml:"heikinAshi,omitempty"`
+	marginInfoUpdater *MarginInfoUpdater
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
+	//
+	// Trades field here is used for collecting trades in the back-test mode
+	// in the production environment, we usually use trade store in the strategy instance to collect trades
 	Trades map[string]*types.TradeSlice `json:"-" yaml:"-"`
 
 	// markets defines market configuration of a symbol
-	markets map[string]types.Market
-
-	// orderBooks stores the streaming order book
-	orderBooks map[string]*types.StreamOrderBook
+	markets     map[string]types.Market
+	marketMutex sync.Mutex
 
 	// startPrices is used for backtest
 	startPrices map[string]fixedpoint.Value
 
 	lastPrices         map[string]fixedpoint.Value
 	lastPriceUpdatedAt time.Time
+	lastPricesMutex    sync.Mutex
 
 	// marketDataStores contains the market data store of each market
-	marketDataStores map[string]*MarketDataStore
+	marketDataStores map[string]*types.MarketDataStore
 
 	positions map[string]*types.Position
 
@@ -117,40 +233,62 @@ type ExchangeSession struct {
 	// indicators is the v2 api indicators
 	indicators map[string]*IndicatorSet
 
-	orderStores map[string]*core.OrderStore
-
 	usedSymbols        map[string]struct{}
 	initializedSymbols map[string]struct{}
 
 	logger log.FieldLogger
+
+	priceSolver *pricesolver.SimplePriceSolver
 }
 
+// NewExchangeSession creates a new exchange session instance
+// NOTE: make sure it intialize the session as the way as InitExchange
+// TODO: unify the session creation and initialization (ex: calling InitExchange in NewExchangeSession)
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	userDataStream := exchange.NewStream()
+
 	marketDataStream := exchange.NewStream()
 	marketDataStream.SetPublicOnly()
 
-	session := &ExchangeSession{
-		Name:             name,
-		Exchange:         exchange,
-		UserDataStream:   userDataStream,
-		MarketDataStream: marketDataStream,
-		Subscriptions:    make(map[types.Subscription]types.Subscription),
-		Account:          &types.Account{},
-		Trades:           make(map[string]*types.TradeSlice),
+	userDataConnectivity := types.NewConnectivity()
+	userDataConnectivity.Bind(userDataStream)
 
-		orderBooks:            make(map[string]*types.StreamOrderBook),
-		markets:               make(map[string]types.Market),
-		startPrices:           make(map[string]fixedpoint.Value),
-		lastPrices:            make(map[string]fixedpoint.Value),
+	marketDataConnectivity := types.NewConnectivity()
+	marketDataConnectivity.Bind(marketDataStream)
+
+	connectivityGroup := types.NewConnectivityGroup(marketDataConnectivity, userDataConnectivity)
+
+	session := &ExchangeSession{
+		ExchangeSessionConfig: ExchangeSessionConfig{
+			Name:         name,
+			ExchangeName: exchange.Name(),
+		},
+
+		Exchange: exchange,
+
+		UserDataStream:       userDataStream,
+		UserDataConnectivity: userDataConnectivity,
+
+		MarketDataStream:       marketDataStream,
+		MarketDataConnectivity: marketDataConnectivity,
+
+		Connectivity: connectivityGroup,
+
+		Subscriptions: make(map[types.Subscription]types.Subscription),
+		Account:       &types.Account{},
+		Trades:        make(map[string]*types.TradeSlice),
+
+		markets:               make(map[string]types.Market, 100),
+		startPrices:           make(map[string]fixedpoint.Value, 30),
+		lastPrices:            make(map[string]fixedpoint.Value, 30),
 		positions:             make(map[string]*types.Position),
-		marketDataStores:      make(map[string]*MarketDataStore),
+		marketDataStores:      make(map[string]*types.MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
 		indicators:            make(map[string]*IndicatorSet),
-		orderStores:           make(map[string]*core.OrderStore),
 		usedSymbols:           make(map[string]struct{}),
 		initializedSymbols:    make(map[string]struct{}),
 		logger:                log.WithField("session", name),
+		priceSolver:           pricesolver.NewSimplePriceResolver(nil),
 	}
 
 	session.OrderExecutor = &ExchangeOrderExecutor{
@@ -161,11 +299,67 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	return session
 }
 
+func (session *ExchangeSession) GetPriceSolver() *pricesolver.SimplePriceSolver {
+	if session.priceSolver == nil {
+		session.priceSolver = pricesolver.NewSimplePriceResolver(session.Markets())
+	}
+
+	return session.priceSolver
+}
+
+func (session *ExchangeSession) UnmarshalJSON(data []byte) error {
+	// unmarshal the config first
+	if err := json.Unmarshal(data, &session.ExchangeSessionConfig); err != nil {
+		return fmt.Errorf("unmarshal exchange session config: %w", err)
+	}
+
+	// then unmarshal the rest of the fields
+	if err := json.Unmarshal(data, session); err != nil {
+		return fmt.Errorf("unmarshal exchange session: %w", err)
+	}
+
+	return nil
+}
+
+func (session *ExchangeSession) GetAccountLabel() string {
+	var label string
+
+	if len(session.AccountOwner) > 0 {
+		label = session.AccountOwner
+		if len(session.AccountName) > 0 {
+			label = " (" + session.AccountName + ")"
+		}
+	} else if len(session.AccountName) > 0 {
+		label = session.AccountName
+	}
+
+	if len(label) == 0 {
+		label = os.Getenv("POD_NAME")
+	}
+
+	if len(label) == 0 {
+		label = os.Getenv("HOSTNAME")
+	}
+
+	return label
+}
+
 func (session *ExchangeSession) GetAccount() (a *types.Account) {
 	session.accountMutex.Lock()
 	a = session.Account
 	session.accountMutex.Unlock()
 	return a
+}
+
+func (session *ExchangeSession) GetIsolatedSymbol() string {
+	isolatedSymbol := ""
+	if session.IsolatedMarginSymbol != "" {
+		isolatedSymbol = session.IsolatedMarginSymbol
+	} else if session.IsolatedFuturesSymbol != "" {
+		isolatedSymbol = session.IsolatedFuturesSymbol
+	}
+
+	return isolatedSymbol
 }
 
 // UpdateAccount locks the account mutex and update the account object
@@ -175,10 +369,32 @@ func (session *ExchangeSession) UpdateAccount(ctx context.Context) (*types.Accou
 		return nil, err
 	}
 
-	session.accountMutex.Lock()
-	session.Account = account
-	session.accountMutex.Unlock()
+	isolatedSymbol := session.GetIsolatedSymbol()
+
+	if account.MarginLevel.Sign() > 0 {
+		metrics.AccountMarginLevelMetrics.With(prometheus.Labels{
+			"exchange":        session.ExchangeName.String(),
+			"account_type":    string(account.AccountType),
+			"isolated_symbol": isolatedSymbol,
+		}).Set(account.MarginLevel.Float64())
+	}
+
+	if account.MarginRatio.Sign() > 0 {
+		metrics.AccountMarginRatioMetrics.With(prometheus.Labels{
+			"exchange":        session.ExchangeName.String(),
+			"account_type":    string(account.AccountType),
+			"isolated_symbol": isolatedSymbol,
+		}).Set(account.MarginRatio.Float64())
+	}
+
+	session.setAccount(account)
 	return account, nil
+}
+
+func (session *ExchangeSession) setAccount(a *types.Account) {
+	session.accountMutex.Lock()
+	session.Account = a
+	session.accountMutex.Unlock()
 }
 
 // Init initializes the basic data structure and market information by its exchange.
@@ -200,8 +416,11 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	var disableMarketsCache = false
 	var markets types.MarketMap
 	var err error
-	if util.SetEnvVarBool("DISABLE_MARKETS_CACHE", &disableMarketsCache); disableMarketsCache {
+	if envvar.SetBool("DISABLE_MARKETS_CACHE", &disableMarketsCache); disableMarketsCache {
 		markets, err = session.Exchange.QueryMarkets(ctx)
+		if err != nil {
+			return err
+		}
 	} else {
 		markets, err = cache.LoadExchangeMarketsWithCache(ctx, session.Exchange)
 		if err != nil {
@@ -213,7 +432,20 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		return ErrEmptyMarketInfo
 	}
 
-	session.markets = markets
+	logger.Infof("%d markets loaded", len(markets))
+	session.SetMarkets(markets)
+
+	session.priceSolver = pricesolver.NewSimplePriceResolver(markets)
+
+	if session.SymbolLeverage != nil && len(session.SymbolLeverage) > 0 && session.Futures {
+		if riskService, ok := session.Exchange.(types.ExchangeRiskService); ok {
+			for symbol, leverage := range session.SymbolLeverage {
+				if err := riskService.SetLeverage(ctx, symbol, leverage); err != nil {
+					logger.WithError(err).Error("failed to set leverage")
+				}
+			}
+		}
+	}
 
 	if feeRateProvider, ok := session.Exchange.(types.ExchangeDefaultFeeRates); ok {
 		defaultFeeRates := feeRateProvider.DefaultFeeRates()
@@ -225,21 +457,15 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		}
 	}
 
-	if session.ModifyOrderAmountForFee {
-		amountProtectExchange, ok := session.Exchange.(types.ExchangeAmountFeeProtect)
-		if !ok {
-			return fmt.Errorf("exchange %s does not support order amount protection", session.ExchangeName.String())
-		}
-
-		fees := types.ExchangeFee{MakerFeeRate: session.MakerFeeRate, TakerFeeRate: session.TakerFeeRate}
-		amountProtectExchange.SetModifyOrderAmountForFee(fees)
-	}
-
 	if session.UseHeikinAshi {
+		// replace the existing market data stream
 		session.MarketDataStream = &types.HeikinAshiStream{
 			StandardStreamEmitter: session.MarketDataStream.(types.StandardStreamEmitter),
 		}
 	}
+
+	session.priceSolver.BindStream(session.UserDataStream)
+	session.priceSolver.BindStream(session.MarketDataStream)
 
 	// query and initialize the balances
 	if !session.PublicOnly {
@@ -248,18 +474,28 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 				setter.SetPrivateChannels(session.PrivateChannels)
 			}
 		}
-
-		logger.Infof("querying account balances...")
-		account, err := session.Exchange.QueryAccount(ctx)
-		if err != nil {
-			return err
+		if len(session.PrivateChannelSymbols) > 0 {
+			if setter, ok := session.UserDataStream.(types.PrivateChannelSymbolSetter); ok {
+				setter.SetPrivateChannelSymbols(session.PrivateChannelSymbols)
+			}
 		}
 
-		session.accountMutex.Lock()
-		session.Account = account
-		session.accountMutex.Unlock()
+		disableStartupBalanceQuery := environ.environmentConfig != nil && environ.environmentConfig.DisableStartupBalanceQuery
+		if disableStartupBalanceQuery {
+			session.setAccount(types.NewAccount())
+		} else {
+			logger.Infof("querying account balances...")
+			account, err := retry.QueryAccountUntilSuccessful(ctx, session.Exchange)
+			if err != nil {
+				return err
+			}
 
-		logger.Infof("account %s balances:\n%s", session.Name, account.Balances().String())
+			session.setAccount(account)
+
+			balances := account.Balances()
+			session.metricsBalancesUpdater(balances)
+			logger.Infof("session %s account balances:\n%s", session.Name, balances.NotZero().String())
+		}
 
 		// forward trade updates and order updates to the order executor
 		session.UserDataStream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
@@ -281,7 +517,6 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 		// if metrics mode is enabled, we bind the callbacks to update metrics
 		if viper.GetBool("metrics") {
-			session.metricsBalancesUpdater(account.Balances())
 			session.bindUserDataStreamMetrics(session.UserDataStream)
 		}
 	}
@@ -337,21 +572,33 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 				session.startPrices[kline.Symbol] = kline.Open
 			}
 
-			session.lastPrices[kline.Symbol] = session.MarketDataStream.(*types.HeikinAshiStream).LastOrigin[kline.Symbol][kline.Interval].Close
+			session.setLastPrice(kline.Symbol, session.MarketDataStream.(*types.HeikinAshiStream).LastOrigin[kline.Symbol][kline.Interval].Close)
 		})
 	} else {
 		session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 			if _, ok := session.startPrices[kline.Symbol]; !ok {
-				session.startPrices[kline.Symbol] = kline.Open
+				session.setLastPrice(kline.Symbol, kline.Open)
 			}
 
-			session.lastPrices[kline.Symbol] = kline.Close
+			session.setLastPrice(kline.Symbol, kline.Close)
 		})
 	}
 
 	session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
-		session.lastPrices[trade.Symbol] = trade.Price
+		session.setLastPrice(trade.Symbol, trade.Price)
 	})
+
+	// session-wide max borrowable updating worker
+	if session.Margin {
+		marginUpdater := NewMarginInfoUpdaterFromExchange(session.Exchange)
+		session.marginInfoUpdater = &marginUpdater
+
+		if session.MarginInfoUpdaterInterval == 0 {
+			session.MarginInfoUpdaterInterval = types.Duration(30 * time.Minute)
+		}
+		session.logger.Infof("max borrowable update interval: %s", session.MarginInfoUpdaterInterval.Duration())
+		go session.marginInfoUpdater.Run(ctx, session.MarginInfoUpdaterInterval)
+	}
 
 	session.IsInitialized = true
 	return nil
@@ -384,65 +631,53 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		return nil
 	}
 
-	market, ok := session.markets[symbol]
+	market, ok := session.Market(symbol)
 	if !ok {
 		return fmt.Errorf("market %s is not defined", symbol)
 	}
 
-	var err error
-	var trades []types.Trade
-	if environ.SyncService != nil && environ.BacktestService == nil {
-		tradingFeeCurrency := session.Exchange.PlatformFeeCurrency()
-		if strings.HasPrefix(symbol, tradingFeeCurrency) {
-			trades, err = environ.TradeService.QueryForTradingFeeCurrency(session.Exchange.Name(), symbol, tradingFeeCurrency)
-		} else {
-			trades, err = environ.TradeService.Query(service.QueryTradesOptions{
-				Exchange: session.Exchange.Name(),
-				Symbol:   symbol,
-				Ordering: "DESC",
-				Limit:    100,
-			})
-		}
+	session.logger.Infof("environment config: %+v", environ.environmentConfig)
 
-		if err != nil {
-			return err
-		}
+	disableMarketDataStore := environ.environmentConfig != nil && environ.environmentConfig.DisableMarketDataStore
+	disableSessionTradeBuffer := environ.environmentConfig != nil && environ.environmentConfig.DisableSessionTradeBuffer
 
-		trades = types.SortTradesAscending(trades)
-		log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
+	maxSessionTradeBufferSize := defaultMaxSessionTradeBufferSize
+	if environ.environmentConfig != nil && environ.environmentConfig.MaxSessionTradeBufferSize > 0 {
+		maxSessionTradeBufferSize = environ.environmentConfig.MaxSessionTradeBufferSize
 	}
 
-	session.Trades[symbol] = &types.TradeSlice{Trades: trades}
-	session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-		if trade.Symbol != symbol {
-			return
-		}
+	session.Trades[symbol] = types.NewTradeSlice(100)
 
-		session.Trades[symbol].Append(trade)
-	})
+	if !disableSessionTradeBuffer {
+		session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+			if trade.Symbol != symbol {
+				return
+			}
 
+			session.Trades[symbol].Append(trade)
+
+			if maxSessionTradeBufferSize > 0 {
+				session.Trades[symbol].Truncate(maxSessionTradeBufferSize)
+			}
+		})
+	}
+
+	// session wide position
 	position := &types.Position{
 		Symbol:        symbol,
 		BaseCurrency:  market.BaseCurrency,
 		QuoteCurrency: market.QuoteCurrency,
 	}
-	position.AddTrades(trades)
 	position.BindStream(session.UserDataStream)
 	session.positions[symbol] = position
 
-	orderStore := core.NewOrderStore(symbol)
-	orderStore.AddOrderUpdate = true
-
-	orderStore.BindStream(session.UserDataStream)
-	session.orderStores[symbol] = orderStore
-
-	if _, ok := session.marketDataStores[symbol]; !ok {
-		marketDataStore := NewMarketDataStore(symbol)
-		marketDataStore.BindStream(session.MarketDataStream)
-		session.marketDataStores[symbol] = marketDataStore
+	marketDataStore := types.NewMarketDataStore(symbol)
+	if !disableMarketDataStore {
+		if _, ok := session.marketDataStores[symbol]; !ok {
+			marketDataStore.BindStream(session.MarketDataStream)
+		}
 	}
-
-	marketDataStore := session.marketDataStores[symbol]
+	session.marketDataStores[symbol] = marketDataStore
 
 	if _, ok := session.standardIndicatorSets[symbol]; !ok {
 		standardIndicatorSet := NewStandardIndicatorSet(symbol, session.MarketDataStream, marketDataStore)
@@ -458,9 +693,6 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	for _, sub := range session.Subscriptions {
 		switch sub.Channel {
 		case types.BookChannel:
-			book := types.NewStreamBook(sub.Symbol)
-			book.BindStream(session.MarketDataStream)
-			session.orderBooks[sub.Symbol] = book
 
 		case types.KLineChannel:
 			if sub.Options.Interval == "" {
@@ -472,49 +704,53 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 			}
 
 			if sub.Symbol == symbol {
-				klineSubscriptions[types.Interval(sub.Options.Interval)] = struct{}{}
+				klineSubscriptions[sub.Options.Interval] = struct{}{}
 			}
 		}
 	}
 
-	// always subscribe the 1m kline so we can make sure the connection persists.
-	klineSubscriptions[minInterval] = struct{}{}
-
-	for interval := range klineSubscriptions {
-		// avoid querying the last unclosed kline
-		endTime := environ.startTime
-		var i int64
-		for i = 0; i < KLinePreloadLimit; i += 1000 {
-			var duration time.Duration = time.Duration(-i * int64(interval.Duration()))
-			e := endTime.Add(duration)
-
-			kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
-				EndTime: &e,
-				Limit:   1000, // indicators need at least 100
-			})
-			if err != nil {
-				return err
-			}
-
-			if len(kLines) == 0 {
-				log.Warnf("no kline data for %s %s (end time <= %s)", symbol, interval, e)
-				continue
-			}
-
-			// update last prices by the given kline
-			lastKLine := kLines[len(kLines)-1]
-			if interval == minInterval {
-				session.lastPrices[symbol] = lastKLine.Close
-			}
-
-			for _, k := range kLines {
-				// let market data store trigger the update, so that the indicator could be updated too.
-				marketDataStore.AddKLine(k)
-			}
-		}
+	if !(environ.environmentConfig != nil && environ.environmentConfig.DisableDefaultKLineSubscription) {
+		// subscribe the 1m kline by default so we can make sure the connection persists.
+		klineSubscriptions[minInterval] = struct{}{}
 	}
 
-	log.Infof("%s last price: %v", symbol, session.lastPrices[symbol])
+	if !(environ.environmentConfig != nil && environ.environmentConfig.DisableHistoryKLinePreload) {
+		for interval := range klineSubscriptions {
+			// avoid querying the last unclosed kline
+			endTime := environ.startTime
+			var i int64
+			for i = 0; i < KLinePreloadLimit; i += 1000 {
+				var duration time.Duration = time.Duration(-i * int64(interval.Duration()))
+				e := endTime.Add(duration)
+
+				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
+					EndTime: &e,
+					Limit:   1000, // indicators need at least 100
+				})
+				if err != nil {
+					return err
+				}
+
+				if len(kLines) == 0 {
+					log.Warnf("no kline data for %s %s (end time <= %s)", symbol, interval, e)
+					continue
+				}
+
+				// update last prices by the given kline
+				lastKLine := kLines[len(kLines)-1]
+				if interval == minInterval {
+					session.setLastPrice(symbol, lastKLine.Close)
+				}
+
+				for _, k := range kLines {
+					// let market data store trigger the update, so that the indicator could be updated too.
+					marketDataStore.AddKLine(k)
+				}
+			}
+		}
+
+		log.Infof("%s last price: %v", symbol, session.lastPrices[symbol])
+	}
 
 	session.initializedSymbols[symbol] = struct{}{}
 	return nil
@@ -534,6 +770,8 @@ func (session *ExchangeSession) Indicators(symbol string) *IndicatorSet {
 	return set
 }
 
+// StandardIndicatorSet
+// Deprecated: use Indicators(symbol) instead
 func (session *ExchangeSession) StandardIndicatorSet(symbol string) *StandardIndicatorSet {
 	log.Warnf("StandardIndicatorSet() is deprecated in v1.49.0 and which will be removed in the next version, please use Indicators() instead")
 
@@ -554,7 +792,7 @@ func (session *ExchangeSession) Position(symbol string) (pos *types.Position, ok
 		return pos, ok
 	}
 
-	market, ok := session.markets[symbol]
+	market, ok := session.Market(symbol)
 	if !ok {
 		return nil, false
 	}
@@ -574,13 +812,13 @@ func (session *ExchangeSession) Positions() map[string]*types.Position {
 }
 
 // MarketDataStore returns the market data store of a symbol
-func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataStore, ok bool) {
+func (session *ExchangeSession) MarketDataStore(symbol string) (s *types.MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
 	if ok {
 		return s, true
 	}
 
-	s = NewMarketDataStore(symbol)
+	s = types.NewMarketDataStore(symbol)
 	s.BindStream(session.MarketDataStream)
 	session.marketDataStores[symbol] = s
 	return s, true
@@ -589,7 +827,7 @@ func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataSto
 // KLine updates will be received in the order listend in intervals array
 func (session *ExchangeSession) SerialMarketDataStore(
 	ctx context.Context, symbol string, intervals []types.Interval, useAggTrade ...bool,
-) (store *SerialMarketDataStore, ok bool) {
+) (store *types.SerialMarketDataStore, ok bool) {
 	st, ok := session.MarketDataStore(symbol)
 	if !ok {
 		return nil, false
@@ -600,7 +838,7 @@ func (session *ExchangeSession) SerialMarketDataStore(
 			minInterval = i
 		}
 	}
-	store = NewSerialMarketDataStore(symbol, minInterval, useAggTrade...)
+	store = types.NewSerialMarketDataStore(symbol, minInterval, useAggTrade...)
 	klines, ok := st.KLinesOfInterval(minInterval)
 	if !ok {
 		log.Errorf("SerialMarketDataStore: cannot get %s history", minInterval)
@@ -616,46 +854,63 @@ func (session *ExchangeSession) SerialMarketDataStore(
 	return store, true
 }
 
-// OrderBook returns the personal orderbook of a symbol
-func (session *ExchangeSession) OrderBook(symbol string) (s *types.StreamOrderBook, ok bool) {
-	s, ok = session.orderBooks[symbol]
-	return s, ok
-}
-
 func (session *ExchangeSession) StartPrice(symbol string) (price fixedpoint.Value, ok bool) {
 	price, ok = session.startPrices[symbol]
 	return price, ok
 }
 
 func (session *ExchangeSession) LastPrice(symbol string) (price fixedpoint.Value, ok bool) {
+	session.lastPricesMutex.Lock()
+	defer session.lastPricesMutex.Unlock()
+
 	price, ok = session.lastPrices[symbol]
 	return price, ok
 }
 
 func (session *ExchangeSession) AllLastPrices() map[string]fixedpoint.Value {
-	return session.lastPrices
+	return session.LastPrices()
 }
 
 func (session *ExchangeSession) LastPrices() map[string]fixedpoint.Value {
+	session.lastPricesMutex.Lock()
+	defer session.lastPricesMutex.Unlock()
+
 	return session.lastPrices
 }
 
 func (session *ExchangeSession) Market(symbol string) (market types.Market, ok bool) {
+	session.marketMutex.Lock()
+	defer session.marketMutex.Unlock()
+
 	market, ok = session.markets[symbol]
 	return market, ok
 }
 
-func (session *ExchangeSession) Markets() map[string]types.Market {
+func (session *ExchangeSession) Markets() types.MarketMap {
+	session.marketMutex.Lock()
+	defer session.marketMutex.Unlock()
+
 	return session.markets
 }
 
-func (session *ExchangeSession) OrderStore(symbol string) (store *core.OrderStore, ok bool) {
-	store, ok = session.orderStores[symbol]
-	return store, ok
+func (session *ExchangeSession) UpdateMarkets(ctx context.Context) error {
+	markets, err := session.Exchange.QueryMarkets(ctx)
+	if err != nil {
+		return err
+	}
+
+	session.SetMarkets(markets)
+	return nil
 }
 
-func (session *ExchangeSession) OrderStores() map[string]*core.OrderStore {
-	return session.orderStores
+func (session *ExchangeSession) SetMarkets(markets types.MarketMap) {
+	session.marketMutex.Lock()
+	defer session.marketMutex.Unlock()
+
+	session.markets = markets
+	if session.priceSolver != nil {
+		session.priceSolver.SetMarkets(markets)
+	}
 }
 
 // Subscribe save the subscription info, later it will be assigned to the stream
@@ -689,15 +944,16 @@ func (session *ExchangeSession) FormatOrder(order types.SubmitOrder) (types.Subm
 }
 
 func (session *ExchangeSession) UpdatePrices(ctx context.Context, currencies []string, fiat string) (err error) {
-	// TODO: move this cache check to the http routes
-	// if session.lastPriceUpdatedAt.After(time.Now().Add(-time.Hour)) {
-	// 	return nil
-	// }
-
-	var symbols []string
+	markets := session.Markets()
+	symbols := make([]string, 0, 50)
 	for _, c := range currencies {
-		symbols = append(symbols, c+fiat) // BTC/USDT
-		symbols = append(symbols, fiat+c) // USDT/TWD
+		for symbol := range markets.FindAssetMarkets(c) {
+			symbols = append(symbols, symbol)
+		}
+	}
+
+	if len(symbols) == 0 {
+		return nil
 	}
 
 	tickers, err := session.Exchange.QueryTickers(ctx, symbols...)
@@ -705,10 +961,25 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context, currencies []s
 		return err
 	}
 
+	priceSolver := session.GetPriceSolver()
+
 	var lastTime time.Time
 	for k, v := range tickers {
+		validPrice := v.GetValidPrice()
+		priceSolver.Update(k, validPrice)
+
 		// for {Crypto}/USDT markets
-		session.lastPrices[k] = v.Last
+		// map things like BTCUSDT = {price}
+		if market, ok := markets[k]; ok {
+			if currency2.IsFiatCurrency(market.BaseCurrency) {
+				session.setLastPrice(k, validPrice.Div(fixedpoint.One))
+			} else {
+				session.setLastPrice(k, validPrice)
+			}
+		} else {
+			session.setLastPrice(k, v.Last)
+		}
+
 		if v.Time.After(lastTime) {
 			lastTime = v.Time
 		}
@@ -718,7 +989,7 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context, currencies []s
 	return err
 }
 
-func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err error) {
+func (session *ExchangeSession) FindPossibleAssetSymbols() (symbols []string, err error) {
 	// If the session is an isolated margin session, there will be only the isolated margin symbol
 	if session.Margin && session.IsolatedMargin {
 		return []string{
@@ -729,7 +1000,7 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 	var balances = session.GetAccount().Balances()
 	var fiatAssets []string
 
-	for _, currency := range types.FiatCurrencies {
+	for _, currency := range currency2.FiatCurrencies {
 		if balance, ok := balances[currency]; ok && balance.Total().Sign() > 0 {
 			fiatAssets = append(fiatAssets, currency)
 		}
@@ -739,7 +1010,7 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 
 	for _, market := range session.Markets() {
 		// ignore the markets that are not fiat currency markets
-		if !util.StringSliceContains(fiatAssets, market.QuoteCurrency) {
+		if !slices.Contains(fiatAssets, market.QuoteCurrency) {
 			continue
 		}
 
@@ -764,7 +1035,12 @@ func (session *ExchangeSession) newBasicPrivateExchange(exchangeName types.Excha
 	var err error
 	var exMinimal types.ExchangeMinimal
 	if session.Key != "" && session.Secret != "" {
-		exMinimal, err = exchange2.New(exchangeName, session.Key, session.Secret, session.Passphrase)
+		options := exchange2.Options{
+			exchange2.OptionKeyAPIKey:        session.Key,
+			exchange2.OptionKeyAPISecret:     session.Secret,
+			exchange2.OptionKeyAPIPassphrase: session.Passphrase,
+		}
+		exMinimal, err = exchange2.New(exchangeName, options)
 	} else {
 		exMinimal, err = exchange2.NewWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
 	}
@@ -832,20 +1108,26 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	session.MarketDataStream = ex.NewStream()
 	session.MarketDataStream.SetPublicOnly()
 
+	session.UserDataConnectivity = types.NewConnectivity()
+	session.UserDataConnectivity.Bind(session.UserDataStream)
+
+	session.MarketDataConnectivity = types.NewConnectivity()
+	session.MarketDataConnectivity.Bind(session.MarketDataStream)
+
+	session.Connectivity = types.NewConnectivityGroup(session.MarketDataConnectivity, session.MarketDataConnectivity)
+
 	// pointer fields
 	session.Subscriptions = make(map[types.Subscription]types.Subscription)
-	session.Account = &types.Account{}
+	session.Account = types.NewAccount()
 	session.Trades = make(map[string]*types.TradeSlice)
 
-	session.orderBooks = make(map[string]*types.StreamOrderBook)
 	session.markets = make(map[string]types.Market)
 	session.lastPrices = make(map[string]fixedpoint.Value)
 	session.startPrices = make(map[string]fixedpoint.Value)
-	session.marketDataStores = make(map[string]*MarketDataStore)
+	session.marketDataStores = make(map[string]*types.MarketDataStore)
 	session.positions = make(map[string]*types.Position)
 	session.standardIndicatorSets = make(map[string]*StandardIndicatorSet)
 	session.indicators = make(map[string]*IndicatorSet)
-	session.orderStores = make(map[string]*core.OrderStore)
 	session.OrderExecutor = &ExchangeOrderExecutor{
 		// copy the notification system so that we can route
 		Session: session,
@@ -857,91 +1139,116 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	return nil
 }
 
-func (session *ExchangeSession) MarginType() string {
-	margin := "none"
+func (session *ExchangeSession) MarginType() types.MarginType {
 	if session.Margin {
-		margin = "margin"
 		if session.IsolatedMargin {
-			margin = "isolated"
+			return types.MarginTypeIsolatedMargin
+		} else {
+			return types.MarginTypeCrossMargin
 		}
 	}
-	return margin
+
+	return types.MarginTypeSpot
 }
 
 func (session *ExchangeSession) metricsBalancesUpdater(balances types.BalanceMap) {
+	labels := prometheus.Labels{
+		"session":     session.Name,
+		"exchange":    session.ExchangeName.String(),
+		"margin_type": string(session.MarginType()),
+		"symbol":      session.IsolatedMarginSymbol,
+	}
+
+	metricsTotalBalancesCurry := metricsTotalBalances.MustCurryWith(labels)
+	metricsBalanceNetMetricsCurry := metricsBalanceNetMetrics.MustCurryWith(labels)
+	metricsBalanceAvailableMetricsCurry := metricsBalanceAvailableMetrics.MustCurryWith(labels)
+	metricsBalanceLockedMetricsCurry := metricsBalanceLockedMetrics.MustCurryWith(labels)
+	metricsBalanceDebtMetricsCurry := metricsBalanceDebtMetrics.MustCurryWith(labels)
+	metricsBalanceBorrowedMetricsCurry := metricsBalanceBorrowedMetrics.MustCurryWith(labels)
+	metricsBalanceInterestMetricsCurry := metricsBalanceInterestMetrics.MustCurryWith(labels)
+
 	for currency, balance := range balances {
-		labels := prometheus.Labels{
-			"exchange": session.ExchangeName.String(),
-			"margin":   session.MarginType(),
-			"symbol":   session.IsolatedMarginSymbol,
+		curLabels := prometheus.Labels{
 			"currency": currency,
 		}
 
-		metricsTotalBalances.With(labels).Set(balance.Total().Float64())
-		metricsLockedBalances.With(labels).Set(balance.Locked.Float64())
-		metricsAvailableBalances.With(labels).Set(balance.Available.Float64())
-		metricsLastUpdateTimeBalance.With(prometheus.Labels{
-			"exchange":  session.ExchangeName.String(),
-			"margin":    session.MarginType(),
-			"channel":   "user",
-			"data_type": "balance",
-			"symbol":    "",
-			"currency":  currency,
+		metricsTotalBalancesCurry.With(curLabels).Set(balance.Total().Float64())
+		metricsBalanceNetMetricsCurry.With(curLabels).Set(balance.Net().Float64())
+		metricsBalanceAvailableMetricsCurry.With(curLabels).Set(balance.Available.Float64())
+		metricsBalanceLockedMetricsCurry.With(curLabels).Set(balance.Locked.Float64())
+
+		// margin metrics
+		metricsBalanceDebtMetricsCurry.With(curLabels).Set(balance.Debt().Float64())
+		metricsBalanceBorrowedMetricsCurry.With(curLabels).Set(balance.Borrowed.Float64())
+		metricsBalanceInterestMetricsCurry.With(curLabels).Set(balance.Interest.Float64())
+
+		metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+			"session":     session.Name,
+			"exchange":    session.ExchangeName.String(),
+			"margin_type": string(session.MarginType()),
+			"channel":     "user",
+			"data_type":   "balance",
+			"symbol":      "",
+			"currency":    currency,
 		}).SetToCurrentTime()
 	}
-
 }
 
 func (session *ExchangeSession) metricsOrderUpdater(order types.Order) {
-	metricsLastUpdateTimeBalance.With(prometheus.Labels{
-		"exchange":  session.ExchangeName.String(),
-		"margin":    session.MarginType(),
-		"channel":   "user",
-		"data_type": "order",
-		"symbol":    order.Symbol,
-		"currency":  "",
+	metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+		"session":     session.Name,
+		"exchange":    session.ExchangeName.String(),
+		"margin_type": string(session.MarginType()),
+		"channel":     "user",
+		"data_type":   "order",
+		"symbol":      order.Symbol,
+		"currency":    "",
 	}).SetToCurrentTime()
 }
 
 func (session *ExchangeSession) metricsTradeUpdater(trade types.Trade) {
 	labels := prometheus.Labels{
-		"exchange":  session.ExchangeName.String(),
-		"margin":    session.MarginType(),
-		"side":      trade.Side.String(),
-		"symbol":    trade.Symbol,
-		"liquidity": trade.Liquidity(),
+		"session":     session.Name,
+		"exchange":    session.ExchangeName.String(),
+		"margin_type": string(session.MarginType()),
+		"side":        trade.Side.String(),
+		"symbol":      trade.Symbol,
+		"liquidity":   trade.Liquidity(),
 	}
 	metricsTradingVolume.With(labels).Add(trade.Quantity.Mul(trade.Price).Float64())
 	metricsTradesTotal.With(labels).Inc()
-	metricsLastUpdateTimeBalance.With(prometheus.Labels{
-		"exchange":  session.ExchangeName.String(),
-		"margin":    session.MarginType(),
-		"channel":   "user",
-		"data_type": "trade",
-		"symbol":    trade.Symbol,
-		"currency":  "",
+	metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+		"session":     session.Name,
+		"exchange":    session.ExchangeName.String(),
+		"margin_type": string(session.MarginType()),
+		"channel":     "user",
+		"data_type":   "trade",
+		"symbol":      trade.Symbol,
+		"currency":    "",
 	}).SetToCurrentTime()
 }
 
 func (session *ExchangeSession) bindMarketDataStreamMetrics(stream types.Stream) {
 	stream.OnBookUpdate(func(book types.SliceOrderBook) {
-		metricsLastUpdateTimeBalance.With(prometheus.Labels{
-			"exchange":  session.ExchangeName.String(),
-			"margin":    session.MarginType(),
-			"channel":   "market",
-			"data_type": "book",
-			"symbol":    book.Symbol,
-			"currency":  "",
+		metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+			"session":     session.Name,
+			"exchange":    session.ExchangeName.String(),
+			"margin_type": string(session.MarginType()),
+			"channel":     "market",
+			"data_type":   "book",
+			"symbol":      book.Symbol,
+			"currency":    "",
 		}).SetToCurrentTime()
 	})
 	stream.OnKLineClosed(func(kline types.KLine) {
-		metricsLastUpdateTimeBalance.With(prometheus.Labels{
-			"exchange":  session.ExchangeName.String(),
-			"margin":    session.MarginType(),
-			"channel":   "market",
-			"data_type": "kline",
-			"symbol":    kline.Symbol,
-			"currency":  "",
+		metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+			"session":     session.Name,
+			"exchange":    session.ExchangeName.String(),
+			"margin_type": string(session.MarginType()),
+			"channel":     "market",
+			"data_type":   "kline",
+			"symbol":      kline.Symbol,
+			"currency":    "",
 		}).SetToCurrentTime()
 	})
 }
@@ -953,18 +1260,20 @@ func (session *ExchangeSession) bindUserDataStreamMetrics(stream types.Stream) {
 	stream.OnOrderUpdate(session.metricsOrderUpdater)
 	stream.OnDisconnect(func() {
 		metricsConnectionStatus.With(prometheus.Labels{
-			"channel":  "user",
-			"exchange": session.ExchangeName.String(),
-			"margin":   session.MarginType(),
-			"symbol":   session.IsolatedMarginSymbol,
+			"channel":     "user",
+			"session":     session.Name,
+			"exchange":    session.ExchangeName.String(),
+			"margin_type": string(session.MarginType()),
+			"symbol":      session.IsolatedMarginSymbol,
 		}).Set(0.0)
 	})
 	stream.OnConnect(func() {
 		metricsConnectionStatus.With(prometheus.Labels{
-			"channel":  "user",
-			"exchange": session.ExchangeName.String(),
-			"margin":   session.MarginType(),
-			"symbol":   session.IsolatedMarginSymbol,
+			"channel":     "user",
+			"session":     session.Name,
+			"exchange":    session.ExchangeName.String(),
+			"margin_type": string(session.MarginType()),
+			"symbol":      session.IsolatedMarginSymbol,
 		}).Set(1.0)
 	})
 }
@@ -1001,4 +1310,37 @@ func (session *ExchangeSession) FormatOrders(orders []types.SubmitOrder) (format
 	}
 
 	return formattedOrders, err
+}
+
+// Expose margin updator APIs via ExchangeSession
+
+func (session *ExchangeSession) AddMarginAssets(
+	assets ...string,
+) {
+	if session.marginInfoUpdater == nil {
+		return
+	}
+	session.logger.Infof("adding margin assets: %v", assets)
+	session.marginInfoUpdater.AddAssets(assets...)
+}
+
+func (session *ExchangeSession) OnMaxBorrowable(cb MaxBorrowableCallback) {
+	if session.marginInfoUpdater == nil {
+		return
+	}
+	session.marginInfoUpdater.OnMaxBorrowable(cb)
+}
+
+func (session *ExchangeSession) UpdateMaxBorrowable(ctx context.Context) {
+	if session.marginInfoUpdater == nil {
+		return
+	}
+	session.marginInfoUpdater.UpdateMaxBorrowable(ctx)
+}
+
+func (session *ExchangeSession) setLastPrice(symbol string, price fixedpoint.Value) {
+	session.lastPricesMutex.Lock()
+	defer session.lastPricesMutex.Unlock()
+
+	session.lastPrices[symbol] = price
 }

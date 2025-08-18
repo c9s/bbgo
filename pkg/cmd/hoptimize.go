@@ -4,16 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/c9s/bbgo/pkg/optimizer"
 	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 func init() {
@@ -69,7 +69,7 @@ var hoptimizeCmd = &cobra.Command{
 			return err
 		}
 
-		yamlBody, err := ioutil.ReadFile(configFile)
+		yamlBody, err := os.ReadFile(configFile)
 		if err != nil {
 			return err
 		}
@@ -94,11 +94,12 @@ var hoptimizeCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
 		go func() {
-			c := make(chan os.Signal)
-			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-			<-c
-			log.Info("Early stop by manual cancelation.")
+			<-sigs
+			log.Info("Early stop by manual cancelation")
 			cancel()
 		}()
 

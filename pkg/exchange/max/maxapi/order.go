@@ -17,6 +17,15 @@ const (
 	WalletTypeMargin WalletType = "m"
 )
 
+type OrderByType string
+
+const (
+	OrderByAsc           OrderByType = "asc"
+	OrderByDesc          OrderByType = "desc"
+	OrderByAscUpdatedAt  OrderByType = "asc_updated_at"
+	OrderByDescUpdatedAt OrderByType = "desc_updated_at"
+)
+
 type OrderStateToQuery int
 
 const (
@@ -36,6 +45,10 @@ const (
 	OrderStateFinalizing = OrderState("finalizing")
 	OrderStateFailed     = OrderState("failed")
 )
+
+func IsFilledOrderState(state OrderState) bool {
+	return state == OrderStateDone || state == OrderStateFinalizing
+}
 
 type OrderType string
 

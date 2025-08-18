@@ -11,15 +11,16 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/types/currency"
 )
 
 var DefaultSubmitOrderRetryTimeout = 5 * time.Minute
 
 func init() {
-	if du, ok := util.GetEnvVarDuration("BBGO_SUBMIT_ORDER_RETRY_TIMEOUT"); ok && du > 0 {
+	if du, ok := envvar.Duration("BBGO_SUBMIT_ORDER_RETRY_TIMEOUT", 5*time.Minute); ok && du > 0 {
 		DefaultSubmitOrderRetryTimeout = du
 	}
 }
@@ -39,7 +40,9 @@ type OrderExecutorExtended interface {
 
 type OrderExecutionRouter interface {
 	// SubmitOrdersTo submit order to a specific exchange Session
-	SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
+	SubmitOrdersTo(
+		ctx context.Context, session string, orders ...types.SubmitOrder,
+	) (createdOrders types.OrderSlice, err error)
 	CancelOrdersTo(ctx context.Context, session string, orders ...types.Order) error
 }
 
@@ -48,7 +51,9 @@ type ExchangeOrderExecutionRouter struct {
 	executors map[string]OrderExecutor
 }
 
-func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (types.OrderSlice, error) {
+func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(
+	ctx context.Context, session string, orders ...types.SubmitOrder,
+) (types.OrderSlice, error) {
 	if executor, ok := e.executors[session]; ok {
 		return executor.SubmitOrders(ctx, orders...)
 	}
@@ -67,7 +72,9 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, sessi
 	return createdOrders, err
 }
 
-func (e *ExchangeOrderExecutionRouter) CancelOrdersTo(ctx context.Context, session string, orders ...types.Order) error {
+func (e *ExchangeOrderExecutionRouter) CancelOrdersTo(
+	ctx context.Context, session string, orders ...types.Order,
+) error {
 	if executor, ok := e.executors[session]; ok {
 		return executor.CancelOrders(ctx, orders...)
 	}
@@ -80,6 +87,7 @@ func (e *ExchangeOrderExecutionRouter) CancelOrdersTo(ctx context.Context, sessi
 }
 
 // ExchangeOrderExecutor is an order executor wrapper for single exchange instance.
+// Deprecated: please use GeneralOrderExecutor instead.
 //
 //go:generate callbackgen -type ExchangeOrderExecutor
 type ExchangeOrderExecutor struct {
@@ -94,7 +102,9 @@ type ExchangeOrderExecutor struct {
 	orderUpdateCallbacks []func(order types.Order)
 }
 
-func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
+func (e *ExchangeOrderExecutor) SubmitOrders(
+	ctx context.Context, orders ...types.SubmitOrder,
+) (types.OrderSlice, error) {
 	formattedOrders, err := e.Session.FormatOrders(orders)
 	if err != nil {
 		return nil, err
@@ -128,7 +138,9 @@ type BasicRiskController struct {
 // 1. Increase the quantity by the minimal requirement
 // 2. Decrease the quantity by risk controls
 // 3. If the quantity does not meet minimal requirement, we should ignore the submit order.
-func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...types.SubmitOrder) (outOrders []types.SubmitOrder, errs []error) {
+func (c *BasicRiskController) ProcessOrders(
+	session *ExchangeSession, orders ...types.SubmitOrder,
+) (outOrders []types.SubmitOrder, errs []error) {
 	balances := session.GetAccount().Balances()
 
 	addError := func(err error) {
@@ -171,8 +183,8 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 
 			if quoteBalance.Available.Compare(c.MinQuoteBalance) < 0 {
 				addError(errors.Wrapf(ErrQuoteBalanceLevelTooLow, "can not place buy order, quote balance level is too low: %s < %s, order: %s",
-					types.USD.FormatMoney(quoteBalance.Available),
-					types.USD.FormatMoney(c.MinQuoteBalance), order.String()))
+					currency.USD.FormatMoney(quoteBalance.Available),
+					currency.USD.FormatMoney(c.MinQuoteBalance), order.String()))
 				continue
 			}
 
@@ -310,7 +322,9 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 type OrderCallback func(order types.Order)
 
 // BatchPlaceOrder
-func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, orderCallback OrderCallback, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
+func BatchPlaceOrder(
+	ctx context.Context, exchange types.Exchange, orderCallback OrderCallback, submitOrders ...types.SubmitOrder,
+) (types.OrderSlice, []int, error) {
 	var createdOrders types.OrderSlice
 	var err error
 
@@ -320,7 +334,10 @@ func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, orderCallback
 		if err2 != nil {
 			err = multierr.Append(err, err2)
 			errIndexes = append(errIndexes, i)
-		} else if createdOrder != nil {
+		}
+
+		// if createdOrder is not nil and has a valid OrderID, we should add it to the createdOrders
+		if createdOrder != nil && createdOrder.OrderID > 0 {
 			createdOrder.Tag = submitOrder.Tag
 
 			if orderCallback != nil {
@@ -335,7 +352,10 @@ func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, orderCallback
 }
 
 // BatchRetryPlaceOrder places the orders and retries the failed orders
-func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx []int, orderCallback OrderCallback, logger log.FieldLogger, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
+func BatchRetryPlaceOrder(
+	ctx context.Context, exchange types.Exchange, errIdx []int, orderCallback OrderCallback, logger log.FieldLogger,
+	submitOrders ...types.SubmitOrder,
+) (types.OrderSlice, []int, error) {
 	if logger == nil {
 		logger = log.StandardLogger()
 	}
@@ -349,6 +369,7 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 		var err2 error
 		createdOrders, errIdx, err2 = BatchPlaceOrder(ctx, exchange, orderCallback, submitOrders...)
 		if err2 != nil {
+			logger.WithError(err2).Warnf("failed to place %d orders, will retry the errored orders", len(errIdx))
 			werr = multierr.Append(werr, err2)
 		} else {
 			return createdOrders, nil, nil
@@ -370,7 +391,8 @@ batchRetryOrder:
 		logger.Warnf("retry round #%d, cooling down for %s", retryRound+1, coolDownTime)
 		time.Sleep(coolDownTime)
 
-		// reset error index since it's a new retry
+		// reset error and error index since it's a new retry
+		werr = nil
 		errIdxNext = nil
 
 		// iterate the error index and re-submit the order
@@ -382,7 +404,7 @@ batchRetryOrder:
 				// can allocate permanent error backoff.Permanent(err) to stop backoff
 				createdOrder, err2 := exchange.SubmitOrder(timeoutCtx, submitOrder)
 				if err2 != nil {
-					logger.WithError(err2).Errorf("submit order error: %s", submitOrder.String())
+					logger.WithError(err2).Warnf("submit order error: %s", submitOrder.String())
 				}
 
 				if err2 == nil && createdOrder != nil {

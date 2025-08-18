@@ -42,6 +42,8 @@ type SeriesExtend interface {
 	Variance(length int) float64
 	Covariance(b Series, length int) float64
 	Correlation(b Series, length int, method ...CorrFunc) float64
+	OLS(b SeriesExtend, length int) (float64, float64)
+	// TODO: AdFuller(parameters ...interface{}) float64
 	AutoCorrelation(length int, lag ...int) float64
 	Rank(length int) SeriesExtend
 	Sigmoid() SeriesExtend

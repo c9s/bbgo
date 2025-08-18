@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -24,6 +25,7 @@ var defaultDialer = &websocket.Dialer{
 	ReadBufferSize:   4096,
 }
 
+//go:generate mockgen -destination=mocks/mock_stream.go -package=mocks . Stream
 type Stream interface {
 	StandardStreamEventHub
 
@@ -46,6 +48,10 @@ type PrivateChannelSetter interface {
 	SetPrivateChannels(channels []string)
 }
 
+type PrivateChannelSymbolSetter interface {
+	SetPrivateChannelSymbols(symbols []string)
+}
+
 type Unsubscriber interface {
 	// Unsubscribe unsubscribes the all subscriptions.
 	Unsubscribe()
@@ -62,10 +68,13 @@ type HeartBeat func(conn *websocket.Conn) error
 
 type BeforeConnect func(ctx context.Context) error
 
+type WebsocketPongEvent struct{}
+
 //go:generate callbackgen -type StandardStream -interface
 type StandardStream struct {
-	parser     Parser
-	dispatcher Dispatcher
+	parser       Parser
+	dispatcher   Dispatcher
+	pingInterval time.Duration
 
 	endpointCreator EndpointCreator
 
@@ -172,9 +181,10 @@ type StandardStreamEmitter interface {
 
 func NewStandardStream() StandardStream {
 	return StandardStream{
-		ReconnectC: make(chan struct{}, 1),
-		CloseC:     make(chan struct{}),
-		sg:         NewSyncGroup(),
+		ReconnectC:   make(chan struct{}, 1),
+		CloseC:       make(chan struct{}),
+		sg:           NewSyncGroup(),
+		pingInterval: pingInterval,
 	}
 }
 
@@ -186,14 +196,18 @@ func (s *StandardStream) GetPublicOnly() bool {
 	return s.PublicOnly
 }
 
+// SetEndpointCreator sets the endpoint creator function to create the websocket endpoint URL.
+// This is useful when the endpoint URL is dynamic or needs to be created based on some context.
 func (s *StandardStream) SetEndpointCreator(creator EndpointCreator) {
 	s.endpointCreator = creator
 }
 
+// SetDispatcher sets the dispatcher function to dispatch the parsed websocket message.
 func (s *StandardStream) SetDispatcher(dispatcher Dispatcher) {
 	s.dispatcher = dispatcher
 }
 
+// SetParser sets the parser function to parse the websocket message.
 func (s *StandardStream) SetParser(parser Parser) {
 	s.parser = parser
 }
@@ -226,6 +240,9 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 	// flag format: debug-{component}-{message type}
 	debugRawMessage := viper.GetBool("debug-websocket-raw-message")
 
+	hasParser := s.parser != nil
+	hasDispatcher := s.dispatcher != nil
+
 	for {
 		select {
 
@@ -237,7 +254,7 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 
 		default:
 			if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
-				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
+				log.WithError(err).Errorf("unable to set read deadline: %v", err)
 			}
 
 			mt, message, err := conn.ReadMessage()
@@ -276,37 +293,49 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 				continue
 			}
 
-			s.EmitRawMessage(message)
-
 			if debugRawMessage {
 				log.Info(string(message))
 			}
 
-			var e interface{}
-			if s.parser != nil {
-				e, err = s.parser(message)
-				if err != nil {
-					log.WithError(err).Errorf("websocket event parse error, message: %s", message)
-					continue
-				}
+			if !hasParser {
+				s.EmitRawMessage(message)
+				continue
 			}
 
-			if s.dispatcher != nil {
+			var e interface{}
+			e, err = s.parser(message)
+			if err != nil {
+				log.WithError(err).Errorf("unable to parse the websocket message. err: %v, message: %s", err, message)
+				// emit raw message even if occurs error, because we want anything can be detected
+				s.EmitRawMessage(message)
+				continue
+			}
+
+			// skip pong event to avoid the message like spam
+			if _, ok := e.(*WebsocketPongEvent); !ok {
+				s.EmitRawMessage(message)
+			}
+
+			if hasDispatcher {
 				s.dispatcher(e)
 			}
 		}
 	}
 }
 
+func (s *StandardStream) SetPingInterval(interval time.Duration) {
+	s.pingInterval = interval
+}
+
 func (s *StandardStream) ping(
-	ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc, interval time.Duration,
+	ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc,
 ) {
 	defer func() {
 		cancel()
 		log.Debug("[websocket] ping worker stopped")
 	}()
 
-	var pingTicker = time.NewTicker(interval)
+	var pingTicker = time.NewTicker(s.pingInterval)
 	defer pingTicker.Stop()
 
 	for {
@@ -328,7 +357,7 @@ func (s *StandardStream) ping(
 			}
 
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout)); err != nil {
-				log.WithError(err).Error("ping error", err)
+				log.WithError(err).Warnf("unable to write ws control message, ping error: %v", err)
 				s.Reconnect()
 				return
 			}
@@ -415,7 +444,7 @@ func (s *StandardStream) reconnector(ctx context.Context) {
 
 			log.Warnf("re-connecting...")
 			if err := s.DialAndConnect(ctx); err != nil {
-				log.WithError(err).Errorf("re-connect error, try to reconnect later")
+				log.WithError(err).Warnf("re-connect error: %v, will reconnect again later...", err)
 
 				// re-emit the re-connect signal if error
 				s.Reconnect()
@@ -437,7 +466,7 @@ func (s *StandardStream) DialAndConnect(ctx context.Context) error {
 		s.Read(connCtx, conn, connCancel)
 	})
 	s.sg.Add(func() {
-		s.ping(connCtx, conn, connCancel, pingInterval)
+		s.ping(connCtx, conn, connCancel)
 	})
 	s.sg.Run()
 	return nil
@@ -475,12 +504,21 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 		return nil
 	})
 
-	log.Infof("[websocket] connected, public = %v, read timeout = %v", s.PublicOnly, readTimeout)
+	if s.PublicOnly {
+		log.Infof("[websocket] public stream connected, read timeout = %v", readTimeout)
+	} else {
+		log.Infof("[websocket] user data stream connected, read timeout = %v", readTimeout)
+	}
+
 	return conn, nil
 }
 
 func (s *StandardStream) Close() error {
-	log.Debugf("[websocket] closing stream...")
+	if s.PublicOnly {
+		log.Debugf("[websocket] closing public stream...")
+	} else {
+		log.Debugf("[websocket] closing user data stream...")
+	}
 
 	// close the close signal channel, so that reader and ping worker will stop
 	close(s.CloseC)
@@ -505,8 +543,15 @@ func (s *StandardStream) Close() error {
 	log.Debugf("[websocket] stream closed")
 
 	// let the reader close the connection
+	// TODO: use signal channel instead
 	<-time.After(time.Second)
 	return nil
+}
+
+func (s *StandardStream) String() string {
+	ss := "StandardStream"
+	ss += fmt.Sprintf("(%p)", s)
+	return ss
 }
 
 // SetHeartBeat sets the custom heart beat implementation if needed
@@ -526,10 +571,12 @@ const (
 	DepthLevelMedium Depth = "MEDIUM"
 	DepthLevel1      Depth = "1"
 	DepthLevel5      Depth = "5"
+	DepthLevel10     Depth = "10"
 	DepthLevel15     Depth = "15"
 	DepthLevel20     Depth = "20"
 	DepthLevel50     Depth = "50"
 	DepthLevel200    Depth = "200"
+	DepthLevel400    Depth = "400"
 )
 
 type Speed string

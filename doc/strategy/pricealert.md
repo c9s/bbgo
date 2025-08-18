@@ -22,4 +22,4 @@ Setup Telegram/Slack notification before using Price Alert Strategy. See [Settin
 
 #### Examples
 
-See [pricealert.yaml](../../config/pricealert.yaml) and [pricealert-tg.yaml](../../config/pricealert-tg.yaml)
+See [pricealert.yaml](../../config/example/pricealert.yaml) and [pricealert-tg.yaml](../../config/pricealert-tg.yaml)

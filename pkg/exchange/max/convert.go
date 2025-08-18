@@ -11,6 +11,17 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+func toGlobalNetwork(network string) (out string) {
+	out = network
+	parts := strings.SplitN(network, "-", 2)
+	if len(parts) > 0 {
+		out = parts[0]
+	}
+
+	out = strings.ToUpper(out)
+	return out
+}
+
 func toGlobalCurrency(currency string) string {
 	return strings.ToUpper(currency)
 }
@@ -172,7 +183,6 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 	executedVolume := maxOrder.ExecutedVolume
 	remainingVolume := maxOrder.RemainingVolume
 	isMargin := maxOrder.WalletType == max.WalletTypeMargin
-
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: maxOrder.ClientOID,
@@ -188,6 +198,7 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 		IsWorking:        maxOrder.State == max.OrderStateWait,
 		OrderID:          maxOrder.ID,
 		Status:           toGlobalOrderStatus(maxOrder.State, executedVolume, remainingVolume),
+		OriginalStatus:   string(maxOrder.State),
 		ExecutedQuantity: executedVolume,
 		CreationTime:     types.Time(maxOrder.CreatedAt.Time()),
 		UpdateTime:       types.Time(maxOrder.UpdatedAt.Time()),
@@ -201,6 +212,11 @@ func toGlobalTradeV3(t v3.Trade) ([]types.Trade, error) {
 	isMargin := t.WalletType == max.WalletTypeMargin
 	side := toGlobalSideType(t.Side)
 
+	fee := fixedpoint.Zero
+	if t.Fee != nil {
+		fee = *t.Fee
+	}
+
 	trade := types.Trade{
 		ID:            t.ID,
 		OrderID:       t.OrderID,
@@ -211,7 +227,8 @@ func toGlobalTradeV3(t v3.Trade) ([]types.Trade, error) {
 		Side:          side,
 		IsBuyer:       t.IsBuyer(),
 		IsMaker:       t.IsMaker(),
-		Fee:           t.Fee,
+		Fee:           fee,
+		FeeProcessing: t.Fee == nil,
 		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
 		FeeDiscounted: t.FeeDiscounted,
 		QuoteQuantity: t.Funds,
@@ -241,29 +258,6 @@ func toGlobalTradeV3(t v3.Trade) ([]types.Trade, error) {
 	return trades, nil
 }
 
-func toGlobalTradeV2(t max.Trade) (*types.Trade, error) {
-	isMargin := t.WalletType == max.WalletTypeMargin
-	side := toGlobalSideType(t.Side)
-	return &types.Trade{
-		ID:            t.ID,
-		OrderID:       t.OrderID,
-		Price:         t.Price,
-		Symbol:        toGlobalSymbol(t.Market),
-		Exchange:      types.ExchangeMax,
-		Quantity:      t.Volume,
-		Side:          side,
-		IsBuyer:       t.IsBuyer(),
-		IsMaker:       t.IsMaker(),
-		Fee:           t.Fee,
-		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
-		QuoteQuantity: t.Funds,
-		Time:          types.Time(t.CreatedAt),
-		IsMargin:      isMargin,
-		IsIsolated:    false,
-		IsFutures:     false,
-	}, nil
-}
-
 func toGlobalDepositStatus(a max.DepositState) types.DepositStatus {
 	switch a {
 
@@ -278,10 +272,21 @@ func toGlobalDepositStatus(a max.DepositState) types.DepositStatus {
 
 	case max.DepositStateAccepted:
 		return types.DepositSuccess
+
+	case max.DepositStateFailed: // v3 state
+		return types.DepositRejected
+
+	case max.DepositStateProcessing: // v3 states
+		return types.DepositPending
+
+	case max.DepositStateDone: // v3 states
+		return types.DepositSuccess
+
 	}
 
 	// other states goes to this
 	// max.DepositStateSuspect, max.DepositStateSuspended
+	log.Errorf("unsupported deposit state %q from max exchange", a)
 	return types.DepositStatus(a)
 }
 
@@ -332,4 +337,96 @@ func convertWebSocketOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 		CreationTime:     types.Time(time.Unix(0, u.CreatedAtMs*int64(time.Millisecond))),
 		UpdateTime:       types.Time(time.Unix(0, u.UpdateTime*int64(time.Millisecond))),
 	}, nil
+}
+
+func convertWithdrawStatusV3(status max.WithdrawStatus) types.WithdrawStatus {
+	switch status {
+
+	case max.WithdrawStatusPending:
+		return types.WithdrawStatusSent
+
+	case max.WithdrawStatusOK:
+		return types.WithdrawStatusCompleted
+
+	case max.WithdrawStatusFailed:
+		return types.WithdrawStatusFailed
+
+	case max.WithdrawStatusCancelled:
+		return types.WithdrawStatusCancelled
+
+	}
+
+	return types.WithdrawStatus(status)
+}
+
+func convertWithdrawStatusV2(state max.WithdrawState) types.WithdrawStatus {
+	switch state {
+
+	case max.WithdrawStateSent, max.WithdrawStateSubmitting, max.WithdrawStatePending, "accepted", "approved":
+		return types.WithdrawStatusSent
+
+	case max.WithdrawStateProcessing, "delisted_processing", "kgi_manually_processing", "kgi_manually_confirmed", "sygna_verifying":
+		return types.WithdrawStatusProcessing
+
+	case max.WithdrawStateFailed, "kgi_possible_failed", "rejected", "suspect", "retryable":
+		return types.WithdrawStatusFailed
+
+	case max.WithdrawStateCanceled:
+		return types.WithdrawStatusCancelled
+
+	case "confirmed":
+		// make it compatible with binance
+		return types.WithdrawStatusCompleted
+
+	default:
+		return types.WithdrawStatus(state)
+	}
+}
+
+func convertDepth(symbol string, depth *v3.Depth) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	snapshot.Symbol = toGlobalSymbol(symbol)
+	snapshot.Time = time.Unix(depth.Timestamp, 0)
+	snapshot.LastUpdateId = depth.LastUpdateId
+
+	finalUpdateID = depth.LastUpdateId
+	for _, entry := range depth.Bids {
+		snapshot.Bids = append(snapshot.Bids, types.PriceVolume{Price: entry[0], Volume: entry[1]})
+	}
+
+	for _, entry := range depth.Asks {
+		snapshot.Asks = append(snapshot.Asks, types.PriceVolume{Price: entry[0], Volume: entry[1]})
+	}
+
+	return snapshot, finalUpdateID, err
+}
+
+func toGlobalKLines(
+	data []v3.KLineData, symbol string, period v3.Period, interval types.Interval, until *time.Time,
+) ([]types.KLine, error) {
+	var kLines []types.KLine
+	for _, slice := range data {
+		ts := int64(slice[0])
+		startTime := time.Unix(ts, 0)
+		endTime := startTime.Add(time.Duration(period)*time.Minute - time.Millisecond)
+		isClosed := time.Now().Before(endTime)
+
+		if until != nil && startTime.After(*until) {
+			break
+		}
+
+		kLines = append(kLines, types.KLine{
+			Symbol:    symbol,
+			Interval:  interval,
+			StartTime: types.Time(startTime),
+			EndTime:   types.Time(endTime),
+			Open:      fixedpoint.NewFromFloat(slice[1]),
+			High:      fixedpoint.NewFromFloat(slice[2]),
+			Low:       fixedpoint.NewFromFloat(slice[3]),
+			Close:     fixedpoint.NewFromFloat(slice[4]),
+			Volume:    fixedpoint.NewFromFloat(slice[5]),
+			Closed:    isClosed,
+		})
+	}
+	return kLines, nil
+
 }

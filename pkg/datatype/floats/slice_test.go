@@ -4,7 +4,43 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gonum.org/v1/gonum/stat/distuv"
 )
+
+func TestNewRandomNormal(t *testing.T) {
+	a := NewRandomNormal(5, 1, 1000)
+	assert.Equal(t, 1000, len(a))
+	mean := a.Mean()
+	assert.InDelta(t, 5, mean, 0.2)
+	std := distuv.Normal{
+		Mu:    5,
+		Sigma: 1,
+	}.StdDev()
+	assert.InDelta(t, std, a.Std(), 0.2)
+}
+
+func TestNewRandomPoisson(t *testing.T) {
+	a := NewRandomPoisson(5, 1000)
+	assert.Equal(t, 1000, len(a))
+	mean := a.Mean()
+	assert.InDelta(t, 5, mean, 0.2)
+	std := distuv.Poisson{
+		Lambda: 5,
+	}.StdDev()
+	assert.InDelta(t, std, a.Std(), 0.2)
+}
+
+func TestNewRandomUniform(t *testing.T) {
+	a := NewRandomUniform(1, 10, 1000)
+	assert.Equal(t, 1000, len(a))
+	mean := a.Mean()
+	assert.InDelta(t, 5.5, mean, 0.2)
+	std := distuv.Uniform{
+		Min: 1,
+		Max: 10,
+	}.StdDev()
+	assert.InDelta(t, std, a.Std(), 0.2)
+}
 
 func TestSub(t *testing.T) {
 	a := New(1, 2, 3, 4, 5)

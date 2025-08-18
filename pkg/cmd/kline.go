@@ -41,12 +41,12 @@ var klineCmd = &cobra.Command{
 			return fmt.Errorf("session %s not found", sessionName)
 		}
 
-		symbol, err := cmd.Flags().GetString("symbol")
+		symbols, err := cmd.Flags().GetStringArray("symbol")
 		if err != nil {
 			return fmt.Errorf("can not get the symbol from flags: %w", err)
 		}
 
-		if symbol == "" {
+		if len(symbols) == 0 {
 			return fmt.Errorf("--symbol option is required")
 		}
 
@@ -56,28 +56,35 @@ var klineCmd = &cobra.Command{
 		}
 
 		now := time.Now()
-		kLines, err := session.Exchange.QueryKLines(ctx, symbol, types.Interval(interval), types.KLineQueryOptions{
-			Limit:   50,
-			EndTime: &now,
-		})
-		if err != nil {
-			return err
-		}
-		log.Infof("kLines from RESTful API")
-		for _, k := range kLines {
-			log.Info(k.String())
-		}
-
 		s := session.Exchange.NewStream()
 		s.SetPublicOnly()
-		s.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: types.Interval(interval)})
-
+		for _, symbol := range symbols {
+			kLines, err := session.Exchange.QueryKLines(ctx, symbol, types.Interval(interval), types.KLineQueryOptions{
+				Limit:   5,
+				EndTime: &now,
+			})
+			if err != nil {
+				return err
+			}
+			log.Infof("kLines from RESTful API")
+			for _, k := range kLines {
+				log.Info(k.String())
+			}
+			s.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: types.Interval(interval)})
+		}
 		s.OnKLineClosed(func(kline types.KLine) {
-			log.Infof("kline closed: %s", kline.String())
+			log.Infof("kline closed: %s (%s~%s)",
+				kline.String(),
+				kline.StartTime.Time().Format(time.RFC3339),
+				kline.EndTime.Time().Format(time.RFC3339),
+			)
 		})
 
 		s.OnKLine(func(kline types.KLine) {
-			log.Infof("kline: %s", kline.String())
+			log.Infof("kline: %s (%s~%s)", kline.String(),
+				kline.StartTime.Time().Format(time.RFC3339),
+				kline.EndTime.Time().Format(time.RFC3339),
+			)
 		})
 
 		log.Infof("connecting...")
@@ -101,7 +108,7 @@ var klineCmd = &cobra.Command{
 func init() {
 	// since the public data does not require trading authentication, we use --exchange option here.
 	klineCmd.Flags().String("session", "", "session name")
-	klineCmd.Flags().String("symbol", "", "the trading pair. e.g, BTCUSDT, LTCUSDT...")
+	klineCmd.Flags().StringArray("symbol", []string{""}, "the trading pair. e.g, BTCUSDT, LTCUSDT...")
 	klineCmd.Flags().String("interval", "1m", "interval of the kline (candle), .e.g, 1m, 3m, 15m")
 	RootCmd.AddCommand(klineCmd)
 }

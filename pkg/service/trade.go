@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +16,7 @@ import (
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var ErrTradeNotFound = errors.New("trade not found")
@@ -32,7 +35,11 @@ type QueryTradesOptions struct {
 
 	// ASC or DESC
 	Ordering string
-	Limit    uint64
+
+	// OrderByColumn is the column name to order by
+	// Currently we only support traded_at and gid column.
+	OrderByColumn string
+	Limit         uint64
 }
 
 type TradingVolume struct {
@@ -58,15 +65,23 @@ func NewTradeService(db *sqlx.DB) *TradeService {
 	return &TradeService{db}
 }
 
-func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
+func (s *TradeService) Sync(
+	ctx context.Context,
+	exchange types.Exchange, symbol string,
+	startTime, endTime time.Time,
+) error {
 	isMargin, isFutures, isIsolated, isolatedSymbol := exchange2.GetSessionAttributes(exchange)
 	// override symbol if isolatedSymbol is not empty
 	if isIsolated && len(isolatedSymbol) > 0 {
 		symbol = isolatedSymbol
 	}
 
+	logger := util.GetLoggerFromCtx(ctx)
+	logger.Infof("session attributes: isMargin=%v isFutures=%v isIsolated=%v isolatedSymbol=%s", isMargin, isFutures, isIsolated, isolatedSymbol)
+
 	api, ok := exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
+		logger.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing trades", exchange.Name())
 		return nil
 	}
 
@@ -83,11 +98,13 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 					last := trades[end]
 					lastTradeID = last.ID
 				}
+				logger.Infof("on load: last trade ID: %d", lastTradeID)
 			},
 			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
 				query := &batch.TradeBatchQuery{
 					ExchangeTradeHistoryService: api,
 				}
+				logger.Infof("sync trades from %s to %s, lastTradeID: %d", startTime, endTime, lastTradeID)
 				return query.Query(ctx, symbol, &types.TradeQueryOptions{
 					StartTime:   &startTime,
 					EndTime:     &endTime,
@@ -99,14 +116,19 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 			},
 			ID: func(obj interface{}) string {
 				trade := obj.(types.Trade)
-				return strconv.FormatUint(trade.ID, 10) + trade.Side.String()
+				id := strconv.FormatUint(trade.ID, 10) + trade.Side.String()
+				return id
+			},
+			Insert: func(obj interface{}) error {
+				trade := obj.(types.Trade)
+				return s.Insert(trade)
 			},
 			LogInsert: true,
 		},
 	}
 
 	for _, sel := range tasks {
-		if err := sel.execute(ctx, s.DB, startTime); err != nil {
+		if err := sel.execute(ctx, s.DB, startTime, endTime); err != nil {
 			return err
 		}
 	}
@@ -258,7 +280,7 @@ func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) strin
 }
 
 func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol string, feeCurrency string) ([]types.Trade, error) {
-	sql := "SELECT * FROM trades WHERE exchange = :exchange AND (symbol = :symbol OR fee_currency = :fee_currency) ORDER BY traded_at ASC"
+	sql := "SELECT " + strings.Join(genTradeSelectColumns(s.DB.DriverName()), ", ") + " FROM trades WHERE exchange = :exchange AND (symbol = :symbol OR fee_currency = :fee_currency) ORDER BY traded_at ASC"
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"exchange":     ex,
 		"symbol":       symbol,
@@ -274,7 +296,7 @@ func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol 
 }
 
 func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) {
-	sel := sq.Select("*").
+	sel := sq.Select(genTradeSelectColumns(s.DB.DriverName())...).
 		From("trades")
 
 	if options.LastGID != 0 {
@@ -300,11 +322,28 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 		sel = sel.Where(sq.Eq{"exchange": options.Sessions})
 	}
 
-	if options.Ordering != "" {
-		sel = sel.OrderBy("traded_at " + options.Ordering)
-	} else {
-		sel = sel.OrderBy("traded_at ASC")
+	var orderByColumn string
+	switch options.OrderByColumn {
+	case "":
+		orderByColumn = "traded_at"
+	case "traded_at", "gid":
+		orderByColumn = options.OrderByColumn
+	default:
+		return nil, fmt.Errorf("invalid order by column: %s", options.OrderByColumn)
 	}
+
+	var ordering string
+
+	switch strings.ToUpper(options.Ordering) {
+	case "":
+		ordering = "ASC"
+	case "ASC", "DESC":
+		ordering = strings.ToUpper(options.Ordering)
+	default:
+		return nil, fmt.Errorf("invalid ordering: %s", options.Ordering)
+	}
+
+	sel = sel.OrderBy(orderByColumn + " " + ordering)
 
 	if options.Limit > 0 {
 		sel = sel.Limit(options.Limit)
@@ -330,8 +369,8 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 
 func (s *TradeService) Load(ctx context.Context, id int64) (*types.Trade, error) {
 	var trade types.Trade
-
-	rows, err := s.DB.NamedQuery("SELECT * FROM trades WHERE id = :id", map[string]interface{}{
+	query := "SELECT " + strings.Join(genTradeSelectColumns(s.DB.DriverName()), ", ") + " FROM trades WHERE id = :id"
+	rows, err := s.DB.NamedQueryContext(ctx, query, map[string]interface{}{
 		"id": id,
 	})
 	if err != nil {
@@ -388,6 +427,28 @@ func queryTradesSQL(options QueryTradesOptions) string {
 	return sql
 }
 
+func genTradeSelectColumns(driver string) []string {
+	if driver != "mysql" {
+		return []string{"*"}
+	}
+	tt := reflect.TypeOf(types.Trade{})
+	var columns []string
+	for i := 0; i < tt.NumField(); i++ {
+		field := tt.Field(i)
+		if colName := field.Tag.Get("db"); colName != "" {
+			if colName == "-" {
+				continue
+			}
+			if colName == "order_uuid" {
+				columns = append(columns, binUuidSelector("trades", "order_uuid"))
+			} else {
+				columns = append(columns, colName)
+			}
+		}
+	}
+	return columns
+}
+
 func (s *TradeService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err error) {
 	for rows.Next() {
 		var trade types.Trade
@@ -402,6 +463,14 @@ func (s *TradeService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err erro
 }
 
 func (s *TradeService) Insert(trade types.Trade) error {
+	if s.DB.DriverName() == "mysql" {
+		_, err := s.DB.NamedExec(`
+			INSERT INTO trades (id, order_id, order_uuid, exchange, price, quantity, quote_quantity, symbol, side, is_buyer, is_maker, traded_at, fee, fee_currency, is_margin, is_futures, is_isolated, strategy, pnl)
+			VALUES (:id, :order_id, IF(:order_uuid != '', UUID_TO_BIN(:order_uuid, true), ''), :exchange, :price, :quantity, :quote_quantity, :symbol, :side, :is_buyer, :is_maker, :traded_at, :fee, :fee_currency, :is_margin, :is_futures, :is_isolated, :strategy, :pnl)
+			ON DUPLICATE KEY UPDATE id=:id, order_id=:order_id, order_uuid=:order_uuid, exchange=:exchange, price=:price, quantity=:quantity, quote_quantity=:quote_quantity, symbol=:symbol, side=:side, is_buyer=:is_buyer, is_maker=:is_maker, traded_at=:traded_at, fee=:fee, fee_currency=:fee_currency, is_margin=:is_margin, is_futures=:is_futures, is_isolated=:is_isolated, strategy=:strategy, pnl=:pnl;`,
+			trade)
+		return err
+	}
 	sql := dbCache.InsertSqlOf(trade)
 	_, err := s.DB.NamedExec(sql, trade)
 	return err

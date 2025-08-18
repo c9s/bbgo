@@ -28,10 +28,13 @@ persistence:
 
 crossExchangeStrategies:
 - xalign:
-    interval: 1m
+    # interval: 1m
+    interval: 3s
+    for: 1m
     sessions:
     - max
     - binance
+    dryRun: true
 
     ## quoteCurrencies config specifies which quote currency should be used for BUY order or SELL order.
     ## when specifying [USDC,TWD] for "BUY", then it will consider BTCUSDC first then BTCTWD second.
@@ -41,9 +44,16 @@ crossExchangeStrategies:
     expectedBalances:
       BTC: 0.0440
     useTakerOrder: false
-    dryRun: true
-    balanceToleranceRange: 10%
+    balanceToleranceRange: 1%
     maxAmounts:
       USDT: 100
       USDC: 100
       TWD: 3000
+    largeAmountAlert:
+      quoteCurrency: USDT
+      amount: 200
+      slack:
+        channel: ""
+        mentions:
+        - '<@USER_ID>'
+        - '<!subteam^TEAM_ID>'

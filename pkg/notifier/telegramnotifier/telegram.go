@@ -20,9 +20,12 @@ var apiLimiter = rate.NewLimiter(rate.Every(50*time.Millisecond), 20)
 var log = logrus.WithField("service", "telegram")
 
 type notifyTask struct {
-	message     string
-	texts       []string
+	message string
+	texts   []string
+
 	photoBuffer *bytes.Buffer
+
+	file *types.UploadFile
 }
 
 type Notifier struct {
@@ -102,8 +105,15 @@ func (n *Notifier) consume(task notifyTask) {
 			album := telebot.Album{
 				photoFromBuffer(task.photoBuffer),
 			}
-			if _, err := n.bot.SendAlbum(chat, album); err != nil {
+
+			if msgs, err := n.bot.SendAlbum(chat, album); err != nil {
 				log.WithError(err).Error("failed to send message")
+			} else {
+				if task.file.References == nil {
+					task.file.References = make(map[string]any)
+				}
+
+				task.file.SetReference("telegram", msgs)
 			}
 		}
 	} else if n.Chats != nil {
@@ -187,7 +197,7 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 		message = a.String()
 
 	default:
-		log.Errorf("unsupported notification format: %T %+v", a, a)
+		log.Warnf("unsupported notification format: %T %+v", a, a)
 
 	}
 
@@ -201,24 +211,22 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 	}
 }
 
-func (n *Notifier) SendPhoto(buffer *bytes.Buffer) {
-	n.SendPhotoTo("", buffer)
+func (n *Notifier) Upload(file *types.UploadFile) {
+	select {
+	case n.taskC <- notifyTask{
+		photoBuffer: file.Data,
+	}:
+	case <-time.After(1 * time.Second):
+		log.Warnf("[telegram] upload skip due to massive message sending, file: %+v", file)
+		return
+	}
+
 }
 
 func photoFromBuffer(buffer *bytes.Buffer) telebot.InputMedia {
 	reader := bytes.NewReader(buffer.Bytes())
 	return &telebot.Photo{
 		File: telebot.FromReader(reader),
-	}
-}
-
-func (n *Notifier) SendPhotoTo(channel string, buffer *bytes.Buffer) {
-	select {
-	case n.taskC <- notifyTask{
-		photoBuffer: buffer,
-	}:
-	case <-time.After(50 * time.Millisecond):
-		return
 	}
 }
 

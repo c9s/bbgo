@@ -2,10 +2,10 @@ package bbgo
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"fmt"
 	"image/png"
-	"io/ioutil"
 	stdlog "log"
 	"math/rand"
 	"os"
@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/pyroscope-go"
 	"github.com/pkg/errors"
 	"github.com/pquerna/otp"
 	log "github.com/sirupsen/logrus"
@@ -20,6 +21,7 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/tucnak/telebot.v2"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/interact"
@@ -29,13 +31,16 @@ import (
 	googleservice "github.com/c9s/bbgo/pkg/service/google"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/asset"
 	"github.com/c9s/bbgo/pkg/util"
 )
 
 func init() {
 	// randomize pulling
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 }
+
+var defaultSyncBufferPeriod = 30 * time.Minute
 
 // IsBackTesting is a global variable that indicates the current environment is back-test or not.
 var IsBackTesting = false
@@ -49,6 +54,19 @@ func SetBackTesting(s service.BackTestable) {
 
 var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
 var LoadedCrossExchangeStrategies = make(map[string]CrossExchangeStrategy)
+
+// GetRegisteredStrategy returns the registered strategy struct value by the given id
+func GetRegisteredStrategy(id string) (types.StrategyID, error) {
+	if st, ok := LoadedExchangeStrategies[id]; ok {
+		return st, nil
+	}
+
+	if st, ok := LoadedCrossExchangeStrategies[id]; ok {
+		return st, nil
+	}
+
+	return nil, fmt.Errorf("strategy %s is not defined or registered, be sure to call the RegisterStrategy() func", id)
+}
 
 func RegisterStrategy(key string, s interface{}) {
 	loaded := 0
@@ -66,8 +84,6 @@ func RegisterStrategy(key string, s interface{}) {
 		panic(fmt.Errorf("%T does not implement SingleExchangeStrategy or CrossExchangeStrategy", s))
 	}
 }
-
-var emptyTime time.Time
 
 type SyncStatus int
 
@@ -93,6 +109,7 @@ type Environment struct {
 	WithdrawService   *service.WithdrawService
 	DepositService    *service.DepositService
 	PersistentService *service.PersistenceServiceFacade
+	ProfilingService  *pyroscope.Profiler
 
 	// external services
 	GoogleSpreadSheetService *googleservice.SpreadSheetService
@@ -108,13 +125,13 @@ type Environment struct {
 	syncStatus      SyncStatus
 	syncConfig      *SyncConfig
 
-	loggingConfig *LoggingConfig
+	loggingConfig     *LoggingConfig
+	environmentConfig *EnvironmentConfig
 
 	sessions map[string]*ExchangeSession
 }
 
 func NewEnvironment() *Environment {
-
 	now := time.Now()
 	return &Environment{
 		// default trade scan time
@@ -162,29 +179,46 @@ func (environ *Environment) SelectSessions(names ...string) map[string]*Exchange
 	return sessions
 }
 
-func (environ *Environment) ConfigureDatabase(ctx context.Context) error {
+func (environ *Environment) ConfigureDatabase(ctx context.Context, config *Config) error {
 	// configureDB configures the database service based on the environment variable
-	if driver, ok := os.LookupEnv("DB_DRIVER"); ok {
+	var dbDriver string
+	var dbDSN string
+	var extraPkgNames []string
 
-		if dsn, ok := os.LookupEnv("DB_DSN"); ok {
-			return environ.ConfigureDatabaseDriver(ctx, driver, dsn)
-		}
-
-	} else if dsn, ok := os.LookupEnv("SQLITE3_DSN"); ok {
-
-		return environ.ConfigureDatabaseDriver(ctx, "sqlite3", dsn)
-
-	} else if dsn, ok := os.LookupEnv("MYSQL_URL"); ok {
-
-		return environ.ConfigureDatabaseDriver(ctx, "mysql", dsn)
-
+	if config != nil && config.DatabaseConfig != nil {
+		dbDriver = config.DatabaseConfig.Driver
+		dbDSN = config.DatabaseConfig.DSN
+		extraPkgNames = config.DatabaseConfig.ExtraMigrationPackages
 	}
 
-	return nil
+	if val, ok := os.LookupEnv("DB_DRIVER"); ok {
+		dbDriver = val
+	}
+
+	if val, ok := os.LookupEnv("DB_DSN"); ok {
+		dbDSN = val
+	} else if val, ok := os.LookupEnv("SQLITE3_DSN"); ok && (dbDriver == "" || dbDriver == "sqlite3") {
+		dbDSN = val
+		dbDriver = "sqlite3"
+	} else if val, ok := os.LookupEnv("MYSQL_URL"); ok && (dbDriver == "" || dbDriver == "mysql") {
+		dbDSN = val
+		dbDriver = "mysql"
+	}
+
+	// database is optional
+	if dbDriver == "" || dbDSN == "" {
+		return nil
+	}
+
+	return environ.ConfigureDatabaseDriver(ctx, dbDriver, dbDSN, extraPkgNames...)
 }
 
-func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver string, dsn string) error {
+func (environ *Environment) ConfigureDatabaseDriver(
+	ctx context.Context, driver string, dsn string, extraPkgNames ...string,
+) error {
 	environ.DatabaseService = service.NewDatabaseService(driver, dsn)
+	environ.DatabaseService.AddMigrationPackages(extraPkgNames...)
+
 	err := environ.DatabaseService.Connect()
 	if err != nil {
 		return err
@@ -237,6 +271,21 @@ func (environ *Environment) ConfigureService(ctx context.Context, srvConfig *Ser
 	return nil
 }
 
+func (environ *Environment) ConfigureProfiling(config *ProfilingConfig) (err error) {
+	if !config.Enabled {
+		return nil
+	}
+
+	if config.PyroscopeURL != "" {
+		environ.ProfilingService, err = setupPyroscopeProfiling(GetCurrentEnv(), config.PyroscopeURL)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (environ *Environment) ConfigureExchangeSessions(userConfig *Config) error {
 	// if sessions are not defined, we detect the sessions automatically
 	if len(userConfig.Sessions) == 0 {
@@ -247,7 +296,7 @@ func (environ *Environment) ConfigureExchangeSessions(userConfig *Config) error 
 }
 
 func (environ *Environment) AddExchangesByViperKeys() error {
-	for _, n := range types.SupportedExchanges {
+	for n, _ := range types.SupportedExchanges {
 		if viper.IsSet(string(n) + "-api-key") {
 			exMinimal, err := exchange.NewWithEnvVarPrefix(n, "")
 			if err != nil {
@@ -451,10 +500,12 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 		sessions = environ.SelectSessions(selectedSessions...)
 	}
 
-	since := time.Now().AddDate(0, -6, 0)
+	since := defaultSyncSinceTime()
 	if userConfig.Sync.Since != nil {
 		since = userConfig.Sync.Since.Time()
 	}
+
+	environ.SetSyncStartTime(since)
 
 	syncSymbolMap, restSymbols := categorizeSyncSymbol(userConfig.Sync.Symbols)
 	for _, session := range sessions {
@@ -463,7 +514,7 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 			syncSymbols = append(syncSymbols, ss...)
 		}
 
-		if err := environ.syncSession(ctx, session, syncSymbols...); err != nil {
+		if err := environ.syncSession(ctx, session, since, syncSymbols...); err != nil {
 			return err
 		}
 
@@ -503,11 +554,6 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 		return nil
 	}
 
-	// for paper trade mode, skip sync
-	if util.IsPaperTrade() {
-		return nil
-	}
-
 	environ.syncMutex.Lock()
 	defer environ.syncMutex.Unlock()
 
@@ -520,8 +566,9 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	}
 
 	// the default sync logics
+	since := defaultSyncSinceTime()
 	for _, session := range environ.sessions {
-		if err := environ.syncSession(ctx, session); err != nil {
+		if err := environ.syncSession(ctx, session, since); err != nil {
 			return err
 		}
 	}
@@ -529,7 +576,7 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	return nil
 }
 
-func (environ *Environment) RecordAsset(t time.Time, session *ExchangeSession, assets types.AssetMap) {
+func (environ *Environment) RecordAsset(t time.Time, session *ExchangeSession, assets asset.Map) {
 	// skip for back-test
 	if environ.BacktestService != nil {
 		return
@@ -562,7 +609,7 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 		return
 	}
 
-	// set profit info to position
+	// guard: set profit info to position if the strategy info is empty
 	if profit != nil {
 		if position.Strategy == "" && profit.Strategy != "" {
 			position.Strategy = profit.Strategy
@@ -573,15 +620,17 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 		}
 	}
 
+	log.Infof("recordPosition: position = %s, trade = %+v, profit = %+v", position.Base.String(), trade, profit)
 	if profit != nil {
-		if err := environ.PositionService.Insert(position, trade, profit.Profit); err != nil {
+		if err := environ.PositionService.Insert(position, trade, profit.Profit, profit.NetProfit); err != nil {
 			log.WithError(err).Errorf("can not insert position record")
 		}
+
 		if err := environ.ProfitService.Insert(*profit); err != nil {
 			log.WithError(err).Errorf("can not insert profit record: %+v", profit)
 		}
 	} else {
-		if err := environ.PositionService.Insert(position, trade, fixedpoint.Zero); err != nil {
+		if err := environ.PositionService.Insert(position, trade, fixedpoint.Zero, fixedpoint.Zero); err != nil {
 			log.WithError(err).Errorf("can not insert position record")
 		}
 	}
@@ -616,10 +665,13 @@ func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSe
 	environ.setSyncing(Syncing)
 	defer environ.setSyncing(SyncDone)
 
-	return environ.syncSession(ctx, session, defaultSymbols...)
+	since := defaultSyncSinceTime()
+	return environ.syncSession(ctx, session, since, defaultSymbols...)
 }
 
-func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
+func (environ *Environment) syncSession(
+	ctx context.Context, session *ExchangeSession, syncStartTime time.Time, defaultSymbols ...string,
+) error {
 	symbols, err := session.getSessionSymbols(defaultSymbols...)
 	if err != nil {
 		return err
@@ -627,7 +679,17 @@ func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSe
 
 	log.Infof("syncing symbols %v from session %s", symbols, session.Name)
 
-	return environ.SyncService.SyncSessionSymbols(ctx, session.Exchange, environ.syncStartTime, symbols...)
+	syncBufferPeriod := -defaultSyncBufferPeriod
+	if environ.environmentConfig != nil && environ.environmentConfig.SyncBufferPeriod != nil {
+		syncBufferPeriod = -environ.environmentConfig.SyncBufferPeriod.Duration()
+	}
+
+	if syncBufferPeriod > 0 {
+		log.Warnf("syncBufferPeriod should be a negative number, given: %d", syncBufferPeriod)
+	}
+
+	syncEndTime := time.Now().Add(syncBufferPeriod)
+	return environ.SyncService.SyncSessionSymbols(ctx, session.Exchange, syncStartTime, syncEndTime, symbols...)
 }
 
 func (environ *Environment) ConfigureNotificationSystem(ctx context.Context, userConfig *Config) error {
@@ -645,7 +707,7 @@ func (environ *Environment) ConfigureNotificationSystem(ctx context.Context, use
 	}
 
 	// setup slack
-	slackToken := viper.GetString("slack-token")
+	slackToken := cmp.Or(viper.GetString("slack-bot-token"), viper.GetString("slack-token"))
 	if len(slackToken) > 0 && userConfig.Notifications != nil {
 		environ.setupSlack(userConfig, slackToken, persistence)
 	}
@@ -718,7 +780,7 @@ func (environ *Environment) setupInteraction(persistence service.PersistenceServ
 	var keyURL string
 	var authStore = environ.getAuthStore(persistence)
 
-	if v, ok := util.GetEnvVarBool("FLUSH_OTP_KEY"); v && ok {
+	if v, ok := envvar.Bool("FLUSH_OTP_KEY"); v && ok {
 		log.Warnf("flushing otp key...")
 		if err := authStore.Reset(); err != nil {
 			return err
@@ -807,16 +869,11 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 		return
 	}
 
-	// app-level token (for specific api)
-	slackAppToken := viper.GetString("slack-app-token")
-	if len(slackAppToken) > 0 && !strings.HasPrefix(slackAppToken, "xapp-") {
-		log.Errorf("SLACK_APP_TOKEN must have the prefix \"xapp-\".")
-		return
-	}
-
 	if conf.ErrorChannel != "" {
-		log.Debugf("found slack configured, setting up log hook...")
-		log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
+		if !conf.DisableErrorHook {
+			log.Debugf("found slack configured, setting up log hook...")
+			log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
+		}
 	}
 
 	log.Debugf("adding slack notifier with default channel: %s", conf.DefaultChannel)
@@ -825,44 +882,57 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 		slack.OptionLog(stdlog.New(os.Stdout, "api: ", stdlog.Lshortfile|stdlog.LstdFlags)),
 	}
 
-	if len(slackAppToken) > 0 {
+	// app-level token (for specific api)
+	slackAppToken := viper.GetString("slack-app-token")
+	hasSlackAppToken := len(slackAppToken) > 0
+	if hasSlackAppToken {
+		if !strings.HasPrefix(slackAppToken, "xapp-") {
+			log.Errorf("SLACK_APP_TOKEN must have the prefix \"xapp-\".")
+			return
+		}
+
 		slackOpts = append(slackOpts, slack.OptionAppLevelToken(slackAppToken))
 	}
 
-	if b, ok := util.GetEnvVarBool("DEBUG_SLACK"); ok {
+	if b, ok := envvar.Bool("DEBUG_SLACK"); ok {
 		slackOpts = append(slackOpts, slack.OptionDebug(b))
 	}
 
 	var client = slack.New(slackToken, slackOpts...)
 
-	var notifier = slacknotifier.New(client, conf.DefaultChannel)
-	Notification.AddNotifier(notifier)
-
-	// allocate a store, so that we can save the chatID for the owner
-	var messenger = interact.NewSlack(client)
-
-	var sessions = interact.SlackSessionMap{}
-	var sessionStore = persistence.NewStore("bbgo", "slack")
-	if err := sessionStore.Load(&sessions); err != nil {
-
-	} else {
-		// TODO: this is not necessary for slack, but we should find a way to restore the sessions
-		/*
-			for _, session := range sessions {
-				if session.IsAuthorized() {
-					// notifier.AddChat(session.Chat)
-				}
-			}
-			messenger.RestoreSessions(sessions)
-			messenger.OnAuthorized(func(userSession *interact.SlackSession) {
-				if userSession.IsAuthorized() {
-					// notifier.AddChat(userSession.Chat)
-				}
-			})
-		*/
+	var notifierOpts []slacknotifier.NotifyOption
+	if conf.QueueSize > 0 {
+		notifierOpts = append(notifierOpts, slacknotifier.OptionQueueSize(conf.QueueSize))
 	}
 
-	interact.AddMessenger(messenger)
+	var notifier = slacknotifier.New(client, conf.DefaultChannel, notifierOpts...)
+	Notification.AddNotifier(notifier)
+
+	if hasSlackAppToken && conf.EnableInteraction {
+		// allocate a store, so that we can save the chatID for the owner
+		var messenger = interact.NewSlack(client)
+		var sessions = interact.SlackSessionMap{}
+		var sessionStore = persistence.NewStore("bbgo", "slack")
+		if err := sessionStore.Load(&sessions); err != nil {
+
+		} else {
+			// TODO: this is not necessary for slack, but we should find a way to restore the sessions
+			/*
+				for _, session := range sessions {
+					if session.IsAuthorized() {
+						// notifier.AddChat(session.Chat)
+					}
+				}
+				messenger.RestoreSessions(sessions)
+				messenger.OnAuthorized(func(userSession *interact.SlackSession) {
+					if userSession.IsAuthorized() {
+						// notifier.AddChat(userSession.Chat)
+					}
+				})
+			*/
+		}
+		interact.AddMessenger(messenger)
+	}
 }
 
 func (environ *Environment) setupTelegram(
@@ -929,6 +999,36 @@ func (environ *Environment) setupTelegram(
 	return nil
 }
 
+func setupPyroscopeProfiling(env string, pyroscopeURL string) (profile *pyroscope.Profiler, err error) {
+	namespace := "bbgo"
+	hostName := os.Getenv("HOSTNAME")
+	log.Infof("profiling is enabled: %s, namespace: %s, hostName: %s", pyroscopeURL, namespace, hostName)
+
+	return pyroscope.Start(pyroscope.Config{
+		ApplicationName: fmt.Sprintf("bbgo.%s", hostName),
+		// The tags is used for filtering the profiles in the pyroscope dashboard.
+		Tags: map[string]string{
+			"environment": env,
+			"namespace":   namespace,
+		},
+		ServerAddress: pyroscopeURL,
+		Logger:        log.StandardLogger(),
+		ProfileTypes: []pyroscope.ProfileType{
+			pyroscope.ProfileCPU,
+			pyroscope.ProfileInuseObjects,
+			pyroscope.ProfileAllocObjects,
+			pyroscope.ProfileInuseSpace,
+			pyroscope.ProfileAllocSpace,
+			pyroscope.ProfileGoroutines,
+			pyroscope.ProfileMutexCount,
+			pyroscope.ProfileMutexDuration,
+			pyroscope.ProfileBlockCount,
+			pyroscope.ProfileBlockDuration,
+		},
+		DisableGCRuns: false,
+	})
+}
+
 func writeOTPKeyAsQRCodePNG(key *otp.Key, imagePath string) error {
 	// Convert TOTP key into a PNG
 	var buf bytes.Buffer
@@ -941,7 +1041,7 @@ func writeOTPKeyAsQRCodePNG(key *otp.Key, imagePath string) error {
 		return err
 	}
 
-	if err := ioutil.WriteFile(imagePath, buf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(imagePath, buf.Bytes(), 0644); err != nil {
 		return err
 	}
 
@@ -1012,5 +1112,9 @@ func (session *ExchangeSession) getSessionSymbols(defaultSymbols ...string) ([]s
 		return defaultSymbols, nil
 	}
 
-	return session.FindPossibleSymbols()
+	return session.FindPossibleAssetSymbols()
+}
+
+func defaultSyncSinceTime() time.Time {
+	return time.Now().AddDate(0, -6, 0)
 }

@@ -227,7 +227,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	return errors.New("exceed retry limit")
 }
 
-func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
+func (s *Strategy) initIndicators(store *types.SerialMarketDataStore) error {
 	s.ma = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
 	s.stdevHigh = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
 	s.stdevLow = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
@@ -854,12 +854,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.highestPrice = 0
 			s.lowestPrice = 0
 		} else if s.Position.IsLong() {
-			s.buyPrice = s.Position.ApproximateAverageCost.Float64()
+			s.buyPrice = s.Position.AverageCost.Float64()
 			s.sellPrice = 0
 			s.highestPrice = math.Max(s.buyPrice, s.highestPrice)
 			s.lowestPrice = s.buyPrice
 		} else if s.Position.IsShort() {
-			s.sellPrice = s.Position.ApproximateAverageCost.Float64()
+			s.sellPrice = s.Position.AverageCost.Float64()
 			s.buyPrice = 0
 			s.highestPrice = s.sellPrice
 			if s.lowestPrice == 0 {

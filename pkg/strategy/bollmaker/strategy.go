@@ -6,11 +6,10 @@ import (
 	"math"
 	"sync"
 
-	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
-	"github.com/c9s/bbgo/pkg/util"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -46,6 +45,16 @@ type BollingerSetting struct {
 	BandWidth float64 `json:"bandWidth"`
 }
 
+type EMACrossSetting struct {
+	Enabled    bool           `json:"enabled"`
+	Interval   types.Interval `json:"interval"`
+	FastWindow int            `json:"fastWindow"`
+	SlowWindow int            `json:"slowWindow"`
+
+	fastEMA, slowEMA *indicatorv2.EWMAStream
+	cross            *indicatorv2.CrossStream
+}
+
 type Strategy struct {
 	Environment          *bbgo.Environment
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
@@ -57,6 +66,12 @@ type Strategy struct {
 	types.IntervalWindow
 
 	bbgo.QuantityOrAmount
+
+	// BidQuantity is used for placing buy order, this will override the default quantity
+	BidQuantity fixedpoint.Value `json:"bidQuantity"`
+
+	// AskQuantity is used for placing sell order, this will override the default quantity
+	AskQuantity fixedpoint.Value `json:"askQuantity"`
 
 	// TrendEMA is used for detecting the trend by a given EMA
 	// you can define interval and window
@@ -115,6 +130,9 @@ type Strategy struct {
 	// BuyBelowNeutralSMA if true, the market maker will only place buy order when the current price is below the neutral band SMA.
 	BuyBelowNeutralSMA bool `json:"buyBelowNeutralSMA"`
 
+	// EMACrossSetting is used for defining ema cross signal to turn on/off buy
+	EMACrossSetting *EMACrossSetting `json:"emaCross"`
+
 	// NeutralBollinger is the smaller range of the bollinger band
 	// If price is in this band, it usually means the price is oscillating.
 	// If price goes out of this band, we tend to not place sell orders or buy orders
@@ -144,24 +162,23 @@ type Strategy struct {
 	ShadowProtection      bool             `json:"shadowProtection"`
 	ShadowProtectionRatio fixedpoint.Value `json:"shadowProtectionRatio"`
 
-	session *bbgo.ExchangeSession
-	book    *types.StreamOrderBook
-
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
 	// persistence fields
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 
+	session       *bbgo.ExchangeSession
+	book          *types.StreamOrderBook
 	orderExecutor *bbgo.GeneralOrderExecutor
-
-	groupID uint32
 
 	// defaultBoll is the BOLLINGER indicator we used for predicting the price.
 	defaultBoll *indicatorv2.BOLLStream
 
 	// neutralBoll is the neutral price section
 	neutralBoll *indicatorv2.BOLLStream
+
+	shouldBuy bool
 
 	// StrategyController
 	bbgo.StrategyController
@@ -194,6 +211,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 	if s.TrendEMA != nil {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TrendEMA.Interval})
+	}
+
+	if s.EMACrossSetting != nil && s.EMACrossSetting.Enabled {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.EMACrossSetting.Interval})
 	}
 
 	s.ExitMethods.SetAndSubscribe(session, s)
@@ -251,8 +272,15 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		s.Position,
 	)
 
-	sellQuantity := s.QuantityOrAmount.CalculateQuantity(askPrice)
-	buyQuantity := s.QuantityOrAmount.CalculateQuantity(bidPrice)
+	sellQuantity := s.AskQuantity
+	if sellQuantity.IsZero() {
+		sellQuantity = s.QuantityOrAmount.CalculateQuantity(askPrice)
+	}
+
+	buyQuantity := s.BidQuantity
+	if buyQuantity.IsZero() {
+		buyQuantity = s.QuantityOrAmount.CalculateQuantity(bidPrice)
+	}
 
 	sellOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -261,8 +289,8 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		Quantity: sellQuantity,
 		Price:    askPrice,
 		Market:   s.Market,
-		GroupID:  s.groupID,
 	}
+
 	buyOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeBuy,
@@ -270,7 +298,6 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		Quantity: buyQuantity,
 		Price:    bidPrice,
 		Market:   s.Market,
-		GroupID:  s.groupID,
 	}
 
 	var submitOrders []types.SubmitOrder
@@ -422,14 +449,20 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		}
 	}
 
+	if !s.shouldBuy {
+		log.Infof("shouldBuy is turned off, skip placing buy order")
+		canBuy = false
+	}
+
 	if canSell {
 		submitOrders = append(submitOrders, sellOrder)
 	}
+
 	if canBuy {
 		submitOrders = append(submitOrders, buyOrder)
 	}
 
-	// condition for lower the average cost
+	// condition for lowering the average cost
 	/*
 		if midPrice < s.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
 			submitOrders = append(submitOrders, buyOrder)
@@ -465,8 +498,25 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
 
+	s.shouldBuy = true
 	s.neutralBoll = session.Indicators(s.Symbol).BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
 	s.defaultBoll = session.Indicators(s.Symbol).BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
+
+	if s.EMACrossSetting != nil && s.EMACrossSetting.Enabled {
+		s.EMACrossSetting.fastEMA = session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.EMACrossSetting.FastWindow})
+		s.EMACrossSetting.slowEMA = session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.EMACrossSetting.SlowWindow})
+		s.EMACrossSetting.cross = indicatorv2.Cross(s.EMACrossSetting.fastEMA, s.EMACrossSetting.slowEMA)
+		s.EMACrossSetting.cross.OnUpdate(func(v float64) {
+			switch indicatorv2.CrossType(v) {
+			case indicatorv2.CrossOver:
+				s.shouldBuy = true
+			case indicatorv2.CrossUnder:
+				s.shouldBuy = false
+				// TODO: can partially close position when necessary
+				// s.orderExecutor.ClosePosition(ctx)
+			}
+		})
+	}
 
 	// Setup dynamic spread
 	if s.DynamicSpread.IsEnabled() {
@@ -498,7 +548,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// calculate group id for orders
 	instanceID := s.InstanceID()
-	s.groupID = util.FNV32(instanceID)
 
 	// If position is nil, we need to allocate a new position for calculation
 	if s.Position == nil {
@@ -550,7 +599,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	session.UserDataStream.OnStart(func() {
-		if s.UseTickerPrice {
+		if !bbgo.IsBackTesting && s.UseTickerPrice {
 			ticker, err := s.session.Exchange.QueryTicker(ctx, s.Symbol)
 			if err != nil {
 				return

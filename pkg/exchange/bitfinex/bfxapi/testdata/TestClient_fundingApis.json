@@ -1,0 +1,356 @@
+[
+  {
+    "timestamp": "2025-08-12T12:58:25.231098+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/r/funding/offers/",
+      "header": {
+        "Bfx-Signature": [
+          "78e032f67e53ddabd3de88c1633a897d79005c3a143b2ee99b7aa3a9df2be26ae175a7b56d50789a34e40d3b9bf4e2e2"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96dd65c25f666b60-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 12 Aug 2025 04:58:25 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[4244934737,\"fUST\",1754974678000,1754974678000,149.999999,149.999999,\"LIMIT\",null,null,null,\"ACTIVE\",null,null,null,0,2,0,0,null,0,null]]"
+    }
+  },
+  {
+    "timestamp": "2025-08-12T12:58:25.493543+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/w/funding/offer/cancel",
+      "header": {
+        "Bfx-Signature": [
+          "12e3ed117ff598f1874de267a06323ce2c331ca6a0d2be80e38540cdbb9ce3bedc0ea098804127ba94ffd1079151df61"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96dd65c3d8ab6b60-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 12 Aug 2025 04:58:25 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[1754974705404,\"foc-req\",null,null,[4244934737,\"fUST\",1754974678000,1754974678000,149.999999,149.999999,\"LIMIT\",null,null,null,\"ACTIVE\",null,null,null,0,2,false,0,null,false,null],null,\"SUCCESS\",null]"
+    }
+  },
+  {
+    "timestamp": "2025-08-12T12:58:25.757037+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/w/funding/auto",
+      "header": {
+        "Bfx-Signature": [
+          "a4eb08c65fdd998ebe4a72f3c0add53d729da769d85258a3ff99c57fa20f1a43e634812453ded0733214b7bff401a10e"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "500 Internal Server Error",
+      "status_code": 500,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96dd65c57a386b60-TPE"
+        ],
+        "Content-Length": [
+          "64"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 12 Aug 2025 04:58:25 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[\"error\",10001,\"This currency cannot be used in margin funding\"]"
+    }
+  },
+  {
+    "timestamp": "2025-08-12T12:58:26.034079+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/w/funding/offer/submit",
+      "header": {
+        "Bfx-Signature": [
+          "d4f38579afa838bb0093858ea28a209fb4768b054d1b6caa26843bcf2482f7c889450bb647232d7ca1bc670845dc7d61"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96dd65c71b9d6b60-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 12 Aug 2025 04:58:26 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[1754974705946,\"fon-req\",null,null,[4244935500,\"fUST\",1754974705938,1754974705938,150,150,\"LIMIT\",null,null,null,\"ACTIVE\",null,null,null,0.0002,2,false,0,null,false,null],null,\"SUCCESS\",\"Submitting funding offer of 150.0 UST at 0.02000 for 2 days.\"]"
+    }
+  },
+  {
+    "timestamp": "2025-08-12T12:58:26.355459+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/w/funding/offer/cancel",
+      "header": {
+        "Bfx-Signature": [
+          "a374ecfc38398f5d7c2aa2d4efa59889e6a9c5a4543bf128be159a5b810d73be9e2c5b4590063249ead4eaf6c4db1ce2"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96dd65c8dd776b60-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 12 Aug 2025 04:58:26 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[1754974706237,\"foc-req\",null,null,[4244935500,\"fUST\",1754974706000,1754974706000,150,150,\"LIMIT\",null,null,null,\"ACTIVE\",null,null,null,0.0002,2,false,0,null,false,null],null,\"SUCCESS\",null]"
+    }
+  },
+  {
+    "timestamp": "2025-08-12T12:58:26.587722+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/r/funding/offers/hist",
+      "header": {
+        "Bfx-Signature": [
+          "a31513326e4c5eca40ee1662c42ae572ab16b5e61fc98a5835b9743abb78e430e587ecab26e0d152c518b987439b40f9"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96dd65cadf306b60-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 12 Aug 2025 04:58:26 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[4244935500,\"fUST\",1754974706000,1754974706000,150,150,null,null,null,null,\"CANCELED\",null,null,null,0.0002,2,0,0,null,null,null],[4244934737,\"fUST\",1754974678000,1754974705000,149.999999,149.999999,null,null,null,null,\"CANCELED\",null,null,null,0,2,0,0,null,null,null],[4244933827,\"fUST\",1754974636000,1754974637000,149.999999,149.999999,null,null,null,null,\"CANCELED\",null,null,null,0,2,0,0,null,null,null],[4244933301,\"fUST\",1754974620000,1754974622000,149.999999,149.999999,null,null,null,null,\"CANCELED\",null,null,null,0,2,0,0,null,null,null],[4244933081,\"fUST\",1754974611000,1754974612000,150,150,null,null,null,null,\"CANCELED\",null,null,null,0.0002,2,0,0,null,null,null],[4244932446,\"fUST\",1754974579000,1754974605000,149.999999,149.999999,null,null,null,null,\"CANCELED\",null,null,null,0,2,0,0,null,null,null],[4244930833,\"fUST\",1754974521000,1754974522000,149.999999,149.999999,null,null,null,null,\"CANCELED\",null,null,null,0,2,0,0,null,null,null],[4244929929,\"fUST\",1754974491000,1754974491000,150,150,null,null,null,null,\"CANCELED\",null,null,null,0.0002,2,0,0,null,null,null],[4244928431,\"fUST\",1754974442000,1754974443000,150,150,null,null,null,null,\"CANCELED\",null,null,null,0.0002,2,0,0,null,null,null],[4241433622,\"fUST\",1754899222000,1754899222000,150,150,\"LIMIT\",null,null,null,\"CANCELED\",null,null,null,0.0002,2,0,null,null,0,null],[4241425454,\"fUST\",1754899027000,1754899028000,150,150,\"LIMIT\",null,null,null,\"CANCELED\",null,null,null,0.0002,2,0,null,null,0,null],[4241416369,\"fUST\",1754898813000,1754898813000,150,150,\"LIMIT\",null,null,null,\"CANCELED\",null,null,null,0.0002,2,0,null,null,0,null],[4241414815,\"fUST\",1754898778000,1754898779000,150,150,\"LIMIT\",null,null,null,\"CANCELED\",null,null,null,0.0002,2,0,null,null,0,null],[4241389106,\"fUST\",1754898269000,1754898578000,150,150,\"LIMIT\",null,null,null,\"CANCELED\",null,null,null,0.0002,2,0,null,null,0,null],[4241375286,\"fUST\",1754897971000,1754898173000,150,150,\"LIMIT\",null,null,null,\"CANCELED\",null,null,null,0.0002,2,0,null,null,0,null]]"
+    }
+  }
+]

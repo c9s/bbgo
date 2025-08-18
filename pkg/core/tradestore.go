@@ -4,26 +4,44 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const TradeExpiryTime = 24 * time.Hour
-const PruneTriggerNumOfTrades = 10_000
+const TradeExpiryTime = 3 * time.Hour
+const CoolTradePeriod = 1 * time.Hour
+const MaximumTradeStoreSize = 1_000
 
 type TradeStore struct {
 	// any created trades for tracking trades
 	sync.Mutex
 
-	EnablePrune bool
-
-	trades        map[uint64]types.Trade
-	lastTradeTime time.Time
+	pruneEnabled        bool
+	storeSize           int
+	trades              map[types.TradeKey]types.Trade
+	tradeExpiryDuration time.Duration
+	lastTradeTime       time.Time
 }
 
 func NewTradeStore() *TradeStore {
 	return &TradeStore{
-		trades: make(map[uint64]types.Trade),
+		trades:              make(map[types.TradeKey]types.Trade),
+		storeSize:           MaximumTradeStoreSize,
+		tradeExpiryDuration: TradeExpiryTime,
 	}
+}
+
+func (s *TradeStore) SetPruneEnabled(enabled bool) {
+	s.pruneEnabled = enabled
+}
+
+func (s *TradeStore) SetTradeExpiryDuration(d time.Duration) {
+	s.tradeExpiryDuration = d
+}
+
+func (s *TradeStore) SetStoreSize(size int) {
+	s.storeSize = size
 }
 
 func (s *TradeStore) Num() (num int) {
@@ -44,17 +62,17 @@ func (s *TradeStore) Trades() (trades []types.Trade) {
 	return trades
 }
 
-func (s *TradeStore) Exists(oID uint64) (ok bool) {
+func (s *TradeStore) Exists(key types.TradeKey) (ok bool) {
 	s.Lock()
 	defer s.Unlock()
 
-	_, ok = s.trades[oID]
+	_, ok = s.trades[key]
 	return ok
 }
 
 func (s *TradeStore) Clear() {
 	s.Lock()
-	s.trades = make(map[uint64]types.Trade)
+	s.trades = make(map[types.TradeKey]types.Trade)
 	s.Unlock()
 }
 
@@ -63,10 +81,10 @@ type TradeFilter func(trade types.Trade) bool
 // Filter filters the trades by a given TradeFilter function
 func (s *TradeStore) Filter(filter TradeFilter) {
 	s.Lock()
-	var trades = make(map[uint64]types.Trade)
+	var trades = make(map[types.TradeKey]types.Trade)
 	for _, trade := range s.trades {
 		if !filter(trade) {
-			trades[trade.ID] = trade
+			trades[trade.Key()] = trade
 		}
 	}
 	s.trades = trades
@@ -76,6 +94,9 @@ func (s *TradeStore) Filter(filter TradeFilter) {
 // GetOrderTrades finds the trades match order id matches to the given order
 func (s *TradeStore) GetOrderTrades(o types.Order) (trades []types.Trade) {
 	s.Lock()
+	if o.OrderID == 0 {
+		log.WithFields(o.LogFields()).Errorf("[tradestore] getting trades for order %+v with OrderID 0", o)
+	}
 	for _, t := range s.trades {
 		if t.OrderID == o.OrderID {
 			trades = append(trades, t)
@@ -90,7 +111,7 @@ func (s *TradeStore) GetAndClear() (trades []types.Trade) {
 	for _, t := range s.trades {
 		trades = append(trades, t)
 	}
-	s.trades = make(map[uint64]types.Trade)
+	s.trades = make(map[types.TradeKey]types.Trade)
 	s.Unlock()
 
 	return trades
@@ -101,7 +122,10 @@ func (s *TradeStore) Add(trades ...types.Trade) {
 	defer s.Unlock()
 
 	for _, trade := range trades {
-		s.trades[trade.ID] = trade
+		if trade.OrderID == 0 {
+			log.Errorf("[tradestore] detecting trade %+v with OrderID 0", trade)
+		}
+		s.trades[trade.Key()] = trade
 		s.touchLastTradeTime(trade)
 	}
 }
@@ -112,32 +136,36 @@ func (s *TradeStore) touchLastTradeTime(trade types.Trade) {
 	}
 }
 
-// pruneExpiredTrades prunes trades that are older than the expiry time
-// see TradeExpiryTime
-func (s *TradeStore) pruneExpiredTrades(curTime time.Time) {
+// Prune prunes trades that are older than the expiry time
+// see TradeExpiryTime (3 hours)
+func (s *TradeStore) Prune(curTime time.Time) {
 	s.Lock()
 	defer s.Unlock()
 
-	var trades = make(map[uint64]types.Trade)
-	var cutOffTime = curTime.Add(-TradeExpiryTime)
+	var trades = make(map[types.TradeKey]types.Trade)
+	var cutOffTime = curTime.Add(-s.tradeExpiryDuration)
+
+	log.Infof("pruning expired trades, cutoff time = %s", cutOffTime.String())
 	for _, trade := range s.trades {
 		if trade.Time.Before(cutOffTime) {
 			continue
 		}
 
-		trades[trade.ID] = trade
+		trades[trade.Key()] = trade
 	}
 
 	s.trades = trades
-}
 
-func (s *TradeStore) Prune(curTime time.Time) {
-	s.pruneExpiredTrades(curTime)
+	log.Infof("trade pruning done, size: %d", len(trades))
 }
 
 func (s *TradeStore) isCoolTrade(trade types.Trade) bool {
-	// if the time of last trade is over 1 hour, we call it's cool trade
-	return s.lastTradeTime != (time.Time{}) && time.Time(trade.Time).Sub(s.lastTradeTime) > time.Hour
+	// if the duration between the current trade and the last trade is over 1 hour, we call it "cool trade"
+	return !s.lastTradeTime.IsZero() && time.Time(trade.Time).Sub(s.lastTradeTime) > CoolTradePeriod
+}
+
+func (s *TradeStore) exceededMaximumTradeStoreSize() bool {
+	return len(s.trades) > s.storeSize
 }
 
 func (s *TradeStore) BindStream(stream types.Stream) {
@@ -145,9 +173,9 @@ func (s *TradeStore) BindStream(stream types.Stream) {
 		s.Add(trade)
 	})
 
-	if s.EnablePrune {
+	if s.pruneEnabled {
 		stream.OnTradeUpdate(func(trade types.Trade) {
-			if s.isCoolTrade(trade) {
+			if s.isCoolTrade(trade) || s.exceededMaximumTradeStoreSize() {
 				s.Prune(time.Time(trade.Time))
 			}
 		})

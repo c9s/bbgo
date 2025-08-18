@@ -14,7 +14,7 @@ import (
 	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
 
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/envvar"
 )
 
 type SlackReply struct {
@@ -179,7 +179,7 @@ func NewSlack(client *slack.Client) *Slack {
 				stdlog.Lshortfile|stdlog.LstdFlags)),
 	}
 
-	if b, ok := util.GetEnvVarBool("DEBUG_SLACK"); ok {
+	if b, ok := envvar.Bool("DEBUG_SLACK"); ok {
 		opts = append(opts, socketmode.OptionDebug(b))
 	}
 
@@ -492,7 +492,7 @@ func generateTextInputModalRequest(title string, prompt string, textFields ...Te
 		textInputObject := slack.NewPlainTextInputBlockElement(placeHolderObject, textField.Name)
 
 		// Notice that blockID is a unique identifier for a block
-		inputBlock := slack.NewInputBlock("block-"+textField.Name+"-"+uuid.NewString(), labelObject, textInputObject)
+		inputBlock := slack.NewInputBlock("block-"+textField.Name+"-"+uuid.NewString(), labelObject, labelObject, textInputObject)
 		blocks.BlockSet = append(blocks.BlockSet, inputBlock)
 	}
 

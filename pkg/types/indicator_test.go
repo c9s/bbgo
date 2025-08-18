@@ -19,6 +19,17 @@ func TestQueue(t *testing.T) {
 	assert.Equal(t, zeroq.Index(0), 0.)
 	zeroq.Update(1.)
 	assert.Equal(t, zeroq.Length(), 0)
+
+	q := NewQueue(10)
+	for i := 0; i < 10; i++ {
+		q.Update(float64(i))
+	}
+	assert.Equal(t, q.Last(0), 9.0)
+	assert.Equal(t, q.Last(1), 8.0)
+	assert.Equal(t, q.Last(2), 7.0)
+	assert.Equal(t, q.Last(10), 0.0)
+	assert.Equal(t, q.Last(11), 0.0)
+
 }
 
 func TestFloat(t *testing.T) {
@@ -215,6 +226,10 @@ func TestDot(t *testing.T) {
 	assert.InDelta(t, out2, 3., 0.001)
 	out3 := Dot(3., &a, 2)
 	assert.InDelta(t, out2, out3, 0.001)
+	out4 := Dot(&a, 3, 2)
+	assert.InDelta(t, out2, 3., 0.001)
+	out5 := Dot(3, &a, 2)
+	assert.InDelta(t, out4, out5, 0.001)
 }
 
 func TestClone(t *testing.T) {
@@ -245,4 +260,23 @@ func TestFilter(t *testing.T) {
 	assert.Equal(t, b.Length(), 4)
 	assert.Equal(t, b.Last(0), 1000.)
 	assert.Equal(t, b.Sum(3), 1200.)
+}
+
+func TestOLS(t *testing.T) {
+	/*
+		python
+		import numpy as np
+		import statsmodels.api as sm
+		x = np.array([1., 2., 3., 4., 5.])
+		y = np.array([2., 3., 4., 5., 6.])
+		x = sm.add_constant(x)
+		model = sm.OLS(y, x)
+		results = model.fit()
+		print(results.params)
+	*/
+	a := floats.Slice{1., 2., 3., 4., 5.}
+	b := floats.Slice{2., 3., 4., 5., 6.}
+	alpha, beta := OLS(NewSeries(&a), NewSeries(&b), a.Length())
+	assert.InDelta(t, alpha, 1.0, 0.001)
+	assert.InDelta(t, beta, 1.0, 0.001)
 }

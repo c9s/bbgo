@@ -13,7 +13,32 @@ import (
 
 const DateFormat = "2006-01-02"
 
+//go:generate mapgen -type ExchangeName
 type ExchangeName string
+
+const (
+	ExchangeMax      ExchangeName = "max"
+	ExchangeBinance  ExchangeName = "binance"
+	ExchangeOKEx     ExchangeName = "okex"
+	ExchangeKucoin   ExchangeName = "kucoin"
+	ExchangeBitget   ExchangeName = "bitget"
+	ExchangeBacktest ExchangeName = "backtest"
+	ExchangeBybit    ExchangeName = "bybit"
+	ExchangeCoinBase ExchangeName = "coinbase"
+	ExchangeBitfinex ExchangeName = "bitfinex"
+)
+
+var SupportedExchanges = map[ExchangeName]struct{}{
+	ExchangeMax:      struct{}{},
+	ExchangeBinance:  struct{}{},
+	ExchangeOKEx:     struct{}{},
+	ExchangeKucoin:   struct{}{},
+	ExchangeBitget:   struct{}{},
+	ExchangeBybit:    struct{}{},
+	ExchangeCoinBase: struct{}{},
+	ExchangeBitfinex: struct{}{},
+	// note: we are not using "backtest"
+}
 
 func (n *ExchangeName) Value() (driver.Value, error) {
 	return n.String(), nil
@@ -25,49 +50,37 @@ func (n *ExchangeName) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	switch s {
-	case "max", "binance", "okex", "kucoin":
-		*n = ExchangeName(s)
-		return nil
-
+	*n = ExchangeName(s)
+	if !n.IsValid() {
+		return fmt.Errorf("%s is an invalid exchange name", s)
 	}
 
-	return fmt.Errorf("unknown or unsupported exchange name: %s, valid names are: max, binance, okex, kucoin", s)
+	return nil
+}
+
+func (n ExchangeName) IsValid() bool {
+	if _, exist := SupportedExchanges[n]; exist {
+		return true
+	}
+
+	return false
 }
 
 func (n ExchangeName) String() string {
 	return string(n)
 }
 
-const (
-	ExchangeMax      ExchangeName = "max"
-	ExchangeBinance  ExchangeName = "binance"
-	ExchangeOKEx     ExchangeName = "okex"
-	ExchangeKucoin   ExchangeName = "kucoin"
-	ExchangeBitget   ExchangeName = "bitget"
-	ExchangeBacktest ExchangeName = "backtest"
-	ExchangeBybit    ExchangeName = "bybit"
-)
-
-var SupportedExchanges = []ExchangeName{
-	ExchangeMax,
-	ExchangeBinance,
-	ExchangeOKEx,
-	ExchangeKucoin,
-	ExchangeBitget,
-	ExchangeBybit,
-	// note: we are not using "backtest"
-}
-
 func ValidExchangeName(a string) (ExchangeName, error) {
-	aa := strings.ToLower(a)
-	for _, n := range SupportedExchanges {
-		if string(n) == aa {
-			return n, nil
-		}
+	exName := ExchangeName(strings.ToLower(a))
+	if !exName.IsValid() {
+		return "", fmt.Errorf("invalid exchange name: %s", a)
 	}
 
-	return "", fmt.Errorf("invalid exchange name: %s", a)
+	return exName, nil
+}
+
+type Initializer interface {
+	Initialize(ctx context.Context) error
 }
 
 type ExchangeMinimal interface {
@@ -81,6 +94,18 @@ type Exchange interface {
 	ExchangeMarketDataService
 	ExchangeAccountService
 	ExchangeTradeService
+}
+
+//go:generate mockgen -destination=mocks/mock_exchange_extended.go -package=mocks . ExchangeExtended
+type ExchangeExtended interface {
+	Exchange
+	ExchangeOrderQueryService
+}
+
+//go:generate mockgen -destination=mocks/mock_exchange_public.go -package=mocks . ExchangePublic
+type ExchangePublic interface {
+	ExchangeMinimal
+	ExchangeMarketDataService
 }
 
 // ExchangeBasic is the new type for replacing the original Exchange interface
@@ -112,14 +137,12 @@ type ExchangeDefaultFeeRates interface {
 	DefaultFeeRates() ExchangeFee
 }
 
-type ExchangeAmountFeeProtect interface {
-	SetModifyOrderAmountForFee(ExchangeFee)
-}
-
 //go:generate mockgen -destination=mocks/mock_exchange_trade_history.go -package=mocks . ExchangeTradeHistoryService
 type ExchangeTradeHistoryService interface {
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
-	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
+	QueryClosedOrders(
+		ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
+	) (orders []Order, err error)
 }
 
 type ExchangeMarketDataService interface {
@@ -134,9 +157,28 @@ type ExchangeMarketDataService interface {
 	QueryKLines(ctx context.Context, symbol string, interval Interval, options KLineQueryOptions) ([]KLine, error)
 }
 
+type OTCExchange interface {
+	RequestForQuote(
+		ctx context.Context, symbol string, side SideType, quantity fixedpoint.Value,
+	) (submitOrder SubmitOrder, err error)
+}
+
 type CustomIntervalProvider interface {
 	SupportedInterval() map[Interval]int
 	IsSupportedInterval(interval Interval) bool
+}
+
+type DepositHistoryService interface {
+	QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []Deposit, err error)
+}
+
+type WithdrawHistoryService interface {
+	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)
+}
+
+type ExchangeTransferHistoryService interface {
+	DepositHistoryService
+	WithdrawHistoryService
 }
 
 type ExchangeTransferService interface {
@@ -145,11 +187,18 @@ type ExchangeTransferService interface {
 }
 
 type ExchangeWithdrawalService interface {
-	Withdraw(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *WithdrawalOptions) error
+	Withdraw(
+		ctx context.Context, asset string, amount fixedpoint.Value, address string, options *WithdrawalOptions,
+	) error
 }
 
 type ExchangeRewardService interface {
 	QueryRewards(ctx context.Context, startTime time.Time) ([]Reward, error)
+}
+
+type ExchangeRiskService interface {
+	SetLeverage(ctx context.Context, symbol string, leverage int) error
+	QueryPositionRisk(ctx context.Context, symbol ...string) ([]PositionRisk, error)
 }
 
 type TradeQueryOptions struct {

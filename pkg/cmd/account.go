@@ -8,15 +8,25 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/c9s/bbgo/pkg/types"
-
 	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
 func init() {
 	accountCmd.Flags().String("session", "", "the exchange session name for querying information")
-	accountCmd.Flags().Bool("total", false, "report total asset")
 	RootCmd.AddCommand(accountCmd)
+}
+
+func printSessionAccount(ctx context.Context, session *bbgo.ExchangeSession) error {
+	a, err := session.Exchange.QueryAccount(ctx)
+	if err != nil {
+		return errors.Wrapf(err, "account query failed")
+	}
+
+	log.Infof("--------------------------------------------")
+	log.Infof("SESSION %s", session.Name)
+	log.Infof("--------------------------------------------")
+	a.Print(log.Infof)
+	return nil
 }
 
 // go run ./cmd/bbgo account --session=binance --config=config/bbgo.yaml
@@ -27,18 +37,13 @@ var accountCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		showTotal, err := cmd.Flags().GetBool("total")
-		if err != nil {
-			return err
-		}
-
 		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
 			return err
 		}
 
 		environ := bbgo.NewEnvironment()
-		if err := environ.ConfigureDatabase(ctx); err != nil {
+		if err := environ.ConfigureDatabase(ctx, userConfig); err != nil {
 			return err
 		}
 
@@ -52,44 +57,15 @@ var accountCmd = &cobra.Command{
 				return fmt.Errorf("session %s not found", sessionName)
 			}
 
-			a, err := session.Exchange.QueryAccount(ctx)
-			if err != nil {
-				return errors.Wrapf(err, "account query failed")
+			if err := printSessionAccount(ctx, session); err != nil {
+				return err
 			}
-
-			a.Print()
 		} else {
-			var total = types.BalanceMap{}
 			for _, session := range environ.Sessions() {
-				a, err := session.Exchange.QueryAccount(ctx)
-				if err != nil {
-					return errors.Wrapf(err, "account query failed")
-				}
-
-				log.Infof("--------------------------------------------")
-				log.Infof("SESSION %s", session.Name)
-				log.Infof("--------------------------------------------")
-				a.Print()
-
-				for c, b := range a.Balances() {
-					tb, ok := total[c]
-					if !ok {
-						total[c] = b
-					} else {
-						tb.Available = tb.Available.Add(b.Available)
-						tb.Locked = tb.Locked.Add(b.Locked)
-						total[c] = tb
-					}
-				}
-
-				if showTotal {
-					log.Infof("===============================================")
-					log.Infof("TOTAL ASSETS")
-					log.Infof("===============================================")
-					total.Print()
+				if err := printSessionAccount(ctx, session); err != nil {
+					return err
 				}
 			}
-
 		}
 
 		return nil

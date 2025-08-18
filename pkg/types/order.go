@@ -3,14 +3,17 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types/currency"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 )
 
@@ -33,15 +36,17 @@ var (
 	TimeInForceGTC TimeInForce = "GTC"
 	TimeInForceIOC TimeInForce = "IOC"
 	TimeInForceFOK TimeInForce = "FOK"
+	TimeInForceGTT TimeInForce = "GTT" // for coinbase exchange api
 )
 
 // MarginOrderSideEffectType define side effect type for orders
 type MarginOrderSideEffectType string
 
 var (
-	SideEffectTypeNoSideEffect MarginOrderSideEffectType = "NO_SIDE_EFFECT"
-	SideEffectTypeMarginBuy    MarginOrderSideEffectType = "MARGIN_BUY"
-	SideEffectTypeAutoRepay    MarginOrderSideEffectType = "AUTO_REPAY"
+	SideEffectTypeNoSideEffect    MarginOrderSideEffectType = "NO_SIDE_EFFECT"
+	SideEffectTypeMarginBuy       MarginOrderSideEffectType = "MARGIN_BUY"
+	SideEffectTypeAutoRepay       MarginOrderSideEffectType = "AUTO_REPAY"
+	SideEffectTypeAutoBorrowRepay MarginOrderSideEffectType = "AUTO_BORROW_REPAY"
 )
 
 func (t *MarginOrderSideEffectType) UnmarshalJSON(data []byte) error {
@@ -65,6 +70,10 @@ func (t *MarginOrderSideEffectType) UnmarshalJSON(data []byte) error {
 		*t = SideEffectTypeAutoRepay
 		return nil
 
+	case string(SideEffectTypeAutoBorrowRepay), "BORROWREPAY", "AUTOBORROWREPAY":
+		*t = SideEffectTypeAutoBorrowRepay
+		return nil
+
 	}
 
 	return fmt.Errorf("invalid side effect type: %s", data)
@@ -79,6 +88,8 @@ const (
 	OrderTypeMarket     OrderType = "MARKET"
 	OrderTypeStopLimit  OrderType = "STOP_LIMIT"
 	OrderTypeStopMarket OrderType = "STOP_MARKET"
+
+	OrderTypeTakeProfitMarket OrderType = "TAKE_PROFIT_MARKET"
 )
 
 /*
@@ -114,12 +125,16 @@ const (
 
 	// OrderStatusRejected means the order is not placed successfully, it's rejected by the api
 	OrderStatusRejected OrderStatus = "REJECTED"
+
+	// OrderStatusExpired means the order is expired, it's an end state.
+	OrderStatusExpired OrderStatus = "EXPIRED"
 )
 
 func (o OrderStatus) Closed() bool {
 	return o == OrderStatusFilled ||
 		o == OrderStatusCanceled ||
-		o == OrderStatusRejected
+		o == OrderStatusRejected ||
+		o == OrderStatusExpired
 }
 
 type SubmitOrder struct {
@@ -129,8 +144,8 @@ type SubmitOrder struct {
 	Side   SideType  `json:"side" db:"side"`
 	Type   OrderType `json:"orderType" db:"order_type"`
 
-	Quantity fixedpoint.Value `json:"quantity" db:"quantity"`
 	Price    fixedpoint.Value `json:"price" db:"price"`
+	Quantity fixedpoint.Value `json:"quantity" db:"quantity"`
 
 	// AveragePrice is only used in back-test currently
 	AveragePrice fixedpoint.Value `json:"averagePrice,omitempty"`
@@ -143,12 +158,38 @@ type SubmitOrder struct {
 
 	GroupID uint32 `json:"groupID,omitempty"`
 
-	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect,omitempty"` // AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
+	// QuoteID is for OTC exchange
+	QuoteID string `json:"quoteID,omitempty" db:"quote_id"`
 
-	ReduceOnly    bool `json:"reduceOnly,omitempty" db:"reduce_only"`
+	// MarginSideEffect is used for margin orders, it can be NO_SIDE_EFFECT, AUTO_BORROW_REPAY, AUTO_REPAY, MARGIN_BUY
+	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect,omitempty"` // AUTO_BORROW_REPAY = borrowrepay, AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
+
+	// ReduceOnly is used for futures orders, it means the order is only used to reduce the position size.
+	ReduceOnly bool `json:"reduceOnly,omitempty" db:"reduce_only"`
+
+	// ClosePosition this is mostly designed for binance: true, false；Close-All，used with STOP_MARKET or TAKE_PROFIT_MARKET.
 	ClosePosition bool `json:"closePosition,omitempty" db:"close_position"`
 
 	Tag string `json:"tag,omitempty" db:"-"`
+}
+
+func (o *SubmitOrder) LogFields() logrus.Fields {
+	fields := logrus.Fields{
+		"symbol": o.Symbol,
+	}
+
+	if len(o.ClientOrderID) > 0 {
+		fields["client_order_id"] = o.ClientOrderID
+	}
+
+	return fields
+}
+
+func (o *SubmitOrder) AsQuery() OrderQuery {
+	return OrderQuery{
+		Symbol:        o.Symbol,
+		ClientOrderID: o.ClientOrderID,
+	}
 }
 
 func (o *SubmitOrder) In() (fixedpoint.Value, string) {
@@ -211,10 +252,10 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 	}
 
 	if o.Price.Sign() > 0 && o.Quantity.Sign() > 0 && len(o.Market.QuoteCurrency) > 0 {
-		if IsFiatCurrency(o.Market.QuoteCurrency) {
+		if currency.IsFiatCurrency(o.Market.QuoteCurrency) {
 			fields = append(fields, slack.AttachmentField{
 				Title: "Amount",
-				Value: USD.FormatMoney(o.Price.Mul(o.Quantity)),
+				Value: currency.USD.FormatMoney(o.Price.Mul(o.Quantity)),
 				Short: true,
 			})
 		} else {
@@ -246,6 +287,7 @@ type OrderQuery struct {
 	Symbol        string
 	OrderID       string
 	ClientOrderID string
+	OrderUUID     string
 }
 
 type Order struct {
@@ -256,17 +298,83 @@ type Order struct {
 	// GID is used for relational database storage, it's an incremental ID
 	GID     uint64 `json:"gid,omitempty" db:"gid"`
 	OrderID uint64 `json:"orderID" db:"order_id"` // order id
-	UUID    string `json:"uuid,omitempty"`
+	UUID    string `json:"uuid,omitempty" db:"uuid"`
 
-	Status           OrderStatus      `json:"status" db:"status"`
+	Status OrderStatus `json:"status" db:"status"`
+
+	// OriginalStatus stores the original order status from the specific exchange
+	OriginalStatus string `json:"originalStatus,omitempty" db:"-"`
+
+	// ExecutedQuantity is how much quantity has been executed
 	ExecutedQuantity fixedpoint.Value `json:"executedQuantity" db:"executed_quantity"`
-	IsWorking        bool             `json:"isWorking" db:"is_working"`
-	CreationTime     Time             `json:"creationTime" db:"created_at"`
-	UpdateTime       Time             `json:"updateTime" db:"updated_at"`
+
+	// IsWorking means if the order is still on the order book (active order)
+	IsWorking bool `json:"isWorking" db:"is_working"`
+
+	// CreationTime is the time when this order is created
+	CreationTime Time `json:"creationTime" db:"created_at"`
+
+	// UpdateTime is the latest time when this order gets updated
+	UpdateTime Time `json:"updateTime" db:"updated_at"`
 
 	IsFutures  bool `json:"isFutures,omitempty" db:"is_futures"`
 	IsMargin   bool `json:"isMargin,omitempty" db:"is_margin"`
 	IsIsolated bool `json:"isIsolated,omitempty" db:"is_isolated"`
+}
+
+func (o *Order) LogFields() logrus.Fields {
+	fields := o.SubmitOrder.LogFields()
+	fields["exchange"] = o.Exchange.String()
+	fields["order_id"] = o.OrderID
+	fields["status"] = o.Status
+
+	if len(o.UUID) > 0 {
+		fields["uuid"] = o.UUID
+	}
+
+	if len(o.ClientOrderID) > 0 {
+		fields["client_order_id"] = o.ClientOrderID
+	}
+
+	return fields
+}
+
+func (o *Order) Update(update Order) {
+	// if the update time is older than the current order, ignore it
+	if update.UpdateTime.Before(o.UpdateTime.Time()) {
+		return
+	}
+	o.UpdateTime = update.UpdateTime
+	if len(update.Status) > 0 {
+		o.Status = update.Status
+	}
+	if len(update.OriginalStatus) > 0 {
+		o.OriginalStatus = update.OriginalStatus
+	}
+	// executed quantity should be increasing
+	if update.ExecutedQuantity.Compare(o.ExecutedQuantity) > 0 {
+		o.ExecutedQuantity = update.ExecutedQuantity
+	}
+	// update quantity and price only if the update value is greater than 0
+	if update.Quantity.Sign() > 0 {
+		o.Quantity = update.Quantity
+	}
+	if update.Price.Sign() > 0 {
+		o.Price = update.Price
+	}
+	o.IsWorking = update.IsWorking
+}
+
+func (o *Order) GetRemainingQuantity() fixedpoint.Value {
+	return o.Quantity.Sub(o.ExecutedQuantity)
+}
+
+func (o Order) AsQuery() OrderQuery {
+	return OrderQuery{
+		Symbol:    o.Symbol,
+		OrderID:   strconv.FormatUint(o.OrderID, 10),
+		OrderUUID: o.UUID,
+	}
 }
 
 func (o Order) CsvHeader() []string {
@@ -301,6 +409,10 @@ func (o Order) CsvRecords() [][]string {
 	}
 }
 
+func (o *Order) ObjectID() string {
+	return "order-" + o.Exchange.String() + "-" + o.Symbol + "-" + strconv.FormatUint(o.OrderID, 10)
+}
+
 // Backup backs up the current order quantity to a SubmitOrder object
 // so that we can post the order later when we want to restore the orders.
 func (o Order) Backup() SubmitOrder {
@@ -320,19 +432,22 @@ func (o Order) String() string {
 		orderID = strconv.FormatUint(o.OrderID, 10)
 	}
 
-	desc := fmt.Sprintf("ORDER %s | %s | %s | %s %-4s | %s/%s @ %s",
+	desc := fmt.Sprintf("ORDER %s | %s | %s | %s %-4s |",
 		o.Exchange.String(),
 		orderID,
 		o.Symbol,
 		o.Type,
 		o.Side,
-		o.ExecutedQuantity.String(),
+	)
+
+	switch o.Type {
+	case OrderTypeStopLimit, OrderTypeStopMarket, OrderTypeTakeProfitMarket:
+		desc += " stop@ " + o.StopPrice.String() + " ->"
+	}
+
+	desc += fmt.Sprintf(" %s/%s @ %s", o.ExecutedQuantity.String(),
 		o.Quantity.String(),
 		o.Price.String())
-
-	if o.Type == OrderTypeStopLimit {
-		desc += " Stop @ " + o.StopPrice.String()
-	}
 
 	desc += " | " + string(o.Status) + " | "
 
@@ -354,9 +469,9 @@ func (o Order) PlainText() string {
 		o.Symbol,
 		o.Type,
 		o.Side,
-		o.Price.FormatString(2),
-		o.ExecutedQuantity.FormatString(2),
-		o.Quantity.FormatString(4),
+		o.Price.String(),
+		o.ExecutedQuantity.String(),
+		o.Quantity.String(),
 		o.Status)
 }
 
@@ -439,12 +554,7 @@ func OrdersAll(orders []Order, f func(o Order) bool) bool {
 }
 
 func OrdersAny(orders []Order, f func(o Order) bool) bool {
-	for _, o := range orders {
-		if f(o) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(orders, f)
 }
 
 func IsActiveOrder(o Order) bool {

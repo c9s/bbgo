@@ -18,7 +18,7 @@ type IntervalProfitCollector struct {
 	Interval  Interval      `json:"interval"`
 	Profits   *floats.Slice `json:"profits"`
 	Timestamp *floats.Slice `json:"timestamp"`
-	tmpTime   time.Time     `json:"tmpTime"`
+	tmpTime   time.Time
 }
 
 func NewIntervalProfitCollector(i Interval, startTime time.Time) *IntervalProfitCollector {

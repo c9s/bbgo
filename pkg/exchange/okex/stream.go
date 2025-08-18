@@ -2,15 +2,28 @@ package okex
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
+	"github.com/gorilla/websocket"
+	"golang.org/x/time/rate"
+
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+var (
+	marketTradeLogLimiter = rate.NewLimiter(rate.Every(time.Minute), 1)
+	tradeLogLimiter       = rate.NewLimiter(rate.Every(time.Minute), 1)
+	// pingInterval the connection will break automatically if the subscription is not established or data has not been
+	// pushed for more than 30 seconds. Therefore, we set it to 20 seconds.
+	pingInterval = 20 * time.Second
+)
+
 type WebsocketOp struct {
-	Op   string      `json:"op"`
+	Op   WsEventType `json:"op"`
 	Args interface{} `json:"args"`
 }
 
@@ -24,49 +37,131 @@ type WebsocketLogin struct {
 //go:generate callbackgen -type Stream -interface
 type Stream struct {
 	types.StandardStream
+	kLineStream *KLineStream
 
-	client *okexapi.RestClient
+	client   *okexapi.RestClient
+	exchange *Exchange
 
 	// public callbacks
-	candleEventCallbacks       []func(candle Candle)
-	bookEventCallbacks         []func(book BookEvent)
-	eventCallbacks             []func(event WebSocketEvent)
-	accountEventCallbacks      []func(account okexapi.Account)
-	orderDetailsEventCallbacks []func(orderDetails []okexapi.OrderDetails)
-
-	lastCandle map[CandleKey]Candle
+	kLineEventCallbacks       []func(candle KLineEvent)
+	bookEventCallbacks        []func(book BookEvent)
+	accountEventCallbacks     []func(account okexapi.Account)
+	orderTradesEventCallbacks []func(orderTrades []OrderTradeEvent)
+	marketTradeEventCallbacks []func(tradeDetail []MarketTradeEvent)
 }
 
-type CandleKey struct {
-	InstrumentID string
-	Channel      string
-}
-
-func NewStream(client *okexapi.RestClient) *Stream {
+func NewStream(client *okexapi.RestClient, exchange *Exchange) *Stream {
 	stream := &Stream{
 		client:         client,
+		exchange:       exchange,
 		StandardStream: types.NewStandardStream(),
-		lastCandle:     make(map[CandleKey]Candle),
+		kLineStream:    NewKLineStream(exchange),
 	}
 
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.createEndpoint)
+	stream.SetPingInterval(pingInterval)
 
-	stream.OnCandleEvent(stream.handleCandleEvent)
 	stream.OnBookEvent(stream.handleBookEvent)
 	stream.OnAccountEvent(stream.handleAccountEvent)
-	stream.OnOrderDetailsEvent(stream.handleOrderDetailsEvent)
-	stream.OnEvent(stream.handleEvent)
+	stream.OnMarketTradeEvent(stream.handleMarketTradeEvent)
+	stream.OnOrderTradesEvent(stream.handleOrderDetailsEvent)
 	stream.OnConnect(stream.handleConnect)
+	stream.OnAuth(stream.subscribePrivateChannels(stream.emitBalanceSnapshot))
+	stream.kLineStream.OnKLineClosed(stream.EmitKLineClosed)
+	stream.kLineStream.OnKLine(stream.EmitKLine)
+
 	return stream
+}
+
+func syncSubscriptions(conn *websocket.Conn, subscriptions []types.Subscription, opType WsEventType, instType okexapi.InstrumentType) error {
+	if opType != WsEventTypeUnsubscribe && opType != WsEventTypeSubscribe {
+		return fmt.Errorf("unexpected subscription type: %v", opType)
+	}
+
+	logger := log.WithField("opType", opType)
+	var topics []WebsocketSubscription
+	for _, subscription := range subscriptions {
+		topic, err := convertSubscription(subscription, instType)
+		if err != nil {
+			logger.WithError(err).Errorf("convert error, subscription: %+v", subscription)
+			return err
+		}
+
+		topics = append(topics, topic)
+	}
+
+	logger.Infof("%s channels: %+v", opType, topics)
+	if err := conn.WriteJSON(WebsocketOp{
+		Op:   opType,
+		Args: topics,
+	}); err != nil {
+		logger.WithError(err).Error("failed to send request")
+		return err
+	}
+
+	return nil
+}
+
+func (s *Stream) Unsubscribe() {
+	// errors are handled in the syncSubscriptions, so they are skipped here.
+	instType := s.exchange.getInstrumentType()
+	_ = syncSubscriptions(s.StandardStream.Conn, s.StandardStream.Subscriptions, WsEventTypeUnsubscribe, instType)
+
+	err := s.Resubscribe(func(old []types.Subscription) (new []types.Subscription, err error) {
+		// clear the subscriptions
+		return []types.Subscription{}, nil
+	})
+	if err != nil {
+		log.WithError(err).Warnf("Resubscribe error")
+	}
+
+	s.kLineStream.Unsubscribe()
+}
+
+func (s *Stream) Connect(ctx context.Context) error {
+	if err := s.StandardStream.Connect(ctx); err != nil {
+		return err
+	}
+
+	if err := s.kLineStream.Connect(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Stream) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) {
+	if channel == types.KLineChannel {
+		s.kLineStream.Subscribe(channel, symbol, options)
+	} else {
+		s.StandardStream.Subscribe(channel, symbol, options)
+	}
+}
+
+func subscribe(conn *websocket.Conn, subs []WebsocketSubscription) {
+	if len(subs) == 0 {
+		return
+	}
+
+	log.Infof("subscribing channels: %+v", subs)
+	err := conn.WriteJSON(WebsocketOp{
+		Op:   "subscribe",
+		Args: subs,
+	})
+
+	if err != nil {
+		log.WithError(err).Error("subscribe error")
+	}
 }
 
 func (s *Stream) handleConnect() {
 	if s.PublicOnly {
 		var subs []WebsocketSubscription
+
+		instType := s.exchange.getInstrumentType()
 		for _, subscription := range s.Subscriptions {
-			sub, err := convertSubscription(subscription)
+			sub, err := convertSubscription(subscription, instType)
 			if err != nil {
 				log.WithError(err).Errorf("subscription convert error")
 				continue
@@ -74,19 +169,7 @@ func (s *Stream) handleConnect() {
 
 			subs = append(subs, sub)
 		}
-		if len(subs) == 0 {
-			return
-		}
-
-		log.Infof("subscribing channels: %+v", subs)
-		err := s.Conn.WriteJSON(WebsocketOp{
-			Op:   "subscribe",
-			Args: subs,
-		})
-
-		if err != nil {
-			log.WithError(err).Error("subscribe error")
-		}
+		subscribe(s.StandardStream.Conn, subs)
 	} else {
 		// login as private channel
 		// sign example:
@@ -114,80 +197,99 @@ func (s *Stream) handleConnect() {
 	}
 }
 
-func (s *Stream) handleEvent(event WebSocketEvent) {
-	switch event.Event {
-	case "login":
-		if event.Code == "0" {
-			s.EmitAuth()
-			var subs = []WebsocketSubscription{
-				{Channel: "account"},
-				{Channel: "orders", InstrumentType: string(okexapi.InstrumentTypeSpot)},
-			}
-
-			log.Infof("subscribing private channels: %+v", subs)
-			err := s.Conn.WriteJSON(WebsocketOp{
-				Op:   "subscribe",
-				Args: subs,
-			})
-
-			if err != nil {
-				log.WithError(err).Error("private channel subscribe error")
-			}
+func (s *Stream) subscribePrivateChannels(next func()) func() {
+	return func() {
+		instType := s.exchange.getInstrumentType()
+		var subs = []WebsocketSubscription{
+			{Channel: ChannelAccount},
+			{Channel: "orders", InstrumentType: string(instType)},
 		}
+
+		// https://www.okx.com/docs-v5/zh/#overview-websocket-connect
+		// **NOTICE** 2024/06/03 Since the number of channels we are currently subscribed to is far less
+		// than the rate limit of 20, rate limiting is not supported for now.
+		log.Infof("subscribing private channels: %+v", subs)
+		err := s.Conn.WriteJSON(WebsocketOp{
+			Op:   "subscribe",
+			Args: subs,
+		})
+		if err != nil {
+			log.WithError(err).Error("private channel subscribe error")
+			return
+		}
+		next()
 	}
 }
 
-func (s *Stream) handleOrderDetailsEvent(orderDetails []okexapi.OrderDetails) {
-	detailTrades, detailOrders := segmentOrderDetails(orderDetails)
+func (s *Stream) emitBalanceSnapshot() {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 
-	trades, err := toGlobalTrades(detailTrades)
+	var balancesMap types.BalanceMap
+	var err error
+	err = retry.GeneralBackoff(ctx, func() error {
+		balancesMap, err = s.exchange.QueryAccountBalances(ctx)
+		return err
+	})
 	if err != nil {
-		log.WithError(err).Errorf("error converting order details into trades")
-	} else {
-		for _, trade := range trades {
-			s.EmitTradeUpdate(trade)
-		}
+		log.WithError(err).Error("no more attempts to retrieve balances")
+		return
 	}
 
-	orders, err := toGlobalOrders(detailOrders)
-	if err != nil {
-		log.WithError(err).Errorf("error converting order details into orders")
-	} else {
-		for _, order := range orders {
-			s.EmitOrderUpdate(order)
+	s.EmitBalanceSnapshot(balancesMap)
+}
+
+func (s *Stream) handleOrderDetailsEvent(orderTrades []OrderTradeEvent) {
+	for _, evt := range orderTrades {
+		if evt.TradeId != "" {
+			trade, err := evt.toGlobalTrade()
+			if err != nil {
+				if tradeLogLimiter.Allow() {
+					log.WithError(err).Errorf("failed to convert global trade")
+				}
+			} else {
+				s.EmitTradeUpdate(trade)
+			}
+		}
+
+		order, err := orderDetailToGlobalOrder(&evt.OrderDetail)
+		if err != nil {
+			if tradeLogLimiter.Allow() {
+				log.WithError(err).Errorf("failed to convert global order")
+			}
+		} else {
+			s.EmitOrderUpdate(*order)
 		}
 	}
 }
 
 func (s *Stream) handleAccountEvent(account okexapi.Account) {
 	balances := toGlobalBalance(&account)
-	s.EmitBalanceSnapshot(balances)
+	s.EmitBalanceUpdate(balances)
 }
 
 func (s *Stream) handleBookEvent(data BookEvent) {
 	book := data.Book()
 	switch data.Action {
-	case "snapshot":
+	case ActionTypeSnapshot:
 		s.EmitBookSnapshot(book)
-	case "update":
+	case ActionTypeUpdate:
 		s.EmitBookUpdate(book)
 	}
 }
 
-func (s *Stream) handleCandleEvent(candle Candle) {
-	key := CandleKey{Channel: candle.Channel, InstrumentID: candle.InstrumentID}
-	kline := candle.KLine()
+func (s *Stream) handleMarketTradeEvent(data []MarketTradeEvent) {
+	for _, event := range data {
+		trade, err := event.toGlobalTrade()
+		if err != nil {
+			if marketTradeLogLimiter.Allow() {
+				log.WithError(err).Error("failed to convert to market trade")
+			}
+			continue
+		}
 
-	// check if we need to close previous kline
-	lastCandle, ok := s.lastCandle[key]
-	if ok && candle.StartTime.After(lastCandle.StartTime) {
-		lastKline := lastCandle.KLine()
-		lastKline.Closed = true
-		s.EmitKLineClosed(lastKline)
+		s.EmitMarketTrade(trade)
 	}
-
-	s.EmitKLine(kline)
-	s.lastCandle[key] = candle
 }
 
 func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
@@ -203,22 +305,29 @@ func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch et := e.(type) {
 	case *WebSocketEvent:
-		s.EmitEvent(*et)
+		if err := et.IsValid(); err != nil {
+			log.Errorf("invalid event: %v", err)
+			return
+		}
+		if et.IsAuthenticated() {
+			s.EmitAuth()
+		}
 
 	case *BookEvent:
 		// there's "books" for 400 depth and books5 for 5 depth
-		if et.channel != "books5" {
+		if et.channel != ChannelBooks5 {
 			s.EmitBookEvent(*et)
 		}
 		s.EmitBookTickerUpdate(et.BookTicker())
-	case *Candle:
-		s.EmitCandleEvent(*et)
 
 	case *okexapi.Account:
 		s.EmitAccountEvent(*et)
 
-	case []okexapi.OrderDetails:
-		s.EmitOrderDetailsEvent(et)
+	case []OrderTradeEvent:
+		s.EmitOrderTradesEvent(et)
+
+	case []MarketTradeEvent:
+		s.EmitMarketTradeEvent(et)
 
 	}
 }

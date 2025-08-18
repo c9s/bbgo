@@ -30,6 +30,7 @@ crossExchangeStrategies:
 
 - xnav:
     interval: 1h
+    # schedule: "0 * * * *" # every hour
     reportOnStart: true
     ignoreDusts: true
 

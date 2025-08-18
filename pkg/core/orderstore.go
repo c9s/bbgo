@@ -2,6 +2,9 @@ package core
 
 import (
 	"sync"
+	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -79,6 +82,9 @@ func (s *OrderStore) Orders() (orders []types.Order) {
 func (s *OrderStore) Exists(oID uint64) (ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if oID == 0 {
+		logrus.Error("[orderstore-Exists] given oID is 0")
+	}
 
 	_, ok = s.orders[oID]
 	return ok
@@ -90,6 +96,10 @@ func (s *OrderStore) Get(oID uint64) (order types.Order, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if oID == 0 {
+		logrus.Error("[orderstore-Get] given oID is 0")
+	}
+
 	order, ok = s.orders[oID]
 	return order, ok
 }
@@ -99,6 +109,9 @@ func (s *OrderStore) Add(orders ...types.Order) {
 	defer s.mu.Unlock()
 
 	for _, o := range orders {
+		if o.OrderID == 0 {
+			logrus.WithFields(o.LogFields()).Errorf("[orderstore] adding order %+v with OrderID 0", o)
+		}
 		old, ok := s.orders[o.OrderID]
 		if ok && o.Tag == "" && old.Tag != "" {
 			o.Tag = old.Tag
@@ -111,17 +124,23 @@ func (s *OrderStore) Remove(o types.Order) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if o.OrderID == 0 {
+		logrus.WithFields(o.LogFields()).Errorf("[orderstore-Remove] given order %+v with OrderID 0", o)
+	}
+
 	delete(s.orders, o.OrderID)
 }
 
 func (s *OrderStore) Update(o types.Order) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	old, ok := s.orders[o.OrderID]
+	if o.OrderID == 0 {
+		logrus.WithFields(o.LogFields()).Errorf("[orderstore-Update] given order %+v with OrderID 0", o)
+	}
+	existing, ok := s.orders[o.OrderID]
 	if ok {
-		o.Tag = old.Tag
-		s.orders[o.OrderID] = o
+		existing.Update(o)
+		s.orders[o.OrderID] = existing
 	}
 	return ok
 }
@@ -136,6 +155,43 @@ func (s *OrderStore) BindStream(stream types.Stream) {
 
 		s.HandleOrderUpdate(order)
 	})
+}
+
+func (s *OrderStore) Size() (l int) {
+	s.mu.Lock()
+	l = len(s.orders)
+	s.mu.Unlock()
+	return l
+}
+
+func (s *OrderStore) Prune(expiryDuration time.Duration) {
+	size := s.Size()
+
+	// skip prune if the size is less than 100
+	if size < 100 {
+		return
+	}
+
+	cutOffTime := time.Now().Add(-expiryDuration)
+	orders := make(map[uint64]types.Order, size)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	logrus.Infof("orderStore: pruning orders before %s, %d orders", cutOffTime.String(), len(s.orders))
+
+	for idx, o := range s.orders {
+		// if the order is canceled or filled, we should remove the order if the update time is before the cut off time
+		if o.Status == types.OrderStatusCanceled || o.Status == types.OrderStatusFilled {
+			if o.UpdateTime.Time().Before(cutOffTime) {
+				continue
+			}
+		}
+
+		orders[idx] = o
+	}
+
+	s.orders = orders
 }
 
 func (s *OrderStore) HandleOrderUpdate(order types.Order) {

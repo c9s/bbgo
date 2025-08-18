@@ -16,11 +16,12 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/style"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 //go:generate bash symbols.sh
@@ -31,7 +32,7 @@ var log = logrus.WithField("strategy", ID)
 
 var one = fixedpoint.One
 var marketOrderProtectiveRatio = fixedpoint.NewFromFloat(0.008)
-var balanceBufferRatio = fixedpoint.NewFromFloat(0.005)
+var balanceBufferRatio = fixedpoint.NewFromFloat(0.002)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -104,6 +105,8 @@ type State struct {
 }
 
 type Strategy struct {
+	*bbgo.Environment
+
 	Symbols                    []string                    `json:"symbols"`
 	Paths                      [][]string                  `json:"paths"`
 	MinSpreadRatio             fixedpoint.Value            `json:"minSpreadRatio"`
@@ -168,11 +171,23 @@ func (s *Strategy) executeOrder(ctx context.Context, order types.SubmitOrder) *t
 	return nil
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-
+func (s *Strategy) Defaults() error {
 	if s.TradeState == nil {
 		s.TradeState = types.NewTradeStats("")
 	}
+
+	if len(s.Symbols) == 0 {
+		s.Symbols = collectSymbols(s.Paths)
+	}
+
+	return nil
+}
+
+func (s *Strategy) Initialize() error {
+	return nil
+}
+
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 
 	s.Symbols = compileSymbols(s.Symbols)
 
@@ -278,46 +293,51 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.paths = append(s.paths, p)
 	}
 
-	go func() {
-		fs := []ratioFunction{calculateForwardRatio, calculateBackwardRate}
-		log.Infof("waiting for market prices ready...")
-		wait := true
-		for wait {
-			wait = false
-			for _, p := range s.paths {
-				if !p.Ready() {
-					wait = true
-					break
-				}
-			}
-		}
-
-		log.Infof("all markets ready")
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-s.sigC:
-				minRatio := s.MinSpreadRatio.Float64()
-				for side, f := range fs {
-					ranks := s.calculateRanks(minRatio, f)
-					if len(ranks) == 0 {
+	session.UserDataStream.OnAuth(func() {
+		go func() {
+			fs := []ratioFunction{calculateForwardRatio, calculateBackwardRate}
+			log.Infof("waiting for market prices ready...")
+			wait := true
+			for wait {
+				wait = false
+				for _, p := range s.paths {
+					if !p.Ready() {
+						wait = true
 						break
 					}
-
-					forward := side == 0
-					bestRank := ranks[0]
-					if forward {
-						log.Infof("%d paths elected, found best forward path %s profit %.5f%%", len(ranks), bestRank.Path, (bestRank.Ratio-1.0)*100.0)
-					} else {
-						log.Infof("%d paths elected, found best backward path %s profit %.5f%%", len(ranks), bestRank.Path, (bestRank.Ratio-1.0)*100.0)
-					}
-					s.executePath(ctx, session, bestRank.Path, bestRank.Ratio, forward)
 				}
 			}
-		}
-	}()
+
+			log.Infof("all markets ready")
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-s.sigC:
+					minRatio := s.MinSpreadRatio.Float64()
+					for side, f := range fs {
+						ranks := s.calculateRanks(minRatio, f)
+						if len(ranks) == 0 {
+							break
+						}
+
+						forward := side == 0
+						bestRank := ranks[0]
+						if forward {
+							debug("%d paths elected, found best forward path %s profit %.5f%%", len(ranks), bestRank.Path, (bestRank.Ratio-1.0)*100.0)
+						} else {
+							debug("%d paths elected, found best backward path %s profit %.5f%%", len(ranks), bestRank.Path, (bestRank.Ratio-1.0)*100.0)
+						}
+
+						logMarketPath(bestRank.Path)
+
+						s.executePath(ctx, session, bestRank.Path, bestRank.Ratio, forward)
+					}
+				}
+			}
+		}()
+	})
 
 	return nil
 }
@@ -326,13 +346,16 @@ type ratioFunction func(p *Path) float64
 
 func (s *Strategy) checkMinimalOrderQuantity(orders [3]types.SubmitOrder) error {
 	for _, order := range orders {
-		market := s.arbMarkets[order.Symbol]
-		if order.Quantity.Compare(market.market.MinQuantity) < 0 {
-			return fmt.Errorf("order quantity is too small: %f < %f", order.Quantity.Float64(), market.market.MinQuantity.Float64())
+		if order.Quantity.Compare(order.Market.MinQuantity) <= 0 {
+			return fmt.Errorf("%s order quantity is too small: %f < %f",
+				order.Symbol,
+				order.Quantity.Float64(), order.Market.MinQuantity.Float64())
 		}
 
-		if order.Quantity.Mul(order.Price).Compare(market.market.MinNotional) < 0 {
-			return fmt.Errorf("order min notional is too small: %f < %f", order.Quantity.Mul(order.Price).Float64(), market.market.MinNotional.Float64())
+		if order.Quantity.Mul(order.Price).Compare(order.Market.MinNotional) <= 0 {
+			return fmt.Errorf("%s order min notional is too small: %f < %f",
+				order.Symbol,
+				order.Quantity.Mul(order.Price).Float64(), order.Market.MinNotional.Float64())
 		}
 	}
 
@@ -365,7 +388,7 @@ func (s *Strategy) optimizeMarketQuantityPrecision() {
 }
 
 func (s *Strategy) applyBalanceMaxQuantity(balances types.BalanceMap) types.BalanceMap {
-	if s.Limits == nil {
+	if s.Limits == nil || len(s.Limits) == 0 {
 		return balances
 	}
 
@@ -490,7 +513,9 @@ func notifyUsdPnL(profit fixedpoint.Value) {
 	bbgo.Notify(title)
 }
 
-func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder, ratio float64) (types.OrderSlice, error) {
+func (s *Strategy) iocOrderExecution(
+	ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder, ratio float64,
+) (types.OrderSlice, error) {
 	service, ok := session.Exchange.(types.ExchangeOrderQueryService)
 	if !ok {
 		return nil, errors.New("exchange does not support ExchangeOrderQueryService")
@@ -529,6 +554,8 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 			return
 		} else if o != nil {
 			select {
+			case <-ctx.Done():
+				return
 			case iocOrderC <- *o:
 			default:
 			}
@@ -536,12 +563,14 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	}()
 
 	go func() {
-		o, err := waitForOrderFilled(ctx, service, *iocOrder, 3*time.Second)
+		o, err := retry.QueryOrderUntilFilled(ctx, service, iocOrder.AsQuery())
 		if err != nil {
 			log.WithError(err).Errorf("ioc order restful wait error")
 			return
 		} else if o != nil {
 			select {
+			case <-ctx.Done():
+				return
 			case iocOrderC <- *o:
 			default:
 			}
@@ -566,6 +595,9 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 
 	orders[1].Quantity = orders[1].Quantity.Mul(filledRatio)
 	orders[2].Quantity = orders[2].Quantity.Mul(filledRatio)
+
+	orders[1].Quantity = orders[1].Market.TruncateQuantity(orders[1].Quantity)
+	orders[2].Quantity = orders[2].Market.TruncateQuantity(orders[2].Quantity)
 
 	if orders[1].Quantity.Compare(orders[1].Market.MinQuantity) <= 0 {
 		log.Warnf("order #2 quantity %f is less than min quantity %f, skip", orders[1].Quantity.Float64(), orders[1].Market.MinQuantity.Float64())
@@ -643,7 +675,7 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 }
 
 func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, timeoutDuration time.Duration) (*types.Order, error) {
-	prof := util.StartTimeProfile("waitWebSocketOrderDone")
+	prof := timeprofile.Start("waitWebSocketOrderDone")
 	defer prof.StopAndLog(log.Infof)
 
 	if order, ok := s.orderStore.Get(orderID); ok {
@@ -670,7 +702,9 @@ func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, t
 	}
 }
 
-func (s *Strategy) waitOrdersAndCollectTrades(ctx context.Context, service types.ExchangeOrderQueryService, createdOrders types.OrderSlice) (map[uint64][]types.Trade, types.OrderSlice, error) {
+func (s *Strategy) waitOrdersAndCollectTrades(
+	ctx context.Context, service types.ExchangeOrderQueryService, createdOrders types.OrderSlice,
+) (map[uint64][]types.Trade, types.OrderSlice, error) {
 	var err error
 	var orderTrades = make(map[uint64][]types.Trade)
 	var updatedOrders types.OrderSlice
@@ -733,7 +767,9 @@ func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
 	}
 }
 
-func (s *Strategy) buildArbMarkets(session *bbgo.ExchangeSession, symbols []string, separateStream bool, sigC sigchan.Chan) (map[string]*ArbMarket, error) {
+func (s *Strategy) buildArbMarkets(
+	session *bbgo.ExchangeSession, symbols []string, separateStream bool, sigC sigchan.Chan,
+) (map[string]*ArbMarket, error) {
 	markets := make(map[string]*ArbMarket)
 	// build market object
 	for _, symbol := range symbols {
@@ -743,11 +779,13 @@ func (s *Strategy) buildArbMarkets(session *bbgo.ExchangeSession, symbols []stri
 		}
 
 		m := &ArbMarket{
-			Symbol:        symbol,
-			market:        market,
-			BaseCurrency:  market.BaseCurrency,
-			QuoteCurrency: market.QuoteCurrency,
-			sigC:          sigC,
+			Symbol:                symbol,
+			market:                market,
+			BaseCurrency:          market.BaseCurrency,
+			QuoteCurrency:         market.QuoteCurrency,
+			sigC:                  sigC,
+			truncateBaseQuantity:  createBaseQuantityTruncator(market),
+			truncateQuoteQuantity: createPricePrecisionBasedQuoteQuantityTruncator(market),
 		}
 
 		if separateStream {
@@ -758,9 +796,9 @@ func (s *Strategy) buildArbMarkets(session *bbgo.ExchangeSession, symbols []stri
 				Speed: types.SpeedHigh,
 			})
 
-			book := types.NewStreamBook(symbol)
+			book := types.NewStreamBook(symbol, session.ExchangeName)
 			priceUpdater := func(_ types.SliceOrderBook) {
-				bestAsk, bestBid, _ := book.BestBidAndAsk()
+				bestBid, bestAsk, _ := book.BestBidAndAsk()
 				if bestAsk.Equals(m.bestAsk) && bestBid.Equals(m.bestBid) {
 					return
 				}
@@ -782,7 +820,9 @@ func (s *Strategy) buildArbMarkets(session *bbgo.ExchangeSession, symbols []stri
 			m.book = book
 			m.stream = stream
 		} else {
-			book, _ := session.OrderBook(symbol)
+
+			book := types.NewStreamBook(symbol, session.ExchangeName)
+			book.BindStream(session.MarketDataStream)
 			priceUpdater := func(_ types.SliceOrderBook) {
 				bestAsk, bestBid, _ := book.BestBidAndAsk()
 				if bestAsk.Equals(m.bestAsk) && bestBid.Equals(m.bestBid) {
@@ -828,8 +868,10 @@ func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64
 	return ranks
 }
 
-func waitForOrderFilled(ctx context.Context, ex types.ExchangeOrderQueryService, order types.Order, timeout time.Duration) (*types.Order, error) {
-	prof := util.StartTimeProfile("waitForOrderFilled")
+func waitForOrderFilled(
+	ctx context.Context, ex types.ExchangeOrderQueryService, order types.Order, timeout time.Duration,
+) (*types.Order, error) {
+	prof := timeprofile.Start("waitForOrderFilled")
 	defer prof.StopAndLog(log.Infof)
 
 	timeoutC := time.After(timeout)
@@ -840,7 +882,7 @@ func waitForOrderFilled(ctx context.Context, ex types.ExchangeOrderQueryService,
 			return nil, fmt.Errorf("order wait timeout %s", timeout)
 
 		default:
-			p := util.StartTimeProfile("queryOrder")
+			p := timeprofile.Start("queryOrder")
 			remoteOrder, err2 := ex.QueryOrder(ctx, types.OrderQuery{
 				Symbol:  order.Symbol,
 				OrderID: strconv.FormatUint(order.OrderID, 10),
@@ -877,4 +919,49 @@ func tradeAveragePrice(trades []types.Trade, orderID uint64) fixedpoint.Value {
 	}
 
 	return totalAmount.Div(totalQuantity)
+}
+
+func displayBook(id string, market *ArbMarket) {
+	if !debugMode {
+		return
+	}
+
+	var s strings.Builder
+
+	s.WriteString(id + ") " + market.market.Symbol + "\n")
+	s.WriteString(fmt.Sprintf("bestAsk: %-12s x %s\n",
+		market.bestAsk.Price.String(),
+		market.bestAsk.Volume.String(),
+	))
+	s.WriteString(fmt.Sprintf("bestBid: %-12s x %s\n",
+		market.bestBid.Price.String(),
+		market.bestBid.Volume.String(),
+	))
+
+	debug(s.String())
+}
+
+func logMarketPath(path *Path) {
+	if !debugMode {
+		return
+	}
+
+	displayBook("A", path.marketA)
+	displayBook("B", path.marketB)
+	displayBook("C", path.marketC)
+}
+
+func collectSymbols(paths [][]string) (symbols []string) {
+	symbolMap := make(map[string]struct{})
+	for _, path := range paths {
+		for _, s := range path {
+			symbolMap[s] = struct{}{}
+		}
+	}
+
+	for s := range symbolMap {
+		symbols = append(symbols, s)
+	}
+
+	return symbols
 }

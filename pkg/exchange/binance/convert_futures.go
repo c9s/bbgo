@@ -2,8 +2,9 @@ package binance
 
 import (
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/pkg/errors"
@@ -12,45 +13,36 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func toGlobalFuturesAccountInfo(account *binanceapi.FuturesAccount) *types.FuturesAccountInfo {
-	return &types.FuturesAccountInfo{
+func toGlobalFuturesAccountInfo(account *binanceapi.FuturesAccount) *types.FuturesAccount {
+	return &types.FuturesAccount{
 		Assets:                      toGlobalFuturesUserAssets(account.Assets),
 		Positions:                   toGlobalFuturesPositions(account.Positions),
-		TotalInitialMargin:          fixedpoint.MustNewFromString(account.TotalInitialMargin),
-		TotalMaintMargin:            fixedpoint.MustNewFromString(account.TotalMaintMargin),
-		TotalMarginBalance:          fixedpoint.MustNewFromString(account.TotalMarginBalance),
-		TotalOpenOrderInitialMargin: fixedpoint.MustNewFromString(account.TotalOpenOrderInitialMargin),
-		TotalPositionInitialMargin:  fixedpoint.MustNewFromString(account.TotalPositionInitialMargin),
-		TotalUnrealizedProfit:       fixedpoint.MustNewFromString(account.TotalUnrealizedProfit),
-		TotalWalletBalance:          fixedpoint.MustNewFromString(account.TotalWalletBalance),
-		UpdateTime:                  account.UpdateTime,
+		TotalInitialMargin:          account.TotalInitialMargin,
+		TotalMaintMargin:            account.TotalMaintMargin,
+		TotalWalletBalance:          account.TotalWalletBalance,
+		TotalMarginBalance:          account.TotalMarginBalance,
+		TotalOpenOrderInitialMargin: account.TotalOpenOrderInitialMargin,
+		TotalPositionInitialMargin:  account.TotalPositionInitialMargin,
+		TotalUnrealizedProfit:       account.TotalUnrealizedProfit,
+
+		AvailableBalance: account.AvailableBalance,
 	}
 }
 
-func toGlobalFuturesBalance(balances []*futures.Balance) types.BalanceMap {
-	retBalances := make(types.BalanceMap)
-	for _, balance := range balances {
-		retBalances[balance.Asset] = types.Balance{
-			Currency:  balance.Asset,
-			Available: fixedpoint.MustNewFromString(balance.AvailableBalance),
-		}
-	}
-	return retBalances
-}
-
-func toGlobalFuturesPositions(futuresPositions []*binanceapi.FuturesAccountPosition) types.FuturesPositionMap {
+func toGlobalFuturesPositions(futuresPositions []binanceapi.FuturesAccountPosition) types.FuturesPositionMap {
 	retFuturesPositions := make(types.FuturesPositionMap)
 	for _, futuresPosition := range futuresPositions {
 		retFuturesPositions[futuresPosition.Symbol] = types.FuturesPosition{ // TODO: types.FuturesPosition
-			Isolated:               futuresPosition.Isolated,
-			AverageCost:            fixedpoint.MustNewFromString(futuresPosition.EntryPrice),
-			ApproximateAverageCost: fixedpoint.MustNewFromString(futuresPosition.EntryPrice),
-			Base:                   fixedpoint.MustNewFromString(futuresPosition.PositionAmt),
-			Quote:                  fixedpoint.MustNewFromString(futuresPosition.Notional),
+			Isolated:    futuresPosition.Isolated,
+			AverageCost: futuresPosition.EntryPrice,
+			Base:        futuresPosition.PositionAmt,
+			Quote:       futuresPosition.Notional,
 
+			// TODO: convert position risk
 			PositionRisk: &types.PositionRisk{
-				Leverage: fixedpoint.MustNewFromString(futuresPosition.Leverage),
+				Leverage: futuresPosition.Leverage,
 			},
+
 			Symbol:     futuresPosition.Symbol,
 			UpdateTime: futuresPosition.UpdateTime,
 		}
@@ -59,19 +51,19 @@ func toGlobalFuturesPositions(futuresPositions []*binanceapi.FuturesAccountPosit
 	return retFuturesPositions
 }
 
-func toGlobalFuturesUserAssets(assets []*binanceapi.FuturesAccountAsset) (retAssets types.FuturesAssetMap) {
+func toGlobalFuturesUserAssets(assets []binanceapi.FuturesAccountAsset) (retAssets types.FuturesAssetMap) {
 	retFuturesAssets := make(types.FuturesAssetMap)
 	for _, futuresAsset := range assets {
 		retFuturesAssets[futuresAsset.Asset] = types.FuturesUserAsset{
 			Asset:                  futuresAsset.Asset,
-			InitialMargin:          fixedpoint.MustNewFromString(futuresAsset.InitialMargin),
-			MaintMargin:            fixedpoint.MustNewFromString(futuresAsset.MaintMargin),
-			MarginBalance:          fixedpoint.MustNewFromString(futuresAsset.MarginBalance),
-			MaxWithdrawAmount:      fixedpoint.MustNewFromString(futuresAsset.MaxWithdrawAmount),
-			OpenOrderInitialMargin: fixedpoint.MustNewFromString(futuresAsset.OpenOrderInitialMargin),
-			PositionInitialMargin:  fixedpoint.MustNewFromString(futuresAsset.PositionInitialMargin),
-			UnrealizedProfit:       fixedpoint.MustNewFromString(futuresAsset.UnrealizedProfit),
-			WalletBalance:          fixedpoint.MustNewFromString(futuresAsset.WalletBalance),
+			InitialMargin:          futuresAsset.InitialMargin,
+			MaintMargin:            futuresAsset.MaintMargin,
+			MarginBalance:          futuresAsset.MarginBalance,
+			MaxWithdrawAmount:      futuresAsset.MaxWithdrawAmount,
+			OpenOrderInitialMargin: futuresAsset.OpenOrderInitialMargin,
+			PositionInitialMargin:  futuresAsset.PositionInitialMargin,
+			UnrealizedProfit:       futuresAsset.UnrealizedProfit,
+			WalletBalance:          futuresAsset.WalletBalance,
 		}
 	}
 
@@ -87,14 +79,17 @@ func toLocalFuturesOrderType(orderType types.OrderType) (futures.OrderType, erro
 	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		return futures.OrderTypeLimit, nil
 
-	// case types.OrderTypeStopLimit:
-	// 	return futures.OrderTypeStopLossLimit, nil //TODO
+	case types.OrderTypeStopLimit:
+		return futures.OrderTypeStop, nil
 
-	// case types.OrderTypeStopMarket:
-	// 	return futures.OrderTypeStopLoss, nil //TODO
+	case types.OrderTypeStopMarket:
+		return futures.OrderTypeStopMarket, nil
 
 	case types.OrderTypeMarket:
 		return futures.OrderTypeMarket, nil
+
+	case types.OrderTypeTakeProfitMarket:
+		return futures.OrderTypeTakeProfitMarket, nil
 	}
 
 	return "", fmt.Errorf("can not convert to local order, order type %s not supported", orderType)
@@ -114,6 +109,11 @@ func toGlobalFuturesOrders(futuresOrders []*futures.Order, isIsolated bool) (ord
 }
 
 func toGlobalFuturesOrder(futuresOrder *futures.Order, isIsolated bool) (*types.Order, error) {
+	orderPrice := futuresOrder.Price
+	if orderPrice == "" {
+		orderPrice = futuresOrder.AvgPrice
+	}
+
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: futuresOrder.ClientOrderID,
@@ -123,7 +123,8 @@ func toGlobalFuturesOrder(futuresOrder *futures.Order, isIsolated bool) (*types.
 			ReduceOnly:    futuresOrder.ReduceOnly,
 			ClosePosition: futuresOrder.ClosePosition,
 			Quantity:      fixedpoint.MustNewFromString(futuresOrder.OrigQuantity),
-			Price:         fixedpoint.MustNewFromString(futuresOrder.Price),
+			StopPrice:     fixedpoint.MustNewFromString(futuresOrder.StopPrice),
+			Price:         fixedpoint.MustNewFromString(orderPrice),
 			TimeInForce:   types.TimeInForce(futuresOrder.TimeInForce),
 		},
 		Exchange:         types.ExchangeBinance,
@@ -133,6 +134,7 @@ func toGlobalFuturesOrder(futuresOrder *futures.Order, isIsolated bool) (*types.
 		CreationTime:     types.Time(millisecondTime(futuresOrder.Time)),
 		UpdateTime:       types.Time(millisecondTime(futuresOrder.UpdateTime)),
 		IsFutures:        true,
+		IsIsolated:       isIsolated,
 	}, nil
 }
 
@@ -211,13 +213,16 @@ func toGlobalFuturesOrderType(orderType futures.OrderType) types.OrderType {
 		return types.OrderTypeStopLimit
 
 	case futures.OrderTypeTakeProfitMarket:
-		return types.OrderTypeStopMarket
+		return types.OrderTypeTakeProfitMarket
 
 	case futures.OrderTypeStopMarket:
 		return types.OrderTypeStopMarket
 
 	case futures.OrderTypeLimit:
 		return types.OrderTypeLimit
+
+	case futures.OrderTypeStop:
+		return types.OrderTypeStopLimit
 
 	case futures.OrderTypeMarket:
 		return types.OrderTypeMarket
@@ -272,19 +277,38 @@ func convertPremiumIndex(index *futures.PremiumIndex) (*types.PremiumIndex, erro
 	}, nil
 }
 
-func convertPositionRisk(risk *futures.PositionRisk) (*types.PositionRisk, error) {
-	leverage, err := fixedpoint.NewFromString(risk.Leverage)
-	if err != nil {
-		return nil, err
+func toGlobalPositionRisk(positions []binanceapi.FuturesPositionRisk) []types.PositionRisk {
+	retPositions := make([]types.PositionRisk, len(positions))
+	for i, position := range positions {
+		retPositions[i] = types.PositionRisk{
+			LiquidationPrice:       position.LiquidationPrice,
+			PositionSide:           toGlobalPositionSide(position.PositionSide),
+			Symbol:                 position.Symbol,
+			MarkPrice:              position.MarkPrice,
+			EntryPrice:             position.EntryPrice,
+			PositionAmount:         position.PositionAmount,
+			BreakEvenPrice:         position.BreakEvenPrice,
+			UnrealizedPnL:          position.UnRealizedProfit,
+			InitialMargin:          position.InitialMargin,
+			Notional:               position.Notional,
+			PositionInitialMargin:  position.PositionInitialMargin,
+			MaintMargin:            position.MaintMargin,
+			Adl:                    position.Adl,
+			OpenOrderInitialMargin: position.OpenOrderInitialMargin,
+			UpdateTime:             position.UpdateTime,
+			MarginAsset:            position.MarginAsset,
+		}
 	}
+	return retPositions
+}
 
-	liquidationPrice, err := fixedpoint.NewFromString(risk.LiquidationPrice)
-	if err != nil {
-		return nil, err
+func toGlobalPositionSide(positionSide string) types.PositionType {
+	switch positionSide {
+	case "LONG":
+		return types.PositionLong
+	case "SHORT":
+		return types.PositionShort
+	default:
+		return types.PositionType(positionSide)
 	}
-
-	return &types.PositionRisk{
-		Leverage:         leverage,
-		LiquidationPrice: liquidationPrice,
-	}, nil
 }

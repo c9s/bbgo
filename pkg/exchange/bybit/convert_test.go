@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	v3 "github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi/v3"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestToGlobalMarket(t *testing.T) {
@@ -64,6 +65,7 @@ func TestToGlobalMarket(t *testing.T) {
 	}
 
 	exp := types.Market{
+		Exchange:        types.ExchangeBybit,
 		Symbol:          inst.Symbol,
 		LocalSymbol:     inst.Symbol,
 		PricePrecision:  8,
@@ -836,7 +838,7 @@ func Test_toGlobalKLines(t *testing.T) {
 			Exchange:    types.ExchangeBybit,
 			Symbol:      resp.Symbol,
 			StartTime:   types.Time(resp.List[0].StartTime.Time()),
-			EndTime:     types.Time(resp.List[0].StartTime.Time().Add(interval.Duration())),
+			EndTime:     types.Time(resp.List[0].StartTime.Time().Add(interval.Duration() - time.Millisecond)),
 			Interval:    interval,
 			Open:        fixedpoint.NewFromFloat(29045.3),
 			Close:       fixedpoint.NewFromFloat(29228.56),
@@ -850,7 +852,7 @@ func Test_toGlobalKLines(t *testing.T) {
 			Exchange:    types.ExchangeBybit,
 			Symbol:      resp.Symbol,
 			StartTime:   types.Time(resp.List[1].StartTime.Time()),
-			EndTime:     types.Time(resp.List[1].StartTime.Time().Add(interval.Duration())),
+			EndTime:     types.Time(resp.List[1].StartTime.Time().Add(interval.Duration() - time.Millisecond)),
 			Interval:    interval,
 			Open:        fixedpoint.NewFromFloat(29167.33),
 			Close:       fixedpoint.NewFromFloat(29045.3),

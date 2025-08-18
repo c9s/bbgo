@@ -15,7 +15,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (e *Exchange) queryFuturesClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+func (e *Exchange) queryFuturesClosedOrders(
+	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
+) (orders []types.Order, err error) {
 	req := e.futuresClient.NewListOrdersService().Symbol(symbol)
 
 	if lastOrderID > 0 {
@@ -34,16 +36,19 @@ func (e *Exchange) queryFuturesClosedOrders(ctx context.Context, symbol string, 
 	return toGlobalFuturesOrders(binanceOrders, false)
 }
 
-func (e *Exchange) TransferFuturesAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+func (e *Exchange) TransferFuturesAccountAsset(
+	ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection,
+) error {
 	req := e.client2.NewFuturesTransferRequest()
 	req.Asset(asset)
 	req.Amount(amount.String())
 
-	if io == types.TransferIn {
+	switch io {
+	case types.TransferIn:
 		req.TransferType(binanceapi.FuturesTransferSpotToUsdtFutures)
-	} else if io == types.TransferOut {
+	case types.TransferOut:
 		req.TransferType(binanceapi.FuturesTransferUsdtFuturesToSpot)
-	} else {
+	default:
 		return fmt.Errorf("unexpected transfer direction: %d given", io)
 	}
 
@@ -63,7 +68,6 @@ func (e *Exchange) TransferFuturesAccountAsset(ctx context.Context, asset string
 // Balance.Available = Wallet Balance(in Binance UI) - Used Margin
 // Balance.Locked = Used Margin
 func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, error) {
-	//account, err := e.futuresClient.NewGetAccountService().Do(ctx)
 	reqAccount := e.futuresClient2.NewFuturesGetAccountRequest()
 	account, err := reqAccount.Do(ctx)
 	if err != nil {
@@ -75,6 +79,9 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 	if err != nil {
 		return nil, err
 	}
+
+	// out, _ := json.MarshalIndent(accountBalances, "", "  ")
+	// fmt.Println(string(out))
 
 	var balances = map[string]types.Balance{}
 	for _, b := range accountBalances {
@@ -92,7 +99,7 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 
 	a := &types.Account{
 		AccountType: types.AccountTypeFutures,
-		FuturesInfo: toGlobalFuturesAccountInfo(account), // In binance GO api, Account define account info which mantain []*AccountAsset and []*AccountPosition.
+		FuturesInfo: toGlobalFuturesAccountInfo(account), // In binance GO api, Account define account info which maintain []*AccountAsset and []*AccountPosition.
 		CanDeposit:  account.CanDeposit,                  // if can transfer in asset
 		CanTrade:    account.CanTrade,                    // if can trade
 		CanWithdraw: account.CanWithdraw,                 // if can transfer out asset
@@ -137,7 +144,9 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		Type(orderType).
 		Side(futures.SideType(order.Side))
 
-	if order.ReduceOnly {
+	if dualSidePosition {
+		setDualSidePosition(req, order)
+	} else if order.ReduceOnly {
 		req.ReduceOnly(order.ReduceOnly)
 	} else if order.ClosePosition {
 		req.ClosePosition(order.ClosePosition)
@@ -174,7 +183,7 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 	// set stop price
 	switch order.Type {
 
-	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
+	case types.OrderTypeStopLimit, types.OrderTypeStopMarket, types.OrderTypeTakeProfitMarket:
 		if order.Market.Symbol != "" {
 			req.StopPrice(order.Market.FormatPrice(order.StopPrice))
 		} else {
@@ -213,12 +222,15 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		Type:             response.Type,
 		Side:             response.Side,
 		ReduceOnly:       response.ReduceOnly,
+		ClosePosition:    response.ClosePosition,
 	}, false)
 
 	return createdOrder, err
 }
 
-func (e *Exchange) QueryFuturesKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryFuturesKLines(
+	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
+) ([]types.KLine, error) {
 
 	var limit = 1000
 	if options.Limit > 0 {
@@ -272,7 +284,9 @@ func (e *Exchange) QueryFuturesKLines(ctx context.Context, symbol string, interv
 	return kLines, nil
 }
 
-func (e *Exchange) queryFuturesTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) queryFuturesTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) (trades []types.Trade, err error) {
 
 	var remoteTrades []*futures.AccountTrade
 	req := e.futuresClient.NewListAccountTradeService().
@@ -321,19 +335,6 @@ func (e *Exchange) queryFuturesTrades(ctx context.Context, symbol string, option
 	return trades, nil
 }
 
-func (e *Exchange) QueryFuturesPositionRisks(ctx context.Context, symbol string) error {
-	req := e.futuresClient.NewGetPositionRiskService()
-	req.Symbol(symbol)
-	res, err := req.Do(ctx)
-	if err != nil {
-		return err
-	}
-
-	_ = res
-
-	return nil
-}
-
 // BBGO is a futures broker on Binance
 const futuresBrokerID = "gBhMvywy"
 
@@ -364,8 +365,10 @@ func newFuturesClientOrderID(originalID string) (clientOrderID string) {
 	return clientOrderID
 }
 
-func (e *Exchange) queryFuturesDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
-	res, err := e.futuresClient.NewDepthService().Symbol(symbol).Do(ctx)
+func (e *Exchange) queryFuturesDepth(
+	ctx context.Context, symbol string,
+) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	res, err := e.futuresClient.NewDepthService().Symbol(symbol).Limit(DefaultFuturesDepthLimit).Do(ctx)
 	if err != nil {
 		return snapshot, finalUpdateID, err
 	}
@@ -376,7 +379,7 @@ func (e *Exchange) queryFuturesDepth(ctx context.Context, symbol string) (snapsh
 		Asks:         res.Asks,
 	}
 
-	return convertDepth(snapshot, symbol, finalUpdateID, response)
+	return convertDepthLegacy(snapshot, symbol, finalUpdateID, response)
 }
 
 func (e *Exchange) GetFuturesClient() *binanceapi.FuturesRestClient {
@@ -386,7 +389,9 @@ func (e *Exchange) GetFuturesClient() *binanceapi.FuturesRestClient {
 // QueryFuturesIncomeHistory queries the income history on the binance futures account
 // This is more binance futures specific API, the convert function is not designed yet.
 // TODO: consider other futures platforms and design the common data structure for this
-func (e *Exchange) QueryFuturesIncomeHistory(ctx context.Context, symbol string, incomeType binanceapi.FuturesIncomeType, startTime, endTime *time.Time) ([]binanceapi.FuturesIncome, error) {
+func (e *Exchange) QueryFuturesIncomeHistory(
+	ctx context.Context, symbol string, incomeType binanceapi.FuturesIncomeType, startTime, endTime *time.Time,
+) ([]binanceapi.FuturesIncome, error) {
 	req := e.futuresClient2.NewFuturesGetIncomeHistoryRequest()
 	req.Symbol(symbol)
 	req.IncomeType(incomeType)
@@ -400,4 +405,72 @@ func (e *Exchange) QueryFuturesIncomeHistory(ctx context.Context, symbol string,
 
 	resp, err := req.Do(ctx)
 	return resp, err
+}
+
+func (e *Exchange) SetLeverage(ctx context.Context, symbol string, leverage int) error {
+	if e.IsFutures {
+		_, err := e.futuresClient2.NewFuturesChangeInitialLeverageRequest().
+			Symbol(symbol).
+			Leverage(leverage).
+			Do(ctx)
+		return err
+	}
+
+	return fmt.Errorf("not supported set leverage")
+}
+
+func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol ...string) ([]types.PositionRisk, error) {
+	if !e.IsFutures {
+		return nil, fmt.Errorf("not supported for non-futures exchange")
+	}
+
+	req := e.futuresClient2.NewFuturesGetPositionRisksRequest()
+	if len(symbol) == 1 {
+		req.Symbol(symbol[0])
+		positions, err := req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return toGlobalPositionRisk(positions), nil
+	}
+
+	positions, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(symbol) == 0 {
+		return toGlobalPositionRisk(positions), nil
+	}
+
+	symbolSet := make(map[string]struct{}, len(symbol))
+	for _, s := range symbol {
+		symbolSet[s] = struct{}{}
+	}
+
+	filteredPositions := make([]binanceapi.FuturesPositionRisk, 0, len(symbol))
+	for _, pos := range positions {
+		if _, ok := symbolSet[pos.Symbol]; ok {
+			filteredPositions = append(filteredPositions, pos)
+		}
+	}
+
+	return toGlobalPositionRisk(filteredPositions), nil
+}
+
+func setDualSidePosition(req *futures.CreateOrderService, order types.SubmitOrder) {
+	switch order.Side {
+	case types.SideTypeBuy:
+		if order.ReduceOnly {
+			req.PositionSide(futures.PositionSideTypeShort)
+		} else {
+			req.PositionSide(futures.PositionSideTypeLong)
+		}
+	case types.SideTypeSell:
+		if order.ReduceOnly {
+			req.PositionSide(futures.PositionSideTypeLong)
+		} else {
+			req.PositionSide(futures.PositionSideTypeShort)
+		}
+	}
 }

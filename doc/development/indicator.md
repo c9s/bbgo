@@ -1,124 +1,211 @@
-How To Use Builtin Indicators and Create New Indicators
--------------------------------------------------------
+How To Use Builtin Indicators and Add New Indicators (V2)
+=========================================================
 
-### Built-in Indicators
-In bbgo session, we already have several indicators defined inside.
+## Using Built-in Indicators
+
+In bbgo session, we already have several built-in indicators defined.
+
 We could refer to the live-data without the worriedness of handling market data subscription.
-To use the builtin ones, we could refer the `StandardIndicatorSet` type:
+To use the builtin indicators, call `Indicators(symbol)` method to get the indicator set of a symbol,
 
 ```go
-// defined in pkg/bbgo/session.go
-(*StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandwidth float64) *indicator.BOLL
-(*StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA
-(*StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA
-(*StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH
-(*StandardIndicatorSet) VOLATILITY(iw types.IntervalWindow) *indicator.VOLATILITY
+session.Indicators(symbol string) *IndicatorSet
 ```
 
-and to get the `*StandardIndicatorSet` from `ExchangeSession`, just need to call:
+IndicatorSet is a helper that helps you construct the indicator instance.
+Each indicator is a stream that subscribes to
+an upstream through the callback.
+
+We will explain how the indicator works from scratch in the following section.
+
+The following code will create a kLines stream that subscribes to specific klines from a websocket stream instance:
+
 ```go
-indicatorSet, ok := session.StandardIndicatorSet("BTCUSDT") // param: symbol
+kLines := indicatorv2.KLines(stream, "BTCUSDT", types.Interval1m)
 ```
-in your strategy's `Run` function.
 
+The kLines stream is a special indicator stream that subscribes to the kLine event from the websocket stream. It
+registers a callback on `OnKLineClosed`, and when there is a kLine event triggered, it pushes the kLines into its
+series, and then it triggers all the subscribers that subscribe to it.
 
-And in `Subscribe` function in strategy, just subscribe the `KLineChannel` on the interval window of the indicator you want to query, you should be able to acquire the latest number on the indicators.
+To get the closed prices from the kLines stream, simply pass the kLines stream instance to a ClosedPrice indicator:
 
-However, what if you want to use the indicators not defined in `StandardIndicatorSet`? For example, the `AD` indicator defined in `pkg/indicators/ad.go`?
-
-Here's a simple example in what you should write in your strategy code:
 ```go
-import (
-	"context"
-	"fmt"
+closePrices := indicatorv2.ClosePrices(kLines)
+```
 
-	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/indicator"
-)
+When the kLine indicator pushes a new kline, the ClosePrices stream receives a kLine object then gets the closed price
+from the kLine object.
 
-type Strategy struct {}
+to get the latest value of an indicator (closePrices), use Last(n) method, where n starts from 0:
 
-func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.KLineChannel, s.Symbol. types.SubscribeOptions{Interval: "1m"})
+```go
+lastClosedPrice := closePrices.Last(0)
+secondClosedPrice := closePrices.Last(1)
+```
+
+To create an EMA indicator instance, again, simply pass the closePrice indicator to the SMA stream constructor:
+
+```go
+ema := indicatorv2.EMA(closePrices, 17)
+```
+
+If you want to listen to the EMA value events, add a callback on the indicator instance:
+
+```go
+ema.OnUpdate(func(v float64) { .... })
+```
+
+
+To combine these techniques together:
+
+```go
+
+// use dot import to use the constructors as helpers
+import . "github.com/c9s/bbgo/pkg/indicator/v2"
+
+func main() {
+    // you should get the correct stream instance from the *bbgo.ExchangeSession instance
+    stream := &types.Stream{}
+    
+    ema := EMA(
+        ClosePrices(
+            KLines(stream, types.Interval1m)), 14)
+    _ = ema
 }
+```
 
-func (s *Strategy) Run(ctx context.Context, oe bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	// first we need to get market data store(cached market data) from the exchange session
-	st, ok := session.MarketDataStore(s.Symbol)
-	if !ok {
-		...
-		return err
+
+## Adding New Indicator
+
+Adding a new indicator is pretty straightforward. Simply create a new struct and insert the necessary parameters as
+struct fields.
+
+The indicator algorithm will be implemented in the `Calculate(v float64) float64` method.
+
+You can think of it as a simple input-output model: it takes a float64 number as input, calculates the value, and
+returns a float64 number as output.
+
+```
+[input float64] -> [Calculate] -> [output float64]
+```
+
+Since it will be a float64 value indicator, we will use `*types.Float64Series` here to store our values,
+`types.Float64Series` is a struct that contains a slice to store the float64 values, it is implemented as follows:
+
+```go
+type Float64Series struct {
+	SeriesBase
+	Float64Updater
+	Slice floats.Slice
+}
+```
+
+The `Slice` field is a []float64 slice,
+which provides some helper methods that helps you do some calculation on the float64 slice.
+
+And Float64Updater provides a way to let indicators subscribe to the updated value:
+
+```go
+u := Float64Updater{}
+u.OnUpdate(func(v float64) { ... })
+u.OnUpdate(func(v float64) { ... })
+
+// to emit the callbacks
+u.EmitUpdate(10.0)
+```
+
+Now you have a basic concept about the Float64Series, 
+we can now start to implement our first indicator structure:
+
+```go
+package indicatorv2
+
+type EWMAStream struct {
+    // embedded struct to inherit Float64Series methods
+	*types.Float64Series
+
+    // parameters we need
+	window     int
+	multiplier float64
+}
+```
+
+Again, since it is a float64 value indicator, we use `*types.Float64Series` here to store our values.
+
+And then, add the constructor of the indicator stream:
+
+```go
+// the "source" here is your value source
+func EWMA(source types.Float64Source, window int) *EWMAStream {
+	s := &EWMAStream{
+		Float64Series: types.NewFloat64Series(),
+		window:        window,
+		multiplier:    2.0 / float64(1+window),
 	}
-	// setup the time frame size
-	window := types.IntervalWindow{Window: 10, Interval: types.Interval1m}
-	// construct AD indicator
-	AD := &indicator.AD{IntervalWindow: window}
-	// bind indicator to the data store, so that our callback could be triggered
-	AD.Bind(st)
-	AD.OnUpdate(func (ad float64) {
-		fmt.Printf("now we've got ad: %f, total length: %d\n", ad, AD.Length())
-	})
+	s.Bind(source, s)
+	return s
 }
 ```
 
-#### To Contribute
+Where the source refers to your upstream value, such as closedPrices, openedPrices, or any type of float64 series. For
+example, Volume could also serve as the source.
 
-try to create new indicators in `pkg/indicator/` folder, and add compilation hint of go generator:
+The Bind method invokes the `Calculate()` method to obtain the updated value from a callback of the upstream source.
+Subsequently, it calls EmitUpdate to activate the callbacks of its subscribers,
+thereby passing the updated value to all of them.
+
+Next, write your algorithm within the Calculate method:
+
 ```go
-// go:generate callbackgen -type StructName
-type StructName struct {
-	...
-	updateCallbacks []func(value float64)
-}
+func (s *EWMAStream) Calculate(v float64) float64 {
+    // if you need the last number to calculate the next value
+    // call s.Slice.Last(0)
+    //
+	last := s.Slice.Last(0)
+	if last == 0.0 {
+		return v
+	}
 
+	m := s.multiplier
+	return (1.0-m)*last + m*v
+}
 ```
-And implement required interface methods:
+
+Sometimes you might need to store the intermediate values inside your indicator, you can add the extra field with type Float64Series like this:
+
 ```go
+type EWMAStream struct {
+    // embedded struct to inherit Float64Series methods
+	*types.Float64Series
+	
+	A *types.Float64Series
+	B *types.Float64Series
 
-func (inc *StructName) Update(value float64) {
-    // indicator calculation here...
-    // push value...
-}
-
-func (inc *StructName) PushK(k types.KLine) {
-    inc.Update(k.Close.Float64())
-}
-
-// custom function
-func (inc *StructName) CalculateAndUpdate(kLines []types.KLine) {
-    if len(inc.Values) == 0 {
-        // preload or initialization
-       	for _, k := range allKLines {
-			inc.PushK(k)
-		}
-
-		inc.EmitUpdate(inc.Last())
-    } else {
-        // update new value only
-		k := allKLines[len(allKLines)-1]
-		inc.PushK(k)
-	    inc.EmitUpdate(calculatedValue) // produce data, broadcast to the subscribers
-    }
-}
-
-// custom function
-func (inc *StructName) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	// filter on interval
-	inc.CalculateAndUpdate(window)
-}
-
-// required
-func (inc *StructName) Bind(updator KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
+    // parameters we need
+	window     int
+	multiplier float64
 }
 ```
 
-The `KLineWindowUpdater` interface is currently defined in `pkg/indicator/ewma.go` and may be moved out in the future.
+In your `Calculate()` method, you can push the values into these float64 series, for example:
 
-Once the implementation is done, run `go generate` to generate the callback functions of the indicator.
-You should be able to implement your strategy and use the new indicator in the same way as `AD`.
+```go
+func (s *EWMAStream) Calculate(v float64) float64 {
+    // if you need the last number to calculate the next value
+    // call s.Slice.Last(0)
+	last := s.Slice.Last(0)
+	if last == 0.0 {
+		return v
+	}
+	
+	// If you need to trigger callbacks, use PushAndEmit
+	s.A.Push(last / 2)
+	s.B.Push(last / 3)
 
-#### Generalize
+	m := s.multiplier
+	return (1.0-m)*last + m*v
+}
+```
 
-In order to provide indicator users a lower learning curve, we've designed the `types.Series` interface. We recommend indicator developers to also implement the `types.Series` interface to provide richer functionality on the computed result. To have deeper understanding how `types.Series` works, please refer to [doc/development/series.md](./series.md)
+

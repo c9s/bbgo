@@ -11,6 +11,7 @@ type BacktestStream struct {
 func (s *BacktestStream) Connect(ctx context.Context) error {
 	s.EmitConnect()
 	s.EmitStart()
+	s.EmitAuth()
 	return nil
 }
 

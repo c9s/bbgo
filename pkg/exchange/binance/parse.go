@@ -12,8 +12,31 @@ import (
 	"github.com/adshao/go-binance/v2"
 	"github.com/valyala/fastjson"
 
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+)
+
+type EventType = string
+
+const (
+	EventTypeError                   EventType = "error"
+	EventTypeKLine                   EventType = "kline"
+	EventTypeOutboundAccountPosition EventType = "outboundAccountPosition"
+	EventTypeOutboundAccountInfo     EventType = "outboundAccountInfo"
+	EventTypeBalanceUpdate           EventType = "balanceUpdate"
+	EventTypeExecutionReport         EventType = "executionReport"
+	EventTypeDepthUpdate             EventType = "depthUpdate"
+	EventTypeListenKeyExpired        EventType = "listenKeyExpired"
+	EventTypeTrade                   EventType = "trade"
+	EventTypeAggTrade                EventType = "aggTrade"
+	EventTypeForceOrder              EventType = "forceOrder"
+
+	// Our side defines the following event types since binance doesn't
+	// define the event name from the server messages.
+	//
+	EventTypeBookTicker   EventType = "bookTicker"
+	EventTypePartialDepth EventType = "partialDepth"
 )
 
 type EventBase struct {
@@ -291,84 +314,130 @@ type OutboundAccountInfoEvent struct {
 	Permissions []string  `json:"P,omitempty"`
 }
 
-type ResultEvent struct {
-	Result interface{} `json:"result,omitempty"`
-	ID     int         `json:"id"`
+type RateLimit struct {
+	RateLimitType string `json:"rateLimitType"`
+	Interval      string `json:"interval"`
+	IntervalNum   int    `json:"intervalNum"`
+	Limit         int    `json:"limit"`
+	Count         int    `json:"count"`
 }
 
-func parseWebSocketEvent(message []byte) (interface{}, error) {
-	val, err := fastjson.ParseBytes(message)
+type Error struct {
+	Code    int    `json:"code"`
+	Message string `json:"msg"`
+}
 
+type ResultEvent struct {
+	ID     int            `json:"id"`
+	Error  *Error         `json:"error,omitempty"`
+	Result map[string]any `json:"result,omitempty"`
+	Status int            `json:"status"`
+}
+
+type ErrorEvent struct {
+	Id         int         `json:"id"`
+	Status     int         `json:"status"`
+	Error      *Error      `json:"error"`
+	RateLimits []RateLimit `json:"rateLimits,omitempty"`
+}
+
+var parserPool fastjson.ParserPool
+
+func parseWebSocketEvent(message []byte) (interface{}, error) {
+	parser := parserPool.Get()
+	val, err := parser.ParseBytes(message)
 	if err != nil {
 		return nil, err
 	}
 
-	// res, err := json.MarshalIndent(message, "", "  ")
-	// if err != nil {
-	//	log.Fatal(err)
-	// }
-	// str := strings.ReplaceAll(string(res), "\\", "")
-	// fmt.Println(str)
 	eventType := string(val.GetStringBytes("e"))
-	if eventType == "" && IsBookTicker(val) {
-		eventType = "bookTicker"
+	if eventType == "" {
+		if isBookTicker(val) {
+			eventType = EventTypeBookTicker
+		} else if isPartialDepth(val) {
+			eventType = EventTypePartialDepth
+		} else if eventWrapper := val.Get("event"); eventWrapper != nil {
+			eventType = string(eventWrapper.GetStringBytes("e"))
+			message = val.Get("event").MarshalTo(nil)
+		} else if errVal := val.Get("error"); errVal != nil {
+			eventType = EventTypeError
+		}
 	}
 
 	switch eventType {
-	case "kline":
-		var event KLineEvent
-		err := json.Unmarshal([]byte(message), &event)
+
+	case EventTypeError:
+		var event ErrorEvent
+		err = json.Unmarshal(message, &event)
 		return &event, err
-	case "bookTicker":
+
+	case EventTypeOutboundAccountPosition:
+		var event OutboundAccountPositionEvent
+		err = json.Unmarshal(message, &event)
+		return &event, err
+
+	case EventTypeOutboundAccountInfo:
+		var event OutboundAccountInfoEvent
+		err = json.Unmarshal(message, &event)
+		return &event, err
+
+	case EventTypeBalanceUpdate:
+		var event BalanceUpdateEvent
+		err = json.Unmarshal(message, &event)
+		return &event, err
+
+	case EventTypeExecutionReport:
+		var event ExecutionReportEvent
+		err = json.Unmarshal(message, &event)
+		return &event, err
+
+	case EventTypeDepthUpdate:
+		return parseDepthEvent(val)
+
+	case EventTypeTrade:
+		var event MarketTradeEvent
+		err = json.Unmarshal(message, &event)
+		return &event, err
+
+	case EventTypeBookTicker:
 		var event BookTickerEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err := json.Unmarshal(message, &event)
 		event.Event = eventType
 		return &event, err
 
-	case "outboundAccountPosition":
-		var event OutboundAccountPositionEvent
-		err = json.Unmarshal([]byte(message), &event)
+	case EventTypePartialDepth:
+		var depth binanceapi.Depth
+		err := json.Unmarshal(message, &depth)
+		return &PartialDepthEvent{
+			EventBase: EventBase{
+				Event: EventTypePartialDepth,
+				Time:  types.MillisecondTimestamp(time.Now()),
+			},
+			Depth: depth,
+		}, err
+
+	case EventTypeKLine:
+		var event KLineEvent
+		err := json.Unmarshal(message, &event)
 		return &event, err
 
-	case "outboundAccountInfo":
-		var event OutboundAccountInfoEvent
-		err = json.Unmarshal([]byte(message), &event)
-		return &event, err
-
-	case "balanceUpdate":
-		var event BalanceUpdateEvent
-		err = json.Unmarshal([]byte(message), &event)
-		return &event, err
-
-	case "executionReport":
-		var event ExecutionReportEvent
-		err = json.Unmarshal([]byte(message), &event)
-		return &event, err
-
-	case "depthUpdate":
-		return parseDepthEvent(val)
-
-	case "listenKeyExpired":
+	case EventTypeListenKeyExpired:
 		var event ListenKeyExpired
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
 
-	case "trade":
-		var event MarketTradeEvent
-		err = json.Unmarshal([]byte(message), &event)
-		return &event, err
-
-	case "aggTrade":
+	case EventTypeAggTrade:
 		var event AggTradeEvent
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
-	case "forceOrder":
+
+	case EventTypeForceOrder:
 		var event ForceOrderEvent
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
 	}
 
-	// futures stream
+	// events for futures
 	switch eventType {
 
 	// futures market data stream
@@ -387,6 +456,11 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 	// ========================================================
 	case "ORDER_TRADE_UPDATE":
 		var event OrderTradeUpdateEvent
+		err = json.Unmarshal([]byte(message), &event)
+		return &event, err
+
+	case "TRADE_LITE":
+		var event OrderTradeLiteUpdateEvent
 		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
@@ -414,15 +488,20 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unsupported message: %s", message)
+	return nil, fmt.Errorf("unsupported binance websocket message: %s", message)
 }
 
-// IsBookTicker document ref :https://binance-docs.github.io/apidocs/spot/en/#individual-symbol-book-ticker-streams
-// use key recognition because there's no identify in the content.
-func IsBookTicker(val *fastjson.Value) bool {
-	return !val.Exists("e") && val.Exists("u") &&
-		val.Exists("s") && val.Exists("b") &&
-		val.Exists("B") && val.Exists("a") && val.Exists("A")
+// isBookTicker document ref :https://binance-docs.github.io/apidocs/spot/en/#individual-symbol-book-ticker-streams
+// use key recognition because there's no identification in the content.
+func isBookTicker(val *fastjson.Value) bool {
+	return val.Exists("u") && val.Exists("s") &&
+		val.Exists("b") && val.Exists("B") &&
+		val.Exists("a") && val.Exists("A")
+}
+
+func isPartialDepth(val *fastjson.Value) bool {
+	return val.Exists("lastUpdateId") &&
+		val.Exists("bids") && val.Exists("bids")
 }
 
 type DepthEntry struct {
@@ -433,9 +512,10 @@ type DepthEntry struct {
 type DepthEvent struct {
 	EventBase
 
-	Symbol        string `json:"s"`
-	FirstUpdateID int64  `json:"U"`
-	FinalUpdateID int64  `json:"u"`
+	Symbol           string `json:"s"`
+	FirstUpdateID    int64  `json:"U"`
+	FinalUpdateID    int64  `json:"u"`
+	PreviousUpdateID int64  `json:"pu"`
 
 	Bids types.PriceVolumeSlice `json:"b"`
 	Asks types.PriceVolumeSlice `json:"a"`
@@ -462,52 +542,52 @@ func (e *DepthEvent) String() (o string) {
 	return o
 }
 
-func (e *DepthEvent) OrderBook() (book types.SliceOrderBook, err error) {
+func (e *DepthEvent) OrderBook() (book types.SliceOrderBook) {
 	book.Symbol = e.Symbol
 	book.Time = e.EventBase.Time.Time()
 
 	// already in descending order
 	book.Bids = e.Bids
 	book.Asks = e.Asks
-	return book, err
+	return book
 }
 
-func parseDepthEntry(val *fastjson.Value) (*types.PriceVolume, error) {
+func parseDepthEntry(val *fastjson.Value) (pv types.PriceVolume, err error) {
 	arr, err := val.Array()
 	if err != nil {
-		return nil, err
+		return pv, err
 	}
 
 	if len(arr) < 2 {
-		return nil, errors.New("incorrect depth entry element length")
+		err = errors.New("incorrect depth entry element length")
+		return pv, err
 	}
 
-	price, err := fixedpoint.NewFromString(string(arr[0].GetStringBytes()))
+	pv.Price, err = fixedpoint.NewFromString(string(arr[0].GetStringBytes()))
 	if err != nil {
-		return nil, err
+		return pv, err
 	}
 
-	quantity, err := fixedpoint.NewFromString(string(arr[1].GetStringBytes()))
+	pv.Volume, err = fixedpoint.NewFromString(string(arr[1].GetStringBytes()))
 	if err != nil {
-		return nil, err
+		return pv, err
 	}
 
-	return &types.PriceVolume{
-		Price:  price,
-		Volume: quantity,
-	}, nil
+	return pv, err
 }
 
-func parseDepthEvent(val *fastjson.Value) (*DepthEvent, error) {
-	var err error
-	var depth = &DepthEvent{
+func parseDepthEvent(val *fastjson.Value) (depth *DepthEvent, err error) {
+	depth = &DepthEvent{
 		EventBase: EventBase{
 			Event: string(val.GetStringBytes("e")),
 			Time:  types.NewMillisecondTimestampFromInt(val.GetInt64("E")),
 		},
-		Symbol:        string(val.GetStringBytes("s")),
-		FirstUpdateID: val.GetInt64("U"),
-		FinalUpdateID: val.GetInt64("u"),
+		Symbol:           string(val.GetStringBytes("s")),
+		FirstUpdateID:    val.GetInt64("U"),
+		FinalUpdateID:    val.GetInt64("u"),
+		PreviousUpdateID: val.GetInt64("pu"),
+		Bids:             make(types.PriceVolumeSlice, 0, 50),
+		Asks:             make(types.PriceVolumeSlice, 0, 50),
 	}
 
 	for _, ev := range val.GetArray("b") {
@@ -517,7 +597,7 @@ func parseDepthEvent(val *fastjson.Value) (*DepthEvent, error) {
 			continue
 		}
 
-		depth.Bids = append(depth.Bids, *entry)
+		depth.Bids = append(depth.Bids, entry)
 	}
 
 	for _, ev := range val.GetArray("a") {
@@ -527,7 +607,7 @@ func parseDepthEvent(val *fastjson.Value) (*DepthEvent, error) {
 			continue
 		}
 
-		depth.Asks = append(depth.Asks, *entry)
+		depth.Asks = append(depth.Asks, entry)
 	}
 
 	return depth, err
@@ -827,7 +907,7 @@ type MarkPriceUpdateEvent struct {
 type ContinuousKLineEvent struct {
 	EventBase
 	Symbol string `json:"ps"`
-	ct     string `json:"ct"`
+	CT     string `json:"ct"`
 	KLine  KLine  `json:"k,omitempty"`
 }
 
@@ -965,6 +1045,7 @@ func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
 			Type:          toGlobalFuturesOrderType(futures.OrderType(e.OrderTrade.OrderType)),
 			Quantity:      e.OrderTrade.OriginalQuantity,
 			Price:         e.OrderTrade.OriginalPrice,
+			StopPrice:     e.OrderTrade.StopPrice,
 			TimeInForce:   types.TimeInForce(e.OrderTrade.TimeInForce),
 		},
 		OrderID:          uint64(e.OrderTrade.OrderId),
@@ -1087,19 +1168,47 @@ type AccountConfigUpdateEvent struct {
 	} `json:"ai"`
 }
 
+/*
+	{
+	  "lastUpdateId": 160,  // Last update ID
+	  "bids": [             // Bids to be updated
+	    [
+	      "0.0024",         // Price level to be updated
+	      "10"              // Quantity
+	    ]
+	  ],
+	  "asks": [             // Asks to be updated
+	    [
+	      "0.0026",         // Price level to be updated
+	      "100"             // Quantity
+	    ]
+	  ]
+	}
+*/
+type PartialDepthEvent struct {
+	EventBase
+
+	binanceapi.Depth
+}
+
+/*
+	{
+	  "u":400900217,     // order book updateId
+	  "s":"BNBUSDT",     // symbol
+	  "b":"25.35190000", // best bid price
+	  "B":"31.21000000", // best bid qty
+	  "a":"25.36520000", // best ask price
+	  "A":"40.66000000"  // best ask qty
+	}
+*/
 type BookTickerEvent struct {
 	EventBase
+	UpdateID int64            `json:"u"`
 	Symbol   string           `json:"s"`
 	Buy      fixedpoint.Value `json:"b"`
 	BuySize  fixedpoint.Value `json:"B"`
 	Sell     fixedpoint.Value `json:"a"`
 	SellSize fixedpoint.Value `json:"A"`
-	// "u":400900217,     // order book updateId
-	// "s":"BNBUSDT",     // symbol
-	// "b":"25.35190000", // best bid price
-	// "B":"31.21000000", // best bid qty
-	// "a":"25.36520000", // best ask price
-	// "A":"40.66000000"  // best ask qty
 }
 
 func (k *BookTickerEvent) BookTicker() types.BookTicker {
@@ -1110,4 +1219,37 @@ func (k *BookTickerEvent) BookTicker() types.BookTicker {
 		Sell:     k.Sell,
 		SellSize: k.SellSize,
 	}
+}
+
+/*
+{
+	"e":"TRADE_LITE",             // Event Type
+	"E":1721895408092,            // Event Time
+	"T":1721895408214,            // Transaction Time
+	"s":"BTCUSDT",                // Symbol
+	"q":"0.001",                  // Original Quantity
+	"p":"0",                      // Original Price
+	"m":false,                    // Is this trade the maker side?
+	"c":"z8hcUoOsqEdKMeKPSABslD", // Client Order Id
+	"S":"BUY",                    // Side
+	"L":"64089.20",               // Last Filled Price
+	"l":"0.040",                  // Order Last Filled Quantity
+	"t":109100866,                // Trade Id
+	"i":8886774,                  // Order Id
+}
+*/
+
+type OrderTradeLiteUpdateEvent struct {
+	EventBase
+	Symbol                  string           `json:"s"`
+	Transaction             int64            `json:"T"`
+	ClientOrderID           string           `json:"c"`
+	Side                    string           `json:"S"`
+	OriginalQuantity        fixedpoint.Value `json:"q"`
+	OriginalPrice           fixedpoint.Value `json:"p"`
+	IsMaker                 bool             `json:"m"`
+	LastFilledPrice         fixedpoint.Value `json:"L"`
+	OrderLastFilledQuantity fixedpoint.Value `json:"l"`
+	TradeID                 int64            `json:"t"`
+	OrderID                 int64            `json:"i"`
 }

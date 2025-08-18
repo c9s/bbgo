@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -12,12 +13,27 @@ type PriceVolume struct {
 	Price, Volume fixedpoint.Value
 }
 
+func NewPriceVolume(p, v fixedpoint.Value) PriceVolume {
+	return PriceVolume{
+		Price:  p,
+		Volume: v,
+	}
+}
+
+func (p PriceVolume) InQuote() fixedpoint.Value {
+	return p.Price.Mul(p.Volume)
+}
+
 func (p PriceVolume) Equals(b PriceVolume) bool {
 	return p.Price.Eq(b.Price) && p.Volume.Eq(b.Volume)
 }
 
 func (p PriceVolume) String() string {
-	return fmt.Sprintf("PriceVolume{ price: %s, volume: %s }", p.Price.String(), p.Volume.String())
+	return fmt.Sprintf("PriceVolume{ Price: %s, Volume: %s }", p.Price.String(), p.Volume.String())
+}
+
+func (p PriceVolume) IsZero() bool {
+	return p.Price.IsZero() && p.Volume.IsZero()
 }
 
 type PriceVolumeSlice []PriceVolume
@@ -38,7 +54,7 @@ func (slice PriceVolumeSlice) Trim() (pvs PriceVolumeSlice) {
 }
 
 func (slice PriceVolumeSlice) CopyDepth(depth int) PriceVolumeSlice {
-	if depth > len(slice) {
+	if depth == 0 || depth > len(slice) {
 		return slice.Copy()
 	}
 
@@ -67,8 +83,57 @@ func (slice PriceVolumeSlice) First() (PriceVolume, bool) {
 	return PriceVolume{}, false
 }
 
+// ElemOrLast returns the element on the index i, if i is out of range, it will return the last element
+func (slice PriceVolumeSlice) ElemOrLast(i int) (PriceVolume, bool) {
+	if len(slice) == 0 {
+		return PriceVolume{}, false
+	}
+
+	if i > len(slice)-1 {
+		return slice[len(slice)-1], true
+	}
+
+	return slice[i], true
+}
+
+// IndexByQuoteVolumeDepth returns the index of the price volume slice by the required quote volume depth
+func (slice PriceVolumeSlice) IndexByQuoteVolumeDepth(requiredQuoteVolume fixedpoint.Value) int {
+	var totalQuoteVolume = fixedpoint.Zero
+	for x, pv := range slice {
+		// this should use float64 multiply
+		quoteVolume := fixedpoint.Mul(pv.Volume, pv.Price)
+		totalQuoteVolume = totalQuoteVolume.Add(quoteVolume)
+		if totalQuoteVolume.Compare(requiredQuoteVolume) >= 0 {
+			return x
+		}
+	}
+
+	// depth not enough
+	return -1
+}
+
+func (slice PriceVolumeSlice) SumDepth() fixedpoint.Value {
+	var total = fixedpoint.Zero
+	for _, pv := range slice {
+		total = total.Add(pv.Volume)
+	}
+
+	return total
+}
+
+func (slice PriceVolumeSlice) SumDepthInQuote() fixedpoint.Value {
+	var total = fixedpoint.Zero
+
+	for _, pv := range slice {
+		quoteVolume := fixedpoint.Mul(pv.Price, pv.Volume)
+		total = total.Add(quoteVolume)
+	}
+
+	return total
+}
+
 func (slice PriceVolumeSlice) IndexByVolumeDepth(requiredVolume fixedpoint.Value) int {
-	var tv fixedpoint.Value = fixedpoint.Zero
+	var tv = fixedpoint.Zero
 	for x, el := range slice {
 		tv = tv.Add(el.Volume)
 		if tv.Compare(requiredVolume) >= 0 {
@@ -76,7 +141,7 @@ func (slice PriceVolumeSlice) IndexByVolumeDepth(requiredVolume fixedpoint.Value
 		}
 	}
 
-	// not deep enough
+	// depth not enough
 	return -1
 }
 
@@ -141,15 +206,40 @@ func (slice *PriceVolumeSlice) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// ParsePriceVolumeKvSliceJSON parses a JSON array of objects into PriceVolumeSlice
+// [{"Price":...,"Volume":...}, ...]
+func ParsePriceVolumeKvSliceJSON(b []byte) (PriceVolumeSlice, error) {
+	type S PriceVolumeSlice
+	var ts S
+
+	err := json.Unmarshal(b, &ts)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ts) > 0 && ts[0].Price.IsZero() {
+		return nil, fmt.Errorf("unable to parse price volume slice correctly, input given: %s", string(b))
+	}
+
+	return PriceVolumeSlice(ts), nil
+}
+
 // ParsePriceVolumeSliceJSON tries to parse a 2 dimensional string array into a PriceVolumeSlice
 //
 //	[["9000", "10"], ["9900", "10"], ... ]
+//
+// if parse failed, then it will try to parse the JSON array of objects, function ParsePriceVolumeKvSliceJSON will be called.
 func ParsePriceVolumeSliceJSON(b []byte) (slice PriceVolumeSlice, err error) {
 	var as [][]fixedpoint.Value
 
 	err = json.Unmarshal(b, &as)
 	if err != nil {
-		return slice, err
+		// fallback unmarshalling: if the prefix looks like an object array
+		if bytes.HasPrefix(b, []byte(`[{`)) {
+			return ParsePriceVolumeKvSliceJSON(b)
+		}
+
+		return nil, err
 	}
 
 	for _, a := range as {
@@ -166,4 +256,94 @@ func ParsePriceVolumeSliceJSON(b []byte) (slice PriceVolumeSlice, err error) {
 	}
 
 	return slice, nil
+}
+
+// AverageDepthPriceByQuote calculates the average price by the required quote depth
+// maxLevel is the maximum level to calculate the average price
+func (slice PriceVolumeSlice) AverageDepthPriceByQuote(requiredDepthInQuote fixedpoint.Value, maxLevel int) fixedpoint.Value {
+	if len(slice) == 0 {
+		return fixedpoint.Zero
+	}
+
+	remainingQuote := requiredDepthInQuote
+	totalQuoteAmount := fixedpoint.Zero
+	totalQuantity := fixedpoint.Zero
+
+	l := len(slice)
+	if maxLevel > 0 {
+		l = min(l, maxLevel)
+	}
+
+	for i := 0; i < l; i++ {
+		pv := slice[i]
+
+		quoteVolume := pv.Price.Mul(pv.Volume)
+
+		if remainingQuote.Compare(quoteVolume) >= 0 {
+			totalQuantity = totalQuantity.Add(pv.Volume)
+			totalQuoteAmount = totalQuoteAmount.Add(quoteVolume)
+			remainingQuote = remainingQuote.Sub(quoteVolume)
+		} else {
+			baseAmount := remainingQuote.Div(pv.Price)
+			totalQuantity = totalQuantity.Add(baseAmount)
+			totalQuoteAmount = totalQuoteAmount.Add(remainingQuote)
+			remainingQuote = fixedpoint.Zero
+			break
+		}
+	}
+
+	if totalQuantity.IsZero() {
+		return fixedpoint.Zero
+	}
+
+	return totalQuoteAmount.Div(totalQuantity)
+}
+
+func (slice PriceVolumeSlice) InPriceRange(midPrice fixedpoint.Value, side SideType, r fixedpoint.Value) (sub PriceVolumeSlice) {
+	switch side {
+	case SideTypeSell:
+		boundaryPrice := midPrice.Add(midPrice.Mul(r))
+		for _, pv := range slice {
+			if pv.Price.Compare(boundaryPrice) <= 0 {
+				sub = append(sub, pv)
+			}
+		}
+
+	case SideTypeBuy:
+		boundaryPrice := midPrice.Sub(midPrice.Mul(r))
+		for _, pv := range slice {
+			if pv.Price.Compare(boundaryPrice) >= 0 {
+				sub = append(sub, pv)
+			}
+		}
+	}
+
+	return sub
+}
+
+// AverageDepthPrice uses the required total quantity to calculate the corresponding price
+func (slice PriceVolumeSlice) AverageDepthPrice(requiredQuantity fixedpoint.Value) fixedpoint.Value {
+	// rest quantity
+	rq := requiredQuantity
+	totalAmount := fixedpoint.Zero
+
+	if len(slice) == 0 {
+		return fixedpoint.Zero
+	} else if slice[0].Volume.Compare(requiredQuantity) >= 0 {
+		return slice[0].Price
+	}
+
+	for i := 0; i < len(slice); i++ {
+		pv := slice[i]
+		if pv.Volume.Compare(rq) >= 0 {
+			totalAmount = totalAmount.Add(rq.Mul(pv.Price))
+			rq = fixedpoint.Zero
+			break
+		}
+
+		totalAmount = totalAmount.Add(pv.Volume.Mul(pv.Price))
+		rq = rq.Sub(pv.Volume)
+	}
+
+	return totalAmount.Div(requiredQuantity.Sub(rq))
 }

@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "dep"
+
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "dep"
+    # Create pull requests only for security updates
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: "npm"
+    directories:
+      - "/apps/backtest-report"
+      - "/apps/frontend"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "dep"
+    open-pull-requests-limit: 0

@@ -8,28 +8,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func toGlobalLoan(record binanceapi.MarginLoanRecord) types.MarginLoan {
-	return types.MarginLoan{
-		Exchange:       types.ExchangeBinance,
-		TransactionID:  uint64(record.TxId),
-		Asset:          record.Asset,
-		Principle:      record.Principal,
-		Time:           types.Time(record.Timestamp),
-		IsolatedSymbol: record.IsolatedSymbol,
-	}
-}
-
-func toGlobalRepay(record binanceapi.MarginRepayRecord) types.MarginRepay {
-	return types.MarginRepay{
-		Exchange:       types.ExchangeBinance,
-		TransactionID:  record.TxId,
-		Asset:          record.Asset,
-		Principle:      record.Principal,
-		Time:           types.Time(record.Timestamp),
-		IsolatedSymbol: record.IsolatedSymbol,
-	}
-}
-
 func toGlobalInterest(record binanceapi.MarginInterest) types.MarginInterest {
 	return types.MarginInterest{
 		Exchange:       types.ExchangeBinance,

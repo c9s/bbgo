@@ -4,35 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
-	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/pkg/errors"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
-
-type OrderResponse struct {
-	OrderID       string `json:"ordId"`
-	ClientOrderID string `json:"clOrdId"`
-	Tag           string `json:"tag"`
-	Code          string `json:"sCode"`
-	Message       string `json:"sMsg"`
-}
-
-func (c *RestClient) NewPlaceOrderRequest() *PlaceOrderRequest {
-	return &PlaceOrderRequest{
-		client: c,
-	}
-}
 
 func (c *RestClient) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
 	return &BatchPlaceOrderRequest{
-		client: c,
-	}
-}
-
-func (c *RestClient) NewCancelOrderRequest() *CancelOrderRequest {
-	return &CancelOrderRequest{
 		client: c,
 	}
 }
@@ -49,123 +30,15 @@ func (c *RestClient) NewGetOrderDetailsRequest() *GetOrderDetailsRequest {
 	}
 }
 
-func (c *RestClient) NewGetPendingOrderRequest() *GetPendingOrderRequest {
-	return &GetPendingOrderRequest{
-		client: c,
-	}
-}
-
 func (c *RestClient) NewGetTransactionDetailsRequest() *GetTransactionDetailsRequest {
 	return &GetTransactionDetailsRequest{
 		client: c,
 	}
 }
 
-//go:generate requestgen -type PlaceOrderRequest
-type PlaceOrderRequest struct {
-	client *RestClient
-
-	instrumentID string `param:"instId"`
-
-	// tdMode
-	// margin mode: "cross", "isolated"
-	// non-margin mode cash
-	tradeMode string `param:"tdMode" validValues:"cross,isolated,cash"`
-
-	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
-	clientOrderID *string `param:"clOrdId"`
-
-	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
-	tag *string `param:"tag"`
-
-	// "buy" or "sell"
-	side SideType `param:"side" validValues:"buy,sell"`
-
-	orderType OrderType `param:"ordType"`
-
-	quantity string `param:"sz"`
-
-	// price
-	price *string `param:"px"`
-}
-
 func (r *PlaceOrderRequest) Parameters() map[string]interface{} {
 	params, _ := r.GetParameters()
 	return params
-}
-
-func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
-	payload := r.Parameters()
-	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v5/trade/order", nil, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse APIResponse
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-	var data []OrderResponse
-	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
-		return nil, err
-	}
-
-	if len(data) == 0 {
-		return nil, errors.New("order create error")
-	}
-
-	return &data[0], nil
-}
-
-//go:generate requestgen -type CancelOrderRequest
-type CancelOrderRequest struct {
-	client *RestClient
-
-	instrumentID  string  `param:"instId"`
-	orderID       *string `param:"ordId"`
-	clientOrderID *string `param:"clOrdId"`
-}
-
-func (r *CancelOrderRequest) Parameters() map[string]interface{} {
-	payload, _ := r.GetParameters()
-	return payload
-}
-
-func (r *CancelOrderRequest) Do(ctx context.Context) ([]OrderResponse, error) {
-	payload, err := r.GetParameters()
-	if err != nil {
-		return nil, err
-	}
-
-	if r.clientOrderID == nil && r.orderID != nil {
-		return nil, errors.New("either orderID or clientOrderID is required for canceling order")
-	}
-
-	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v5/trade/cancel-order", nil, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse APIResponse
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-	var data []OrderResponse
-	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
 
 type BatchCancelOrderRequest struct {
@@ -183,7 +56,10 @@ func (r *BatchCancelOrderRequest) Do(ctx context.Context) ([]OrderResponse, erro
 	var parameterList []map[string]interface{}
 
 	for _, req := range r.reqs {
-		params := req.Parameters()
+		params, err := req.GetParameters()
+		if err != nil {
+			return nil, err
+		}
 		parameterList = append(parameterList, params)
 	}
 
@@ -276,7 +152,7 @@ type OrderDetails struct {
 	LastFilledFee         fixedpoint.Value           `json:"fillFee"`
 	LastFilledFeeCurrency string                     `json:"fillFeeCcy"`
 	LastFilledPnl         fixedpoint.Value           `json:"fillPnl"`
-	BillID                types.StrInt64             `json:"billId"`
+	BillID                strint.Int64               `json:"billId"`
 
 	// ExecutionType = liquidity (M = maker or T = taker)
 	ExecutionType string `json:"execType"`
@@ -366,89 +242,6 @@ func (r *GetOrderDetailsRequest) Do(ctx context.Context) (*OrderDetails, error) 
 	}
 
 	return &data[0], nil
-}
-
-type GetPendingOrderRequest struct {
-	client *RestClient
-
-	instId *string
-
-	instType *InstrumentType
-
-	orderTypes []string
-
-	state *OrderState
-}
-
-func (r *GetPendingOrderRequest) InstrumentID(instId string) *GetPendingOrderRequest {
-	r.instId = &instId
-	return r
-}
-
-func (r *GetPendingOrderRequest) InstrumentType(instType InstrumentType) *GetPendingOrderRequest {
-	r.instType = &instType
-	return r
-}
-
-func (r *GetPendingOrderRequest) State(state OrderState) *GetPendingOrderRequest {
-	r.state = &state
-	return r
-}
-
-func (r *GetPendingOrderRequest) OrderTypes(orderTypes []string) *GetPendingOrderRequest {
-	r.orderTypes = orderTypes
-	return r
-}
-
-func (r *GetPendingOrderRequest) AddOrderTypes(orderTypes ...string) *GetPendingOrderRequest {
-	r.orderTypes = append(r.orderTypes, orderTypes...)
-	return r
-}
-
-func (r *GetPendingOrderRequest) Parameters() map[string]interface{} {
-	var payload = map[string]interface{}{}
-
-	if r.instId != nil {
-		payload["instId"] = r.instId
-	}
-
-	if r.instType != nil {
-		payload["instType"] = r.instType
-	}
-
-	if r.state != nil {
-		payload["state"] = r.state
-	}
-
-	if len(r.orderTypes) > 0 {
-		payload["ordType"] = strings.Join(r.orderTypes, ",")
-	}
-
-	return payload
-}
-
-func (r *GetPendingOrderRequest) Do(ctx context.Context) ([]OrderDetails, error) {
-	payload := r.Parameters()
-	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v5/trade/orders-pending", nil, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse APIResponse
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-	var data []OrderDetails
-	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
 
 type GetTransactionDetailsRequest struct {

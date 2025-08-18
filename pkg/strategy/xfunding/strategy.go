@@ -13,6 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/util/backoff"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -137,6 +138,8 @@ type Strategy struct {
 	// Reset your position info
 	Reset bool `json:"reset"`
 
+	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer"`
+
 	// CloseFuturesPosition can be enabled to close the futures position and then transfer the collateral asset back to the spot account.
 	CloseFuturesPosition bool `json:"closeFuturesPosition"`
 
@@ -258,7 +261,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
-func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+func (s *Strategy) CrossRun(
+	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
+) error {
 	instanceID := s.InstanceID()
 
 	s.spotSession = sessions[s.SpotSession]
@@ -284,22 +289,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	if err := s.setInitialLeverage(ctx); err != nil {
 		return err
-	}
-
-	// adjust QuoteInvestment
-	if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
-		originalQuoteInvestment := s.QuoteInvestment
-
-		// adjust available quote with the fee rate
-		available := b.Available.Mul(fixedpoint.NewFromFloat(1.0 - (0.01 * 0.075)))
-		s.QuoteInvestment = fixedpoint.Min(available, s.QuoteInvestment)
-
-		if originalQuoteInvestment.Compare(s.QuoteInvestment) != 0 {
-			log.Infof("adjusted quoteInvestment from %s to %s according to the balance",
-				originalQuoteInvestment.String(),
-				s.QuoteInvestment.String(),
-			)
-		}
 	}
 
 	if s.ProfitStats == nil || s.Reset {
@@ -332,7 +321,46 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.State = newState()
 	}
 
-	if err := s.checkAndRestorePositionRisks(ctx); err != nil {
+	if s.ProfitFixerConfig != nil {
+		log.Infof("profitFixer is enabled, start fixing with config: %+v", s.ProfitFixerConfig)
+
+		s.SpotPosition = types.NewPositionFromMarket(s.spotMarket)
+		s.FuturesPosition = types.NewPositionFromMarket(s.futuresMarket)
+		s.ProfitStats.ProfitStats = types.NewProfitStats(s.Market)
+
+		since := s.ProfitFixerConfig.TradesSince.Time()
+		now := time.Now()
+
+		spotFixer := common.NewProfitFixer()
+		if ss, ok := s.spotSession.Exchange.(types.ExchangeTradeHistoryService); ok {
+			spotFixer.AddExchange(s.spotSession.Name, ss)
+		}
+
+		if err2 := spotFixer.Fix(ctx, s.Symbol,
+			since, now,
+			s.ProfitStats.ProfitStats,
+			s.SpotPosition); err2 != nil {
+			return err2
+		}
+
+		futuresFixer := common.NewProfitFixer()
+		if ss, ok := s.futuresSession.Exchange.(types.ExchangeTradeHistoryService); ok {
+			futuresFixer.AddExchange(s.futuresSession.Name, ss)
+		}
+
+		if err2 := futuresFixer.Fix(ctx, s.Symbol,
+			since, now,
+			s.ProfitStats.ProfitStats,
+			s.FuturesPosition); err2 != nil {
+			return err2
+		}
+
+		bbgo.Notify("Fixed spot position", s.SpotPosition)
+		bbgo.Notify("Fixed futures position", s.FuturesPosition)
+		bbgo.Notify("Fixed profit stats", s.ProfitStats.ProfitStats)
+	}
+
+	if err := s.syncPositionRisks(ctx); err != nil {
 		return err
 	}
 
@@ -348,7 +376,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	bbgo.Notify("Spot Position", s.SpotPosition)
 	bbgo.Notify("Futures Position", s.FuturesPosition)
 	bbgo.Notify("Neutral Position", s.NeutralPosition)
-	bbgo.Notify("State", s.State.PositionState)
+	bbgo.Notify("State: %s", s.State.PositionState.String())
 
 	// sync funding fee txns
 	s.syncFundingFeeRecords(ctx, s.ProfitStats.LastFundingFeeTime)
@@ -357,6 +385,31 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	// s.syncFundingFeeRecords(ctx, time.Now().Add(-3*24*time.Hour))
 
 	switch s.State.PositionState {
+	case PositionClosed:
+		// adjust QuoteInvestment according to the available quote balance
+		// ONLY when the position is not opening
+		if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
+			originalQuoteInvestment := s.QuoteInvestment
+
+			// adjust available quote with the fee rate
+			spotFeeRate := 0.075
+			availableQuoteWithoutFee := b.Available.Mul(fixedpoint.NewFromFloat(1.0 - (spotFeeRate * 0.01)))
+
+			s.QuoteInvestment = fixedpoint.Min(availableQuoteWithoutFee, s.QuoteInvestment)
+
+			if originalQuoteInvestment.Compare(s.QuoteInvestment) != 0 {
+				log.Infof("adjusted quoteInvestment from %f to %f according to the balance",
+					originalQuoteInvestment.Float64(),
+					s.QuoteInvestment.Float64(),
+				)
+			}
+		}
+	default:
+	}
+
+	switch s.State.PositionState {
+	case PositionReady:
+
 	case PositionOpening:
 		// transfer all base assets from the spot account into the spot account
 		if err := s.transferIn(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, fixedpoint.Zero); err != nil {
@@ -368,6 +421,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		if err := s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, fixedpoint.Zero); err != nil {
 			log.WithError(err).Errorf("futures asset transfer out error")
 		}
+
 	}
 
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
@@ -735,12 +789,14 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 
 	if futuresBase.Sign() > 0 {
 		// unexpected error
-		log.Errorf("unexpected futures position (got positive, expecting negative)")
+		log.Errorf("unexpected futures position, got positive number (long), expecting negative number (short)")
 		return
 	}
 
+	// cancel the previous futures order
 	_ = s.futuresOrderExecutor.GracefulCancel(ctx)
 
+	// get the latest ticker price
 	ticker, err := s.futuresSession.Exchange.QueryTicker(ctx, s.Symbol)
 	if err != nil {
 		log.WithError(err).Errorf("can not query ticker")
@@ -753,6 +809,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		log.WithError(err).Errorf("can not calculate futures account quote value")
 		return
 	}
+
 	log.Infof("calculated futures account quote value = %s", quoteValue.String())
 	if quoteValue.IsZero() {
 		return
@@ -796,12 +853,10 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	orderQuantity = fixedpoint.Max(diffQuantity, s.minQuantity)
 	orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
 
-	/*
-		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
-			log.Warnf("unexpected dust quantity, skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
-			return
-		}
-	*/
+	if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
+		log.Warnf("unexpected dust quantity, skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
+		return
+	}
 
 	submitOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -814,7 +869,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, submitOrder)
 
 	if err != nil {
-		log.WithError(err).Errorf("can not submit spot order: %+v", submitOrder)
+		log.WithError(err).Errorf("can not submit futures order: %+v", submitOrder)
 		return
 	}
 
@@ -1083,7 +1138,9 @@ func (s *Strategy) notPositionState(state PositionState) bool {
 	return ret
 }
 
-func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.ExchangeSession, instanceID string, position *types.Position) *bbgo.GeneralOrderExecutor {
+func (s *Strategy) allocateOrderExecutor(
+	ctx context.Context, session *bbgo.ExchangeSession, instanceID string, position *types.Position,
+) *bbgo.GeneralOrderExecutor {
 	orderExecutor := bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, position)
 	orderExecutor.SetMaxRetries(0)
 	orderExecutor.BindEnvironment(s.Environment)
@@ -1141,7 +1198,7 @@ func (s *Strategy) checkAndFixMarginMode(ctx context.Context) error {
 	return nil
 }
 
-func (s *Strategy) checkAndRestorePositionRisks(ctx context.Context) error {
+func (s *Strategy) syncPositionRisks(ctx context.Context) error {
 	futuresClient := s.binanceFutures.GetFuturesClient()
 	req := futuresClient.NewFuturesGetPositionRisksRequest()
 	req.Symbol(s.Symbol)

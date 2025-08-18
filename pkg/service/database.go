@@ -3,9 +3,10 @@ package service
 import (
 	"context"
 
-	"github.com/c9s/rockhopper"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+
+	"github.com/c9s/rockhopper/v2"
 
 	mysqlMigrations "github.com/c9s/bbgo/pkg/migrations/mysql"
 	sqlite3Migrations "github.com/c9s/bbgo/pkg/migrations/sqlite3"
@@ -18,6 +19,8 @@ type DatabaseService struct {
 	Driver string
 	DSN    string
 	DB     *sqlx.DB
+
+	migrationPackages []string
 }
 
 func NewDatabaseService(driver, dsn string) *DatabaseService {
@@ -34,7 +37,6 @@ func NewDatabaseService(driver, dsn string) *DatabaseService {
 		Driver: driver,
 		DSN:    dsn,
 	}
-
 }
 
 func (s *DatabaseService) Connect() error {
@@ -47,6 +49,10 @@ func (s *DatabaseService) Insert(record interface{}) error {
 	sql := dbCache.InsertSqlOf(record)
 	_, err := s.DB.NamedExec(sql, record)
 	return err
+}
+
+func (s *DatabaseService) AddMigrationPackages(pkgNames ...string) {
+	s.migrationPackages = append(s.migrationPackages, pkgNames...)
 }
 
 func (s *DatabaseService) Close() error {
@@ -70,18 +76,18 @@ func (s *DatabaseService) Upgrade(ctx context.Context) error {
 	}
 
 	// sqlx.DB is different from sql.DB
-	rh := rockhopper.New(s.Driver, dialect, s.DB.DB)
+	rh := rockhopper.New(s.Driver, dialect, s.DB.DB, rockhopper.TableName)
 
-	currentVersion, err := rh.CurrentVersion()
-	if err != nil {
+	if err := rh.Touch(ctx); err != nil {
 		return err
 	}
 
-	if err := rockhopper.Up(ctx, rh, migrations, currentVersion, 0); err != nil {
-		return err
+	if len(migrations) == 0 {
+		return nil
 	}
 
-	return nil
+	pkgNames := append([]string{rockhopper.DefaultPackageName}, s.migrationPackages...)
+	return rockhopper.Upgrade(ctx, rh, migrations.FilterPackage(pkgNames))
 }
 
 func ReformatMysqlDSN(dsn string) (string, error) {

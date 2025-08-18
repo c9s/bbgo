@@ -10,10 +10,27 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"strconv"
+	"time"
 )
 
 func (g *GetWalletOpenOrdersRequest) Market(market string) *GetWalletOpenOrdersRequest {
 	g.market = market
+	return g
+}
+
+func (g *GetWalletOpenOrdersRequest) Timestamp(timestamp time.Time) *GetWalletOpenOrdersRequest {
+	g.timestamp = &timestamp
+	return g
+}
+
+func (g *GetWalletOpenOrdersRequest) OrderBy(orderBy max.OrderByType) *GetWalletOpenOrdersRequest {
+	g.orderBy = &orderBy
+	return g
+}
+
+func (g *GetWalletOpenOrdersRequest) Limit(limit uint) *GetWalletOpenOrdersRequest {
+	g.limit = &limit
 	return g
 }
 
@@ -48,6 +65,31 @@ func (g *GetWalletOpenOrdersRequest) GetParameters() (map[string]interface{}, er
 
 	// assign parameter of market
 	params["market"] = market
+	// check timestamp field -> json key timestamp
+	if g.timestamp != nil {
+		timestamp := *g.timestamp
+
+		// assign parameter of timestamp
+		// convert time.Time to milliseconds time stamp
+		params["timestamp"] = strconv.FormatInt(timestamp.UnixNano()/int64(time.Millisecond), 10)
+	} else {
+	}
+	// check orderBy field -> json key order_by
+	if g.orderBy != nil {
+		orderBy := *g.orderBy
+
+		// assign parameter of orderBy
+		params["order_by"] = orderBy
+	} else {
+	}
+	// check limit field -> json key limit
+	if g.limit != nil {
+		limit := *g.limit
+
+		// assign parameter of limit
+		params["limit"] = limit
+	} else {
+	}
 
 	return params, nil
 }
@@ -142,6 +184,12 @@ func (g *GetWalletOpenOrdersRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetWalletOpenOrdersRequest) GetPath() string {
+	return "/api/v3/wallet/:walletType/orders/open"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetWalletOpenOrdersRequest) Do(ctx context.Context) ([]max.Order, error) {
 
 	// empty params for GET operation
@@ -151,7 +199,9 @@ func (g *GetWalletOpenOrdersRequest) Do(ctx context.Context) ([]max.Order, error
 		return nil, err
 	}
 
-	apiURL := "/api/v3/wallet/:walletType/orders/open"
+	var apiURL string
+
+	apiURL = g.GetPath()
 	slugs, err := g.GetSlugsMap()
 	if err != nil {
 		return nil, err
@@ -170,8 +220,32 @@ func (g *GetWalletOpenOrdersRequest) Do(ctx context.Context) ([]max.Order, error
 	}
 
 	var apiResponse []max.Order
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return apiResponse, nil
 }

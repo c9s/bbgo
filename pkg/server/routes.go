@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -21,6 +20,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/asset"
 )
 
 const DefaultBindAddress = "localhost:8080"
@@ -405,25 +405,13 @@ func (s *Server) getSessionAccountBalance(c *gin.Context) {
 }
 
 func (s *Server) listSessionOpenOrders(c *gin.Context) {
-	sessionName := c.Param("session")
-	session, ok := s.Environ.Session(sessionName)
-
-	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("session %s not found", sessionName)})
-		return
-	}
-
-	marketOrders := make(map[string][]types.Order)
-	for symbol, orderStore := range session.OrderStores() {
-		marketOrders[symbol] = orderStore.Orders()
-	}
-
-	c.JSON(http.StatusOK, gin.H{"orders": marketOrders})
+	// FIXME
+	c.JSON(http.StatusOK, gin.H{"orders": nil})
 }
 
-func genFakeAssets() types.AssetMap {
+func genFakeAssets() asset.Map {
 
-	totalAssets := types.AssetMap{}
+	totalAssets := asset.Map{}
 	balances := types.BalanceMap{
 		"BTC":  types.Balance{Currency: "BTC", Available: fixedpoint.NewFromFloat(10.0 * rand.Float64())},
 		"BCH":  types.Balance{Currency: "BCH", Available: fixedpoint.NewFromFloat(0.01 * rand.Float64())},
@@ -460,7 +448,7 @@ func (s *Server) listAssets(c *gin.Context) {
 		return
 	}
 
-	totalAssets := types.AssetMap{}
+	totalAssets := asset.Map{}
 	for _, session := range s.Environ.Sessions() {
 		balances := session.GetAccount().Balances()
 
@@ -525,7 +513,7 @@ func (s *Server) setupSaveConfig(c *gin.Context) {
 		return
 	}
 
-	if err := ioutil.WriteFile(filename, out, 0666); err != nil {
+	if err := os.WriteFile(filename, out, 0666); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

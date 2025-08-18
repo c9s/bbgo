@@ -38,7 +38,6 @@ func BOLL(source types.Float64Source, window int, k float64) *BOLLStream {
 		SMA:           sma,
 		StdDev:        stdDev,
 	}
-	s.Bind(source, s)
 
 	// on band update
 	s.Float64Series.OnUpdate(func(band float64) {
@@ -46,6 +45,8 @@ func BOLL(source types.Float64Source, window int, k float64) *BOLLStream {
 		s.UpBand.PushAndEmit(mid + band)
 		s.DownBand.PushAndEmit(mid - band)
 	})
+
+	s.Bind(source, s)
 	return s
 }
 
@@ -53,4 +54,10 @@ func (s *BOLLStream) Calculate(v float64) float64 {
 	stdDev := s.StdDev.Last(0)
 	band := stdDev * s.k
 	return band
+}
+
+func (s *BOLLStream) Truncate() {
+	s.Slice = generalTruncate(s.Slice)
+	s.UpBand.Slice = generalTruncate(s.UpBand.Slice)
+	s.DownBand.Slice = generalTruncate(s.DownBand.Slice)
 }

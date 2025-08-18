@@ -54,7 +54,7 @@ var orderbookCmd = &cobra.Command{
 			return fmt.Errorf("session %s not found", sessionName)
 		}
 
-		orderBook := types.NewMutexOrderBook(symbol)
+		orderBook := types.NewMutexOrderBook(symbol, session.Exchange.Name())
 
 		s := session.Exchange.NewStream()
 		s.SetPublicOnly()

@@ -8,18 +8,18 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/risk/riskcontrol"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type RiskController struct {
-	PositionHardLimit         fixedpoint.Value     `json:"positionHardLimit"`
-	MaxPositionQuantity       fixedpoint.Value     `json:"maxPositionQuantity"`
-	CircuitBreakLossThreshold fixedpoint.Value     `json:"circuitBreakLossThreshold"`
-	CircuitBreakEMA           types.IntervalWindow `json:"circuitBreakEMA"`
+	PositionHardLimit         fixedpoint.Value `json:"positionHardLimit"`
+	MaxPositionQuantity       fixedpoint.Value `json:"maxPositionQuantity"`
+	CircuitBreakLossThreshold fixedpoint.Value `json:"circuitBreakLossThreshold"`
 
 	positionRiskControl     *riskcontrol.PositionRiskControl
-	circuitBreakRiskControl *riskcontrol.CircuitBreakRiskControl
+	circuitBreakRiskControl *circuitbreaker.BasicCircuitBreaker
 }
 
 // Strategy provides the core functionality that is required by a long/short strategy.
@@ -37,7 +37,9 @@ type Strategy struct {
 	RiskController
 }
 
-func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string) {
+func (s *Strategy) Initialize(
+	ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string,
+) {
 	s.parent = ctx
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
@@ -69,9 +71,6 @@ func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, se
 	s.OrderExecutor.BindEnvironment(environ)
 	s.OrderExecutor.BindProfitStats(s.ProfitStats)
 	s.OrderExecutor.Bind()
-	s.OrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		// bbgo.Sync(ctx, s)
-	})
 
 	if !s.PositionHardLimit.IsZero() && !s.MaxPositionQuantity.IsZero() {
 		log.Infof("positionHardLimit and maxPositionQuantity are configured, setting up PositionRiskControl...")
@@ -81,12 +80,18 @@ func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, se
 
 	if !s.CircuitBreakLossThreshold.IsZero() {
 		log.Infof("circuitBreakLossThreshold is configured, setting up CircuitBreakRiskControl...")
-		s.circuitBreakRiskControl = riskcontrol.NewCircuitBreakRiskControl(
-			s.Position,
-			session.Indicators(market.Symbol).EWMA(s.CircuitBreakEMA),
-			s.CircuitBreakLossThreshold,
-			s.ProfitStats,
-			24*time.Hour)
+		s.circuitBreakRiskControl = &circuitbreaker.BasicCircuitBreaker{
+			Enabled:          true,
+			MaximumTotalLoss: s.CircuitBreakLossThreshold,
+			HaltDuration:     types.Duration(24 * time.Hour),
+		}
+		s.circuitBreakRiskControl.SetMetricsInfo(strategyID, instanceID, market.Symbol)
+
+		s.OrderExecutor.TradeCollector().OnProfit(func(trade types.Trade, profit *types.Profit) {
+			if profit != nil && s.circuitBreakRiskControl != nil {
+				s.circuitBreakRiskControl.RecordProfit(profit.Profit, trade.Time.Time())
+			}
+		})
 	}
 }
 
@@ -94,5 +99,7 @@ func (s *Strategy) IsHalted(t time.Time) bool {
 	if s.circuitBreakRiskControl == nil {
 		return false
 	}
-	return s.circuitBreakRiskControl.IsHalted(t)
+
+	_, isHalted := s.circuitBreakRiskControl.IsHalted(t)
+	return isHalted
 }

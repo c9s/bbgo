@@ -13,52 +13,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 const defaultHTTPTimeout = time.Second * 15
-const RestBaseURL = "https://www.okex.com/"
-const PublicWebSocketURL = "wss://ws.okex.com:8443/ws/v5/public"
-const PrivateWebSocketURL = "wss://ws.okex.com:8443/ws/v5/private"
+const RestBaseURL = "https://www.okx.com"
+const PublicWebSocketURL = "wss://ws.okx.com:8443/ws/v5/public"
+const PrivateWebSocketURL = "wss://ws.okx.com:8443/ws/v5/private"
+const PublicBusinessWebSocketURL = "wss://ws.okx.com:8443/ws/v5/business"
 
-type SideType string
-
-const (
-	SideTypeBuy  SideType = "buy"
-	SideTypeSell SideType = "sell"
-)
-
-type OrderType string
-
-const (
-	OrderTypeMarket   OrderType = "market"
-	OrderTypeLimit    OrderType = "limit"
-	OrderTypePostOnly OrderType = "post_only"
-	OrderTypeFOK      OrderType = "fok"
-	OrderTypeIOC      OrderType = "ioc"
-)
-
-type InstrumentType string
-
-const (
-	InstrumentTypeSpot    InstrumentType = "SPOT"
-	InstrumentTypeSwap    InstrumentType = "SWAP"
-	InstrumentTypeFutures InstrumentType = "FUTURES"
-	InstrumentTypeOption  InstrumentType = "OPTION"
-	InstrumentTypeMARGIN  InstrumentType = "MARGIN"
-)
-
-type OrderState string
-
-const (
-	OrderStateCanceled        OrderState = "canceled"
-	OrderStateLive            OrderState = "live"
-	OrderStatePartiallyFilled OrderState = "partially_filled"
-	OrderStateFilled          OrderState = "filled"
-)
+func (o OrderState) IsWorking() bool {
+	return o == OrderStateLive || o == OrderStatePartiallyFilled
+}
 
 type RestClient struct {
 	requestgen.BaseAPIClient
@@ -96,7 +66,9 @@ func (c *RestClient) Auth(key, secret, passphrase string) {
 }
 
 // NewAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewAuthenticatedRequest(
+	ctx context.Context, method, refURL string, params url.Values, payload interface{},
+) (*http.Request, error) {
 	if len(c.Key) == 0 {
 		return nil, errors.New("empty api key")
 	}
@@ -157,52 +129,6 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	req.Header.Add("OK-ACCESS-TIMESTAMP", timestamp)
 	req.Header.Add("OK-ACCESS-PASSPHRASE", c.Passphrase)
 	return req, nil
-}
-
-type BalanceDetail struct {
-	Currency                string                     `json:"ccy"`
-	Available               fixedpoint.Value           `json:"availEq"`
-	CashBalance             fixedpoint.Value           `json:"cashBal"`
-	OrderFrozen             fixedpoint.Value           `json:"ordFrozen"`
-	Frozen                  fixedpoint.Value           `json:"frozenBal"`
-	Equity                  fixedpoint.Value           `json:"eq"`
-	EquityInUSD             fixedpoint.Value           `json:"eqUsd"`
-	UpdateTime              types.MillisecondTimestamp `json:"uTime"`
-	UnrealizedProfitAndLoss fixedpoint.Value           `json:"upl"`
-}
-
-type Account struct {
-	TotalEquityInUSD fixedpoint.Value `json:"totalEq"`
-	UpdateTime       string           `json:"uTime"`
-	Details          []BalanceDetail  `json:"details"`
-}
-
-func (c *RestClient) AccountBalances(ctx context.Context) (*Account, error) {
-	req, err := c.NewAuthenticatedRequest(ctx, "GET", "/api/v5/account/balance", nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := c.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var balanceResponse struct {
-		Code    string    `json:"code"`
-		Message string    `json:"msg"`
-		Data    []Account `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&balanceResponse); err != nil {
-		return nil, err
-	}
-
-	if len(balanceResponse.Data) == 0 {
-		return nil, errors.New("empty account data")
-	}
-
-	return &balanceResponse.Data[0], nil
 }
 
 type AssetBalance struct {
@@ -273,90 +199,6 @@ func (c *RestClient) AssetCurrencies(ctx context.Context) ([]AssetCurrency, erro
 	return currencyResponse.Data, nil
 }
 
-type MarketTicker struct {
-	InstrumentType string `json:"instType"`
-	InstrumentID   string `json:"instId"`
-
-	// last traded price
-	Last fixedpoint.Value `json:"last"`
-
-	// last traded size
-	LastSize fixedpoint.Value `json:"lastSz"`
-
-	AskPrice fixedpoint.Value `json:"askPx"`
-	AskSize  fixedpoint.Value `json:"askSz"`
-
-	BidPrice fixedpoint.Value `json:"bidPx"`
-	BidSize  fixedpoint.Value `json:"bidSz"`
-
-	Open24H           fixedpoint.Value `json:"open24h"`
-	High24H           fixedpoint.Value `json:"high24H"`
-	Low24H            fixedpoint.Value `json:"low24H"`
-	Volume24H         fixedpoint.Value `json:"vol24h"`
-	VolumeCurrency24H fixedpoint.Value `json:"volCcy24h"`
-
-	// Millisecond timestamp
-	Timestamp types.MillisecondTimestamp `json:"ts"`
-}
-
-func (c *RestClient) MarketTicker(ctx context.Context, instId string) (*MarketTicker, error) {
-	// SPOT, SWAP, FUTURES, OPTION
-	var params = url.Values{}
-	params.Add("instId", instId)
-
-	req, err := c.NewRequest(ctx, "GET", "/api/v5/market/ticker", params, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := c.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var tickerResponse struct {
-		Code    string         `json:"code"`
-		Message string         `json:"msg"`
-		Data    []MarketTicker `json:"data"`
-	}
-	if err := response.DecodeJSON(&tickerResponse); err != nil {
-		return nil, err
-	}
-
-	if len(tickerResponse.Data) == 0 {
-		return nil, fmt.Errorf("ticker of %s not found", instId)
-	}
-
-	return &tickerResponse.Data[0], nil
-}
-
-func (c *RestClient) MarketTickers(ctx context.Context, instType InstrumentType) ([]MarketTicker, error) {
-	// SPOT, SWAP, FUTURES, OPTION
-	var params = url.Values{}
-	params.Add("instType", string(instType))
-
-	req, err := c.NewRequest(ctx, "GET", "/api/v5/market/tickers", params, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := c.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var tickerResponse struct {
-		Code    string         `json:"code"`
-		Message string         `json:"msg"`
-		Data    []MarketTicker `json:"data"`
-	}
-	if err := response.DecodeJSON(&tickerResponse); err != nil {
-		return nil, err
-	}
-
-	return tickerResponse.Data, nil
-}
-
 func Sign(payload string, secret string) string {
 	var sig = hmac.New(sha256.New, []byte(secret))
 	_, err := sig.Write([]byte(payload))
@@ -372,4 +214,21 @@ type APIResponse struct {
 	Code    string          `json:"code"`
 	Message string          `json:"msg"`
 	Data    json.RawMessage `json:"data"`
+
+	// InTime is the timestamp at REST gateway when the request is received, Unix timestamp format in microseconds, e.g. 1597026383085123
+	InTime strint.Int64 `json:"inTime"`
+
+	// OutTime is the timestamp at REST gateway when the response is sent, Unix timestamp format in microseconds, e.g. 1597026383085123
+	OutTime strint.Int64 `json:"outTime"`
+}
+
+func (a APIResponse) Validate() error {
+	if a.Code != "0" {
+		return a.Error()
+	}
+	return nil
+}
+
+func (a APIResponse) Error() error {
+	return fmt.Errorf("retCode: %s, retMsg: %s, data: %s", a.Code, a.Message, string(a.Data))
 }

@@ -14,8 +14,8 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
+	"github.com/c9s/bbgo/pkg/util/timejitter"
 )
 
 const ID = "xbalance"
@@ -283,7 +283,9 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	}
 }
 
-func (s *Strategy) findHighestBalanceLevelSession(sessions map[string]*bbgo.ExchangeSession, requiredAmount fixedpoint.Value) (*bbgo.ExchangeSession, types.Balance, error) {
+func (s *Strategy) findHighestBalanceLevelSession(
+	sessions map[string]*bbgo.ExchangeSession, requiredAmount fixedpoint.Value,
+) (*bbgo.ExchangeSession, types.Balance, error) {
 	var balance types.Balance
 	var maxBalanceLevel = fixedpoint.Zero
 	var maxBalanceSession *bbgo.ExchangeSession = nil
@@ -350,7 +352,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 
 	go func() {
-		ticker := time.NewTicker(util.MillisecondsJitter(s.Interval.Duration(), 1000))
+		ticker := time.NewTicker(timejitter.Milliseconds(s.Interval.Duration(), 1000))
 		defer ticker.Stop()
 
 		for {

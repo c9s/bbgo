@@ -1,0 +1,43 @@
+sessions:
+  max:
+    exchange: &exchange max
+    envVarPrefix: max
+    publicOnly: true
+
+exchangeStrategies:
+  - on: *exchange
+    sentinel: &sentinel
+      symbol: BTCUSDT
+      interval: 5m
+      threshold: 0.6
+      proportion: 0.05
+      numSamples: 1440
+      window: 60
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: ETHUSDT
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: BCHUSDT
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: LTCUSDT
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: XRPUSDT
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: MAXUSDT
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: BCNTUSDT
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: ARBUSDT

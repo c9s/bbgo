@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -14,8 +13,8 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/backoff"
 )
 
@@ -99,7 +98,7 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 			return err
 		}
 
-		if err := ioutil.WriteFile(cacheFile, out, 0666); err != nil {
+		if err := os.WriteFile(cacheFile, out, 0666); err != nil {
 			return err
 		}
 
@@ -113,7 +112,7 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 	} else {
 		log.Debugf("cache %s found", cacheFile)
 
-		data, err := ioutil.ReadFile(cacheFile)
+		data, err := os.ReadFile(cacheFile)
 		if err != nil {
 			return err
 		}
@@ -126,8 +125,8 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 	return nil
 }
 
-func LoadExchangeMarketsWithCache(ctx context.Context, ex types.Exchange) (markets types.MarketMap, err error) {
-	inMem, ok := util.GetEnvVarBool("USE_MARKETS_CACHE_IN_MEMORY")
+func LoadExchangeMarketsWithCache(ctx context.Context, ex types.ExchangePublic) (markets types.MarketMap, err error) {
+	inMem, ok := envvar.Bool("USE_MARKETS_CACHE_IN_MEMORY")
 	if ok && inMem {
 		return loadMarketsFromMem(ctx, ex)
 	}
@@ -137,7 +136,7 @@ func LoadExchangeMarketsWithCache(ctx context.Context, ex types.Exchange) (marke
 }
 
 // loadMarketsFromMem is useful for one process to run multiple bbgos in different go routines.
-func loadMarketsFromMem(ctx context.Context, ex types.Exchange) (markets types.MarketMap, _ error) {
+func loadMarketsFromMem(ctx context.Context, ex types.ExchangePublic) (markets types.MarketMap, _ error) {
 	exName := ex.Name().String()
 	if globalMarketMemCache.IsOutdated(exName) {
 		op := func() error {
@@ -162,7 +161,7 @@ func loadMarketsFromMem(ctx context.Context, ex types.Exchange) (markets types.M
 	return rst, nil
 }
 
-func loadMarketsFromFile(ctx context.Context, ex types.Exchange) (markets types.MarketMap, err error) {
+func loadMarketsFromFile(ctx context.Context, ex types.ExchangePublic) (markets types.MarketMap, err error) {
 	key := fmt.Sprintf("%s-markets", ex.Name())
 	if futureExchange, implemented := ex.(types.FuturesExchange); implemented {
 		settings := futureExchange.GetFuturesSettings()

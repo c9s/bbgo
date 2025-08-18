@@ -75,11 +75,11 @@ webserver:
   enabled: false
 
 metrics:
-  enabled: false
+  enabled: true
   port: 9090
 
 logFormatter:
-  enabled: false
+  enabled: true
   format: json
 
 grpc:
@@ -88,6 +88,18 @@ grpc:
 
 debug:
   enabled: false
+
+environment: dev
+
+# this set ENABLE_RBT_ORDERBOOK env
+rbTreeOrderbook:
+  enabled: false
+
+sync:
+  enabled: false
+  schedule: "0 * * * *"
+  ## since: sync from time
+  since: false
 
 resources:
   # We usually recommend not to specify default resources and to leave this as a conscious

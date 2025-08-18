@@ -10,7 +10,7 @@ import (
 
 	bybitapi "github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	types "github.com/c9s/bbgo/pkg/types"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockStreamDataProvider is a mock of StreamDataProvider interface.

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -18,18 +19,18 @@ func (g *GetWalletTradesRequest) Market(market string) *GetWalletTradesRequest {
 	return g
 }
 
-func (g *GetWalletTradesRequest) From(from uint64) *GetWalletTradesRequest {
-	g.from = &from
+func (g *GetWalletTradesRequest) Timestamp(timestamp time.Time) *GetWalletTradesRequest {
+	g.timestamp = &timestamp
 	return g
 }
 
-func (g *GetWalletTradesRequest) StartTime(startTime time.Time) *GetWalletTradesRequest {
-	g.startTime = &startTime
+func (g *GetWalletTradesRequest) FromID(fromID uint64) *GetWalletTradesRequest {
+	g.fromID = &fromID
 	return g
 }
 
-func (g *GetWalletTradesRequest) EndTime(endTime time.Time) *GetWalletTradesRequest {
-	g.endTime = &endTime
+func (g *GetWalletTradesRequest) Order(order string) *GetWalletTradesRequest {
+	g.order = &order
 	return g
 }
 
@@ -38,7 +39,7 @@ func (g *GetWalletTradesRequest) Limit(limit uint64) *GetWalletTradesRequest {
 	return g
 }
 
-func (g *GetWalletTradesRequest) WalletType(walletType WalletType) *GetWalletTradesRequest {
+func (g *GetWalletTradesRequest) WalletType(walletType max.WalletType) *GetWalletTradesRequest {
 	g.walletType = walletType
 	return g
 }
@@ -69,30 +70,40 @@ func (g *GetWalletTradesRequest) GetParameters() (map[string]interface{}, error)
 
 	// assign parameter of market
 	params["market"] = market
-	// check from field -> json key from_id
-	if g.from != nil {
-		from := *g.from
+	// check timestamp field -> json key timestamp
+	if g.timestamp != nil {
+		timestamp := *g.timestamp
 
-		// assign parameter of from
-		params["from_id"] = from
+		// assign parameter of timestamp
+		// convert time.Time to milliseconds time stamp
+		params["timestamp"] = strconv.FormatInt(timestamp.UnixNano()/int64(time.Millisecond), 10)
 	} else {
 	}
-	// check startTime field -> json key start_time
-	if g.startTime != nil {
-		startTime := *g.startTime
+	// check fromID field -> json key from_id
+	if g.fromID != nil {
+		fromID := *g.fromID
 
-		// assign parameter of startTime
-		// convert time.Time to milliseconds time stamp
-		params["start_time"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
+		// assign parameter of fromID
+		params["from_id"] = fromID
 	} else {
 	}
-	// check endTime field -> json key end_time
-	if g.endTime != nil {
-		endTime := *g.endTime
+	// check order field -> json key order
+	if g.order != nil {
+		order := *g.order
 
-		// assign parameter of endTime
-		// convert time.Time to milliseconds time stamp
-		params["end_time"] = strconv.FormatInt(endTime.UnixNano()/int64(time.Millisecond), 10)
+		// TEMPLATE check-valid-values
+		switch order {
+		case "asc", "desc":
+			params["order"] = order
+
+		default:
+			return nil, fmt.Errorf("order value %v is invalid", order)
+
+		}
+		// END TEMPLATE check-valid-values
+
+		// assign parameter of order
+		params["order"] = order
 	} else {
 	}
 	// check limit field -> json key limit
@@ -197,6 +208,12 @@ func (g *GetWalletTradesRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetWalletTradesRequest) GetPath() string {
+	return "/api/v3/wallet/:walletType/trades"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetWalletTradesRequest) Do(ctx context.Context) ([]Trade, error) {
 
 	// empty params for GET operation
@@ -206,7 +223,9 @@ func (g *GetWalletTradesRequest) Do(ctx context.Context) ([]Trade, error) {
 		return nil, err
 	}
 
-	apiURL := "/api/v3/wallet/:walletType/trades"
+	var apiURL string
+
+	apiURL = g.GetPath()
 	slugs, err := g.GetSlugsMap()
 	if err != nil {
 		return nil, err
@@ -225,8 +244,32 @@ func (g *GetWalletTradesRequest) Do(ctx context.Context) ([]Trade, error) {
 	}
 
 	var apiResponse []Trade
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return apiResponse, nil
 }

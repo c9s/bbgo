@@ -13,6 +13,7 @@ import (
 
 func toGlobalMarket(m bybitapi.Instrument) types.Market {
 	return types.Market{
+		Exchange:        types.ExchangeBybit,
 		Symbol:          m.Symbol,
 		LocalSymbol:     m.Symbol,
 		PricePrecision:  m.LotSizeFilter.QuotePrecision.NumFractionalDigits(),
@@ -76,9 +77,9 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 		return nil, fmt.Errorf("unexpected order id: %s, err: %w", order.OrderId, err)
 	}
 
-	qty, err := processMarketBuyQuantity(order)
-	if err != nil {
-		return nil, err
+	price := order.Price
+	if orderType == types.OrderTypeMarket {
+		price = order.AvgPrice
 	}
 
 	return &types.Order{
@@ -87,9 +88,11 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 			Symbol:        order.Symbol,
 			Side:          side,
 			Type:          orderType,
-			Quantity:      qty,
-			Price:         order.Price,
-			TimeInForce:   timeInForce,
+			// We specified the quantity for the market buy order as the base coin when we submitted the order,
+			// so we can just use the Qty field.
+			Quantity:    order.Qty,
+			Price:       price,
+			TimeInForce: timeInForce,
 		},
 		Exchange:         types.ExchangeBybit,
 		OrderID:          orderIdNum,
@@ -325,17 +328,51 @@ func v3ToGlobalTrade(trade v3.Trade) (*types.Trade, error) {
 	}, nil
 }
 
+func toGlobalTrade(trade bybitapi.Trade) (*types.Trade, error) {
+	side, err := toGlobalSideType(trade.Side)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected side: %s, err: %w", trade.Side, err)
+	}
+	orderIdNum, err := strconv.ParseUint(trade.OrderId, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected order id: %s, err: %w", trade.OrderId, err)
+	}
+	tradeIdNum, err := strconv.ParseUint(trade.ExecId, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected trade id: %s, err: %w", trade.ExecId, err)
+	}
+
+	return &types.Trade{
+		ID:            tradeIdNum,
+		OrderID:       orderIdNum,
+		Exchange:      types.ExchangeBybit,
+		Price:         trade.ExecPrice,
+		Quantity:      trade.ExecQty,
+		QuoteQuantity: trade.ExecPrice.Mul(trade.ExecQty),
+		Symbol:        trade.Symbol,
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       trade.IsMaker,
+		Time:          types.Time(trade.ExecTime),
+		Fee:           trade.ExecFee,
+		FeeCurrency:   trade.FeeCurrency,
+		IsMargin:      false,
+		IsFutures:     false,
+		IsIsolated:    false,
+	}, nil
+}
+
 func toGlobalBalanceMap(events []bybitapi.WalletBalances) types.BalanceMap {
 	bm := types.BalanceMap{}
 	for _, event := range events {
-		if event.AccountType != bybitapi.AccountTypeSpot {
+		if event.AccountType != bybitapi.AccountTypeUnified {
 			continue
 		}
 
 		for _, obj := range event.Coins {
 			bm[obj.Coin] = types.Balance{
 				Currency:  obj.Coin,
-				Available: obj.Free,
+				Available: obj.WalletBalance.Sub(obj.Locked),
 				Locked:    obj.Locked,
 			}
 		}
@@ -368,7 +405,7 @@ func toLocalInterval(interval types.Interval) (string, error) {
 func toGlobalKLines(symbol string, interval types.Interval, klines []bybitapi.KLine) []types.KLine {
 	gKLines := make([]types.KLine, len(klines))
 	for i, kline := range klines {
-		endTime := types.Time(kline.StartTime.Time().Add(interval.Duration()))
+		endTime := types.Time(kline.StartTime.Time().Add(interval.Duration() - time.Millisecond))
 		gKLines[i] = types.KLine{
 			Exchange:    types.ExchangeBybit,
 			Symbol:      symbol,

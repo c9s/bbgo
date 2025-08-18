@@ -18,15 +18,21 @@ var defaultPersistenceServiceFacade = &service.PersistenceServiceFacade{
 	Memory: service.NewMemoryService(),
 }
 
+type CustomSync interface {
+	Store(ctx context.Context, store service.Store) error
+	Load(ctx context.Context, store service.Store) error
+}
+
 // Sync syncs the object properties into the persistence layer
 func Sync(ctx context.Context, obj interface{}) {
+	isolation := GetIsolationFromContext(ctx)
+	logger := isolation.GetLogger()
+
 	id := dynamic.CallID(obj)
 	if len(id) == 0 {
-		log.Warnf("InstanceID() is not provided, can not sync persistence")
+		logger.Warnf("InstanceID() is not provided, can not sync persistence")
 		return
 	}
-
-	isolation := GetIsolationFromContext(ctx)
 
 	ps := isolation.persistenceServiceFacade.Get()
 
@@ -36,14 +42,25 @@ func Sync(ctx context.Context, obj interface{}) {
 		defer locker.Unlock()
 	}
 
+	if customSync, ok := obj.(CustomSync); ok {
+		store := ps.NewStore(id)
+		if err := customSync.Store(ctx, store); err != nil {
+			logger.WithError(err).Errorf("failed to store with id %s", id)
+		}
+
+		return
+	}
+
 	err := storePersistenceFields(obj, id, ps)
 	if err != nil {
-		log.WithError(err).Errorf("persistence sync failed")
+		logger.WithError(err).Errorf("persistence sync failed")
 	}
 }
 
 func loadPersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
-	return dynamic.IterateFieldsByTag(obj, "persistence", true, func(tag string, field reflect.StructField, value reflect.Value) error {
+	return dynamic.IterateFieldsByTag(obj, "persistence", true, func(
+		tag string, field reflect.StructField, value reflect.Value,
+	) error {
 		log.Debugf("[loadPersistenceFields] loading value into field %v, tag = %s, original value = %v", field, tag, value)
 
 		newValueInf := dynamic.NewTypeValueInterface(value.Type())
@@ -71,7 +88,9 @@ func loadPersistenceFields(obj interface{}, id string, persistence service.Persi
 }
 
 func storePersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
-	return dynamic.IterateFieldsByTag(obj, "persistence", true, func(tag string, ft reflect.StructField, fv reflect.Value) error {
+	return dynamic.IterateFieldsByTag(obj, "persistence", true, func(
+		tag string, ft reflect.StructField, fv reflect.Value,
+	) error {
 		log.Debugf("[storePersistenceFields] storing value from field %v, tag = %s, original value = %v", ft, tag, fv)
 
 		inf := fv.Interface()

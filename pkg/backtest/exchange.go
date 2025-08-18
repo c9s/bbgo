@@ -136,12 +136,6 @@ func (e *Exchange) resetMatchingBooks() {
 	e.matchingBooksMutex.Unlock()
 }
 
-func (e *Exchange) addMatchingBook(symbol string, market types.Market) {
-	e.matchingBooksMutex.Lock()
-	e._addMatchingBook(symbol, market)
-	e.matchingBooksMutex.Unlock()
-}
-
 func (e *Exchange) _addMatchingBook(symbol string, market types.Market) {
 	matching := &SimplePriceMatching{
 		currentTime:     e.currentTime,
@@ -256,11 +250,11 @@ func (e *Exchange) QueryKLines(
 	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
 ) ([]types.KLine, error) {
 	if options.EndTime != nil {
-		return e.srv.QueryKLinesBackward(e.sourceName, symbol, interval, *options.EndTime, 1000)
+		return e.srv.QueryKLinesBackward(e.Name(), symbol, interval, *options.EndTime, 1000)
 	}
 
 	if options.StartTime != nil {
-		return e.srv.QueryKLinesForward(e.sourceName, symbol, interval, *options.StartTime, 1000)
+		return e.srv.QueryKLinesForward(e.Name(), symbol, interval, *options.StartTime, 1000)
 	}
 
 	return nil, errors.New("endTime or startTime can not be nil")
@@ -343,7 +337,10 @@ func (e *Exchange) BindUserData(userDataStream types.StandardStreamEmitter) {
 }
 
 func (e *Exchange) SubscribeMarketData(
-	startTime, endTime time.Time, requiredInterval types.Interval, extraIntervals ...types.Interval,
+	startTime, endTime time.Time,
+	defaultSymbols []string,
+	requiredInterval types.Interval,
+	extraIntervals ...types.Interval,
 ) (chan types.KLine, error) {
 	log.Infof("collecting backtest configurations...")
 
@@ -377,20 +374,37 @@ func (e *Exchange) SubscribeMarketData(
 		symbols = append(symbols, symbol)
 	}
 
+	if len(symbols) == 0 {
+		symbols = defaultSymbols
+	}
+
 	var intervals []types.Interval
 	for interval := range loadedIntervals {
 		intervals = append(intervals, interval)
 	}
-	log.Infof("querying klines from database with exchange: %v symbols: %v and intervals: %v for back-testing", e.Name(), symbols, intervals)
+
+	var isFutures bool
+	if futuresExchange, ok := e.publicExchange.(types.FuturesExchange); ok {
+		isFutures = futuresExchange.GetFuturesSettings().IsFutures
+	} else {
+		isFutures = false
+	}
+
+	if isFutures {
+		log.Infof("querying futures klines from database with exchange: %v symbols: %v and intervals: %v for back-testing", e.Name(), symbols, intervals)
+	} else {
+		log.Infof("querying klines from database with exchange: %v symbols: %v and intervals: %v for back-testing", e.Name(), symbols, intervals)
+	}
+
 	if len(symbols) == 0 {
-		log.Warnf("empty symbols, will not query kline data from the database")
+		log.Warnf("empty symbols, will not query kline data from the database, default symbols = %v", defaultSymbols)
 
 		c := make(chan types.KLine)
 		close(c)
 		return c, nil
 	}
 
-	klineC, errC := e.srv.QueryKLinesCh(startTime, endTime, e, symbols, intervals)
+	klineC, errC := e.srv.QueryKLinesCh(startTime, endTime, e.publicExchange, symbols, intervals)
 	go func() {
 		if err := <-errC; err != nil {
 			log.WithError(err).Error("backtest data feed error")

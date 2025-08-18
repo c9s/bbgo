@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -18,6 +19,8 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 	defer func() {
 		s.updateGridNumOfOrdersMetricsWithLock()
 	}()
+	isMax := exchange.IsMaxExchange(session.Exchange)
+	s.logger.Infof("isMax: %t", isMax)
 
 	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
 	// if the exchange doesn't support ExchangeTradeHistoryService, do not run recover
@@ -267,7 +270,7 @@ func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTr
 	var fromTradeID uint64 = 0
 	var limit int64 = 1000
 	for {
-		trades, err := queryTradesService.QueryTrades(ctx, s.Symbol, &types.TradeQueryOptions{
+		trades, err := retry.QueryTradesUntilSuccessful(ctx, queryTradesService, s.Symbol, &types.TradeQueryOptions{
 			StartTime:   &since,
 			EndTime:     &until,
 			LastTradeID: fromTradeID,

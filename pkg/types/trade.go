@@ -25,6 +25,12 @@ type TradeSlice struct {
 	Trades []Trade
 }
 
+func NewTradeSlice(cap int) *TradeSlice {
+	return &TradeSlice{
+		Trades: make([]Trade, 0, cap),
+	}
+}
+
 func (s *TradeSlice) Copy() []Trade {
 	s.mu.Lock()
 	slice := make([]Trade, len(s.Trades))
@@ -47,6 +53,16 @@ func (s *TradeSlice) Append(t Trade) {
 	s.mu.Unlock()
 }
 
+func (s *TradeSlice) Truncate(size int) {
+	s.mu.Lock()
+
+	if len(s.Trades) > size {
+		s.Trades = s.Trades[len(s.Trades)-1-size:]
+	}
+
+	s.mu.Unlock()
+}
+
 type Trade struct {
 	// GID is the global ID
 	GID int64 `json:"gid" db:"gid"`
@@ -54,18 +70,20 @@ type Trade struct {
 	// ID is the source trade ID
 	ID            uint64           `json:"id" db:"id"`
 	OrderID       uint64           `json:"orderID" db:"order_id"`
+	OrderUUID     string           `json:"orderUUID,omitempty" db:"order_uuid"`
 	Exchange      ExchangeName     `json:"exchange" db:"exchange"`
 	Price         fixedpoint.Value `json:"price" db:"price"`
 	Quantity      fixedpoint.Value `json:"quantity" db:"quantity"`
 	QuoteQuantity fixedpoint.Value `json:"quoteQuantity" db:"quote_quantity"`
 	Symbol        string           `json:"symbol" db:"symbol"`
 
-	Side        SideType         `json:"side" db:"side"`
-	IsBuyer     bool             `json:"isBuyer" db:"is_buyer"`
-	IsMaker     bool             `json:"isMaker" db:"is_maker"`
-	Time        Time             `json:"tradedAt" db:"traded_at"`
-	Fee         fixedpoint.Value `json:"fee" db:"fee"`
-	FeeCurrency string           `json:"feeCurrency" db:"fee_currency"`
+	Side          SideType         `json:"side" db:"side"`
+	IsBuyer       bool             `json:"isBuyer" db:"is_buyer"`
+	IsMaker       bool             `json:"isMaker" db:"is_maker"`
+	Time          Time             `json:"tradedAt" db:"traded_at"`
+	Fee           fixedpoint.Value `json:"fee" db:"fee"`
+	FeeCurrency   string           `json:"feeCurrency" db:"fee_currency"`
+	FeeProcessing bool             `json:"feeProcessing" db:"-"`
 
 	// FeeDiscounted is an optional field which indicates whether the trade is using the platform fee token for discount.
 	// When FeeDiscounted = true, means the fee is deducted outside the trade
@@ -84,6 +102,14 @@ type Trade struct {
 
 	// PnL is the profit and loss value of the executed trade
 	PnL sql.NullFloat64 `json:"pnl" db:"pnl"`
+
+	InsertedAt *Time `json:"insertedAt" db:"inserted_at"`
+
+	Tag string `json:"tags" db:"-"`
+}
+
+func (trade Trade) HasTag(tag string) bool {
+	return trade.Tag == tag
 }
 
 func (trade Trade) CsvHeader() []string {
@@ -110,7 +136,10 @@ func (trade Trade) CsvRecords() [][]string {
 	}
 }
 
-func (trade Trade) PositionChange() fixedpoint.Value {
+// PositionDelta returns the position delta of this trade
+// BUY trade -> positive quantity
+// SELL trade -> negative quantity
+func (trade Trade) PositionDelta() fixedpoint.Value {
 	q := trade.Quantity
 	switch trade.Side {
 	case SideTypeSell:
@@ -152,7 +181,11 @@ func trimTrailingZero(a float64) string {
 
 // String is for console output
 func (trade Trade) String() string {
-	return fmt.Sprintf("TRADE %s %s %4s %-4s @ %-6s | AMOUNT %s | FEE %s %s | OrderID %d | TID %d | %s",
+	orderID := trade.OrderUUID
+	if orderID == "" {
+		orderID = strconv.FormatUint(trade.OrderID, 10)
+	}
+	return fmt.Sprintf("TRADE %s %s %4s %-4s @ %-6s | AMOUNT %s | FEE %s %s | OrderID %s | TID %d | %s | %s",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
@@ -161,9 +194,10 @@ func (trade Trade) String() string {
 		trade.QuoteQuantity.String(),
 		trade.Fee.String(),
 		trade.FeeCurrency,
-		trade.OrderID,
+		orderID,
 		trade.ID,
 		trade.Time.Time().Format(time.StampMilli),
+		trade.Liquidity(),
 	)
 }
 
@@ -191,7 +225,6 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 
 	liquidity := trade.Liquidity()
 	text := templateutil.Render(slackTradeTextTemplate, trade)
-	footerIcon := ExchangeFooterIcon(trade.Exchange)
 
 	return slack.Attachment{
 		Text: text,
@@ -200,15 +233,12 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 		Color: color,
 		Fields: []slack.AttachmentField{
 			{Title: "Exchange", Value: trade.Exchange.String(), Short: true},
-			{Title: "Price", Value: trade.Price.String(), Short: true},
-			{Title: "Quantity", Value: trade.Quantity.String(), Short: true},
 			{Title: "QuoteQuantity", Value: trade.QuoteQuantity.String(), Short: true},
-			{Title: "Fee", Value: trade.Fee.String(), Short: true},
-			{Title: "FeeCurrency", Value: trade.FeeCurrency, Short: true},
+			{Title: "Fee", Value: trade.Fee.String() + " " + trade.FeeCurrency, Short: true},
 			{Title: "Liquidity", Value: liquidity, Short: true},
 			{Title: "Order ID", Value: strconv.FormatUint(trade.OrderID, 10), Short: true},
 		},
-		FooterIcon: footerIcon,
+		FooterIcon: ExchangeFooterIcon(trade.Exchange),
 		Footer:     strings.ToLower(trade.Exchange.String()) + templateutil.Render(" creation time {{ . }}", trade.Time.Time().Format(time.StampMilli)),
 	}
 }

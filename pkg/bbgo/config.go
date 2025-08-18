@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"runtime"
 	"strings"
@@ -64,8 +64,11 @@ func (m *ExchangeStrategyMount) Map() (map[string]interface{}, error) {
 }
 
 type SlackNotification struct {
-	DefaultChannel string `json:"defaultChannel,omitempty"  yaml:"defaultChannel,omitempty"`
-	ErrorChannel   string `json:"errorChannel,omitempty"  yaml:"errorChannel,omitempty"`
+	DefaultChannel    string `json:"defaultChannel,omitempty"  yaml:"defaultChannel,omitempty"`
+	ErrorChannel      string `json:"errorChannel,omitempty"  yaml:"errorChannel,omitempty"`
+	DisableErrorHook  bool   `json:"disableErrorHook,omitempty" yaml:"disableErrorHook,omitempty"`
+	QueueSize         int    `json:"queueSize,omitempty" yaml:"queueSize,omitempty"`
+	EnableInteraction bool   `json:"enableInteraction,omitempty" yaml:"enableInteraction,omitempty"`
 }
 
 type SlackNotificationRouting struct {
@@ -291,7 +294,7 @@ type SyncConfig struct {
 	// Sessions to sync, if ignored, all defined sessions will sync
 	Sessions []string `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 
-	// Symbols is the list of session:symbol pair to sync, if ignored, symbols wlll be discovered by your existing crypto balances
+	// Symbols is the list of session:symbol pair to sync, if ignored, symbols will be discovered by your existing crypto balances
 	// Valid formats are: {session}:{symbol},  {symbol} or in YAML object form {symbol: "BTCUSDT", session:"max" }
 	Symbols []SyncSymbol `json:"symbols,omitempty" yaml:"symbols,omitempty"`
 
@@ -328,6 +331,35 @@ type ServiceConfig struct {
 	GoogleSpreadSheetService *GoogleSpreadSheetServiceConfig `json:"googleSpreadSheet" yaml:"googleSpreadSheet"`
 }
 
+type DatabaseConfig struct {
+	Driver string `json:"driver" yaml:"driver"`
+	DSN    string `json:"dsn" yaml:"dsn"`
+
+	ExtraMigrationPackages []string `json:"extraMigrationPackages" yaml:"extraMigrationPackages"`
+}
+
+type ProfilingConfig struct {
+	Enabled      bool   `json:"enabled" yaml:"enabled"`
+	PyroscopeURL string `json:"pyroscopeUrl" yaml:"pyroscopeUrl"`
+}
+
+type EnvironmentConfig struct {
+	DisableDefaultKLineSubscription bool `json:"disableDefaultKLineSubscription"`
+	DisableHistoryKLinePreload      bool `json:"disableHistoryKLinePreload"`
+
+	// DisableStartUpBalanceQuery disables the balance query in the startup process
+	// which initializes the session.Account with the QueryAccount method.
+	DisableStartupBalanceQuery bool `json:"disableStartupBalanceQuery"`
+
+	DisableSessionTradeBuffer bool `json:"disableSessionTradeBuffer"`
+
+	DisableMarketDataStore bool `json:"disableMarketDataStore"`
+
+	MaxSessionTradeBufferSize int `json:"maxSessionTradeBufferSize"`
+
+	SyncBufferPeriod *types.Duration `json:"syncBufferPeriod"`
+}
+
 type Config struct {
 	Build *BuildConfig `json:"build,omitempty" yaml:"build,omitempty"`
 
@@ -345,9 +377,11 @@ type Config struct {
 
 	Service *ServiceConfig `json:"services,omitempty" yaml:"services,omitempty"`
 
-	Sessions map[string]*ExchangeSession `json:"sessions,omitempty" yaml:"sessions,omitempty"`
+	DatabaseConfig *DatabaseConfig `json:"database,omitempty" yaml:"database,omitempty"`
 
-	RiskControls *RiskControls `json:"riskControls,omitempty" yaml:"riskControls,omitempty"`
+	Environment *EnvironmentConfig `json:"environment,omitempty" yaml:"environment,omitempty"`
+
+	Sessions map[string]*ExchangeSession `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 
 	Logging *LoggingConfig `json:"logging,omitempty"`
 
@@ -355,6 +389,8 @@ type Config struct {
 	CrossExchangeStrategies []CrossExchangeStrategy `json:"-" yaml:"-"`
 
 	PnLReporters []PnLReporterConfig `json:"reportPnL,omitempty" yaml:"reportPnL,omitempty"`
+
+	ProfilingConfig *ProfilingConfig `json:"profiling,omitempty" yaml:"profiling,omitempty"`
 }
 
 func (c *Config) Map() (map[string]interface{}, error) {
@@ -470,7 +506,7 @@ func loadStash(config []byte) (Stash, error) {
 func LoadBuildConfig(configFile string) (*Config, error) {
 	var config Config
 
-	content, err := ioutil.ReadFile(configFile)
+	content, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, err
 	}
@@ -500,7 +536,7 @@ func LoadBuildConfig(configFile string) (*Config, error) {
 func Load(configFile string, loadStrategies bool) (*Config, error) {
 	var config Config
 
-	content, err := ioutil.ReadFile(configFile)
+	content, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, err
 	}
@@ -563,7 +599,7 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 		for id, conf := range configStash {
 			// look up the real struct type
 			if st, ok := LoadedCrossExchangeStrategies[id]; ok {
-				val, err := reUnmarshal(conf, st)
+				val, err := ReUnmarshal(conf, st)
 				if err != nil {
 					return err
 				}
@@ -578,7 +614,7 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 
 func NewStrategyFromMap(id string, conf interface{}) (SingleExchangeStrategy, error) {
 	if st, ok := LoadedExchangeStrategies[id]; ok {
-		val, err := reUnmarshal(conf, st)
+		val, err := ReUnmarshal(conf, st)
 		if err != nil {
 			return nil, err
 		}
@@ -636,30 +672,48 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 				return fmt.Errorf("unexpected mount type: %T value: %+v", val, val)
 			}
 		}
+
+		// configStash is a map of strategy id and its config
+		// it has two keys: "on" and {strategyID}
+		strategyLoaded := false
 		for id, conf := range configStash {
-
-			// look up the real struct type
-			if _, ok := LoadedExchangeStrategies[id]; ok {
-				st, err := NewStrategyFromMap(id, conf)
-				if err != nil {
-					return err
-				}
-
-				config.ExchangeStrategies = append(config.ExchangeStrategies, ExchangeStrategyMount{
-					Mounts:   mounts,
-					Strategy: st,
-				})
-			} else if id != "on" && id != "off" {
-				// Show error when we didn't find the Strategy
-				return fmt.Errorf("strategy %s in config not found", id)
+			if id == "on" || id == "off" {
+				continue
 			}
+
+			strategyStruct, err := GetRegisteredStrategy(id)
+			if err != nil {
+				return err
+			}
+
+			strategyInstance, err := ReUnmarshal(conf, strategyStruct)
+			if err != nil {
+				return err
+			}
+
+			singleExchangeStrategyInstance, typeOk := strategyInstance.(SingleExchangeStrategy)
+			if !typeOk {
+				return fmt.Errorf("strategy %s is not a SingleExchangeStrategy", id)
+			}
+
+			config.ExchangeStrategies = append(config.ExchangeStrategies, ExchangeStrategyMount{
+				Mounts:   mounts,
+				Strategy: singleExchangeStrategyInstance,
+			})
+
+			strategyLoaded = true
+		}
+
+		if !strategyLoaded {
+			return fmt.Errorf("strategy is not loaded, possibly caused by an incorrect config format, please check your config file")
 		}
 	}
 
 	return nil
 }
 
-func reUnmarshal(conf interface{}, tpe interface{}) (interface{}, error) {
+// ReUnmarshal unmarshals the given config into the given type
+func ReUnmarshal(conf interface{}, tpe interface{}) (interface{}, error) {
 	// get the type "*Strategy"
 	rt := reflect.TypeOf(tpe)
 

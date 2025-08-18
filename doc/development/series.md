@@ -1,8 +1,12 @@
-Indicator Interface
+Series Interface
 -----------------------------------
 
-In bbgo, we've added several interfaces to standardize the indicator protocol.  
-The new interfaces will allow strategy developers switching similar indicators without checking the code.  
+Series defines the data structure of the indicator data.
+
+indicators use this series interface to manage these time-series data.
+
+The interface allow strategy developers to switch similar indicators without checking the code.  
+
 Signal contributors or indicator developers were also able to be benefit from the existing interface functions, such as `Add`, `Mul`, `Minus`, and `Div`, without rebuilding the wheels.
 
 The series interface in bbgo borrows the concept of `series` type in pinescript that allow us to query data in time-based reverse order (data that created later will be the former object in series). Right now, based on the return type, we have two interfaces been defined in [pkg/types/indicator.go](../../pkg/types/indicator.go):

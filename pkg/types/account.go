@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -29,36 +28,43 @@ const (
 	AccountTypeMargin         = AccountType("margin")
 	AccountTypeIsolatedMargin = AccountType("isolated_margin")
 	AccountTypeSpot           = AccountType("spot")
+	AccountTypeCredit         = AccountType("credit")
 )
 
 type Account struct {
 	sync.Mutex `json:"-"`
 
 	AccountType        AccountType `json:"accountType,omitempty"`
-	FuturesInfo        *FuturesAccountInfo
+	FuturesInfo        *FuturesAccount
 	MarginInfo         *MarginAccountInfo
 	IsolatedMarginInfo *IsolatedMarginAccountInfo
 
 	// Margin related common field
 	// From binance:
 	// Margin Level = Total Asset Value / (Total Borrowed + Total Accrued Interest)
+	//
 	// If your margin level drops to 1.3, you will receive a Margin Call, which is a reminder that you should either increase your collateral (by depositing more funds) or reduce your loan (by repaying what you’ve borrowed).
 	// If your margin level drops to 1.1, your assets will be automatically liquidated, meaning that Binance will sell your funds at market price to repay the loan.
-	MarginLevel     fixedpoint.Value `json:"marginLevel,omitempty"`
+	MarginLevel fixedpoint.Value `json:"marginLevel,omitempty"`
+
 	MarginTolerance fixedpoint.Value `json:"marginTolerance,omitempty"`
 
-	BorrowEnabled   bool `json:"borrowEnabled,omitempty"`
-	TransferEnabled bool `json:"transferEnabled,omitempty"`
+	// MarginRatio = Adjusted equity / (Maintenance margin + Liquidation fees)
+	MarginRatio fixedpoint.Value `json:"marginRatio,omitempty"`
 
-	// isolated margin related fields
+	BorrowEnabled   *bool `json:"borrowEnabled,omitempty"`
+	TransferEnabled *bool `json:"transferEnabled,omitempty"`
+
+	// Isolated margin related fields
+	// ------------------------------
 	// LiquidationPrice is only used when account is in the isolated margin mode
-	MarginRatio      fixedpoint.Value `json:"marginRatio,omitempty"`
 	LiquidationPrice fixedpoint.Value `json:"liquidationPrice,omitempty"`
 	LiquidationRate  fixedpoint.Value `json:"liquidationRate,omitempty"`
 
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
 
+	// TotalAccountValue is the total value of the account in USD or USDT
 	TotalAccountValue fixedpoint.Value `json:"totalAccountValue,omitempty"`
 
 	CanDeposit  bool `json:"canDeposit"`
@@ -68,18 +74,52 @@ type Account struct {
 	balances BalanceMap
 }
 
-type FuturesAccountInfo struct {
+// FuturesAccount defines the account information for futures trading
+// Mostly are derived from the Binance API response
+//
+// @see https://www.binance.com/en/support/faq/detail/b3c689c1f50a44cabb3a84e663b81d93?hl=en
+type FuturesAccount struct {
 	// Futures fields
-	Assets                      FuturesAssetMap    `json:"assets"`
-	Positions                   FuturesPositionMap `json:"positions"`
-	TotalInitialMargin          fixedpoint.Value   `json:"totalInitialMargin"`
-	TotalMaintMargin            fixedpoint.Value   `json:"totalMaintMargin"`
-	TotalMarginBalance          fixedpoint.Value   `json:"totalMarginBalance"`
-	TotalOpenOrderInitialMargin fixedpoint.Value   `json:"totalOpenOrderInitialMargin"`
-	TotalPositionInitialMargin  fixedpoint.Value   `json:"totalPositionInitialMargin"`
-	TotalUnrealizedProfit       fixedpoint.Value   `json:"totalUnrealizedProfit"`
-	TotalWalletBalance          fixedpoint.Value   `json:"totalWalletBalance"`
-	UpdateTime                  int64              `json:"updateTime"`
+	Assets    FuturesAssetMap    `json:"assets"`
+	Positions FuturesPositionMap `json:"positions"`
+
+	// Total initial margin required with current mark price (useless with isolated positions), only for USDT asset
+	//
+	// Initial Margin = Quantity * Entry Price * IMR
+	// IMR = 1 / leverage
+	TotalInitialMargin fixedpoint.Value `json:"totalInitialMargin"`
+
+	// Total maintenance margin required, only for USDT asset
+	//
+	// Maintenance Margin = Position Notional * Maintenance Margin Rate on the level of position notional -  Maintenance Amount on the level of position notional
+	TotalMaintMargin fixedpoint.Value `json:"totalMaintMargin"`
+
+	// Total wallet balance, only for USDT asset
+	//
+	// Wallet Balance = Total Net Transfer + Total Realized Profit + Total Net Funding Fee - Total Commission
+	TotalWalletBalance fixedpoint.Value `json:"totalWalletBalance"`
+
+	// Total margin balance, only for USDT asset
+	//
+	// Margin Balance = Wallet Balance + Unrealized PNL.
+	// Your positions will be liquidated once the Margin Balance ≤ the Maintenance Margin.
+	TotalMarginBalance fixedpoint.Value `json:"totalMarginBalance"`
+
+	// TotalOpenOrderInitialMargin
+	//
+	// For USDⓈ-M Futures:
+	// Available for Order =
+	//		max(0,
+	//			crossWalletBalance + ∑cross Unrealized PNL - (∑Cross Initial Margin + ∑Isolated Open Order Initial Margin)
+	//		)
+	// Isolated Open Order Initial Margin = abs(Isolated Present Notional) * IMR - abs(Size) * IMR * Mark Price
+	TotalOpenOrderInitialMargin fixedpoint.Value `json:"totalOpenOrderInitialMargin"`
+
+	TotalPositionInitialMargin fixedpoint.Value `json:"totalPositionInitialMargin"`
+	TotalUnrealizedProfit      fixedpoint.Value `json:"totalUnrealizedProfit"`
+
+	// AvailableBalance
+	AvailableBalance fixedpoint.Value `json:"availableBalance"`
 }
 
 type MarginAccountInfo struct {
@@ -103,8 +143,26 @@ type IsolatedMarginAccountInfo struct {
 
 func NewAccount() *Account {
 	return &Account{
-		balances: make(BalanceMap),
+		AccountType:        "spot",
+		FuturesInfo:        nil,
+		MarginInfo:         nil,
+		IsolatedMarginInfo: nil,
+		MarginLevel:        fixedpoint.Zero,
+		MarginTolerance:    fixedpoint.Zero,
+		BorrowEnabled:      BoolPtr(false),
+		TransferEnabled:    BoolPtr(false),
+		MarginRatio:        fixedpoint.Zero,
+		LiquidationPrice:   fixedpoint.Zero,
+		LiquidationRate:    fixedpoint.Zero,
+		MakerFeeRate:       fixedpoint.Zero,
+		TakerFeeRate:       fixedpoint.Zero,
+		TotalAccountValue:  fixedpoint.Zero,
+		CanDeposit:         false,
+		CanTrade:           false,
+		CanWithdraw:        false,
+		balances:           make(BalanceMap),
 	}
+
 }
 
 // Balances lock the balances and returned the copied balances
@@ -119,7 +177,19 @@ func (a *Account) Balance(currency string) (balance Balance, ok bool) {
 	a.Lock()
 	balance, ok = a.balances[currency]
 	a.Unlock()
+	if !ok {
+		balance = NewZeroBalance(currency)
+	}
+
 	return balance, ok
+}
+
+func (a *Account) SetBalance(currency string, bal Balance) {
+	a.Lock()
+	defer a.Unlock()
+
+	bal.Currency = currency
+	a.balances[currency] = bal
 }
 
 func (a *Account) AddBalance(currency string, fund fixedpoint.Value) {
@@ -218,20 +288,44 @@ func (a *Account) UpdateBalances(balances BalanceMap) {
 	}
 }
 
-func (a *Account) Print() {
+func (a *Account) Print(log LogFunc) {
 	a.Lock()
 	defer a.Unlock()
 
 	if a.AccountType != "" {
-		logrus.Infof("account type: %s", a.AccountType)
+		log("AccountType: %s", a.AccountType)
 	}
 
-	if a.MakerFeeRate.Sign() > 0 {
-		logrus.Infof("maker fee rate: %v", a.MakerFeeRate)
-	}
-	if a.TakerFeeRate.Sign() > 0 {
-		logrus.Infof("taker fee rate: %v", a.TakerFeeRate)
+	switch a.AccountType {
+	case AccountTypeMargin, AccountTypeFutures:
+		if a.MarginLevel.Sign() != 0 {
+			log("MarginLevel: %f", a.MarginLevel.Float64())
+		}
+
+		if a.MarginTolerance.Sign() != 0 {
+			log("MarginTolerance: %f", a.MarginTolerance.Float64())
+		}
+
+		if a.BorrowEnabled != nil {
+			log("BorrowEnabled: %v", *a.BorrowEnabled)
+		}
+
+		if a.MarginInfo != nil {
+			log("MarginInfo: %#v", a.MarginInfo)
+		}
 	}
 
-	a.balances.Print()
+	if a.TransferEnabled != nil {
+		log("TransferEnabled: %v", *a.TransferEnabled)
+	}
+
+	if a.MakerFeeRate.Sign() != 0 {
+		log("MakerFeeRate: %v", a.MakerFeeRate)
+	}
+
+	if a.TakerFeeRate.Sign() != 0 {
+		log("TakerFeeRate: %v", a.TakerFeeRate)
+	}
+
+	a.balances.Print(log)
 }

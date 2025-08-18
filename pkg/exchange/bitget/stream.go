@@ -5,33 +5,52 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
+	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 var (
 	pingBytes = []byte("ping")
 	pongBytes = []byte("pong")
+
+	marketTradeLogLimiter = rate.NewLimiter(rate.Every(time.Minute), 1)
+	tradeLogLimiter       = rate.NewLimiter(rate.Every(time.Minute), 1)
+	orderLogLimiter       = rate.NewLimiter(rate.Every(time.Minute), 1)
+	kLineLogLimiter       = rate.NewLimiter(rate.Every(time.Minute), 1)
 )
 
 //go:generate callbackgen -type Stream
 type Stream struct {
 	types.StandardStream
 
+	privateChannelSymbols []string
+
+	key, secret, passphrase   string
 	bookEventCallbacks        []func(o BookEvent)
 	marketTradeEventCallbacks []func(o MarketTradeEvent)
 	KLineEventCallbacks       []func(o KLineEvent)
 
+	accountEventCallbacks    []func(e AccountEvent)
+	orderTradeEventCallbacks []func(e OrderTradeEvent)
+
 	lastCandle map[string]types.KLine
 }
 
-func NewStream() *Stream {
+func NewStream(key, secret, passphrase string) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
 		lastCandle:     map[string]types.KLine{},
+		key:            key,
+		secret:         secret,
+		passphrase:     passphrase,
 	}
 
 	stream.SetEndpointCreator(stream.createEndpoint)
@@ -43,6 +62,10 @@ func NewStream() *Stream {
 	stream.OnBookEvent(stream.handleBookEvent)
 	stream.OnMarketTradeEvent(stream.handleMaretTradeEvent)
 	stream.OnKLineEvent(stream.handleKLineEvent)
+
+	stream.OnAuth(stream.handleAuth)
+	stream.OnAccountEvent(stream.handleAccountEvent)
+	stream.OnOrderTradeEvent(stream.handleOrderTradeEvent)
 	return stream
 }
 
@@ -52,7 +75,7 @@ func (s *Stream) syncSubscriptions(opType WsEventType) error {
 	}
 
 	logger := log.WithField("opType", opType)
-	args := []WsArg{}
+	var args []WsArg
 	for _, subscription := range s.Subscriptions {
 		arg, err := convertSubscription(subscription)
 		if err != nil {
@@ -64,12 +87,19 @@ func (s *Stream) syncSubscriptions(opType WsEventType) error {
 	}
 
 	logger.Infof("%s channels: %+v", opType, args)
-	if err := s.Conn.WriteJSON(WsOp{
-		Op:   opType,
-		Args: args,
-	}); err != nil {
-		logger.WithError(err).Error("failed to send request")
-		return err
+
+	batchSize := 10
+	lenArgs := len(args)
+	for begin := 0; begin < lenArgs; begin += batchSize {
+		end := min(begin+batchSize, lenArgs)
+
+		if err := s.Conn.WriteJSON(WsOp{
+			Op:   opType,
+			Args: args[begin:end],
+		}); err != nil {
+			logger.WithError(err).Error("failed to send request")
+			return err
+		}
 	}
 
 	return nil
@@ -87,9 +117,9 @@ func (s *Stream) Unsubscribe() {
 func (s *Stream) createEndpoint(_ context.Context) (string, error) {
 	var url string
 	if s.PublicOnly {
-		url = bitgetapi.PublicWebSocketURL
+		url = v2.PublicWebSocketURL
 	} else {
-		url = bitgetapi.PrivateWebSocketURL
+		url = v2.PrivateWebSocketURL
 	}
 	return url, nil
 }
@@ -99,6 +129,10 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	case *WsEvent:
 		if err := e.IsValid(); err != nil {
 			log.Errorf("invalid event: %v", err)
+			return
+		}
+		if e.IsAuthenticated() {
+			s.EmitAuth()
 		}
 
 	case *BookEvent:
@@ -110,6 +144,12 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	case *KLineEvent:
 		s.EmitKLineEvent(*e)
 
+	case *AccountEvent:
+		s.EmitAccountEvent(*e)
+
+	case *OrderTradeEvent:
+		s.EmitOrderTradeEvent(*e)
+
 	case []byte:
 		// We only handle the 'pong' case. Others are unexpected.
 		if !bytes.Equal(e, pongBytes) {
@@ -118,12 +158,62 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	}
 }
 
+// handleAuth subscribe private stream channels. Because Bitget doesn't allow authentication and subscription to be used
+// consecutively, we subscribe after authentication confirmation.
+func (s *Stream) handleAuth() {
+	op := WsOp{
+		Op: WsEventSubscribe,
+		Args: []WsArg{
+			{
+				InstType: instSpV2,
+				Channel:  ChannelAccount,
+				Coin:     "default", // all coins
+			},
+		},
+	}
+	if len(s.privateChannelSymbols) > 0 {
+		for _, symbol := range s.privateChannelSymbols {
+			op.Args = append(op.Args, WsArg{
+				InstType: instSpV2,
+				Channel:  ChannelOrders,
+				InstId:   symbol,
+			})
+		}
+	} else {
+		log.Warnf("you have not subscribed to any order channels")
+	}
+
+	if err := s.Conn.WriteJSON(op); err != nil {
+		log.WithError(err).Error("failed to send subscription request")
+		return
+	}
+}
+
+func (s *Stream) SetPrivateChannelSymbols(symbols []string) {
+	s.privateChannelSymbols = symbols
+}
+
 func (s *Stream) handlerConnect() {
 	if s.PublicOnly {
 		// errors are handled in the syncSubscriptions, so they are skipped here.
 		_ = s.syncSubscriptions(WsEventSubscribe)
 	} else {
-		log.Error("*** PRIVATE API NOT IMPLEMENTED ***")
+		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+
+		if err := s.Conn.WriteJSON(WsOp{
+			Op: WsEventLogin,
+			Args: []WsArg{
+				{
+					ApiKey:     s.key,
+					Passphrase: s.passphrase,
+					Timestamp:  timestamp,
+					Sign:       bitgetapi.Sign(fmt.Sprintf("%sGET/user/verify", timestamp), s.secret),
+				},
+			},
+		}); err != nil {
+			log.WithError(err).Error("failed to auth request")
+			return
+		}
 	}
 }
 
@@ -152,7 +242,7 @@ func (s *Stream) ping(conn *websocket.Conn) error {
 func convertSubscription(sub types.Subscription) (WsArg, error) {
 	arg := WsArg{
 		// support spot only
-		InstType: instSp,
+		InstType: instSpV2,
 		Channel:  "",
 		InstId:   sub.Symbol,
 	}
@@ -162,9 +252,11 @@ func convertSubscription(sub types.Subscription) (WsArg, error) {
 		arg.Channel = ChannelOrderBook5
 
 		switch sub.Options.Depth {
-		case types.DepthLevel15:
+		case types.DepthLevel5:
+			arg.Channel = ChannelOrderBook5
+		case types.DepthLevel15, types.DepthLevelMedium:
 			arg.Channel = ChannelOrderBook15
-		case types.DepthLevel200:
+		case types.DepthLevel200, types.DepthLevelFull:
 			log.Warn("*** The subscription events for the order book may return fewer than 200 bids/asks at a depth of 200. ***")
 			arg.Channel = ChannelOrderBook
 		}
@@ -190,10 +282,9 @@ func convertSubscription(sub types.Subscription) (WsArg, error) {
 func parseWebSocketEvent(in []byte) (interface{}, error) {
 	switch {
 	case bytes.Equal(in, pongBytes):
-		// Return the original raw data may seem redundant because we can validate the string and return nil,
-		// but we cannot return nil to a lower level handler. This can cause confusion in the next handler, such as
-		// the dispatch handler. Therefore, I return the original raw data.
-		return in, nil
+		// return global pong event to avoid emit raw message
+		return types.WebsocketPongEvent{}, nil
+
 	default:
 		return parseEvent(in)
 	}
@@ -213,6 +304,17 @@ func parseEvent(in []byte) (interface{}, error) {
 
 	ch := event.Arg.Channel
 	switch ch {
+	case ChannelAccount:
+		var acct AccountEvent
+		err = json.Unmarshal(event.Data, &acct.Balances)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal data into AccountEvent, Arg: %+v Data: %s, err: %w", event.Arg, string(event.Data), err)
+		}
+
+		acct.actionType = event.Action
+		acct.instId = event.Arg.InstId
+		return &acct, nil
+
 	case ChannelOrderBook, ChannelOrderBook5, ChannelOrderBook15:
 		var book BookEvent
 		err = json.Unmarshal(event.Data, &book.Events)
@@ -223,6 +325,17 @@ func parseEvent(in []byte) (interface{}, error) {
 		book.actionType = event.Action
 		book.instId = event.Arg.InstId
 		return &book, nil
+
+	case ChannelOrders:
+		var order OrderTradeEvent
+		err = json.Unmarshal(event.Data, &order.Orders)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal data into OrderTradeEvent, Arg: %+v Data: %s, err: %w", event.Arg, string(event.Data), err)
+		}
+
+		order.actionType = event.Action
+		order.instId = event.Arg.InstId
+		return &order, nil
 
 	case ChannelTrade:
 		var trade MarketTradeEvent
@@ -264,7 +377,9 @@ func (s *Stream) handleMaretTradeEvent(m MarketTradeEvent) {
 	for _, trade := range m.Events {
 		globalTrade, err := trade.ToGlobal(m.instId)
 		if err != nil {
-			log.WithError(err).Error("failed to convert to market trade")
+			if marketTradeLogLimiter.Allow() {
+				log.WithError(err).Error("failed to convert to market trade")
+			}
 			return
 		}
 
@@ -280,7 +395,9 @@ func (s *Stream) handleKLineEvent(k KLineEvent) {
 
 	interval, found := toGlobalInterval[string(k.channel)]
 	if !found {
-		log.Errorf("unexpected interval %s on KLine subscription", k.channel)
+		if kLineLogLimiter.Allow() {
+			log.Errorf("unexpected interval %s on KLine subscription", k.channel)
+		}
 		return
 	}
 
@@ -294,5 +411,68 @@ func (s *Stream) handleKLineEvent(k KLineEvent) {
 		kLine := kline.ToGlobal(interval, k.instId)
 		s.EmitKLine(kLine)
 		s.lastCandle[k.CacheKey()] = kLine
+	}
+}
+
+func (s *Stream) handleAccountEvent(m AccountEvent) {
+	balanceMap := toGlobalBalanceMap(m.Balances)
+	if len(balanceMap) == 0 {
+		return
+	}
+
+	if m.actionType == ActionTypeUpdate {
+		s.StandardStream.EmitBalanceUpdate(balanceMap)
+		return
+	}
+	s.StandardStream.EmitBalanceSnapshot(balanceMap)
+}
+
+func (s *Stream) handleOrderTradeEvent(m OrderTradeEvent) {
+	if len(m.Orders) == 0 {
+		return
+	}
+
+	debugf("received OrderTradeEvent %s (%s): %+v", m.instId, m.actionType, m)
+
+	for _, order := range m.Orders {
+		if order.TradeId == 0 {
+			debugf("received %s order update #%d: %+v", m.instId, order.OrderId, order)
+		} else {
+			debugf("received %s order update #%d and trade update #%d: %+v", m.instId, order.OrderId, order.TradeId, order)
+		}
+
+		globalOrder, err := order.toGlobalOrder()
+		if err != nil {
+			if orderLogLimiter.Allow() {
+				log.Errorf("failed to convert order to global: %s", err)
+			}
+			continue
+		}
+
+		// The bitget support only snapshot on orders channel, so we use snapshot as update to emit data.
+		if m.actionType != ActionTypeSnapshot {
+			continue
+		}
+
+		s.StandardStream.EmitOrderUpdate(globalOrder)
+
+		if order.TradeId == 0 {
+			continue
+		}
+
+		debugf("received Trade: %+v", order.Trade)
+
+		switch globalOrder.Status {
+		case types.OrderStatusPartiallyFilled, types.OrderStatusFilled:
+			trade, err := order.toGlobalTrade()
+			if err != nil {
+				if tradeLogLimiter.Allow() {
+					log.Errorf("failed to convert trade to global: %s", err)
+				}
+				continue
+			}
+
+			s.StandardStream.EmitTradeUpdate(trade)
+		}
 	}
 }

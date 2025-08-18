@@ -5,21 +5,19 @@ import (
 	"fmt"
 	"math"
 	"sync"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	. "github.com/c9s/bbgo/pkg/indicator/v2"
-	"github.com/c9s/bbgo/pkg/risk/riskcontrol"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 const ID = "scmaker"
-
-var ten = fixedpoint.NewFromInt(10)
 
 type advancedOrderCancelApi interface {
 	CancelAllOrders(ctx context.Context) ([]types.Order, error)
@@ -62,12 +60,6 @@ type Strategy struct {
 
 	MinProfit fixedpoint.Value `json:"minProfit"`
 
-	// risk related parameters
-	PositionHardLimit         fixedpoint.Value     `json:"positionHardLimit"`
-	MaxPositionQuantity       fixedpoint.Value     `json:"maxPositionQuantity"`
-	CircuitBreakLossThreshold fixedpoint.Value     `json:"circuitBreakLossThreshold"`
-	CircuitBreakEMA           types.IntervalWindow `json:"circuitBreakEMA"`
-
 	liquidityOrderBook, adjustmentOrderBook *bbgo.ActiveOrderBook
 	book                                    *types.StreamOrderBook
 
@@ -77,9 +69,13 @@ type Strategy struct {
 	ewma      *EWMAStream
 	boll      *BOLLStream
 	intensity *IntensityStream
+}
 
-	positionRiskControl     *riskcontrol.PositionRiskControl
-	circuitBreakRiskControl *riskcontrol.CircuitBreakRiskControl
+func (s *Strategy) Initialize() error {
+	if s.Strategy == nil {
+		s.Strategy = &common.Strategy{}
+	}
+	return nil
 }
 
 func (s *Strategy) ID() string {
@@ -100,33 +96,17 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.Strategy = &common.Strategy{}
+func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
-	s.book = types.NewStreamBook(s.Symbol)
-	s.book.BindStream(session.UserDataStream)
+	s.book = types.NewStreamBook(s.Symbol, session.Exchange.Name())
+	s.book.BindStream(session.MarketDataStream)
 
 	s.liquidityOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
 	s.liquidityOrderBook.BindStream(session.UserDataStream)
 
 	s.adjustmentOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
 	s.adjustmentOrderBook.BindStream(session.UserDataStream)
-
-	if !s.PositionHardLimit.IsZero() && !s.MaxPositionQuantity.IsZero() {
-		log.Infof("positionHardLimit and maxPositionQuantity are configured, setting up PositionRiskControl...")
-		s.positionRiskControl = riskcontrol.NewPositionRiskControl(s.OrderExecutor, s.PositionHardLimit, s.MaxPositionQuantity)
-	}
-
-	if !s.CircuitBreakLossThreshold.IsZero() {
-		log.Infof("circuitBreakLossThreshold is configured, setting up CircuitBreakRiskControl...")
-		s.circuitBreakRiskControl = riskcontrol.NewCircuitBreakRiskControl(
-			s.Position,
-			session.Indicators(s.Symbol).EWMA(s.CircuitBreakEMA),
-			s.CircuitBreakLossThreshold,
-			s.ProfitStats,
-			24*time.Hour)
-	}
 
 	scale, err := s.LiquiditySlideRule.Scale()
 	if err != nil {
@@ -142,6 +122,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	s.liquidityScale = scale
+
+	instanceID := s.InstanceID()
+	if err := dynamic.InitializeConfigMetrics(ID, instanceID, s); err != nil {
+		return err
+	}
 
 	s.initializeMidPriceEMA(session)
 	s.initializePriceRangeBollinger(session)
@@ -165,16 +150,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		defer wg.Done()
 
 		err := s.liquidityOrderBook.GracefulCancel(ctx, s.Session.Exchange)
-		logErr(err, "unable to cancel liquidity orders")
+		util.LogErr(err, "unable to cancel liquidity orders")
 
 		err = s.adjustmentOrderBook.GracefulCancel(ctx, s.Session.Exchange)
-		logErr(err, "unable to cancel adjustment orders")
+		util.LogErr(err, "unable to cancel adjustment orders")
+
+		bbgo.Sync(ctx, s)
 	})
 
 	return nil
 }
 
-func (s *Strategy) preloadKLines(inc *KLineStream, session *bbgo.ExchangeSession, symbol string, interval types.Interval) {
+func (s *Strategy) preloadKLines(
+	inc *KLineStream, session *bbgo.ExchangeSession, symbol string, interval types.Interval,
+) {
 	if store, ok := session.MarketDataStore(symbol); ok {
 		if kLinesData, ok := store.KLinesOfInterval(interval); ok {
 			for _, k := range *kLinesData {
@@ -214,12 +203,12 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 	}
 
 	ticker, err := s.Session.Exchange.QueryTicker(ctx, s.Symbol)
-	if logErr(err, "unable to query ticker") {
+	if util.LogErr(err, "unable to query ticker") {
 		return
 	}
 
 	if _, err := s.Session.UpdateAccount(ctx); err != nil {
-		logErr(err, "unable to update account")
+		util.LogErr(err, "unable to update account")
 		return
 	}
 
@@ -269,7 +258,7 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 	}
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, adjOrders...)
-	if logErr(err, "unable to place liquidity orders") {
+	if util.LogErr(err, "unable to place liquidity orders") {
 		return
 	}
 
@@ -278,17 +267,17 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 
 func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	ticker, err := s.Session.Exchange.QueryTicker(ctx, s.Symbol)
-	if logErr(err, "unable to query ticker") {
+	if util.LogErr(err, "unable to query ticker") {
 		return
 	}
 
-	if s.circuitBreakRiskControl != nil && s.circuitBreakRiskControl.IsHalted(ticker.Time) {
+	if s.IsHalted(ticker.Time) {
 		log.Warn("circuitBreakRiskControl: trading halted")
 		return
 	}
 
 	err = s.liquidityOrderBook.GracefulCancel(ctx, s.Session.Exchange)
-	if logErr(err, "unable to cancel orders") {
+	if util.LogErr(err, "unable to cancel orders") {
 		return
 	}
 
@@ -302,7 +291,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	}
 
 	if _, err := s.Session.UpdateAccount(ctx); err != nil {
-		logErr(err, "unable to update account")
+		util.LogErr(err, "unable to update account")
 		return
 	}
 
@@ -468,7 +457,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	makerQuota.Commit()
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, liqOrders...)
-	if logErr(err, "unable to place liquidity orders") {
+	if util.LogErr(err, "unable to place liquidity orders") {
 		return
 	}
 
@@ -476,7 +465,9 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	log.Infof("%d liq orders are placed successfully", len(liqOrders))
 }
 
-func profitProtectedPrice(side types.SideType, averageCost, price, feeRate, minProfit fixedpoint.Value) fixedpoint.Value {
+func profitProtectedPrice(
+	side types.SideType, averageCost, price, feeRate, minProfit fixedpoint.Value,
+) fixedpoint.Value {
 	switch side {
 	case types.SideTypeSell:
 		minProfitPrice := averageCost.Add(
@@ -490,22 +481,4 @@ func profitProtectedPrice(side types.SideType, averageCost, price, feeRate, minP
 
 	}
 	return price
-}
-
-func logErr(err error, msgAndArgs ...interface{}) bool {
-	if err == nil {
-		return false
-	}
-
-	if len(msgAndArgs) == 0 {
-		log.WithError(err).Error(err.Error())
-	} else if len(msgAndArgs) == 1 {
-		msg := msgAndArgs[0].(string)
-		log.WithError(err).Error(msg)
-	} else if len(msgAndArgs) > 1 {
-		msg := msgAndArgs[0].(string)
-		log.WithError(err).Errorf(msg, msgAndArgs[1:]...)
-	}
-
-	return true
 }

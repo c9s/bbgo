@@ -23,6 +23,9 @@ func (g *GracefulShutdown) Shutdown(shutdownCtx context.Context) {
 	wg.Wait()
 }
 
+// OnShutdown helps you register your shutdown handler
+// the first context object is where you want to register your shutdown handler, where the context has the isolated storage.
+// in your handler, you will get another context for the timeout context.
 func OnShutdown(ctx context.Context, f ShutdownHandler) {
 	isolatedContext := GetIsolationFromContext(ctx)
 	isolatedContext.gracefulShutdown.OnShutdown(f)

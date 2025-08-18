@@ -19,6 +19,7 @@ func init() {
 	rootCmd.PersistentFlags().String("binance-api-key", "", "binance api key")
 	rootCmd.PersistentFlags().String("binance-api-secret", "", "binance api secret")
 	rootCmd.PersistentFlags().String("symbol", "BNBUSDT", "symbol")
+	rootCmd.PersistentFlags().Bool("use-futures", false, "use binance futures client")
 }
 
 var rootCmd = &cobra.Command{
@@ -42,13 +43,18 @@ var rootCmd = &cobra.Command{
 			return errors.New("empty key or secret")
 		}
 
+		useFutures := viper.GetBool("use-futures")
 		var exchange = binance.New(key, secret)
+		if useFutures {
+			exchange.UseFutures()
+			log.Info("change exchange to use futures")
+		}
 
 		stream := exchange.NewStream()
 		stream.SetPublicOnly()
 		stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 
-		streamBook := types.NewStreamBook(symbol)
+		streamBook := types.NewStreamBook(symbol, exchange.Name())
 		streamBook.BindStream(stream)
 
 		go func() {

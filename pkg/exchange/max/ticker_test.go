@@ -6,20 +6,22 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/testutil"
 )
 
 func TestExchange_QueryTickers_AllSymbols(t *testing.T) {
-	key := os.Getenv("MAX_API_KEY")
-	secret := os.Getenv("MAX_API_SECRET")
-	if len(key) == 0 && len(secret) == 0 {
-		t.Skip("api key/secret are not configured")
-		return
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
 	}
 
 	e := New(key, secret)
 	got, err := e.QueryTickers(context.Background())
 	if assert.NoError(t, err) {
 		assert.True(t, len(got) > 1, "max: attempting to get all symbol tickers, but get 1 or less")
+
+		t.Logf("tickers: %+v", got)
 	}
 }
 

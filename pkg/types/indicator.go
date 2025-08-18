@@ -234,7 +234,7 @@ func switchIface(b interface{}) Series {
 // Divid two series, result[i] = a[i] / b[i]
 func Div(a interface{}, b interface{}) SeriesExtend {
 	aa := switchIface(a)
-	if 0 == b {
+	if b == 0 {
 		panic("Divid by zero exception")
 	}
 	bb := switchIface(b)
@@ -327,29 +327,29 @@ func Dot(a interface{}, b interface{}, limit ...int) float64 {
 		aas = tp
 		isaf = false
 	default:
-		panic("input should be either Series or float64")
+		panic("input should be either *Series or numbers")
 	}
 	switch tp := b.(type) {
 	case float64:
 		bbf = tp
 		isbf = true
 	case int32:
-		aaf = float64(tp)
-		isaf = true
+		bbf = float64(tp)
+		isbf = true
 	case int64:
-		aaf = float64(tp)
-		isaf = true
+		bbf = float64(tp)
+		isbf = true
 	case float32:
-		aaf = float64(tp)
-		isaf = true
+		bbf = float64(tp)
+		isbf = true
 	case int:
-		aaf = float64(tp)
-		isaf = true
+		bbf = float64(tp)
+		isbf = true
 	case Series:
 		bbs = tp
 		isbf = false
 	default:
-		panic("input should be either Series or float64")
+		panic("input should be either *Series or numbers")
 
 	}
 	l := 1
@@ -406,6 +406,32 @@ func Array(a Series, limit ...int) (result []float64) {
 		result[i] = a.Last(i)
 	}
 	return
+}
+
+// Ordinary Least Squares fit result, only support 1d array
+func OLS(a SeriesExtend, b SeriesExtend, n int) (float64, float64) {
+	if a.Length() < n {
+		n = a.Length()
+	}
+	if b.Length() < n {
+		n = b.Length()
+	}
+	numerator := 0.0
+	denominator := 0.0
+	meana := a.Mean(n)
+	meanb := b.Mean(n)
+	for i := 0; i < n; i++ {
+		x := a.Last(i)
+		y := b.Last(i)
+		numerator += (x - meana) * (y - meanb)
+		denominator += (x - meana) * (x - meana)
+	}
+	if denominator == 0 {
+		return 0, 0
+	}
+	beta := numerator / denominator
+	alpha := meanb - beta*meana
+	return alpha, beta
 }
 
 // Similar to Array but in reverse order.
@@ -748,7 +774,7 @@ func Rolling(a Series, window int) *RollingResult {
 	return &RollingResult{a, window}
 }
 
-// SoftMax returns the input value in the range of 0 to 1
+// Softmax returns the input value in the range of 0 to 1
 // with sum of all the probabilities being equal to one.
 // It is commonly used in machine learning neural networks.
 // Will return Softmax SeriesExtend result based in latest [window] numbers from [a] Series

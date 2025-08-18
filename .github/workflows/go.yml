@@ -2,11 +2,13 @@ name: Go
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
     branches:
     - "main"
-    - "v*"
+  pull_request:
+    # types: [synchronize, opened, reopened, edited]
+    # branches:
+    # - "main"
+    # - "v*"
 
 jobs:
   build:
@@ -16,22 +18,23 @@ jobs:
     strategy:
       matrix:
         redis-version:
-        - 6.2
+        - "6.2"
         go-version:
-        - 1.18
+        - "1.23"
     env:
+      GITHUB_CI: true
       MYSQL_DATABASE: bbgo
       MYSQL_USER: "root"
       MYSQL_PASSWORD: "root" # pragma: allowlist secret
 
     steps:
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         # lfs: 'true'
         ssh-key: ${{ secrets.git_ssh_key }}
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v4
       with:
         path: |
           ~/.cache/go-build
@@ -52,12 +55,12 @@ jobs:
         # auto-start: "false"
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go-version }}
 
     - name: Install Migration Tool
-      run: go install github.com/c9s/rockhopper/cmd/rockhopper@v1.2.1
+      run: go install github.com/c9s/rockhopper/v2/cmd/rockhopper@latest
 
     - name: Test Migration SQL Files For MySQL
       run: |
@@ -78,7 +81,7 @@ jobs:
 
     - name: Test
       run: |
-        go test -race -coverprofile coverage.txt -covermode atomic ./pkg/...
+        go test -count 3 -race -coverprofile coverage.txt -covermode atomic ./pkg/...
         sed -i -e '/_requestgen.go/d' coverage.txt
 
     - name: TestDnum
@@ -87,13 +90,13 @@ jobs:
         sed -i -e '/_requestgen.go/d' coverage_dnum.txt
 
     - name: Revive Check
-      uses: morphy2k/revive-action@v2
+      uses: morphy2k/revive-action@v2.7.7 # https://github.com/mgechev/revive/issues/956
       with:
         reporter: github-pr-review
         fail_on_error: true
 
     - name: Upload Coverage Report
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
         files: ./coverage.txt,./coverage_dnum.txt
 

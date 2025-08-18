@@ -325,3 +325,16 @@ func TestPosition_SetClosing(t *testing.T) {
 	ret = p.SetClosing(false)
 	assert.True(t, ret)
 }
+
+func TestPosition_GetBaseAndAverageCost(t *testing.T) {
+	pos := Position{
+		Symbol:        "BTCUSDT",
+		BaseCurrency:  "BTC",
+		QuoteCurrency: "USDT",
+		Base:          fixedpoint.NewFromFloat(0.01),
+		AverageCost:   fixedpoint.NewFromFloat(1000),
+	}
+	base, avgCost := pos.GetBaseAndAverageCost()
+	assert.Equal(t, pos.Base, base)
+	assert.Equal(t, pos.AverageCost, avgCost)
+}

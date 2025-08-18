@@ -9,12 +9,35 @@ import (
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/pkg/errors"
 
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+func toGlobalWithdrawStatus(status binanceapi.WithdrawStatus) (types.WithdrawStatus, error) {
+	switch status {
+	case binanceapi.WithdrawStatusEmailSent:
+		return types.WithdrawStatusSent, nil
+	case binanceapi.WithdrawStatusCancelled:
+		return types.WithdrawStatusCancelled, nil
+	case binanceapi.WithdrawStatusAwaitingApproval:
+		return types.WithdrawStatusAwaitingApproval, nil
+	case binanceapi.WithdrawStatusRejected:
+		return types.WithdrawStatusRejected, nil
+	case binanceapi.WithdrawStatusProcessing:
+		return types.WithdrawStatusProcessing, nil
+	case binanceapi.WithdrawStatusFailure:
+		return types.WithdrawStatusFailed, nil
+	case binanceapi.WithdrawStatusCompleted:
+		return types.WithdrawStatusCompleted, nil
+	default:
+		return types.WithdrawStatusUnknown, fmt.Errorf("unable to convert the withdraw status: %s", status)
+	}
+}
+
 func toGlobalMarket(symbol binance.Symbol) types.Market {
 	market := types.Market{
+		Exchange:        types.ExchangeBinance,
 		Symbol:          symbol.Symbol,
 		LocalSymbol:     symbol.Symbol,
 		PricePrecision:  symbol.QuotePrecision,
@@ -23,7 +46,7 @@ func toGlobalMarket(symbol binance.Symbol) types.Market {
 		BaseCurrency:    symbol.BaseAsset,
 	}
 
-	if f := symbol.MinNotionalFilter(); f != nil {
+	if f := symbol.NotionalFilter(); f != nil {
 		market.MinNotional = fixedpoint.MustNewFromString(f.MinNotional)
 		market.MinAmount = fixedpoint.MustNewFromString(f.MinNotional)
 	}
@@ -59,6 +82,7 @@ func toGlobalMarket(symbol binance.Symbol) types.Market {
 // TODO: Cuz it returns types.Market as well, merge following to the above function
 func toGlobalFuturesMarket(symbol futures.Symbol) types.Market {
 	market := types.Market{
+		Exchange:        types.ExchangeBinance,
 		Symbol:          symbol.Symbol,
 		LocalSymbol:     symbol.Symbol,
 		PricePrecision:  symbol.QuotePrecision,
@@ -177,6 +201,7 @@ func toGlobalOrder(binanceOrder *binance.Order, isMargin bool) (*types.Order, er
 		IsWorking:        binanceOrder.IsWorking,
 		OrderID:          uint64(binanceOrder.OrderID),
 		Status:           toGlobalOrderStatus(binanceOrder.Status),
+		OriginalStatus:   string(binanceOrder.Status),
 		ExecutedQuantity: fixedpoint.MustNewFromString(binanceOrder.ExecutedQuantity),
 		CreationTime:     types.Time(millisecondTime(binanceOrder.Time)),
 		UpdateTime:       types.Time(millisecondTime(binanceOrder.UpdateTime)),
@@ -228,7 +253,7 @@ func toGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 		OrderID:       uint64(t.OrderID),
 		Price:         price,
 		Symbol:        t.Symbol,
-		Exchange:      "binance",
+		Exchange:      types.ExchangeBinance,
 		Quantity:      quantity,
 		QuoteQuantity: quoteQuantity,
 		Side:          side,
@@ -317,9 +342,13 @@ func convertSubscription(s types.Subscription) string {
 		case types.DepthLevel5:
 			n += "5"
 
-		case types.DepthLevelMedium:
+		case types.DepthLevel10:
+			n += "10"
+
+		case types.DepthLevel20, types.DepthLevelMedium:
 			n += "20"
 
+			// default to full
 		case types.DepthLevelFull:
 		default:
 

@@ -332,6 +332,23 @@ func TestFuturesResponseParsing(t *testing.T) {
 			  }
 			}`,
 		},
+		{
+			input: `{
+				"e": "TRADE_LITE",
+				"E": 1721895408092,
+				"T": 1721895408214,
+				"s": "BTCUSDT",
+				"q": "0.001",
+				"p": "0",
+				"m": false,
+				"c": "z8hcUoOsqEdKMeKPSABslD",
+				"S": "BUY",
+				"L": "64089.20",
+				"l": "0.040",
+				"t": 109100866,
+				"i": 8886774
+			}`,
+		},
 	}
 
 	for _, testcase := range testcases {

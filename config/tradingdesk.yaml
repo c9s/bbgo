@@ -1,0 +1,26 @@
+---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
+sessions:
+  binance:
+    exchange: binance
+    futures: true
+    symbolLeverage:
+      BTCUSDT: 3
+      ETHUSDT: 3
+
+exchangeStrategies:
+  - on: binance
+    tradingdesk:
+      maxLossLimit: 10
+      openPositions:
+      - symbol: BTCUSDT
+        side: SELL
+        # quantity: 0.001
+        stopLossPrice: 125_000
+        takeProfitPrice: 90_000
+        timeToLive: "1m"
+      closePositionsOnShutdown: true

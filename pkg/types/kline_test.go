@@ -2,8 +2,9 @@ package types
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestKLineWindow_Tail(t *testing.T) {
@@ -55,4 +56,15 @@ func TestKLineWindow_Truncate(t *testing.T) {
 	win.Truncate(1)
 	assert.Len(t, win, 1)
 	assert.Equal(t, 11603.0, win.Last().Open.Float64())
+}
+
+func TestShrinkSlice(t *testing.T) {
+	var slice = make([]float64, 0, 100)
+	for i := 0; i < 50000; i++ {
+		slice = append(slice, float64(i))
+	}
+
+	slice2 := ShrinkSlice(slice, 40000, 10000)
+	assert.NotEqual(t, &slice2, &slice)
+	assert.Equal(t, 10000, len(slice2))
 }

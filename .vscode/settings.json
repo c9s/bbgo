@@ -1,0 +1,13 @@
+{
+    "go.testEnvFile": "${workspaceFolder}/.env.local",
+    "go.testFlags": [
+        "-race",
+        "-count",
+        "3",
+        "-coverprofile",
+        "${workspaceFolder}/coverage.out",
+        "-covermode",
+        "atomic"
+    ],
+    "go.testTimeout": "10m"
+}

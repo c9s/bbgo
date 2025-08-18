@@ -2,10 +2,8 @@ package cmd
 
 import (
 	"context"
-	"os"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -25,31 +23,13 @@ var SyncCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		configFile, err := cmd.Flags().GetString("config")
-		if err != nil {
-			return err
-		}
-
-		if len(configFile) == 0 {
-			return errors.New("--config option is required")
-		}
-
-		if _, err := os.Stat(configFile); os.IsNotExist(err) {
-			return err
-		}
-
-		userConfig, err := bbgo.Load(configFile, false)
-		if err != nil {
-			return err
-		}
-
 		since, err := cmd.Flags().GetString("since")
 		if err != nil {
 			return err
 		}
 
 		environ := bbgo.NewEnvironment()
-		if err := environ.ConfigureDatabase(ctx); err != nil {
+		if err := environ.ConfigureDatabase(ctx, userConfig); err != nil {
 			return err
 		}
 

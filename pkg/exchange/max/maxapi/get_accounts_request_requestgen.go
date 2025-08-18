@@ -109,13 +109,21 @@ func (g *GetAccountsRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetAccountsRequest) GetPath() string {
+	return "v2/members/accounts"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetAccountsRequest) Do(ctx context.Context) ([]Account, error) {
 
 	// no body params
 	var params interface{}
 	query := url.Values{}
 
-	apiURL := "v2/members/accounts"
+	var apiURL string
+
+	apiURL = g.GetPath()
 
 	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
@@ -128,8 +136,32 @@ func (g *GetAccountsRequest) Do(ctx context.Context) ([]Account, error) {
 	}
 
 	var apiResponse []Account
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return apiResponse, nil
 }

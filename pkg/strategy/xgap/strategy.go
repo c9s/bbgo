@@ -12,18 +12,19 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/timejitter"
+	"github.com/c9s/bbgo/pkg/util/tradingutil"
 )
 
 const ID = "xgap"
 
-const stateKey = "state-v1"
-
 var log = logrus.WithField("strategy", ID)
 
-var StepPercentageGap = fixedpoint.NewFromFloat(0.05)
-var NotionModifier = fixedpoint.NewFromFloat(1.01)
+var maxStepPercentageGap = fixedpoint.NewFromFloat(0.05)
+
 var Two = fixedpoint.NewFromInt(2)
 
 func init() {
@@ -34,102 +35,95 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
-type State struct {
-	AccumulatedFeeStartedAt time.Time                   `json:"accumulatedFeeStartedAt,omitempty"`
-	AccumulatedFees         map[string]fixedpoint.Value `json:"accumulatedFees,omitempty"`
-	AccumulatedVolume       fixedpoint.Value            `json:"accumulatedVolume,omitempty"`
-}
-
-func (s *State) IsOver24Hours() bool {
-	return time.Since(s.AccumulatedFeeStartedAt) >= 24*time.Hour
-}
-
-func (s *State) Reset() {
-	t := time.Now()
-	dateTime := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-
-	log.Infof("resetting accumulated started time to: %s", dateTime)
-
-	s.AccumulatedFeeStartedAt = dateTime
-	s.AccumulatedFees = make(map[string]fixedpoint.Value)
-	s.AccumulatedVolume = fixedpoint.Zero
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s:%s:%s", ID, s.TradingExchange, s.Symbol)
 }
 
 type Strategy struct {
-	Symbol          string           `json:"symbol"`
-	SourceExchange  string           `json:"sourceExchange"`
-	TradingExchange string           `json:"tradingExchange"`
-	MinSpread       fixedpoint.Value `json:"minSpread"`
-	Quantity        fixedpoint.Value `json:"quantity"`
+	*common.Strategy
+	*common.FeeBudget
 
-	DailyFeeBudgets map[string]fixedpoint.Value `json:"dailyFeeBudgets,omitempty"`
-	DailyMaxVolume  fixedpoint.Value            `json:"dailyMaxVolume,omitempty"`
-	UpdateInterval  types.Duration              `json:"updateInterval"`
-	SimulateVolume  bool                        `json:"simulateVolume"`
+	Environment *bbgo.Environment
+
+	Symbol          string `json:"symbol"`
+	TradingExchange string `json:"tradingExchange"`
+
+	SourceSymbol   string `json:"sourceSymbol"`
+	SourceExchange string `json:"sourceExchange"`
+
+	MinSpread  fixedpoint.Value `json:"minSpread"`
+	MakeSpread struct {
+		Enabled                    bool             `json:"enabled"`
+		SkipLargeQuantityThreshold fixedpoint.Value `json:"skipLargeQuantityThreshold"`
+	} `json:"makeSpread"`
+	Quantity          fixedpoint.Value `json:"quantity"`
+	MaxJitterQuantity fixedpoint.Value `json:"maxJitterQuantity"`
+
+	SellBelowBestAsk bool `json:"sellBelowBestAsk"`
+
+	DryRun bool `json:"dryRun"`
+
+	DailyMaxVolume    fixedpoint.Value `json:"dailyMaxVolume,omitempty"`
+	DailyTargetVolume fixedpoint.Value `json:"dailyTargetVolume,omitempty"`
+	UpdateInterval    types.Duration   `json:"updateInterval"`
+	SimulateVolume    bool             `json:"simulateVolume"`
+	SimulatePrice     bool             `json:"simulatePrice"`
 
 	sourceSession, tradingSession *bbgo.ExchangeSession
 	sourceMarket, tradingMarket   types.Market
 
-	State *State `persistence:"state"`
-
 	mu                                sync.Mutex
 	lastSourceKLine, lastTradingKLine types.KLine
 	sourceBook, tradingBook           *types.StreamOrderBook
-	groupID                           uint32
+
+	logger logrus.FieldLogger
 
 	stopC chan struct{}
 }
 
-func (s *Strategy) isBudgetAllowed() bool {
-	if s.DailyFeeBudgets == nil {
-		return true
+func (s *Strategy) Initialize() error {
+	if s.Strategy == nil {
+		s.Strategy = &common.Strategy{}
 	}
 
-	if s.State.AccumulatedFees == nil {
-		return true
+	if s.FeeBudget == nil {
+		s.FeeBudget = &common.FeeBudget{}
 	}
 
-	for asset, budget := range s.DailyFeeBudgets {
-		if fee, ok := s.State.AccumulatedFees[asset]; ok {
-			if fee.Compare(budget) >= 0 {
-				log.Warnf("accumulative fee %s exceeded the fee budget %s, skipping...", fee.String(), budget.String())
-				return false
-			}
-		}
-	}
-
-	return true
+	s.logger = logrus.WithFields(logrus.Fields{
+		"strategy":          ID,
+		"strategy_instance": s.InstanceID(),
+		"symbol":            s.Symbol,
+	})
+	return nil
 }
 
-func (s *Strategy) handleTradeUpdate(trade types.Trade) {
-	log.Infof("received trade %+v", trade)
+func (s *Strategy) Validate() error {
+	return nil
+}
 
-	if trade.Symbol != s.Symbol {
-		return
+func (s *Strategy) Defaults() error {
+	if s.UpdateInterval == 0 {
+		s.UpdateInterval = types.Duration(time.Second)
 	}
 
-	if s.State.IsOver24Hours() {
-		s.State.Reset()
+	if s.SourceSymbol == "" {
+		s.SourceSymbol = s.Symbol
 	}
 
-	// safe check
-	if s.State.AccumulatedFees == nil {
-		s.State.AccumulatedFees = make(map[string]fixedpoint.Value)
-	}
-
-	s.State.AccumulatedFees[trade.FeeCurrency] = s.State.AccumulatedFees[trade.FeeCurrency].Add(trade.Fee)
-	s.State.AccumulatedVolume = s.State.AccumulatedVolume.Add(trade.Quantity)
-	log.Infof("accumulated fee: %s %s", s.State.AccumulatedFees[trade.FeeCurrency].String(), trade.FeeCurrency)
+	return nil
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
-	sourceSession, ok := sessions[s.SourceExchange]
-	if !ok {
-		panic(fmt.Errorf("source session %s is not defined", s.SourceExchange))
-	}
+	if len(s.SourceExchange) > 0 && len(s.SourceSymbol) > 0 {
+		sourceSession, ok := sessions[s.SourceExchange]
+		if !ok {
+			panic(fmt.Errorf("source session %s is not defined", s.SourceExchange))
+		}
 
-	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
-	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
+		sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol, types.SubscribeOptions{Interval: "1m"})
+		sourceSession.Subscribe(types.BookChannel, s.SourceSymbol, types.SubscribeOptions{Depth: types.DepthLevelFull})
+	}
 
 	tradingSession, ok := sessions[s.TradingExchange]
 	if !ok {
@@ -137,19 +131,20 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	}
 
 	tradingSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
-	tradingSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
+	tradingSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{Depth: types.DepthLevel5})
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
-	if s.UpdateInterval == 0 {
-		s.UpdateInterval = types.Duration(time.Second)
-	}
-
 	sourceSession, ok := sessions[s.SourceExchange]
 	if !ok {
 		return fmt.Errorf("source session %s is not defined", s.SourceExchange)
 	}
 	s.sourceSession = sourceSession
+
+	s.sourceMarket, ok = s.sourceSession.Market(s.SourceSymbol)
+	if !ok {
+		return fmt.Errorf("source session market %s is not defined", s.Symbol)
+	}
 
 	tradingSession, ok := sessions[s.TradingExchange]
 	if !ok {
@@ -157,67 +152,64 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 	s.tradingSession = tradingSession
 
-	s.sourceMarket, ok = s.sourceSession.Market(s.Symbol)
-	if !ok {
-		return fmt.Errorf("source session market %s is not defined", s.Symbol)
-	}
-
 	s.tradingMarket, ok = s.tradingSession.Market(s.Symbol)
 	if !ok {
 		return fmt.Errorf("trading session market %s is not defined", s.Symbol)
 	}
 
+	s.Strategy.Initialize(ctx, s.Environment, tradingSession, s.tradingMarket, ID, s.InstanceID())
+	s.Strategy.OrderExecutor.DisableNotify()
+
+	s.FeeBudget.Initialize()
+
 	s.stopC = make(chan struct{})
-
-	if s.State == nil {
-		s.State = &State{}
-		s.State.Reset()
-	}
-
-	if s.State.IsOver24Hours() {
-		log.Warn("state is over 24 hours, resetting to zero")
-		s.State.Reset()
-	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
+
 		close(s.stopC)
-		bbgo.Sync(context.Background(), s)
+
+		if err := tradingutil.UniversalCancelAllOrders(ctx, s.tradingSession.Exchange, s.Symbol, nil); err != nil {
+			s.logger.WithError(err).Errorf("cancel all orders error")
+		}
+
+		bbgo.Sync(ctx, s)
 	})
 
 	// from here, set data binding
-	s.sourceSession.MarketDataStream.OnKLine(func(kline types.KLine) {
-		log.Infof("source exchange %s price: %s volume: %s",
-			s.Symbol, kline.Close.String(), kline.Volume.String())
+	sourceKLineHandler := func(kline types.KLine) {
 		s.mu.Lock()
 		s.lastSourceKLine = kline
 		s.mu.Unlock()
-	})
-	s.tradingSession.MarketDataStream.OnKLine(func(kline types.KLine) {
-		log.Infof("trading exchange %s price: %s volume: %s",
-			s.Symbol, kline.Close.String(), kline.Volume.String())
-		s.mu.Lock()
-		s.lastTradingKLine = kline
-		s.mu.Unlock()
-	})
+	}
+	s.sourceSession.MarketDataStream.OnKLine(sourceKLineHandler)
+	s.tradingSession.MarketDataStream.OnKLine(sourceKLineHandler)
 
-	s.sourceBook = types.NewStreamBook(s.Symbol)
-	s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
+	if s.SourceExchange != "" && s.SourceSymbol != "" {
+		s.sourceBook = types.NewStreamBook(s.SourceSymbol, sourceSession.ExchangeName)
+		s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
+		s.sourceBook.DebugBindStream(s.sourceSession.MarketDataStream, log)
+	}
 
-	s.tradingBook = types.NewStreamBook(s.Symbol)
+	s.tradingBook = types.NewStreamBook(s.Symbol, tradingSession.ExchangeName)
 	s.tradingBook.BindStream(s.tradingSession.MarketDataStream)
+	s.tradingBook.DebugBindStream(s.tradingSession.MarketDataStream, log)
 
-	s.tradingSession.UserDataStream.OnTradeUpdate(s.handleTradeUpdate)
-
-	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
-	s.groupID = util.FNV32(instanceID) % math.MaxInt32
-	log.Infof("using group id %d from fnv32(%s)", s.groupID, instanceID)
+	s.tradingSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+		if trade.Symbol != s.Symbol {
+			return
+		}
+		s.FeeBudget.HandleTradeUpdate(trade)
+	})
 
 	go func() {
 		ticker := time.NewTicker(
-			util.MillisecondsJitter(s.UpdateInterval.Duration(), 1000),
+			timejitter.Milliseconds(s.UpdateInterval.Duration(), 1000),
 		)
 		defer ticker.Stop()
+
+		s.placeOrders(ctx)
+		s.cancelOrders(ctx)
 
 		for {
 			select {
@@ -228,141 +220,392 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 				return
 
 			case <-ticker.C:
-				if !s.isBudgetAllowed() {
+				if !s.IsBudgetAllowed() {
 					continue
 				}
 
 				// < 10 seconds jitter sleep
-				delay := util.MillisecondsJitter(s.UpdateInterval.Duration(), 10*1000)
+				delay := timejitter.Milliseconds(s.UpdateInterval.Duration(), 10*1000)
 				if delay < s.UpdateInterval.Duration() {
 					time.Sleep(delay)
 				}
 
-				bestBid, hasBid := s.tradingBook.BestBid()
-				bestAsk, hasAsk := s.tradingBook.BestAsk()
-
-				// try to use the bid/ask price from the trading book
-				if hasBid && hasAsk {
-					var spread = bestAsk.Price.Sub(bestBid.Price)
-					var spreadPercentage = spread.Div(bestAsk.Price)
-					log.Infof("trading book spread=%s %s",
-						spread.String(), spreadPercentage.Percentage())
-
-					// use the source book price if the spread percentage greater than 10%
-					if spreadPercentage.Compare(StepPercentageGap) > 0 {
-						log.Warnf("spread too large (%s %s), using source book",
-							spread.String(), spreadPercentage.Percentage())
-						bestBid, hasBid = s.sourceBook.BestBid()
-						bestAsk, hasAsk = s.sourceBook.BestAsk()
-					}
-
-					if s.MinSpread.Sign() > 0 {
-						if spread.Compare(s.MinSpread) < 0 {
-							log.Warnf("spread < min spread, spread=%s minSpread=%s bid=%s ask=%s",
-								spread.String(), s.MinSpread.String(),
-								bestBid.Price.String(), bestAsk.Price.String())
-							continue
-						}
-					}
-
-					// if the spread is less than 100 ticks (100 pips), skip
-					if spread.Compare(s.tradingMarket.TickSize.MulExp(2)) < 0 {
-						log.Warnf("spread too small, we can't place orders: spread=%v bid=%v ask=%v",
-							spread, bestBid.Price, bestAsk.Price)
-						continue
-					}
-
-				} else {
-					bestBid, hasBid = s.sourceBook.BestBid()
-					bestAsk, hasAsk = s.sourceBook.BestAsk()
-				}
-
-				if !hasBid || !hasAsk {
-					log.Warn("no bids or asks on the source book or the trading book")
-					continue
-				}
-
-				var spread = bestAsk.Price.Sub(bestBid.Price)
-				var spreadPercentage = spread.Div(bestAsk.Price)
-				log.Infof("spread=%v %s ask=%v bid=%v",
-					spread, spreadPercentage.Percentage(),
-					bestAsk.Price, bestBid.Price)
-				// var spreadPercentage = spread.Float64() / bestBid.Price.Float64()
-
-				var midPrice = bestAsk.Price.Add(bestBid.Price).Div(Two)
-				var price = midPrice
-
-				log.Infof("mid price %v", midPrice)
-
-				var balances = s.tradingSession.GetAccount().Balances()
-				var quantity = s.tradingMarket.MinQuantity
-
-				if s.Quantity.Sign() > 0 {
-					quantity = fixedpoint.Min(s.Quantity, s.tradingMarket.MinQuantity)
-				} else if s.SimulateVolume {
-					s.mu.Lock()
-					if s.lastTradingKLine.Volume.Sign() > 0 && s.lastSourceKLine.Volume.Sign() > 0 {
-						volumeDiff := s.lastSourceKLine.Volume.Sub(s.lastTradingKLine.Volume)
-						// change the current quantity only diff is positive
-						if volumeDiff.Sign() > 0 {
-							quantity = volumeDiff
-						}
-
-						if baseBalance, ok := balances[s.tradingMarket.BaseCurrency]; ok {
-							quantity = fixedpoint.Min(quantity, baseBalance.Available)
-						}
-
-						if quoteBalance, ok := balances[s.tradingMarket.QuoteCurrency]; ok {
-							maxQuantity := quoteBalance.Available.Div(price)
-							quantity = fixedpoint.Min(quantity, maxQuantity)
-						}
-					}
-					s.mu.Unlock()
-				} else {
-					// plus a 2% quantity jitter
-					jitter := 1.0 + math.Max(0.02, rand.Float64())
-					quantity = quantity.Mul(fixedpoint.NewFromFloat(jitter))
-				}
-
-				var quoteAmount = price.Mul(quantity)
-				if quoteAmount.Compare(s.tradingMarket.MinNotional) <= 0 {
-					quantity = fixedpoint.Max(
-						s.tradingMarket.MinQuantity,
-						s.tradingMarket.MinNotional.Mul(NotionModifier).Div(price))
-				}
-
-				createdOrders, _, err := bbgo.BatchPlaceOrder(ctx, tradingSession.Exchange, nil, types.SubmitOrder{
-					Symbol:   s.Symbol,
-					Side:     types.SideTypeBuy,
-					Type:     types.OrderTypeLimit,
-					Quantity: quantity,
-					Price:    price,
-					Market:   s.tradingMarket,
-					// TimeInForce: types.TimeInForceGTC,
-					GroupID: s.groupID,
-				}, types.SubmitOrder{
-					Symbol:   s.Symbol,
-					Side:     types.SideTypeSell,
-					Type:     types.OrderTypeLimit,
-					Quantity: quantity,
-					Price:    price,
-					Market:   s.tradingMarket,
-					// TimeInForce: types.TimeInForceGTC,
-					GroupID: s.groupID,
-				})
-
-				if err != nil {
-					log.WithError(err).Error("order submit error")
-				}
-
-				time.Sleep(time.Second)
-
-				if err := tradingSession.Exchange.CancelOrders(ctx, createdOrders...); err != nil {
-					log.WithError(err).Error("cancel order error")
-				}
+				s.placeOrders(ctx)
+				s.cancelOrders(ctx)
 			}
 		}
 	}()
 
 	return nil
+}
+
+func (s *Strategy) makeSpread(ctx context.Context, bestBid, bestAsk types.PriceVolume) error {
+	quantity := fixedpoint.Max(bestBid.Volume, s.tradingMarket.MinQuantity)
+	if quantity.Compare(s.MakeSpread.SkipLargeQuantityThreshold) >= 0 {
+		return fmt.Errorf(
+			"make spread quantity %s is too large (>=%s), skip",
+			quantity.String(),
+			s.MakeSpread.SkipLargeQuantityThreshold.String(),
+		)
+	}
+	balances := s.tradingSession.GetAccount().Balances()
+	order := types.SubmitOrder{
+		Symbol:      s.Symbol,
+		Side:        types.SideTypeSell,
+		Type:        types.OrderTypeLimit,
+		Quantity:    quantity,
+		Price:       bestBid.Price,
+		Market:      s.tradingMarket,
+		TimeInForce: types.TimeInForceIOC,
+	}
+	if ok, err := tradingutil.HasSufficientBalance(
+		s.tradingMarket,
+		order,
+		balances,
+	); !ok {
+		return fmt.Errorf(
+			"cannot make spread for %s: %s",
+			s.Symbol,
+			err,
+		)
+	}
+	orderForms := []types.SubmitOrder{order}
+
+	log.Infof("make spread order forms: %+v", orderForms)
+
+	if s.DryRun {
+		log.Infof("dry run, skip")
+		return nil
+	}
+
+	_, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
+	return err
+}
+
+// buildAdjustPositionOrder returns the order form that can adjust the current position if possible.
+// When in a short position, it will try to place a buy order.
+// When in a long position, it will try to place a sell order.
+// It's based on the spread and the condition of the current position.
+func buildAdjustPositionOrder(
+	symbol string,
+	positionSnapshot *types.Position,
+	bestBid, bestAsk types.PriceVolume,
+) (ok bool, order types.SubmitOrder) {
+	if positionSnapshot.IsClosed() {
+		return
+	}
+
+	var pv types.PriceVolume
+	var side types.SideType
+	if positionSnapshot.IsShort() && bestAsk.Price.Compare(positionSnapshot.AverageCost) < 0 {
+		// in short position and the best ask price is less than the average cost
+		pv = bestAsk
+		side = types.SideTypeBuy
+	} else if positionSnapshot.IsLong() && bestBid.Price.Compare(positionSnapshot.AverageCost) > 0 {
+		// in long position and the best bid price is greater than the average cost
+		pv = bestBid
+		side = types.SideTypeSell
+	}
+	price := pv.Price
+	// the quantity should be less or equal to the position size
+	quantity := fixedpoint.Min(
+		positionSnapshot.Base.Abs(),
+		pv.Volume,
+	)
+	ok = !pv.IsZero()
+	if ok {
+		order = types.SubmitOrder{
+			Symbol:      symbol,
+			Side:        side,
+			Type:        types.OrderTypeLimit,
+			Quantity:    quantity,
+			Price:       price,
+			Market:      positionSnapshot.Market,
+			TimeInForce: types.TimeInForceIOC,
+		}
+	}
+	return
+}
+
+func (s *Strategy) tryPlaceAdjustPositionOrder(ctx context.Context, bestBid, bestAsk types.PriceVolume, balances types.BalanceMap) bool {
+	positionSnapshot := getPositionSnapshot(s.Position)
+	s.logger.Infof("position snapshot: %+v", positionSnapshot)
+	adjPosIsPossible, adjPosOrder := buildAdjustPositionOrder(
+		s.Symbol,
+		positionSnapshot,
+		bestBid,
+		bestAsk,
+	)
+	if !adjPosIsPossible {
+		return false
+	}
+	// sanity checks on the order
+	// check dust quantity
+	if s.tradingMarket.IsDustQuantity(adjPosOrder.Quantity, adjPosOrder.Price) {
+		s.logger.Warnf("adjust position order is of dust quantity: %+v", adjPosOrder)
+		return false
+	}
+	// check balance
+	balanceOk, balanceErr := tradingutil.HasSufficientBalance(
+		s.tradingMarket,
+		adjPosOrder,
+		balances,
+	)
+	if !balanceOk {
+		s.logger.WithError(balanceErr).Warnf("cannot place position adjusting order: %+v", adjPosOrder)
+		return false
+	}
+
+	s.logger.Infof("adjust position order forms: %+v", adjPosOrder)
+	_, err := s.OrderExecutor.SubmitOrders(ctx, adjPosOrder)
+	if err != nil {
+		// note that, since the order is IOC order, we don't need to cancel it if there is an error
+		s.logger.WithError(err).Error("adjust position order submit error")
+		return false
+	}
+	return true
+}
+
+func (s *Strategy) placeOrders(ctx context.Context) {
+	bestBid, bestAsk, hasPrice := s.tradingBook.BestBidAndAsk()
+	balances := s.tradingSession.GetAccount().Balances()
+	// try to use the bid/ask price from the trading book
+	if hasPrice {
+		// try to place orders that can adjust the position if possible
+		if s.Position != nil {
+			if canAdj := s.tryPlaceAdjustPositionOrder(
+				ctx,
+				bestBid, bestAsk,
+				balances,
+			); canAdj {
+				// adjust position order placed, abort placing new orders
+				return
+			}
+		}
+		var spread = bestAsk.Price.Sub(bestBid.Price)
+		var spreadPercentage = spread.Div(bestAsk.Price)
+		log.Infof("trading book spread=%s(%s-%s) %s, position=%s",
+			spread.String(), bestAsk.Price.String(), bestBid.Price.String(), spreadPercentage.Percentage(),
+			s.Position.GetBase().String(),
+		)
+
+		// use the source book price if the spread percentage greater than 5%
+		if s.SimulatePrice && s.sourceBook != nil && spreadPercentage.Compare(maxStepPercentageGap) > 0 {
+			log.Warnf("spread too large (%s %s), using source book",
+				spread.String(), spreadPercentage.Percentage())
+			bestBid, bestAsk, hasPrice = s.sourceBook.BestBidAndAsk()
+		}
+
+		if s.MinSpread.Sign() > 0 {
+			if spreadPercentage.Compare(s.MinSpread) < 0 {
+				log.Warnf("spread < min spread, spread=%s minSpread=%s bid=%s ask=%s",
+					spreadPercentage.String(), s.MinSpread.String(),
+					bestBid.Price.String(), bestAsk.Price.String())
+
+				if s.MakeSpread.Enabled {
+					if err := s.makeSpread(ctx, bestBid, bestAsk); err != nil {
+						log.WithError(err).Error("make spread error")
+					}
+				}
+				return
+			}
+		}
+
+		// if the spread is less than 2 ticks, skip
+		if spread.Compare(s.tradingMarket.TickSize.Mul(fixedpoint.NewFromFloat(2.0))) < 0 {
+			log.Warnf("spread too small, we can't place orders: spread=%s bid=%s ask=%s",
+				spread.String(), bestBid.Price.String(), bestAsk.Price.String())
+			return
+		}
+
+	} else if s.sourceBook != nil {
+		bestBid, bestAsk, hasPrice = s.sourceBook.BestBidAndAsk()
+
+		s.logger.Infof("trading book has no price, fall back to sourceBook: ask/bid = %s/%s", bestAsk.String(), bestBid.String())
+	}
+
+	if !hasPrice {
+		s.logger.Warn("no bids or asks on the source book or the trading book")
+		return
+	}
+
+	if bestBid.Price.IsZero() || bestAsk.Price.IsZero() {
+		s.logger.Warn("bid price or ask price is zero")
+		return
+	}
+
+	var spread = bestAsk.Price.Sub(bestBid.Price)
+	var spreadPercentage = spread.Div(bestAsk.Price)
+	var midPrice = bestAsk.Price.Add(bestBid.Price).Div(Two)
+
+	s.logger.Infof("spread = %s (%s) ask/bid = %s/%s midPrice = %s",
+		spread.String(),
+		spreadPercentage.Percentage(),
+		bestAsk.Price.String(), bestBid.Price.String(), midPrice)
+
+	var price fixedpoint.Value
+	if s.SellBelowBestAsk {
+		price = bestAsk.Price.Sub(s.tradingMarket.TickSize)
+		log.Infof("price at 1 tick below best ask: %s (%s)", price.String(), s.tradingMarket.TickSize.String())
+	} else {
+		price = adjustPrice(midPrice, s.tradingMarket.PricePrecision)
+		log.Infof("adjusted mid price: %s -> %s (precision: %v)", midPrice.String(), price.String(), s.tradingMarket.PricePrecision)
+	}
+
+	baseBalance, ok := balances[s.tradingMarket.BaseCurrency]
+	if !ok {
+		s.logger.Errorf("base balance %s not found", s.tradingMarket.BaseCurrency)
+		return
+	}
+
+	quoteBalance, ok := balances[s.tradingMarket.QuoteCurrency]
+	if !ok {
+		s.logger.Errorf("quote balance %s not found", s.tradingMarket.QuoteCurrency)
+		return
+	}
+
+	minQuantity := s.tradingMarket.AdjustQuantityByMinNotional(s.tradingMarket.MinQuantity, price)
+
+	if baseBalance.Available.Compare(minQuantity) <= 0 {
+		s.logger.Infof("base balance: %s %s is not enough, skip", baseBalance.Available.String(), s.tradingMarket.BaseCurrency)
+		return
+	}
+
+	if quoteBalance.Available.Div(price).Compare(minQuantity) <= 0 {
+		s.logger.Infof("quote balance: %s %s is not enough, skip", quoteBalance.Available.String(), s.tradingMarket.QuoteCurrency)
+		return
+	}
+
+	maxQuantity := baseBalance.Available
+	if !quoteBalance.Available.IsZero() {
+		maxQuantity = fixedpoint.Min(maxQuantity, quoteBalance.Available.Div(price))
+	}
+
+	quantity := minQuantity
+
+	// if we set the fixed quantity, we should use the fixed
+	if s.Quantity.Sign() > 0 {
+		quantity = fixedpoint.Max(s.Quantity, quantity)
+	} else if s.SimulateVolume {
+		s.mu.Lock()
+		lastTradingKLine := s.lastTradingKLine
+		lastSourceKLine := s.lastSourceKLine
+		s.mu.Unlock()
+
+		if lastTradingKLine.Volume.Sign() > 0 && lastSourceKLine.Volume.Sign() > 0 {
+			s.logger.Infof("trading exchange %s price: %s volume: %s",
+				s.Symbol, lastTradingKLine.Close.String(), lastTradingKLine.Volume.String())
+			s.logger.Infof("source exchange %s price: %s volume: %s",
+				s.Symbol, lastSourceKLine.Close.String(), lastSourceKLine.Volume.String())
+
+			volumeDiff := s.lastSourceKLine.Volume.Sub(lastTradingKLine.Volume)
+
+			// change the current quantity only diff is positive
+			if volumeDiff.Sign() > 0 {
+				quantity = volumeDiff
+			}
+		}
+	} else if s.DailyTargetVolume.Sign() > 0 {
+		numOfTicks := (24 * time.Hour) / s.UpdateInterval.Duration()
+		quantity = fixedpoint.NewFromFloat(s.DailyTargetVolume.Float64() / float64(numOfTicks))
+	}
+
+	if s.MaxJitterQuantity.Sign() > 0 {
+		quantity = quantityJitter2(quantity, s.MaxJitterQuantity)
+	}
+
+	s.logger.Infof("%s order quantity %s at price %s", s.Symbol, quantity.String(), price.String())
+
+	quantity = fixedpoint.Min(quantity, maxQuantity)
+	log.Infof("%s adjusted quantity: %f", s.Symbol, quantity.Float64())
+
+	price = s.tradingMarket.TruncatePrice(price)
+	log.Infof("%s truncated price: %f", s.Symbol, price.Float64())
+
+	bid, ask, _ := s.tradingBook.BestBidAndAsk()
+	if price.Compare(bid.Price) <= 0 || price.Compare(ask.Price) >= 0 {
+		s.logger.Warnf(
+			"price (%s) is not between bid(%s) and ask(%s), abort placing orders",
+			price.String(), bid.Price.String(), ask.Price.String(),
+		)
+		return
+	}
+	if s.tradingMarket.IsDustQuantity(quantity, price) {
+		s.logger.Warnf("order is of dust quantity: %s, %s", quantity.String(), price.String())
+		return
+	}
+	var orderForms []types.SubmitOrder
+	for _, order := range []types.SubmitOrder{
+		{
+			Symbol:   s.Symbol,
+			Side:     types.SideTypeBuy,
+			Type:     types.OrderTypeLimit,
+			Quantity: quantity,
+			Price:    price,
+			Market:   s.tradingMarket,
+		},
+		{
+			Symbol:      s.Symbol,
+			Side:        types.SideTypeSell,
+			Type:        types.OrderTypeLimit,
+			Quantity:    quantity,
+			Price:       price,
+			Market:      s.tradingMarket,
+			TimeInForce: types.TimeInForceIOC,
+		},
+	} {
+		okBalance, errBalance := tradingutil.HasSufficientBalance(
+			s.tradingMarket,
+			order,
+			balances,
+		)
+		if !okBalance {
+			// since self-trading is not possible, return here
+			s.logger.WithError(errBalance).Warnf("insufficient balance for order: %+v", order)
+			return
+		}
+		orderForms = append(orderForms, order)
+	}
+	log.Infof("order forms: %+v", orderForms)
+
+	if s.DryRun {
+		log.Infof("dry run, skip")
+		return
+	}
+	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
+	if err != nil {
+		log.WithError(err).Error("order submit error")
+	}
+
+	time.Sleep(time.Second)
+
+	if err := s.OrderExecutor.GracefulCancel(ctx, createdOrders...); err != nil {
+		log.WithError(err).Warnf("cancel order error")
+	}
+}
+
+func (s *Strategy) cancelOrders(ctx context.Context) {
+	if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
+		s.logger.WithError(err).Error("cancel order error")
+	}
+}
+
+func quantityJitter(q fixedpoint.Value, rg float64) fixedpoint.Value {
+	jitter := 1.0 + math.Max(rg, rand.Float64())
+	return q.Mul(fixedpoint.NewFromFloat(jitter))
+}
+
+func quantityJitter2(q, maxJitterQ fixedpoint.Value) fixedpoint.Value {
+	rg := maxJitterQ.Sub(q).Float64()
+	randQuantity := fixedpoint.NewFromFloat(q.Float64() + rg*rand.Float64())
+	return randQuantity
+}
+
+func adjustPrice(price fixedpoint.Value, pricePrecision int) fixedpoint.Value {
+	if pricePrecision <= 0 {
+		return price
+	}
+
+	priceAdjusted := util.RoundAndTruncatePrice(price, pricePrecision)
+	return priceAdjusted
 }

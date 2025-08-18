@@ -1,3 +1,6 @@
+* [English👈](./README.md)
+* [中文](./README.zh_TW.md)
+
 # BBGO
 
 A modern crypto trading bot framework written in Go.
@@ -30,7 +33,7 @@ You can use BBGO's trading unit and back-test unit to implement your own strateg
 
 ### Trading Unit Developers 🧑‍💻
 
-You can use BBGO's underlying common exchange API, currently, it supports 4+ major exchanges, so you don't have to repeat
+You can use BBGO's underlying common exchange API; currently, it supports 4+ major exchanges, so you don't have to repeat
 the implementation.
 
 ## Features
@@ -127,11 +130,11 @@ the implementation.
 ## Supported Exchanges
 
 - Binance Spot Exchange (and binance.us)
-- OKEx Spot Exchange
+- OKX Spot Exchange (previous OKEX)
 - Kucoin Spot Exchange
 - MAX Spot Exchange (located in Taiwan)
-- Bitget Exchange (In Progress)
-- Bybit Exchange (In Progress)
+- Bitget Exchange
+- Bybit Exchange
 
 ## Documentation and General Topics
 
@@ -139,15 +142,19 @@ the implementation.
 
 ## Requirements
 
-Get your exchange API key and secret after you register the accounts (you can choose one or more exchanges):
+* Go SDK 1.22
 
-- MAX: <https://max.maicoin.com/signup?r=c7982718>
-- Binance: <https://accounts.binance.com/en/register?ref=38192708>
-- OKEx: <https://www.okex.com/join/2412712?src=from:ios-share>
-- Kucoin: <https://www.kucoin.com/ucenter/signup?rcode=r3KX2D4>
+* Linux / MacOS / Windows (WSL)
 
-This project is maintained and supported by a small group of team. If you would like to support this project, please
-register on the exchanges using the provided links with referral codes above.
+* Get your exchange API key and secret after you register the accounts (you can choose one or more exchanges):
+
+  - MAX: <https://max.maicoin.com/signup?r=c7982718>
+  - Binance: <https://accounts.binance.com/en/register?ref=38192708>
+  - OKEx: <https://www.okex.com/join/2412712?src=from:ios-share>
+  - Kucoin: <https://www.kucoin.com/ucenter/signup?rcode=r3KX2D4>
+
+  This project is maintained and supported by a small group of people. If you would like to support this project, please
+  Register on the exchanges using the provided links with the referral codes above.
 
 ## Installation
 
@@ -385,10 +392,10 @@ persistence:
 
 Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
 
-- `pricealert` strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert). See
+- `pricealert` strategy demonstrates how to use the notification system [pricealert](pkg/strategy/example/pricealert). See
   [document](./doc/strategy/pricealert.md).
 - `buyandhold` strategy demonstrates how to subscribe kline events and submit market
-  order [buyandhold](pkg/strategy/pricedrop)
+  order [buyandhold](pkg/strategy/example/pricedrop)
 - `bollgrid` strategy implements a basic grid strategy with the built-in bollinger
   indicator [bollgrid](pkg/strategy/bollgrid)
 - `grid` strategy implements the fixed price band grid strategy [grid](pkg/strategy/grid). See
@@ -405,6 +412,7 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
 - `irr` - return rate strategy.
 - `drift` - drift strategy.
 - `grid2` - the second-generation grid strategy.
+- `rebalance` - rebalances your portfolio based on target weights. [rebalance](pkg/strategy/rebalance). See [document](./doc/strategy/rebalance.md).
 
 To run these built-in strategies, just modify the config file to make the configuration suitable for you, for example, if
 you want to run
@@ -440,7 +448,7 @@ Write your own strategy in the strategy file:
 vim strategy.go
 ```
 
-You can grab the skeleton strategy from <https://github.com/c9s/bbgo/blob/main/pkg/strategy/skeleton/strategy.go>
+You can grab the skeleton strategy from <https://github.com/c9s/bbgo/blob/main/pkg/strategy/example/skeleton/strategy.go>
 
 Now add your config:
 
@@ -622,7 +630,7 @@ make embed && go run -tags web ./cmd/bbgo-lorca
 
 You can write an article about BBGO on any topic, in 750-1500 words for exchange, and I can implement the strategy for
 you (depending on the complexity and effort). If you're interested in, DM me in telegram <https://t.me/c123456789s> or
-twitter <https://twitter.com/c9s>, and we can discuss.
+x/twitter <https://x.com/c9s>, and we can discuss.
 
 ### Adding New Crypto Exchange support?
 
@@ -633,7 +641,7 @@ The cost is 10 ETH. If you're interested in it, DM me in telegram <https://t.me/
 
 - Telegram Group <https://t.me/bbgo_intl>
 - Telegram Group (Taiwan) <https://t.me/bbgocrypto>
-- Twitter <https://twitter.com/bbgotrading>
+- X/Twitter <https://x.com/bbgotrading>
 
 ## Contributing
 
@@ -641,7 +649,9 @@ See [Contributing](./CONTRIBUTING.md)
 
 ### Financial Contributors
 
-<object type="image/svg+xml" data="https://opencollective.com/bbgo/tiers/backer.svg?avatarHeight=36&width=600"></object>
+[[Become a backer](https://opencollective.com/bbgo#backer)]
+
+<a href="https://opencollective.com/bbgo#backers" target="_blank"><img src="https://opencollective.com/bbgo/tiers/backer.svg?width=890"></a>
 
 ## BBGO Tokenomics
 

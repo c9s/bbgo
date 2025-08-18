@@ -2,7 +2,7 @@ package bbgo
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -52,7 +52,6 @@ func TestLoadConfig(t *testing.T) {
 				assert.Equal(t, "#error", config.Notifications.Slack.ErrorChannel)
 			},
 		},
-
 		{
 			name:    "strategy",
 			args:    args{configFile: "testdata/strategy.yaml"},
@@ -75,25 +74,18 @@ func TestLoadConfig(t *testing.T) {
 				assert.Equal(t, map[string]interface{}{
 					"sessions": map[string]interface{}{
 						"max": map[string]interface{}{
-							"exchange":                "max",
-							"envVarPrefix":            "MAX",
-							"takerFeeRate":            0.,
-							"makerFeeRate":            0.,
-							"modifyOrderAmountForFee": false,
+							"exchange":                  "max",
+							"envVarPrefix":              "MAX",
+							"takerFeeRate":              0.,
+							"makerFeeRate":              0.,
+							"marginInfoUpdaterInterval": "3m0s",
 						},
 						"binance": map[string]interface{}{
-							"exchange":                "binance",
-							"envVarPrefix":            "BINANCE",
-							"takerFeeRate":            0.,
-							"makerFeeRate":            0.,
-							"modifyOrderAmountForFee": false,
-						},
-						"ftx": map[string]interface{}{
-							"exchange":                "ftx",
-							"envVarPrefix":            "FTX",
-							"takerFeeRate":            0.,
-							"makerFeeRate":            0.,
-							"modifyOrderAmountForFee": true,
+							"exchange":                  "binance",
+							"envVarPrefix":              "BINANCE",
+							"takerFeeRate":              0.,
+							"makerFeeRate":              0.,
+							"marginInfoUpdaterInterval": "5m0s",
 						},
 					},
 					"build": map[string]interface{}{
@@ -128,7 +120,7 @@ func TestLoadConfig(t *testing.T) {
 				yamlText, err := config.YAML()
 				assert.NoError(t, err)
 
-				yamlTextSource, err := ioutil.ReadFile("testdata/strategy.yaml")
+				yamlTextSource, err := os.ReadFile("testdata/strategy.yaml")
 				assert.NoError(t, err)
 
 				var sourceMap map[string]interface{}
@@ -144,7 +136,6 @@ func TestLoadConfig(t *testing.T) {
 				assert.Equal(t, sourceMap, actualMap)
 			},
 		},
-
 		{
 			name:    "persistence",
 			args:    args{configFile: "testdata/persistence.yaml"},
@@ -155,33 +146,6 @@ func TestLoadConfig(t *testing.T) {
 				assert.NotNil(t, config.Persistence.Json)
 			},
 		},
-
-		{
-			name:    "order_executor",
-			args:    args{configFile: "testdata/order_executor.yaml"},
-			wantErr: false,
-			f: func(t *testing.T, config *Config) {
-				assert.Len(t, config.Sessions, 2)
-
-				session, ok := config.Sessions["max"]
-				assert.True(t, ok)
-				assert.NotNil(t, session)
-
-				riskControls := config.RiskControls
-				assert.NotNil(t, riskControls)
-				assert.NotNil(t, riskControls.SessionBasedRiskControl)
-
-				conf, ok := riskControls.SessionBasedRiskControl["max"]
-				assert.True(t, ok)
-				assert.NotNil(t, conf)
-				assert.NotNil(t, conf.OrderExecutor)
-				assert.NotNil(t, conf.OrderExecutor.BySymbol)
-
-				executorConf, ok := conf.OrderExecutor.BySymbol["BTCUSDT"]
-				assert.True(t, ok)
-				assert.NotNil(t, executorConf)
-			},
-		},
 		{
 			name:    "backtest",
 			args:    args{configFile: "testdata/backtest.yaml"},
@@ -189,9 +153,9 @@ func TestLoadConfig(t *testing.T) {
 			f: func(t *testing.T, config *Config) {
 				assert.Len(t, config.ExchangeStrategies, 1)
 				assert.NotNil(t, config.Backtest)
-				assert.NotNil(t, config.Backtest.Account)
-				assert.NotNil(t, config.Backtest.Account["binance"].Balances)
-				assert.Len(t, config.Backtest.Account["binance"].Balances, 2)
+				assert.NotNil(t, config.Backtest.Accounts)
+				assert.NotNil(t, config.Backtest.Accounts["binance"].Balances)
+				assert.Len(t, config.Backtest.Accounts["binance"].Balances, 2)
 			},
 		},
 	}
@@ -199,14 +163,12 @@ func TestLoadConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config, err := Load(tt.args.configFile, true)
-			if err != nil {
-				t.Errorf("Load() error = %v", err)
+
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			} else {
-				if tt.wantErr {
-					t.Errorf("Load() error = %v, wantErr %v", err, tt.wantErr)
-					return
-				}
+				assert.NoError(t, err)
 			}
 
 			assert.NotNil(t, config)

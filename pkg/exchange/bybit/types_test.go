@@ -20,19 +20,9 @@ func Test_parseWebSocketEvent(t *testing.T) {
 		raw, err := s.parseWebSocketEvent([]byte(msg))
 		assert.NoError(t, err)
 
-		expRetMsg := string(WsOpTypePong)
-		e, ok := raw.(*WebSocketOpEvent)
+		e, ok := raw.(*types.WebsocketPongEvent)
 		assert.True(t, ok)
-		assert.Equal(t, &WebSocketOpEvent{
-			Success: true,
-			RetMsg:  expRetMsg,
-			ConnId:  "a806f6c4-3608-4b6d-a225-9f5da975bc44",
-			ReqId:   "",
-			Op:      WsOpTypePing,
-			Args:    nil,
-		}, e)
-
-		assert.NoError(t, e.IsValid())
+		assert.Equal(t, &types.WebsocketPongEvent{}, e)
 	})
 
 	t.Run("[public] PingEvent with req id", func(t *testing.T) {
@@ -41,20 +31,9 @@ func Test_parseWebSocketEvent(t *testing.T) {
 		raw, err := s.parseWebSocketEvent([]byte(msg))
 		assert.NoError(t, err)
 
-		expRetMsg := string(WsOpTypePong)
-		expReqId := "b26704da-f5af-44c2-bdf7-935d6739e1a0"
-		e, ok := raw.(*WebSocketOpEvent)
+		e, ok := raw.(*types.WebsocketPongEvent)
 		assert.True(t, ok)
-		assert.Equal(t, &WebSocketOpEvent{
-			Success: true,
-			RetMsg:  expRetMsg,
-			ConnId:  "a806f6c4-3608-4b6d-a225-9f5da975bc44",
-			ReqId:   expReqId,
-			Op:      WsOpTypePing,
-			Args:    nil,
-		}, e)
-
-		assert.NoError(t, e.IsValid())
+		assert.Equal(t, &types.WebsocketPongEvent{}, e)
 	})
 
 	t.Run("[private] PingEvent without req id", func(t *testing.T) {
@@ -63,18 +42,9 @@ func Test_parseWebSocketEvent(t *testing.T) {
 		raw, err := s.parseWebSocketEvent([]byte(msg))
 		assert.NoError(t, err)
 
-		e, ok := raw.(*WebSocketOpEvent)
+		e, ok := raw.(*types.WebsocketPongEvent)
 		assert.True(t, ok)
-		assert.Equal(t, &WebSocketOpEvent{
-			Success: false,
-			RetMsg:  "",
-			ConnId:  "civn4p1dcjmtvb69ome0-yrt1",
-			ReqId:   "",
-			Op:      WsOpTypePong,
-			Args:    []string{"1690884539181"},
-		}, e)
-
-		assert.NoError(t, e.IsValid())
+		assert.Equal(t, &types.WebsocketPongEvent{}, e)
 	})
 
 	t.Run("[private] PingEvent with req id", func(t *testing.T) {
@@ -83,19 +53,9 @@ func Test_parseWebSocketEvent(t *testing.T) {
 		raw, err := s.parseWebSocketEvent([]byte(msg))
 		assert.NoError(t, err)
 
-		expReqId := "78d36b57-a142-47b7-9143-5843df77d44d"
-		e, ok := raw.(*WebSocketOpEvent)
+		e, ok := raw.(*types.WebsocketPongEvent)
 		assert.True(t, ok)
-		assert.Equal(t, &WebSocketOpEvent{
-			Success: false,
-			RetMsg:  "",
-			ConnId:  "civn4p1dcjmtvb69ome0-yrt1",
-			ReqId:   expReqId,
-			Op:      WsOpTypePong,
-			Args:    []string{"1690884539181"},
-		}, e)
-
-		assert.NoError(t, e.IsValid())
+		assert.Equal(t, &types.WebsocketPongEvent{}, e)
 	})
 }
 
@@ -568,7 +528,7 @@ func TestTradeEvent_toGlobalTrade(t *testing.T) {
 		}
 	*/
 	t.Run("succeeds", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -596,20 +556,22 @@ func TestTradeEvent_toGlobalTrade(t *testing.T) {
 			FeeCurrency:   "BTC",
 		}
 		tradeEvent := TradeEvent{
-			OrderId:         fmt.Sprintf("%d", expTrade.OrderID),
+			Trade: bybitapi.Trade{
+				OrderId:   fmt.Sprintf("%d", expTrade.OrderID),
+				Symbol:    expTrade.Symbol,
+				ExecId:    fmt.Sprintf("%d", expTrade.ID),
+				ExecPrice: expTrade.Price,
+				ExecQty:   expTrade.Quantity,
+				IsMaker:   false,
+				OrderType: "",
+				Side:      bybitapi.SideBuy,
+				ExecTime:  types.MillisecondTimestamp(timeNow),
+				ExecFee:   fixedpoint.NewFromInt(0),
+			},
 			OrderLinkId:     "1691419101980",
 			Category:        "spot",
-			Symbol:          expTrade.Symbol,
-			ExecId:          fmt.Sprintf("%d", expTrade.ID),
-			ExecPrice:       expTrade.Price,
-			ExecQty:         expTrade.Quantity,
-			IsMaker:         false,
 			BlockTradeId:    "",
-			OrderType:       "",
-			Side:            bybitapi.SideBuy,
-			ExecTime:        types.MillisecondTimestamp(timeNow),
 			ClosedSize:      fixedpoint.NewFromInt(0),
-			ExecFee:         fixedpoint.NewFromInt(0),
 			ExecType:        "",
 			ExecValue:       fixedpoint.NewFromInt(0),
 			FeeRate:         fixedpoint.NewFromInt(0),
@@ -635,45 +597,51 @@ func TestTradeEvent_toGlobalTrade(t *testing.T) {
 			Category: "test-spot",
 		}
 
-		actualTrade, err := tradeEvent.toGlobalTrade(symbolFeeDetail{})
+		actualTrade, err := tradeEvent.toGlobalTrade(SymbolFeeDetail{})
 		assert.Equal(t, fmt.Errorf("unexected category: %s", tradeEvent.Category), err)
 		assert.Nil(t, actualTrade)
 	})
 
 	t.Run("unexpected side", func(t *testing.T) {
 		tradeEvent := TradeEvent{
+			Trade: bybitapi.Trade{
+				Side: bybitapi.Side("BOTH"),
+			},
 			Category: "spot",
-			Side:     bybitapi.Side("BOTH"),
 		}
 
-		actualTrade, err := tradeEvent.toGlobalTrade(symbolFeeDetail{})
+		actualTrade, err := tradeEvent.toGlobalTrade(SymbolFeeDetail{})
 		assert.Equal(t, fmt.Errorf("unexpected side: BOTH"), err)
 		assert.Nil(t, actualTrade)
 	})
 
 	t.Run("unexpected order id", func(t *testing.T) {
 		tradeEvent := TradeEvent{
+			Trade: bybitapi.Trade{
+				Side:    bybitapi.SideBuy,
+				OrderId: "ABCD3123",
+			},
 			Category: "spot",
-			Side:     bybitapi.SideBuy,
-			OrderId:  "ABCD3123",
 		}
 
 		_, nerr := strconv.ParseUint(tradeEvent.OrderId, 10, 64)
-		actualTrade, err := tradeEvent.toGlobalTrade(symbolFeeDetail{})
+		actualTrade, err := tradeEvent.toGlobalTrade(SymbolFeeDetail{})
 		assert.Equal(t, fmt.Errorf("unexpected order id: %s, err: %w", tradeEvent.OrderId, nerr), err)
 		assert.Nil(t, actualTrade)
 	})
 
 	t.Run("unexpected exec id", func(t *testing.T) {
 		tradeEvent := TradeEvent{
+			Trade: bybitapi.Trade{
+				Side:    bybitapi.SideBuy,
+				OrderId: "3123",
+				ExecId:  "ABC3123",
+			},
 			Category: "spot",
-			Side:     bybitapi.SideBuy,
-			OrderId:  "3123",
-			ExecId:   "ABC3123",
 		}
 
 		_, nerr := strconv.ParseUint(tradeEvent.ExecId, 10, 64)
-		actualTrade, err := tradeEvent.toGlobalTrade(symbolFeeDetail{})
+		actualTrade, err := tradeEvent.toGlobalTrade(SymbolFeeDetail{})
 		assert.Equal(t, fmt.Errorf("unexpected exec id: %s, err: %w", tradeEvent.ExecId, nerr), err)
 		assert.Nil(t, actualTrade)
 	})
@@ -681,7 +649,7 @@ func TestTradeEvent_toGlobalTrade(t *testing.T) {
 
 func TestTradeEvent_CalculateFee(t *testing.T) {
 	t.Run("maker fee positive, maker, buyer", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -694,19 +662,21 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 		qty := fixedpoint.NewFromFloat(0.010000)
 		price := fixedpoint.NewFromFloat(28830.8100)
 		trade := &TradeEvent{
-			ExecPrice: price,
-			ExecQty:   qty,
-			IsMaker:   true,
-			Side:      bybitapi.SideBuy,
+			Trade: bybitapi.Trade{
+				ExecPrice: price,
+				ExecQty:   qty,
+				IsMaker:   true,
+				Side:      bybitapi.SideBuy,
+			},
 		}
 
-		feeCurrency, fee := calculateFee(*trade, symbolFee)
+		feeCurrency, fee := calculateFee(trade.Trade, symbolFee)
 		assert.Equal(t, feeCurrency, "BTC")
 		assert.Equal(t, fee, qty.Mul(symbolFee.FeeRate.MakerFeeRate))
 	})
 
 	t.Run("maker fee positive, maker, seller", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -719,19 +689,21 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 		qty := fixedpoint.NewFromFloat(0.010000)
 		price := fixedpoint.NewFromFloat(28830.8099)
 		trade := &TradeEvent{
-			ExecPrice: price,
-			ExecQty:   qty,
-			IsMaker:   true,
-			Side:      bybitapi.SideSell,
+			Trade: bybitapi.Trade{
+				ExecPrice: price,
+				ExecQty:   qty,
+				IsMaker:   true,
+				Side:      bybitapi.SideSell,
+			},
 		}
 
-		feeCurrency, fee := calculateFee(*trade, symbolFee)
+		feeCurrency, fee := calculateFee(trade.Trade, symbolFee)
 		assert.Equal(t, feeCurrency, "USDT")
 		assert.Equal(t, fee, qty.Mul(price).Mul(symbolFee.FeeRate.MakerFeeRate))
 	})
 
 	t.Run("maker fee positive, taker, buyer", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -744,19 +716,21 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 		qty := fixedpoint.NewFromFloat(0.010000)
 		price := fixedpoint.NewFromFloat(28830.8100)
 		trade := &TradeEvent{
-			ExecPrice: price,
-			ExecQty:   qty,
-			IsMaker:   false,
-			Side:      bybitapi.SideBuy,
+			Trade: bybitapi.Trade{
+				ExecPrice: price,
+				ExecQty:   qty,
+				IsMaker:   false,
+				Side:      bybitapi.SideBuy,
+			},
 		}
 
-		feeCurrency, fee := calculateFee(*trade, symbolFee)
+		feeCurrency, fee := calculateFee(trade.Trade, symbolFee)
 		assert.Equal(t, feeCurrency, "BTC")
 		assert.Equal(t, fee, qty.Mul(symbolFee.FeeRate.TakerFeeRate))
 	})
 
 	t.Run("maker fee positive, taker, seller", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -769,19 +743,21 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 		qty := fixedpoint.NewFromFloat(0.010000)
 		price := fixedpoint.NewFromFloat(28830.8099)
 		trade := &TradeEvent{
-			ExecPrice: price,
-			ExecQty:   qty,
-			IsMaker:   false,
-			Side:      bybitapi.SideSell,
+			Trade: bybitapi.Trade{
+				ExecPrice: price,
+				ExecQty:   qty,
+				IsMaker:   false,
+				Side:      bybitapi.SideSell,
+			},
 		}
 
-		feeCurrency, fee := calculateFee(*trade, symbolFee)
+		feeCurrency, fee := calculateFee(trade.Trade, symbolFee)
 		assert.Equal(t, feeCurrency, "USDT")
 		assert.Equal(t, fee, qty.Mul(price).Mul(symbolFee.FeeRate.TakerFeeRate))
 	})
 
 	t.Run("maker fee negative, maker, buyer", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(-0.001),
@@ -794,19 +770,21 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 		qty := fixedpoint.NewFromFloat(0.002289)
 		price := fixedpoint.NewFromFloat(28829.7600)
 		trade := &TradeEvent{
-			ExecPrice: price,
-			ExecQty:   qty,
-			IsMaker:   true,
-			Side:      bybitapi.SideBuy,
+			Trade: bybitapi.Trade{
+				ExecPrice: price,
+				ExecQty:   qty,
+				IsMaker:   true,
+				Side:      bybitapi.SideBuy,
+			},
 		}
 
-		feeCurrency, fee := calculateFee(*trade, symbolFee)
+		feeCurrency, fee := calculateFee(trade.Trade, symbolFee)
 		assert.Equal(t, feeCurrency, "USDT")
 		assert.Equal(t, fee, qty.Mul(price).Mul(symbolFee.FeeRate.MakerFeeRate))
 	})
 
 	t.Run("maker fee negative, maker, seller", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(-0.001),
@@ -819,19 +797,21 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 		qty := fixedpoint.NewFromFloat(0.002289)
 		price := fixedpoint.NewFromFloat(28829.7600)
 		trade := &TradeEvent{
-			ExecPrice: price,
-			ExecQty:   qty,
-			IsMaker:   true,
-			Side:      bybitapi.SideSell,
+			Trade: bybitapi.Trade{
+				ExecPrice: price,
+				ExecQty:   qty,
+				IsMaker:   true,
+				Side:      bybitapi.SideSell,
+			},
 		}
 
-		feeCurrency, fee := calculateFee(*trade, symbolFee)
+		feeCurrency, fee := calculateFee(trade.Trade, symbolFee)
 		assert.Equal(t, feeCurrency, "BTC")
 		assert.Equal(t, fee, qty.Mul(symbolFee.FeeRate.MakerFeeRate))
 	})
 
 	t.Run("maker fee negative, taker, buyer", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(-0.001),
@@ -844,19 +824,21 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 		qty := fixedpoint.NewFromFloat(0.002289)
 		price := fixedpoint.NewFromFloat(28829.7600)
 		trade := &TradeEvent{
-			ExecPrice: price,
-			ExecQty:   qty,
-			IsMaker:   false,
-			Side:      bybitapi.SideBuy,
+			Trade: bybitapi.Trade{
+				ExecPrice: price,
+				ExecQty:   qty,
+				IsMaker:   false,
+				Side:      bybitapi.SideBuy,
+			},
 		}
 
-		feeCurrency, fee := calculateFee(*trade, symbolFee)
+		feeCurrency, fee := calculateFee(trade.Trade, symbolFee)
 		assert.Equal(t, feeCurrency, "BTC")
 		assert.Equal(t, fee, qty.Mul(symbolFee.FeeRate.TakerFeeRate))
 	})
 
 	t.Run("maker fee negative, taker, seller", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(-0.001),
@@ -869,13 +851,15 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 		qty := fixedpoint.NewFromFloat(0.002289)
 		price := fixedpoint.NewFromFloat(28829.7600)
 		trade := &TradeEvent{
-			ExecPrice: price,
-			ExecQty:   qty,
-			IsMaker:   false,
-			Side:      bybitapi.SideSell,
+			Trade: bybitapi.Trade{
+				ExecPrice: price,
+				ExecQty:   qty,
+				IsMaker:   false,
+				Side:      bybitapi.SideSell,
+			},
 		}
 
-		feeCurrency, fee := calculateFee(*trade, symbolFee)
+		feeCurrency, fee := calculateFee(trade.Trade, symbolFee)
 		assert.Equal(t, feeCurrency, "USDT")
 		assert.Equal(t, fee, qty.Mul(price).Mul(symbolFee.FeeRate.TakerFeeRate))
 	})
@@ -883,7 +867,7 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 }
 
 func TestTradeEvent_baseCoinAsFee(t *testing.T) {
-	symbolFee := symbolFeeDetail{
+	symbolFee := SymbolFeeDetail{
 		FeeRate: bybitapi.FeeRate{
 			Symbol:       "BTCUSDT",
 			TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -895,18 +879,20 @@ func TestTradeEvent_baseCoinAsFee(t *testing.T) {
 	qty := fixedpoint.NewFromFloat(0.002289)
 	price := fixedpoint.NewFromFloat(28829.7600)
 	trade := &TradeEvent{
-		ExecPrice: price,
-		ExecQty:   qty,
-		IsMaker:   false,
+		Trade: bybitapi.Trade{
+			ExecPrice: price,
+			ExecQty:   qty,
+			IsMaker:   false,
+		},
 	}
-	assert.Equal(t, symbolFee.FeeRate.TakerFeeRate.Mul(qty), baseCoinAsFee(*trade, symbolFee))
+	assert.Equal(t, symbolFee.FeeRate.TakerFeeRate.Mul(qty), baseCoinAsFee(trade.Trade, symbolFee))
 
 	trade.IsMaker = true
-	assert.Equal(t, symbolFee.FeeRate.MakerFeeRate.Mul(qty), baseCoinAsFee(*trade, symbolFee))
+	assert.Equal(t, symbolFee.FeeRate.MakerFeeRate.Mul(qty), baseCoinAsFee(trade.Trade, symbolFee))
 }
 
 func TestTradeEvent_quoteCoinAsFee(t *testing.T) {
-	symbolFee := symbolFeeDetail{
+	symbolFee := SymbolFeeDetail{
 		FeeRate: bybitapi.FeeRate{
 			Symbol:       "BTCUSDT",
 			TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -918,12 +904,14 @@ func TestTradeEvent_quoteCoinAsFee(t *testing.T) {
 	qty := fixedpoint.NewFromFloat(0.002289)
 	price := fixedpoint.NewFromFloat(28829.7600)
 	trade := &TradeEvent{
-		ExecPrice: price,
-		ExecQty:   qty,
-		IsMaker:   false,
+		Trade: bybitapi.Trade{
+			ExecPrice: price,
+			ExecQty:   qty,
+			IsMaker:   false,
+		},
 	}
-	assert.Equal(t, symbolFee.FeeRate.TakerFeeRate.Mul(qty.Mul(price)), quoteCoinAsFee(*trade, symbolFee))
+	assert.Equal(t, symbolFee.FeeRate.TakerFeeRate.Mul(qty.Mul(price)), quoteCoinAsFee(trade.Trade, symbolFee))
 
 	trade.IsMaker = true
-	assert.Equal(t, symbolFee.FeeRate.MakerFeeRate.Mul(qty.Mul(price)), quoteCoinAsFee(*trade, symbolFee))
+	assert.Equal(t, symbolFee.FeeRate.MakerFeeRate.Mul(qty.Mul(price)), quoteCoinAsFee(trade.Trade, symbolFee))
 }

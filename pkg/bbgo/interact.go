@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"path"
 	"reflect"
-	"strconv"
-	"strings"
 
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -147,7 +145,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		position := reader.CurrentPosition()
 		if position == nil || position.Base.IsZero() {
 			reply.Message(fmt.Sprintf("Strategy %q has no opened position", signature))
-			return fmt.Errorf("strategy %T has no opened position", strategy)
+			return nil
 		}
 
 		reply.Send("Your current position:")
@@ -556,19 +554,6 @@ func getStrategySignature(strategy SingleExchangeStrategy) (string, error) {
 	return signature, nil
 }
 
-func parseFloatPercent(s string, bitSize int) (f float64, err error) {
-	i := strings.Index(s, "%")
-	if i < 0 {
-		return strconv.ParseFloat(s, bitSize)
-	}
-
-	f, err = strconv.ParseFloat(s[:i], bitSize)
-	if err != nil {
-		return 0, err
-	}
-	return f / 100.0, nil
-}
-
 func getStrategySignatures(exchangeStrategies map[string]SingleExchangeStrategy) []string {
 	var strategies []string
 	for signature := range exchangeStrategies {
@@ -580,7 +565,9 @@ func getStrategySignatures(exchangeStrategies map[string]SingleExchangeStrategy)
 
 // filterStrategies filters the exchange strategies by a filter tester function
 // if filter() returns true, the strategy will be added to the returned map.
-func filterStrategies(exchangeStrategies map[string]SingleExchangeStrategy, filter func(s SingleExchangeStrategy) bool) (map[string]SingleExchangeStrategy, error) {
+func filterStrategies(
+	exchangeStrategies map[string]SingleExchangeStrategy, filter func(s SingleExchangeStrategy) bool,
+) (map[string]SingleExchangeStrategy, error) {
 	retStrategies := make(map[string]SingleExchangeStrategy)
 	for signature, strategy := range exchangeStrategies {
 		if ok := filter(strategy); ok {
@@ -609,14 +596,18 @@ func testInterface(obj interface{}, checkType interface{}) bool {
 	return reflect.TypeOf(obj).Implements(rt)
 }
 
-func filterStrategiesByInterface(exchangeStrategies map[string]SingleExchangeStrategy, checkInterface interface{}) (map[string]SingleExchangeStrategy, error) {
+func filterStrategiesByInterface(
+	exchangeStrategies map[string]SingleExchangeStrategy, checkInterface interface{},
+) (map[string]SingleExchangeStrategy, error) {
 	rt := reflect.TypeOf(checkInterface).Elem()
 	return filterStrategies(exchangeStrategies, func(s SingleExchangeStrategy) bool {
 		return reflect.TypeOf(s).Implements(rt)
 	})
 }
 
-func filterStrategiesByField(exchangeStrategies map[string]SingleExchangeStrategy, fieldName string, fieldType reflect.Type) (map[string]SingleExchangeStrategy, error) {
+func filterStrategiesByField(
+	exchangeStrategies map[string]SingleExchangeStrategy, fieldName string, fieldType reflect.Type,
+) (map[string]SingleExchangeStrategy, error) {
 	return filterStrategies(exchangeStrategies, func(s SingleExchangeStrategy) bool {
 		r := reflect.ValueOf(s).Elem()
 		f := r.FieldByName(fieldName)

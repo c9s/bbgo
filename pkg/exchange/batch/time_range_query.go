@@ -6,10 +6,11 @@ import (
 	"sort"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 )
 
 var log = logrus.WithField("component", "batch")
@@ -32,6 +33,8 @@ type AsyncTimeRangedBatchQuery struct {
 
 	// JumpIfEmpty jump the startTime + duration when the result is empty
 	JumpIfEmpty time.Duration
+
+	DisableBackoff bool
 }
 
 func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, since, until time.Time) chan error {
@@ -56,19 +59,39 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 
 			log.Debugf("batch querying %T: %v <=> %v", q.Type, startTime, endTime)
 
-			queryProfiler := util.StartTimeProfile("remoteQuery")
+			var sliceInf any
+			doQuery := func() (queryErr error) {
+				queryProfiler := timeprofile.Start("remoteQuery")
+				defer queryProfiler.StopAndLog(log.Debugf)
 
-			sliceInf, err := q.Q(startTime, endTime)
-			if err != nil {
-				errC <- err
-				return
+				sliceInf, queryErr = q.Q(startTime, endTime)
+				if queryErr != nil {
+					log.WithError(queryErr).Errorf("unable to query %T, error: %v", q.Type, queryErr)
+				}
+
+				return queryErr
+			}
+
+			if q.DisableBackoff {
+				if err := doQuery(); err != nil {
+					errC <- err
+					return
+				}
+			} else {
+				err := backoff.Retry(doQuery, backoff.WithContext(
+					backoff.WithMaxRetries(
+						backoff.NewExponentialBackOff(),
+						32),
+					ctx))
+				if err != nil {
+					errC <- err
+					return
+				}
 			}
 
 			listRef := reflect.ValueOf(sliceInf)
 			listLen := listRef.Len()
 			log.Debugf("batch querying %T: %d remote records", q.Type, listLen)
-
-			queryProfiler.StopAndLog(log.Debugf)
 
 			if listLen == 0 {
 				if q.JumpIfEmpty > 0 {

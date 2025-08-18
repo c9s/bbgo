@@ -1,5 +1,9 @@
 package v3
 
+//go:generate -command GetRequest requestgen -method GET
+//go:generate -command PostRequest requestgen -method POST
+//go:generate -command DeleteRequest requestgen -method DELETE
+
 import (
 	"time"
 

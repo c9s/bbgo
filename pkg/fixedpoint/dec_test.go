@@ -11,6 +11,70 @@ import (
 
 const Delta = 1e-9
 
+func BenchmarkFloat64(b *testing.B) {
+	b.ResetTimer()
+
+	b.Run("convert-float64", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := NewFromFloat(20.0)
+			_ = x.Float64() // nolint
+		}
+	})
+	b.Run("convert-float64-large-numbers", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := NewFromFloat(88.12345678)
+			_ = x.Float64() // nolint
+		}
+	})
+}
+
+func BenchmarkDiv(b *testing.B) {
+	b.ResetTimer()
+
+	b.Run("div-float64", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := NewFromFloat(20.0)
+			y := NewFromFloat(20.0)
+			x = x.Div(y) // nolint
+		}
+	})
+	b.Run("div-float64-large-numbers", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := NewFromFloat(88.12345678)
+			y := NewFromFloat(888.12345678)
+			x = x.Div(y) // nolint
+		}
+	})
+	b.Run("div-big-small-numbers", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := big.NewFloat(20.0)
+			y := big.NewFloat(20.0)
+			x = new(big.Float).Quo(x, y) // nolint
+		}
+	})
+	b.Run("div-big-large-numbers", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := big.NewFloat(88.12345678)
+			y := big.NewFloat(888.12345678)
+			x = new(big.Float).Quo(x, y) // nolint
+		}
+	})
+	b.Run("div-native-float64", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := 20.0
+			y := 20.0
+			x = x / y // nolint
+		}
+	})
+	b.Run("div-native-float64-large-numbers", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := 88.12345678
+			y := 888.12345678
+			x = x / y // nolint
+		}
+	})
+}
+
 func BenchmarkMul(b *testing.B) {
 	b.ResetTimer()
 
@@ -43,6 +107,14 @@ func BenchmarkMul(b *testing.B) {
 			x := big.NewFloat(88.12345678)
 			y := big.NewFloat(88.12345678)
 			x = new(big.Float).Mul(x, y) // nolint
+		}
+	})
+
+	b.Run("mul native float64", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := 20.0
+			y := 20.0
+			x = x * y // nolint
 		}
 	})
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -13,21 +14,28 @@ import (
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type OrderService struct {
 	DB *sqlx.DB
 }
 
-func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
+func (s *OrderService) Sync(
+	ctx context.Context, exchange types.Exchange, symbol string,
+	startTime, endTime time.Time,
+) error {
 	isMargin, isFutures, isIsolated, isolatedSymbol := exchange2.GetSessionAttributes(exchange)
 	// override symbol if isolatedSymbol is not empty
 	if isIsolated && len(isolatedSymbol) > 0 {
 		symbol = isolatedSymbol
 	}
+	logger := util.GetLoggerFromCtx(ctx)
+	logger.Infof("session attributes: isMargin=%v isFutures=%v isIsolated=%v isolatedSymbol=%s", isMargin, isFutures, isIsolated, isolatedSymbol)
 
 	api, ok := exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
+		logger.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing orders", exchange.Name())
 		return nil
 	}
 
@@ -77,7 +85,7 @@ func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol
 	}
 
 	for _, sel := range tasks {
-		if err := sel.execute(ctx, s.DB, startTime); err != nil {
+		if err := sel.execute(ctx, s.DB, startTime, endTime); err != nil {
 			return err
 		}
 	}
@@ -112,7 +120,7 @@ type QueryOrdersOptions struct {
 }
 
 func (s *OrderService) Query(options QueryOrdersOptions) ([]AggOrder, error) {
-	sql := genOrderSQL(options)
+	sql := genOrderSQL(s.DB.DriverName(), options)
 
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"exchange": options.Exchange,
@@ -128,7 +136,7 @@ func (s *OrderService) Query(options QueryOrdersOptions) ([]AggOrder, error) {
 	return s.scanAggRows(rows)
 }
 
-func genOrderSQL(options QueryOrdersOptions) string {
+func genOrderSQL(driver string, options QueryOrdersOptions) string {
 	// ascending
 	ordering := "ASC"
 	switch v := strings.ToUpper(options.Ordering); v {
@@ -140,21 +148,42 @@ func genOrderSQL(options QueryOrdersOptions) string {
 	if options.LastGID > 0 {
 		switch ordering {
 		case "ASC":
-			where = append(where, "gid > :gid")
+			where = append(where, "orders.gid > :gid")
 		case "DESC":
-			where = append(where, "gid < :gid")
+			where = append(where, "orders.gid < :gid")
 
 		}
 	}
 
 	if len(options.Exchange) > 0 {
-		where = append(where, "exchange = :exchange")
+		where = append(where, "orders.exchange = :exchange")
 	}
 	if len(options.Symbol) > 0 {
-		where = append(where, "symbol = :symbol")
+		where = append(where, "orders.symbol = :symbol")
 	}
 
-	sql := `SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders` +
+	var selColumns []string
+	if driver == "mysql" {
+		to := reflect.TypeOf(types.Order{})
+		for i := 0; i < to.NumField(); i++ {
+			field := to.Field(i)
+			colName := field.Tag.Get("db")
+			if colName == "" || colName == "-" {
+				continue
+			}
+			if colName == "uuid" {
+				selColumns = append(selColumns, binUuidSelector("orders", "uuid"))
+			} else {
+				selColumns = append(selColumns, "orders."+colName)
+			}
+
+		}
+	} else {
+		selColumns = append(selColumns, "orders.*")
+	}
+	selColumns = append(selColumns, "IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price")
+
+	sql := `SELECT ` + strings.Join(selColumns, ", ") + ` FROM orders` +
 		` LEFT JOIN trades AS t ON (t.order_id = orders.order_id)`
 	if len(where) > 0 {
 		sql += ` WHERE ` + strings.Join(where, " AND ")
@@ -196,15 +225,15 @@ func (s *OrderService) scanRows(rows *sqlx.Rows) (orders []types.Order, err erro
 func (s *OrderService) Insert(order types.Order) (err error) {
 	if s.DB.DriverName() == "mysql" {
 		_, err = s.DB.NamedExec(`
-			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_futures, is_isolated)
-			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_futures, :is_isolated)
+			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_futures, is_isolated, uuid)
+			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_futures, :is_isolated, IF(:uuid != '', UUID_TO_BIN(:uuid, true), ''))
 			ON DUPLICATE KEY UPDATE status=:status, executed_quantity=:executed_quantity, is_working=:is_working, updated_at=:updated_at`, order)
 		return err
 	}
 
 	_, err = s.DB.NamedExec(`
-			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_futures, is_isolated)
-			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_futures, :is_isolated)
+			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_futures, is_isolated, uuid)
+			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_futures, :is_isolated, :uuid)
 	`, order)
 
 	return err

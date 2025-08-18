@@ -170,7 +170,9 @@ func (v Value) Percentage() string {
 	} else if v == NegInf {
 		return "-inf%"
 	}
-	return strconv.FormatFloat(float64(v)/DefaultPow*100., 'f', -1, 64) + "%"
+
+	trcv := math.Trunc(float64(v)/DefaultPow*100.*1e4) / 1e4
+	return strconv.FormatFloat(trcv, 'f', -1, 64) + "%"
 }
 
 func (v Value) FormatPercentage(prec int) string {
@@ -296,7 +298,7 @@ func (v *Value) UnmarshalJSON(data []byte) error {
 		*v = Zero
 		return nil
 	}
-	if len(data) == 0 {
+	if len(data) == 0 || bytes.Equal(data, []byte{'"', '"'}) {
 		*v = Zero
 		return nil
 	}

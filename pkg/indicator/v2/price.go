@@ -41,6 +41,10 @@ func (s *PriceStream) AddSubscriber(f func(v float64)) {
 	}
 }
 
+func (s *PriceStream) Truncate() {
+	s.Slice = types.ShrinkSlice(s.Slice, 5000, 2000)
+}
+
 func (s *PriceStream) PushAndEmit(v float64) {
 	s.Slice.Push(v)
 	s.EmitUpdate(v)
