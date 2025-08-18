@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	bbgochart "github.com/c9s/bbgo/pkg/chart/v1"
+	"github.com/c9s/bbgo/pkg/datasource/csvsource"
 	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -154,7 +155,8 @@ type Backtest struct {
 	Sessions []string                   `json:"sessions" yaml:"sessions"`
 
 	// sync 1 second interval KLines
-	SyncSecKLines bool `json:"syncSecKLines,omitempty" yaml:"syncSecKLines,omitempty"`
+	SyncSecKLines bool                 `json:"syncSecKLines,omitempty" yaml:"syncSecKLines,omitempty"`
+	CsvSource     *csvsource.CsvConfig `json:"csvConfig,omitempty" yaml:"csvConfig,omitempty"`
 }
 
 func (b *Backtest) GetAccount(n string) BacktestAccount {

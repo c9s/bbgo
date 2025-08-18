@@ -2,9 +2,23 @@ package types
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestTruncate(t *testing.T) {
+	ts := time.Date(2023, 11, 5, 17, 36, 43, 716, time.UTC)
+	expectedDay := time.Date(ts.Year(), ts.Month(), ts.Day(), 0, 0, 0, 0, time.UTC)
+	assert.Equal(t, expectedDay, Interval1d.Truncate(ts))
+	expected2h := time.Date(ts.Year(), ts.Month(), ts.Day(), 16, 0, 0, 0, time.UTC)
+	assert.Equal(t, expected2h, Interval2h.Truncate(ts))
+	expectedHour := time.Date(ts.Year(), ts.Month(), ts.Day(), 17, 0, 0, 0, time.UTC)
+	assert.Equal(t, expectedHour, Interval1h.Truncate(ts))
+	expected30m := time.Date(ts.Year(), ts.Month(), ts.Day(), 17, 30, 0, 0, time.UTC)
+	assert.Equal(t, expected30m, Interval30m.Truncate(ts))
+
+}
 
 func TestParseInterval(t *testing.T) {
 	assert.Equal(t, ParseInterval("1s"), 1)
