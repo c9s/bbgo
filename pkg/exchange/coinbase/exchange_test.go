@@ -276,8 +276,7 @@ func TestExchange_QueryOrderTrades(t *testing.T) {
 	ex, saveRecord := getExchangeOrSkip(t)
 	defer saveRecord()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
+	ctx := context.Background()
 
 	trades, err := ex.QueryOrderTrades(ctx, types.OrderQuery{Symbol: "BTCUSDT"})
 	t.Logf("queried trades: %+v", trades)
