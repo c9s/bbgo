@@ -1,9 +1,9 @@
 [
   {
-    "timestamp": "2025-08-15T16:07:14.188611+08:00",
+    "timestamp": "2025-08-18T13:57:48.431971+08:00",
     "request": {
       "method": "GET",
-      "url": "https://api.exchange.coinbase.com/orders?limit=100\u0026product_id=BTC-USD\u0026sortedBy=created_at\u0026sorting=desc\u0026status%5B%5D=open",
+      "url": "https://api.exchange.coinbase.com/orders?limit=100&product_id=BTC-USD&sortedBy=created_at&sorting=desc&status%5B%5D=open",
       "header": {
         "Content-Type": [
           "application/json"
@@ -39,7 +39,7 @@
           "MISS"
         ],
         "Cf-Ray": [
-          "96f73277ca96a3ab-TPE"
+          "970f2cff7c154a5d-TPE"
         ],
         "Content-Length": [
           "2"
@@ -48,7 +48,7 @@
           "application/json; charset=utf-8"
         ],
         "Date": [
-          "Fri, 15 Aug 2025 08:07:14 GMT"
+          "Mon, 18 Aug 2025 05:57:48 GMT"
         ],
         "Etag": [
           "W/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\""
@@ -57,13 +57,13 @@
           "{\"success_fraction\":0.01,\"report_to\":\"cf-nel\",\"max_age\":604800}"
         ],
         "Report-To": [
-          "{\"endpoints\":[{\"url\":\"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=bQ5pI%2FuRQX2LnOMkqW0wp34YdDeMaOFF57lRSaEHdxmOXBLoxE6hQvEOzCysOfNHjmkmV3KY%2FB%2FNXs%2FRLq56xGNs%2BQD0DjDSPKYDYvW2NDvXCP1VIFVr5dsz774V1EsH%2BEt7F3x5tmEg2Hw%3D\"}],\"group\":\"cf-nel\",\"max_age\":604800}"
+          "{\"endpoints\":[{\"url\":\"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=rEHHfZSpwjwSn6m%2FXRoXYq%2BPZMwiL3HW3NhOprlkz%2BNKT%2BakDKIaNO2ySQKj21DPYH48eRpl5%2FPXUU8r67GaehjrlVs%2Fc3%2BqoT%2BTYmai%2B%2F%2F8oojbS8kRZKzUW%2B4p79ixPkVtt%2BQVU%2FYSmT4%3D\"}],\"group\":\"cf-nel\",\"max_age\":604800}"
         ],
         "Server": [
           "cloudflare"
         ],
         "Set-Cookie": [
-          "__cf_bm=j.xrgBVtFSoPH7psQSkWk3yBRB_OkzOaRW79CKDvOCE-1755245234-1.0.1.1-dxALKOCq7XY2d5byCSjsW5SAt1rFCxkeKt9UfYBLDKggAdLLbMZvkei4MNT_38xr1Dl4.v6fvghS08mRmWss.ta08milMbJspeEWtcaDX0A; path=/; expires=Fri, 15-Aug-25 08:37:14 GMT; domain=.exchange.coinbase.com; HttpOnly; Secure; SameSite=None"
+          "__cf_bm=dxKm8q0tyYIHnV6JR7EMfwHyrtA40ZTxsL.9yhssxE8-1755496668-1.0.1.1-goUScrRiGrtpgcH7H_xjQKawAXvTzeUoOx9iB5ukqiO_p6W6ASfaJ4jp4S7YXo933zK0raRPl6gyo1FxuPQkDybtRfuMUFPV9YHL1dcEsOQ; path=/; expires=Mon, 18-Aug-25 06:27:48 GMT; domain=.exchange.coinbase.com; HttpOnly; Secure; SameSite=None"
         ],
         "Strict-Transport-Security": [
           "max-age=15552000; includeSubDomains"
@@ -91,10 +91,10 @@
     }
   },
   {
-    "timestamp": "2025-08-15T16:07:14.509453+08:00",
+    "timestamp": "2025-08-18T13:57:48.875775+08:00",
     "request": {
       "method": "GET",
-      "url": "https://api.exchange.coinbase.com/orders?limit=100\u0026product_id=ETH-USD\u0026sortedBy=created_at\u0026sorting=desc\u0026status%5B%5D=open",
+      "url": "https://api.exchange.coinbase.com/orders?limit=100&product_id=ETH-USD&sortedBy=created_at&sorting=desc&status%5B%5D=open",
       "header": {
         "Content-Type": [
           "application/json"
@@ -130,7 +130,7 @@
           "MISS"
         ],
         "Cf-Ray": [
-          "96f73279bc78a3ab-TPE"
+          "970f2d019dd94a5d-TPE"
         ],
         "Content-Length": [
           "2"
@@ -139,7 +139,7 @@
           "application/json; charset=utf-8"
         ],
         "Date": [
-          "Fri, 15 Aug 2025 08:07:14 GMT"
+          "Mon, 18 Aug 2025 05:57:48 GMT"
         ],
         "Etag": [
           "W/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\""
@@ -148,13 +148,13 @@
           "{\"success_fraction\":0.01,\"report_to\":\"cf-nel\",\"max_age\":604800}"
         ],
         "Report-To": [
-          "{\"endpoints\":[{\"url\":\"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=AxodgqAv34MyU%2Fr5WLDvEvvFSnee8FuSK1%2BChZ%2BJiOmt6tpBWzqF3VYnJ%2BcvUVhjOubkvlHDxSCgxchYYg84jJaB8l5XuSjCszen1Dpmb4Hi%2FbugDTJ35g4JWfzD9s4JuGT4OEuocm%2BgcrY%3D\"}],\"group\":\"cf-nel\",\"max_age\":604800}"
+          "{\"endpoints\":[{\"url\":\"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=V2zu4nCwCdII9UNI4DlluKcH7Sd96Z5zL60B2i0xmVVgU04YqHEHPnf5etVyFr0DwIR6MJoZxPr5mfgFQNyJcu%2Bxt4gAzw9fG42wpuqqTFcU85g95y%2BGxjc%2B8ku86wGLs5Fsigm1VoCsNOg%3D\"}],\"group\":\"cf-nel\",\"max_age\":604800}"
         ],
         "Server": [
           "cloudflare"
         ],
         "Set-Cookie": [
-          "__cf_bm=YMGsU1xYzbmFe0829hyHWQawnkQWymVlwmwNtNOmiUM-1755245234-1.0.1.1-HD9Tnjjd8RnyQBPsNZsuvCv6OBuFv4V1iu07cS50Jg.jTc6H.pHU3uFwqJHvqsrxCOET4bk6MTNbocJ33YcGZlN5aK49bQUAvcJ6Y71sUeI; path=/; expires=Fri, 15-Aug-25 08:37:14 GMT; domain=.exchange.coinbase.com; HttpOnly; Secure; SameSite=None"
+          "__cf_bm=DVJNamvOvnwHDGqKFLV_rtGQ51AwE78ryLmMy3mHVlA-1755496668-1.0.1.1-YAxdWqx47TzrAbEl.BjR5fDLcmwkn1nq5D4qWzzfwJGr9I9WM9ZMQjS9iSkuPWxMX_WGlnHK7UU6klXUud4aqJ9cTRlN.2gKB_XrSzjAlig; path=/; expires=Mon, 18-Aug-25 06:27:48 GMT; domain=.exchange.coinbase.com; HttpOnly; Secure; SameSite=None"
         ],
         "Strict-Transport-Security": [
           "max-age=15552000; includeSubDomains"
@@ -182,10 +182,10 @@
     }
   },
   {
-    "timestamp": "2025-08-15T16:07:14.810589+08:00",
+    "timestamp": "2025-08-18T13:57:49.213118+08:00",
     "request": {
       "method": "GET",
-      "url": "https://api.exchange.coinbase.com/orders?limit=100\u0026product_id=ETH-BTC\u0026sortedBy=created_at\u0026sorting=desc\u0026status%5B%5D=open",
+      "url": "https://api.exchange.coinbase.com/orders?limit=100&product_id=ETH-BTC&sortedBy=created_at&sorting=desc&status%5B%5D=open",
       "header": {
         "Content-Type": [
           "application/json"
@@ -221,7 +221,7 @@
           "MISS"
         ],
         "Cf-Ray": [
-          "96f7327bbe78a3ab-TPE"
+          "970f2d04585f4a5d-TPE"
         ],
         "Content-Length": [
           "2"
@@ -230,7 +230,7 @@
           "application/json; charset=utf-8"
         ],
         "Date": [
-          "Fri, 15 Aug 2025 08:07:14 GMT"
+          "Mon, 18 Aug 2025 05:57:49 GMT"
         ],
         "Etag": [
           "W/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\""
@@ -239,13 +239,13 @@
           "{\"success_fraction\":0.01,\"report_to\":\"cf-nel\",\"max_age\":604800}"
         ],
         "Report-To": [
-          "{\"endpoints\":[{\"url\":\"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=h7xkNNIcMgEywXNksoh6o7NzBXJzmzW2%2B%2F7ZW1m1%2BdJBLGvgtVk%2F787l4G78Y5gqntm5%2FKOwgWoma4Cqmt5WXQ%2FQ7stZjVyoTb0hLY9gZ4FhqdviCoIlzugwLlJNxEvSK1TCX1TbRnltFZA%3D\"}],\"group\":\"cf-nel\",\"max_age\":604800}"
+          "{\"endpoints\":[{\"url\":\"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=V9zkkM0GY7uT5GRfQ0DO7T1CF8VflS%2BzxzKd6GtFbe%2BMylbYuXCQtFAx7RAbEwJwZBe9EEBvM2t%2Bc9PWYzexlpmrB9IzftOgDFgJmPceZWwy4uyC%2FmkQR%2FZgtbCIIUoxkzYK9KReNBlH2pg%3D\"}],\"group\":\"cf-nel\",\"max_age\":604800}"
         ],
         "Server": [
           "cloudflare"
         ],
         "Set-Cookie": [
-          "__cf_bm=9et8ZlbAFf60pdosqJtZjDPKQkc18LhxjrnRrybBA0M-1755245234-1.0.1.1-fXe2aC71iHL79ceR2s774I7CuSlvLSsauOEdLXBxTKCTqpUtCCGacPJ4XHyRozaOl4ft_zYIwCTp3Kihf9_yWBOP2YgPYzjFMMHxy1pU4HE; path=/; expires=Fri, 15-Aug-25 08:37:14 GMT; domain=.exchange.coinbase.com; HttpOnly; Secure; SameSite=None"
+          "__cf_bm=3LHz1XYD7CT8bl6F2z7tT8Bq8o_548uKfa1daxENNTo-1755496669-1.0.1.1-5hxCpRliBy9uM5syM1drsclVbidw5TnZUQ3VUanseyuLecwRdXMfPkUQY_EKd9TlWk9OmnSn4oC6PAIWxMUud5xZwZXnddJmbMm6w1QzPLY; path=/; expires=Mon, 18-Aug-25 06:27:49 GMT; domain=.exchange.coinbase.com; HttpOnly; Secure; SameSite=None"
         ],
         "Strict-Transport-Security": [
           "max-age=15552000; includeSubDomains"
