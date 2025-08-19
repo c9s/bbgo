@@ -1,0 +1,269 @@
+[
+  {
+    "timestamp": "2025-08-18T13:58:01.809038+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.exchange.coinbase.com/products/BTC-USD/ticker",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Accept-Ranges": [
+          "bytes"
+        ],
+        "Access-Control-Allow-Headers": [
+          "Content-Type, Accept, cb-session, cb-fp, cb-form-factor"
+        ],
+        "Access-Control-Allow-Methods": [
+          "GET,POST,DELETE,PUT"
+        ],
+        "Access-Control-Allow-Origin": [
+          "*"
+        ],
+        "Access-Control-Expose-Headers": [
+          "cb-before, cb-after, cb-gdpr"
+        ],
+        "Access-Control-Max-Age": [
+          "7200"
+        ],
+        "Cache-Control": [
+          "public, max-age=1, must-revalidate"
+        ],
+        "Cf-Cache-Status": [
+          "HIT"
+        ],
+        "Cf-Ray": [
+          "970f2d548a2149f7-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Mon, 18 Aug 2025 05:58:01 GMT"
+        ],
+        "Etag": [
+          "W/\"a1-eKLDGCv1D0CQLcN2uIe4t19JvtM\""
+        ],
+        "Nel": [
+          "{\"success_fraction\":0.01,\"report_to\":\"cf-nel\",\"max_age\":604800}"
+        ],
+        "Report-To": [
+          "<REPORT-TO>"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Set-Cookie": [
+          "<SET-COOKIE>"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=15552000; includeSubDomains"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Dns-Prefetch-Control": [
+          "off"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"ask\": \"115740.12\", \"bid\": \"115740.11\", \"volume\": \"3406.39184933\", \"trade_id\": 862973875, \"price\": \"115743.68\", \"size\": \"0.00480835\", \"time\": \"2025-08-18T05:57:58.133100Z\", \"rfq_volume\": \"12.914565\"}"
+    }
+  },
+  {
+    "timestamp": "2025-08-18T13:58:01.83385+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.exchange.coinbase.com/products/ETH-USD/ticker",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Accept-Ranges": [
+          "bytes"
+        ],
+        "Access-Control-Allow-Headers": [
+          "Content-Type, Accept, cb-session, cb-fp, cb-form-factor"
+        ],
+        "Access-Control-Allow-Methods": [
+          "GET,POST,DELETE,PUT"
+        ],
+        "Access-Control-Allow-Origin": [
+          "*"
+        ],
+        "Access-Control-Expose-Headers": [
+          "cb-before, cb-after, cb-gdpr"
+        ],
+        "Access-Control-Max-Age": [
+          "7200"
+        ],
+        "Age": [
+          "1"
+        ],
+        "Cache-Control": [
+          "public, max-age=1, must-revalidate"
+        ],
+        "Cf-Cache-Status": [
+          "HIT"
+        ],
+        "Cf-Ray": [
+          "970f2d552aad49f7-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Mon, 18 Aug 2025 05:58:01 GMT"
+        ],
+        "Etag": [
+          "W/\"9f-E3YDI0M00gYwvAVX4Ijy9EFd6VA\""
+        ],
+        "Nel": [
+          "{\"success_fraction\":0.01,\"report_to\":\"cf-nel\",\"max_age\":604800}"
+        ],
+        "Report-To": [
+          "<REPORT-TO>"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Set-Cookie": [
+          "<SET-COOKIE>"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=15552000; includeSubDomains"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Dns-Prefetch-Control": [
+          "off"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"ask\": \"4311.96\", \"bid\": \"4311.95\", \"volume\": \"130867.40603437\", \"trade_id\": 686153504, \"price\": \"4311.98\", \"size\": \"0.00505978\", \"time\": \"2025-08-18T05:57:59.203013541Z\", \"rfq_volume\": \"1483.651133\"}"
+    }
+  },
+  {
+    "timestamp": "2025-08-18T13:58:01.994845+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.exchange.coinbase.com/products/ETH-BTC/ticker",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Accept-Ranges": [
+          "bytes"
+        ],
+        "Access-Control-Allow-Headers": [
+          "Content-Type, Accept, cb-session, cb-fp, cb-form-factor"
+        ],
+        "Access-Control-Allow-Methods": [
+          "GET,POST,DELETE,PUT"
+        ],
+        "Access-Control-Allow-Origin": [
+          "*"
+        ],
+        "Access-Control-Expose-Headers": [
+          "cb-before, cb-after, cb-gdpr"
+        ],
+        "Access-Control-Max-Age": [
+          "7200"
+        ],
+        "Cache-Control": [
+          "public, max-age=1, must-revalidate"
+        ],
+        "Cf-Cache-Status": [
+          "HIT"
+        ],
+        "Cf-Ray": [
+          "970f2d55cb3849f7-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Mon, 18 Aug 2025 05:58:01 GMT"
+        ],
+        "Etag": [
+          "W/\"8e-kJUXYRdwF2H4fKyxjyzHklUk/IE\""
+        ],
+        "Nel": [
+          "{\"success_fraction\":0.01,\"report_to\":\"cf-nel\",\"max_age\":604800}"
+        ],
+        "Report-To": [
+          "<REPORT-TO>"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Set-Cookie": [
+          "<SET-COOKIE>"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=15552000; includeSubDomains"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Dns-Prefetch-Control": [
+          "off"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"ask\": \"0.03727\", \"bid\": \"0.03725\", \"volume\": \"3106.92562742\", \"trade_id\": 37553402, \"price\": \"0.03726\", \"size\": \"0.01447677\", \"time\": \"2025-08-18T05:57:37.258019509Z\"}"
+    }
+  }
+]

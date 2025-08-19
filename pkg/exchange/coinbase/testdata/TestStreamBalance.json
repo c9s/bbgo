@@ -1,0 +1,28 @@
+[
+  {
+    "type": "subscriptions",
+    "channels": [
+      {
+        "name": "balance"
+      }
+    ]
+  },
+  {
+    "type": "balance",
+    "account_id": "<ACCOUNT_ID>",
+    "currency": "ZRX",
+    "holds": 0.0,
+    "available": 0.0,
+    "updated": "0001-01-01T00:00:00Z",
+    "timestamp": "2025-08-18T06:13:42.381233391Z"
+  },
+  {
+    "type": "balance",
+    "account_id": "<ACCOUNT_ID>",
+    "currency": "ZEN",
+    "holds": 0.0,
+    "available": 0.0,
+    "updated": "0001-01-01T00:00:00Z",
+    "timestamp": "2025-08-18T06:13:42.42706682Z"
+  }
+]
