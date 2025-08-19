@@ -7,9 +7,9 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
-	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/c9s/requestgen"
 )
@@ -38,7 +38,7 @@ func NewClient() *Client {
 			BaseURL:    u,
 			HttpClient: http.DefaultClient,
 		},
-		nonce: NewNonce(),
+		nonce: NewNonce(time.Now()),
 	}
 }
 
@@ -75,8 +75,6 @@ func (c *Client) NewAuthenticatedRequest(
 	if err != nil {
 		return nil, err
 	}
-
-	log.Printf("body: %s from payload: %+v", string(body), payload)
 
 	return c.newAuthenticatedRequest(ctx, method, refURL, params, body)
 }

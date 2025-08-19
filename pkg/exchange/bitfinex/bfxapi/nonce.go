@@ -30,8 +30,8 @@ func (ng *Nonce) GetInt64() int64 {
 	return atomic.AddInt64(&ng.current, 1)
 }
 
-func NewNonce() *Nonce {
+func NewNonce(now time.Time) *Nonce {
 	return &Nonce{
-		current: time.Now().UnixMilli() * 1000,
+		current: now.UnixMilli() * 1000,
 	}
 }

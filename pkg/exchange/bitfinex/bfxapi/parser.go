@@ -120,13 +120,13 @@ func parseJsonArray(data []byte, obj any, skipFields int, va ...int) error {
 		return nil
 	}
 
+	// Handle public messages or other cases
 	switch string(raws[0]) {
 	case "error":
 		var errResp ErrorResponse
 		if err := parseRawArray(raws, &errResp, 0); err != nil {
 			return fmt.Errorf("failed to parse error response: %w", err)
 		}
-
 		return errResp
 	}
 
@@ -142,3 +142,58 @@ type ErrorResponse struct {
 func (e ErrorResponse) Error() string {
 	return fmt.Sprintf("error type: %s, code: %d, message: %s", e.Type, e.Code, e.Message)
 }
+
+// StreamName represents the stream name for private user data.
+type StreamName string
+
+const (
+	StreamOrderSnapshot StreamName = "os" // order snapshot
+	StreamOrderNew      StreamName = "on" // order new
+	StreamOrderUpdate   StreamName = "ou" // order update
+	StreamOrderCancel   StreamName = "oc" // order cancel
+
+	StreamPositionSnapshot StreamName = "ps" // position snapshot
+	StreamPositionNew      StreamName = "pn" // position new
+	StreamPositionUpdate   StreamName = "pu" // position update
+	StreamPositionClose    StreamName = "pc" // position close
+
+	StreamTradeExecuted StreamName = "te" // trade executed
+	StreamTradeUpdate   StreamName = "tu" // trade execution update
+
+	StreamFundingOfferSnapshot StreamName = "fos" // funding offer snapshot
+	StreamFundingOfferNew      StreamName = "fon" // funding offer new
+	StreamFundingOfferUpdate   StreamName = "fou" // funding offer update
+	StreamFundingOfferCancel   StreamName = "foc" // funding offer cancel
+
+	StreamFundingCreditSnapshot StreamName = "fcs" // funding credits snapshot
+	StreamFundingCreditNew      StreamName = "fcn" // funding credits new
+	StreamFundingCreditUpdate   StreamName = "fcu" // funding credits update
+	StreamFundingCreditClose    StreamName = "fcc" // funding credits close
+
+	StreamFundingLoanSnapshot StreamName = "fls" // funding loans snapshot
+	StreamFundingLoanNew      StreamName = "fln" // funding loans new
+	StreamFundingLoanUpdate   StreamName = "flu" // funding loans update
+	StreamFundingLoanClose    StreamName = "flc" // funding loans close
+
+	StreamWalletSnapshot StreamName = "ws" // wallet snapshot
+	StreamWalletUpdate   StreamName = "wu" // wallet update
+
+	StreamBalanceUpdate     StreamName = "bu"  // balance update
+	StreamMarginInfoUpdate  StreamName = "miu" // margin info update
+	StreamFundingInfoUpdate StreamName = "fiu" // funding info update
+
+	StreamFundingTradeExecuted StreamName = "fte" // funding trade executed
+	StreamFundingTradeUpdate   StreamName = "ftu" // funding trade update
+
+	StreamNotification StreamName = "n" // notification
+
+	StreamHeartBeat StreamName = "hb" // heartbeat
+)
+
+// PositionStatus represents the status of a Bitfinex user position.
+type PositionStatus string
+
+const (
+	PositionStatusActive PositionStatus = "ACTIVE"
+	PositionStatusClosed PositionStatus = "CLOSED"
+)
