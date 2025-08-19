@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
+
+	"crypto/hmac"
+	"crypto/sha512"
+	"encoding/hex"
 
 	"github.com/sirupsen/logrus"
 
@@ -34,6 +39,25 @@ const (
 	ChannelBook    Channel = "book"
 	ChannelCandles Channel = "candles"
 	ChannelStatus  Channel = "status"
+)
+
+// Filter represents Bitfinex WebSocket auth filter type.
+type Filter string
+
+const (
+	FilterTrading       Filter = "trading"
+	FilterTradingBTCUSD Filter = "trading-tBTCUSD"
+	FilterFunding       Filter = "funding"
+	FilterFundingBTC    Filter = "funding-fBTC"
+	FilterFundingUSD    Filter = "funding-fUSD"
+	FilterFundingUST    Filter = "funding-fUST"
+
+	FilterWallet            Filter = "wallet"
+	FilterWalletExchangeBTC Filter = "wallet-exchange-BTC"
+
+	FilterAlgo    Filter = "algo"
+	FilterBalance Filter = "balance"
+	FilterNotify  Filter = "notify"
 )
 
 type WebSocketRequest struct {
@@ -571,4 +595,31 @@ func parseTradeEvent(channelID int64, payload json.RawMessage, arr ...[]json.Raw
 		return nil, err
 	}
 	return te, nil
+}
+
+// WebSocketAuthRequest represents Bitfinex private websocket authentication request.
+type WebSocketAuthRequest struct {
+	Event       string   `json:"event"`
+	ApiKey      string   `json:"apiKey"`
+	AuthSig     string   `json:"authSig"`
+	AuthPayload string   `json:"authPayload"`
+	AuthNonce   string   `json:"authNonce"`
+	Filter      []Filter `json:"filter,omitempty"`
+}
+
+// GenerateAuthRequest generates a Bitfinex WebSocketAuthRequest for authentication.
+func GenerateAuthRequest(apiKey, apiSecret string, filter ...Filter) WebSocketAuthRequest {
+	nonce := strconv.FormatInt(time.Now().Unix(), 10)
+	payload := "AUTH" + nonce
+	sig := hmac.New(sha512.New384, []byte(apiSecret))
+	sig.Write([]byte(payload))
+	payloadSign := hex.EncodeToString(sig.Sum(nil))
+	return WebSocketAuthRequest{
+		Event:       "auth",
+		ApiKey:      apiKey,
+		AuthSig:     payloadSign,
+		AuthPayload: payload,
+		AuthNonce:   nonce,
+		Filter:      filter,
+	}
 }

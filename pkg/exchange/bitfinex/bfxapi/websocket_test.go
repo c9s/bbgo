@@ -10,6 +10,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/testutil"
 )
 
 const publicMessageRecordFile = "testdata/bitfinex_ws_raw.jsonl"
@@ -188,4 +190,79 @@ func TestParserParseFromFile(t *testing.T) {
 	}
 
 	t.Logf("total parse errors: %d", errorCount)
+}
+
+func TestWebSocketRecordPrivate(t *testing.T) {
+	if false && os.Getenv("TEST_BFX_WS_PRIVATE_RECORD") == "" {
+		t.Skip("TEST_BFX_WS_PRIVATE_RECORD env not set, skipping real websocket test")
+	}
+
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "BITFINEX")
+	if !ok {
+		t.Skip("BITFINEX integration test not configured, skipping private websocket test")
+	}
+
+	url := PrivateWebSocketURL
+	c, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		t.Fatalf("failed to connect to bitfinex private ws: %v", err)
+	}
+	defer c.Close()
+
+	file, err := os.Create("testdata/bitfinex_ws_private_raw.jsonl")
+	if err != nil {
+		t.Fatalf("failed to create output file: %v", err)
+	}
+	defer func() {
+		if err := file.Sync(); err != nil {
+			logrus.Errorf("failed to sync file: %v", err)
+		}
+		if err := file.Close(); err != nil {
+			logrus.Errorf("failed to close file: %v", err)
+		}
+	}()
+
+	// send auth message
+	authMsg := GenerateAuthRequest(key, secret)
+	if err := c.WriteJSON(authMsg); err != nil {
+		t.Fatalf("failed to send auth message: %v", err)
+	}
+
+	// subscribe to wallet channel (see Bitfinex docs)
+	walletSub := WebSocketRequest{
+		Event:   "subscribe",
+		Channel: "wallet",
+	}
+	if err := c.WriteJSON(walletSub); err != nil {
+		t.Fatalf("failed to subscribe wallet: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			t.Log("timeout reached, closing connection")
+			return
+		default:
+			if err := c.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+				logrus.Errorf("failed to set read deadline: %v", err)
+				return
+			}
+			_, msg, err := c.ReadMessage()
+			if err != nil {
+				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+					t.Log("websocket closed normally")
+					return
+				}
+				logrus.Errorf("read error: %v", err)
+				return
+			}
+			if _, err := file.Write(append(msg, '\n')); err != nil {
+				logrus.Errorf("failed to write message: %v", err)
+			}
+			t.Logf("received message: %s", string(msg))
+		}
+	}
 }

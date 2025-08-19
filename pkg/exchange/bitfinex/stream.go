@@ -2,12 +2,7 @@ package bitfinex
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha512"
-	"encoding/hex"
-	"fmt"
 	"os"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -79,19 +74,7 @@ func (s *Stream) onConnect() {
 			logrus.Warn("bitfinex private websocket: missing API key or secret")
 		}
 
-		nonce := fmt.Sprintf("%v", time.Now().Unix())
-		payload := "AUTH" + nonce
-		sig := hmac.New(sha512.New384, []byte(apiSecret))
-		sig.Write([]byte(payload))
-		payloadSign := hex.EncodeToString(sig.Sum(nil))
-		authMsg := WebSocketAuthRequest{
-			Event:       "auth",
-			ApiKey:      apiKey,
-			AuthSig:     payloadSign,
-			AuthPayload: payload,
-			AuthNonce:   nonce,
-		}
-
+		authMsg := bfxapi.GenerateAuthRequest(apiKey, apiSecret)
 		if err := s.Conn.WriteJSON(authMsg); err != nil {
 			logrus.WithError(err).Error("bitfinex auth: failed to send auth message")
 			return
@@ -107,13 +90,4 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	default:
 		logrus.Warnf("unhandled %T event: %+v", evt, evt)
 	}
-}
-
-// WebSocketAuthRequest represents Bitfinex private websocket authentication request.
-type WebSocketAuthRequest struct {
-	Event       string `json:"event"`
-	ApiKey      string `json:"apiKey"`
-	AuthSig     string `json:"authSig"`
-	AuthPayload string `json:"authPayload"`
-	AuthNonce   string `json:"authNonce"`
 }
