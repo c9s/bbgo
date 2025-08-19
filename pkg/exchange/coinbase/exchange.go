@@ -120,7 +120,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return balances, nil
 }
 
-func (e *Exchange) QueryAccountID(ctx context.Context) (map[string]string, error) {
+func (e *Exchange) queryAccountIDs(ctx context.Context) (map[string]string, error) {
 	req := e.client.NewGetBalancesRequest()
 	accounts, err := req.Do(ctx)
 	if err != nil {

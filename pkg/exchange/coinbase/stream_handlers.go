@@ -159,23 +159,26 @@ func (s *Stream) buildMapForUserDataStream(channel2LocalSymbolsMap map[types.Cha
 	defer cancel()
 	markets, err := s.exchange.QueryMarkets(ctx)
 	if err != nil {
-		panic("fail to query markets")
+		logStream.WithError(err).Warn("fail to query markets")
 	}
-	accountIDsMap, err := s.exchange.QueryAccountID(ctx)
+	accountIDsMap, err := s.exchange.queryAccountIDs(ctx)
 	if err != nil {
-		panic("fail to query account IDs for private symbols")
+		logStream.WithError(err).Warn("fail to query account IDs for private symbols")
 	}
 	dedupAccountIDs := make(map[string]struct{})
 	for _, localSymbol := range privateChannelLocalSymbols {
 		symbol := toGlobalSymbol(localSymbol)
 		market, ok := markets[symbol]
 		if !ok {
-			panic("fail to find market for private symbol: " + symbol)
+			logStream.Warnf("fail to find market for private symbol: %s", symbol)
+			continue
 		}
-		baseAccountId := accountIDsMap[market.BaseCurrency]
-		quoteAccountId := accountIDsMap[market.QuoteCurrency]
-		dedupAccountIDs[baseAccountId] = struct{}{}
-		dedupAccountIDs[quoteAccountId] = struct{}{}
+		if baseAccountId, ok := accountIDsMap[market.BaseCurrency]; ok {
+			dedupAccountIDs[baseAccountId] = struct{}{}
+		}
+		if quoteAccountId, ok := accountIDsMap[market.QuoteCurrency]; ok {
+			dedupAccountIDs[quoteAccountId] = struct{}{}
+		}
 	}
 	balanceAccountIDs := make([]string, 0)
 	for accountId := range dedupAccountIDs {
