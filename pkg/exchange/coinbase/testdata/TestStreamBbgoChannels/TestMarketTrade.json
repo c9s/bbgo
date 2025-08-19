@@ -1,0 +1,125 @@
+[
+  {
+    "type": "subscriptions",
+    "channels": [
+      {
+        "name": "matches",
+        "product_ids": [
+          "BTC-USD"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "last_match",
+    "product_id": "BTC-USD",
+    "sequence": 110324765215,
+    "trade_id": 863007273,
+    "maker_order_id": "97e87319-f981-48f3-b7d0-7f02fc740dda",
+    "taker_order_id": "1a000ad3-ae8e-45a9-bf21-a0336fad61b3",
+    "time": "2025-08-18T07:42:04.521625Z",
+    "size": 0.0014,
+    "price": 115539.58,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "BTC-USD",
+    "sequence": 110324766103,
+    "trade_id": 863007274,
+    "maker_order_id": "ea183b64-7ce6-45b6-bf89-487b80559294",
+    "taker_order_id": "aea7112a-2f00-4cd1-9c47-61b061d52918",
+    "time": "2025-08-18T07:42:05.645609Z",
+    "size": 8.57e-06,
+    "price": 115539.8,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "BTC-USD",
+    "sequence": 110324766755,
+    "trade_id": 863007275,
+    "maker_order_id": "8e8cca2b-ee25-43ff-b295-70158af30db2",
+    "taker_order_id": "5027b4a2-b4f5-4dbe-9bbb-c3750dd11f55",
+    "time": "2025-08-18T07:42:06.721639Z",
+    "size": 0.0051719,
+    "price": 115539.6,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "BTC-USD",
+    "sequence": 110324766868,
+    "trade_id": 863007276,
+    "maker_order_id": "8e8cca2b-ee25-43ff-b295-70158af30db2",
+    "taker_order_id": "4bda7db1-9860-4bbf-8c40-c50500b80b76",
+    "time": "2025-08-18T07:42:06.899566Z",
+    "size": 0.00021024,
+    "price": 115539.6,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "BTC-USD",
+    "sequence": 110324766981,
+    "trade_id": 863007277,
+    "maker_order_id": "8e8cca2b-ee25-43ff-b295-70158af30db2",
+    "taker_order_id": "c9104489-0c5f-4f2d-88e5-f6eedcf236e3",
+    "time": "2025-08-18T07:42:07.302917Z",
+    "size": 0.00856856,
+    "price": 115539.6,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "BTC-USD",
+    "sequence": 110324767008,
+    "trade_id": 863007278,
+    "maker_order_id": "637cbe65-c82c-4435-835b-aa197e241d77",
+    "taker_order_id": "bab3f5bb-28c7-48b7-9f81-cc69b41892d5",
+    "time": "2025-08-18T07:42:07.381346Z",
+    "size": 8.353e-05,
+    "price": 115539.6,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "BTC-USD",
+    "sequence": 110324767238,
+    "trade_id": 863007279,
+    "maker_order_id": "5476e797-ff03-488e-bea3-efb8693507e0",
+    "taker_order_id": "d077ce6b-d7a7-449d-97bf-f5ece67fc25b",
+    "time": "2025-08-18T07:42:07.970657Z",
+    "size": 0.0086,
+    "price": 115539.6,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "BTC-USD",
+    "sequence": 110324767379,
+    "trade_id": 863007280,
+    "maker_order_id": "ea183b64-7ce6-45b6-bf89-487b80559294",
+    "taker_order_id": "e4c9be34-2a26-4852-a2dd-dd533f022037",
+    "time": "2025-08-18T07:42:08.150765Z",
+    "size": 0.00012611,
+    "price": 115539.8,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  }
+]

@@ -1,0 +1,51 @@
+[
+  {
+    "type": "subscriptions",
+    "channels": [
+      {
+        "name": "user",
+        "product_ids": ["ETH-USDT"]
+      }
+    ]
+  },
+  {
+    "type": "received",
+    "product_id": "ETH-USDT",
+    "sequence": 21176252972,
+    "client-oid": "",
+    "order_id": "<ORDER_ID>",
+    "order_type": "market",
+    "side": "sell",
+    "time": "2025-08-18T06:17:36.645487Z",
+    "size": 0.001
+  },
+  {
+    "type": "match",
+    "product_id": "ETH-USDT",
+    "sequence": 21176252973,
+    "trade_id": 30787025,
+    "maker_order_id": "<MAKER_ORDER_ID>",
+    "taker_order_id": "<TAKER_ORDER_ID>",
+    "time": "2025-08-18T06:17:36.645487Z",
+    "size": 0.001,
+    "price": 4284.43,
+    "side": "buy",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>",
+    "taker_user_id": "<USER_ID>",
+    "taker_profile_id": "<TAKER_PROFILE_ID>",
+    "taker_fee_rate": 0.0004
+  },
+  {
+    "type": "done",
+    "product_id": "ETH-USDT",
+    "sequence": 21176252974,
+    "time": "2025-08-18T06:17:36.645487Z",
+    "price": 0.0,
+    "order_id": "<ORDER_ID>",
+    "reason": "filled",
+    "side": "sell",
+    "remaining_size": 0.0,
+    "cancel_reason": "107:Broker"
+  }
+]
