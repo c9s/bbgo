@@ -69,7 +69,7 @@ func TestStreamBasic(t *testing.T) {
 		if isRecording {
 			err := stream.Connect(context.Background())
 			assert.NoError(t, err)
-			<-time.After(10 * time.Second)
+			time.Sleep(10 * time.Second)
 			saveRecord()
 			err = stream.Close()
 			assert.NoError(t, err)
@@ -99,7 +99,7 @@ func TestStreamBasic(t *testing.T) {
 		if isRecording {
 			err := stream.Connect(context.Background())
 			assert.NoError(t, err)
-			<-time.After(5 * time.Second)
+			time.Sleep(5 * time.Second)
 			saveRecord()
 			err = stream.Close()
 			assert.NoError(t, err)
@@ -132,7 +132,7 @@ func TestStreamBasic(t *testing.T) {
 		if isRecording {
 			err := stream.Connect(context.Background())
 			assert.NoError(t, err)
-			<-time.After(5 * time.Second)
+			time.Sleep(5 * time.Second)
 			saveRecord()
 			err = stream.Close()
 			assert.NoError(t, err)
@@ -170,7 +170,7 @@ func TestStreamFull(t *testing.T) {
 	if isRecording {
 		err := stream.Connect(context.Background())
 		assert.NoError(t, err)
-		<-time.After(10 * time.Second)
+		time.Sleep(10 * time.Second)
 		saveRecord()
 		err = stream.Close()
 		assert.NoError(t, err)
@@ -229,7 +229,7 @@ func TestStreamLevel2(t *testing.T) {
 	if isRecording {
 		err := stream.Connect(context.Background())
 		assert.NoError(t, err)
-		<-time.After(5 * time.Second)
+		time.Sleep(5 * time.Second)
 		saveRecord()
 		err = stream.Close()
 		assert.NoError(t, err)
@@ -290,7 +290,7 @@ func TestStreamBalance(t *testing.T) {
 	if isRecording {
 		err := stream.Connect(context.Background())
 		assert.NoError(t, err)
-		<-time.After(10 * time.Second)
+		time.Sleep(10 * time.Second)
 		saveRecord()
 		err = stream.Close()
 		assert.NoError(t, err)
@@ -320,7 +320,7 @@ func TestStreamBbgoChannels(t *testing.T) {
 		if isRecording {
 			err := stream.Connect(context.Background())
 			assert.NoError(t, err)
-			<-time.After(5 * time.Second)
+			time.Sleep(5 * time.Second)
 			saveRecord()
 			err = stream.Close()
 			assert.NoError(t, err)
@@ -366,7 +366,7 @@ func TestStreamBbgoChannels(t *testing.T) {
 		if isRecording {
 			err := stream.Connect(context.Background())
 			assert.NoError(t, err)
-			<-time.After(5 * time.Second)
+			time.Sleep(5 * time.Second)
 			saveRecord()
 			err = stream.Close()
 			assert.NoError(t, err)
@@ -456,7 +456,7 @@ func TestStreamUserTrades(t *testing.T) {
 		)
 		t.Logf("created order: %+v", createdOrder)
 		assert.NoError(t, err)
-		<-time.After(30 * time.Second)
+		time.Sleep(30 * time.Second)
 		saveRecord()
 		err = stream.Close()
 		assert.NoError(t, err)
