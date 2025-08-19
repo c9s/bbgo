@@ -1,0 +1,168 @@
+[
+  {
+    "type": "subscriptions",
+    "channels": [
+      {
+        "name": "matches",
+        "product_ids": [
+          "BTC-USD",
+          "ETH-USD"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "last_match",
+    "product_id": "ETH-USD",
+    "sequence": 85425502773,
+    "trade_id": 686191985,
+    "maker_order_id": "<MAKER_ORDER_ID>",
+    "taker_order_id": "<TAKER_ORDER_ID>",
+    "time": "2025-08-18T07:24:29.076482Z",
+    "size": 0.001,
+    "price": 4260.2,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "last_match",
+    "product_id": "BTC-USD",
+    "sequence": 110324014180,
+    "trade_id": 863004383,
+    "maker_order_id": "<MAKER_ORDER_ID>",
+    "taker_order_id": "<TAKER_ORDER_ID>",
+    "time": "2025-08-18T07:24:29.960012Z",
+    "size": 0.00029437,
+    "price": 115507.8,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "ETH-USD",
+    "sequence": 85425504997,
+    "trade_id": 686191986,
+    "maker_order_id": "<MAKER_ORDER_ID>",
+    "taker_order_id": "<TAKER_ORDER_ID>",
+    "time": "2025-08-18T07:24:31.244926Z",
+    "size": 0.00444467,
+    "price": 4260.3,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "ETH-USD",
+    "sequence": 85425504999,
+    "trade_id": 686191987,
+    "maker_order_id": "<MAKER_ORDER_ID>",
+    "taker_order_id": "<TAKER_ORDER_ID>",
+    "time": "2025-08-18T07:24:31.244926Z",
+    "size": 0.11736251,
+    "price": 4260.31,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "ETH-USD",
+    "sequence": 85425505001,
+    "trade_id": 686191988,
+    "maker_order_id": "<MAKER_ORDER_ID>",
+    "taker_order_id": "<TAKER_ORDER_ID>",
+    "time": "2025-08-18T07:24:31.244926Z",
+    "size": 0.00023766,
+    "price": 4260.33,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "ETH-USD",
+    "sequence": 85425505005,
+    "trade_id": 686191989,
+    "maker_order_id": "<MAKER_ORDER_ID>",
+    "taker_order_id": "<TAKER_ORDER_ID>",
+    "time": "2025-08-18T07:24:31.245533Z",
+    "size": 0.00234735,
+    "price": 4260.42,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "ETH-USD",
+    "sequence": 85425505007,
+    "trade_id": 686191990,
+    "maker_order_id": "<MAKER_ORDER_ID>",
+    "taker_order_id": "<TAKER_ORDER_ID>",
+    "time": "2025-08-18T07:24:31.245533Z",
+    "size": 0.58679597,
+    "price": 4260.43,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "ETH-USD",
+    "sequence": 85425505009,
+    "trade_id": 686191991,
+    "maker_order_id": "<MAKER_ORDER_ID>",
+    "taker_order_id": "<TAKER_ORDER_ID>",
+    "time": "2025-08-18T07:24:31.245533Z",
+    "size": 0.5,
+    "price": 4260.46,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "ETH-USD",
+    "sequence": 85425505017,
+    "trade_id": 686191992,
+    "maker_order_id": "<MAKER_ORDER_ID>",
+    "taker_order_id": "<TAKER_ORDER_ID>",
+    "time": "2025-08-18T07:24:31.24679Z",
+    "size": 0.001,
+    "price": 4260.55,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "BTC-USD",
+    "sequence": 110324014840,
+    "trade_id": 863004384,
+    "maker_order_id": "<MAKER_ORDER_ID>",
+    "taker_order_id": "<TAKER_ORDER_ID>",
+    "time": "2025-08-18T07:24:31.428423Z",
+    "size": 0.00084139,
+    "price": 115507.8,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  },
+  {
+    "type": "match",
+    "product_id": "BTC-USD",
+    "sequence": 110324014866,
+    "trade_id": 863004385,
+    "maker_order_id": "<MAKER_ORDER_ID>",
+    "taker_order_id": "<TAKER_ORDER_ID>",
+    "time": "2025-08-18T07:24:31.520244Z",
+    "size": 0.00084139,
+    "price": 115507.8,
+    "side": "sell",
+    "user_id": "<USER_ID>",
+    "profile_id": "<PROFILE_ID>"
+  }
+]

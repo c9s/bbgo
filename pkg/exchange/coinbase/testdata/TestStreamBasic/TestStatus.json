@@ -1,0 +1,446 @@
+[
+  {
+    "type": "subscriptions",
+    "channels": [
+      {
+        "name": "status"
+      }
+    ]
+  },
+  {
+    "type": "status",
+    "products": [
+      {
+        "id": "ETH-USD",
+        "base_currency": "ETH",
+        "quote_currency": "USD",
+        "base_increment": 1e-08,
+        "quote_increment": 0.01,
+        "display_name": "ETH-USD",
+        "status": "online",
+        "status_message": "",
+        "min_market_funds": 1.0,
+        "post_only": false,
+        "limit_only": false,
+        "cancel_only": false,
+        "fx_stablecoin": false
+      },
+      {
+        "id": "BTC-USDT",
+        "base_currency": "BTC",
+        "quote_currency": "USDT",
+        "base_increment": 1e-08,
+        "quote_increment": 0.01,
+        "display_name": "BTC-USDT",
+        "status": "online",
+        "status_message": "",
+        "min_market_funds": 1.0,
+        "post_only": false,
+        "limit_only": false,
+        "cancel_only": false,
+        "fx_stablecoin": false
+      },
+      {
+        "id": "MATH-USD",
+        "base_currency": "MATH",
+        "quote_currency": "USD",
+        "base_increment": 0.1,
+        "quote_increment": 0.0001,
+        "display_name": "MATH-USD",
+        "status": "online",
+        "status_message": "",
+        "min_market_funds": 1.0,
+        "post_only": false,
+        "limit_only": false,
+        "cancel_only": false,
+        "fx_stablecoin": false
+      },
+      {
+        "id": "ETH-BTC",
+        "base_currency": "ETH",
+        "quote_currency": "BTC",
+        "base_increment": 1e-08,
+        "quote_increment": 1e-05,
+        "display_name": "ETH-BTC",
+        "status": "online",
+        "status_message": "",
+        "min_market_funds": 1e-05,
+        "post_only": false,
+        "limit_only": false,
+        "cancel_only": false,
+        "fx_stablecoin": false
+      },
+      {
+        "id": "ADA-BTC",
+        "base_currency": "ADA",
+        "quote_currency": "BTC",
+        "base_increment": 0.01,
+        "quote_increment": 1e-08,
+        "display_name": "ADA-BTC",
+        "status": "online",
+        "status_message": "",
+        "min_market_funds": 1.6e-05,
+        "post_only": false,
+        "limit_only": false,
+        "cancel_only": false,
+        "fx_stablecoin": false
+      },
+      {
+        "id": "SOL-BTC",
+        "base_currency": "SOL",
+        "quote_currency": "BTC",
+        "base_increment": 0.001,
+        "quote_increment": 1e-07,
+        "display_name": "SOL-BTC",
+        "status": "online",
+        "status_message": "",
+        "min_market_funds": 1.6e-05,
+        "post_only": false,
+        "limit_only": false,
+        "cancel_only": false,
+        "fx_stablecoin": false
+      },
+      {
+        "id": "ETH-USDT",
+        "base_currency": "ETH",
+        "quote_currency": "USDT",
+        "base_increment": 1e-08,
+        "quote_increment": 0.01,
+        "display_name": "ETH-USDT",
+        "status": "online",
+        "status_message": "",
+        "min_market_funds": 1.0,
+        "post_only": false,
+        "limit_only": false,
+        "cancel_only": false,
+        "fx_stablecoin": false
+      },
+      {
+        "id": "BTC-EUR",
+        "base_currency": "BTC",
+        "quote_currency": "EUR",
+        "base_increment": 1e-08,
+        "quote_increment": 0.01,
+        "display_name": "BTC-EUR",
+        "status": "online",
+        "status_message": "",
+        "min_market_funds": 0.84,
+        "post_only": false,
+        "limit_only": false,
+        "cancel_only": false,
+        "fx_stablecoin": false
+      },
+      {
+        "id": "BTC-USD",
+        "base_currency": "BTC",
+        "quote_currency": "USD",
+        "base_increment": 1e-08,
+        "quote_increment": 0.01,
+        "display_name": "BTC-USD",
+        "status": "online",
+        "status_message": "",
+        "min_market_funds": 1.0,
+        "post_only": false,
+        "limit_only": false,
+        "cancel_only": false,
+        "fx_stablecoin": false
+      },
+      {
+        "id": "ETH-EUR",
+        "base_currency": "ETH",
+        "quote_currency": "EUR",
+        "base_increment": 1e-08,
+        "quote_increment": 0.01,
+        "display_name": "ETH-EUR",
+        "status": "online",
+        "status_message": "",
+        "min_market_funds": 0.84,
+        "post_only": false,
+        "limit_only": false,
+        "cancel_only": false,
+        "fx_stablecoin": false
+      }
+    ],
+    "currencies": [
+      {
+        "id": "MATH",
+        "name": "MATH",
+        "display_name": "MATH",
+        "min_size": 1e-08,
+        "status": "online",
+        "status_message": "",
+        "max_precision": 1e-08,
+        "convertible_to": [],
+        "details": {},
+        "default_network": "ethereum",
+        "supported_networks": [
+          {
+            "id": "ethereum",
+            "name": "Ethereum",
+            "status": "online",
+            "contract_address": "0x08d967bb0134f2d07f7cfb6e246680c53927dd30",
+            "crypto_transaction_link": "https://etherscan.io/tx/0x{{txId}}",
+            "min_withdrawal_amount": 1e-08,
+            "max_withdrawal_amount": 3300000.0,
+            "network_confirmations": 14,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          }
+        ]
+      },
+      {
+        "id": "EURC",
+        "name": "EURC",
+        "display_name": "EURC",
+        "min_size": 1e-08,
+        "status": "online",
+        "status_message": "",
+        "max_precision": 1e-06,
+        "convertible_to": [
+          "EUR"
+        ],
+        "details": {},
+        "default_network": "ethereum",
+        "supported_networks": [
+          {
+            "id": "base",
+            "name": "Base",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://basescan.org/tx/0x{{txId}}",
+            "min_withdrawal_amount": 1e-06,
+            "max_withdrawal_amount": 100000.0,
+            "network_confirmations": 0,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          },
+          {
+            "id": "ethereum",
+            "name": "Ethereum",
+            "status": "online",
+            "contract_address": "0x1abaea1f7c830bd89acc67ec4af516284b1bc33c",
+            "crypto_transaction_link": "https://etherscan.io/tx/0x{{txId}}",
+            "min_withdrawal_amount": 1e-06,
+            "max_withdrawal_amount": 2500000.0,
+            "network_confirmations": 14,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          },
+          {
+            "id": "solana",
+            "name": "Solana",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://explorer.solana.com/tx/{{txId}}",
+            "min_withdrawal_amount": 1.0,
+            "max_withdrawal_amount": 370000.0,
+            "network_confirmations": 0,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          }
+        ]
+      },
+      {
+        "id": "SOL",
+        "name": "Solana",
+        "display_name": "SOL",
+        "min_size": 0.01,
+        "status": "online",
+        "status_message": "",
+        "max_precision": 0.0,
+        "convertible_to": [],
+        "details": {},
+        "default_network": "solana",
+        "supported_networks": [
+          {
+            "id": "solana",
+            "name": "Solana",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://explorer.solana.com/tx/{{txId}}",
+            "min_withdrawal_amount": 0.005,
+            "max_withdrawal_amount": 200000.0,
+            "network_confirmations": 31,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          }
+        ]
+      },
+      {
+        "id": "BTC",
+        "name": "Bitcoin",
+        "display_name": "BTC",
+        "min_size": 1e-08,
+        "status": "online",
+        "status_message": "",
+        "max_precision": 1e-08,
+        "convertible_to": [],
+        "details": {},
+        "default_network": "bitcoin",
+        "supported_networks": [
+          {
+            "id": "ethereum",
+            "name": "Ethereum",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://etherscan.io/tx/0x{{txId}}",
+            "min_withdrawal_amount": 2e-05,
+            "max_withdrawal_amount": 200.0,
+            "network_confirmations": 35,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          },
+          {
+            "id": "solana",
+            "name": "Solana",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://explorer.solana.com/tx/{{txId}}",
+            "min_withdrawal_amount": 2e-05,
+            "max_withdrawal_amount": 200.0,
+            "network_confirmations": 31,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          },
+          {
+            "id": "arbitrum",
+            "name": "Arbitrum",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://arbiscan.io/tx/{{txId}}",
+            "min_withdrawal_amount": 2e-05,
+            "max_withdrawal_amount": 200.0,
+            "network_confirmations": 0,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          },
+          {
+            "id": "base",
+            "name": "Base",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://basescan.org/tx/{{txId}}",
+            "min_withdrawal_amount": 2e-05,
+            "max_withdrawal_amount": 200.0,
+            "network_confirmations": 0,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          },
+          {
+            "id": "bitcoin",
+            "name": "Bitcoin",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://live.blockcypher.com/btc/tx/{{txId}}",
+            "min_withdrawal_amount": 0.0001,
+            "max_withdrawal_amount": 2400.0,
+            "network_confirmations": 2,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          }
+        ]
+      },
+      {
+        "id": "ETH",
+        "name": "Ether",
+        "display_name": "ETH",
+        "min_size": 1e-08,
+        "status": "online",
+        "status_message": "",
+        "max_precision": 1e-08,
+        "convertible_to": [],
+        "details": {},
+        "default_network": "ethereum",
+        "supported_networks": [
+          {
+            "id": "optimism",
+            "name": "Optimism",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://optimistic.etherscan.io/tx/{{txId}}",
+            "min_withdrawal_amount": 0.0001,
+            "max_withdrawal_amount": 111.0,
+            "network_confirmations": 0,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          },
+          {
+            "id": "polygon",
+            "name": "Polygon",
+            "status": "online",
+            "contract_address": "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
+            "crypto_transaction_link": "https://polygonscan.com/tx/{{txId}}",
+            "min_withdrawal_amount": 0.0001,
+            "max_withdrawal_amount": 30.0,
+            "network_confirmations": 128,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          },
+          {
+            "id": "unichain",
+            "name": "Unichain",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://unichain-d7a86fxp.blockscout.com/tx/{{txId}}",
+            "min_withdrawal_amount": 0.0001,
+            "max_withdrawal_amount": 300.0,
+            "network_confirmations": 0,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          },
+          {
+            "id": "arbitrum",
+            "name": "Arbitrum",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://arbiscan.io/tx/{{txId}}",
+            "min_withdrawal_amount": 0.0001,
+            "max_withdrawal_amount": 133.0,
+            "network_confirmations": 0,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          },
+          {
+            "id": "base",
+            "name": "Base",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://basescan.org/tx/{{txId}}",
+            "min_withdrawal_amount": 0.0001,
+            "max_withdrawal_amount": 1000.0,
+            "network_confirmations": 0,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          },
+          {
+            "id": "ethereum",
+            "name": "Ethereum",
+            "status": "online",
+            "contract_address": "",
+            "crypto_transaction_link": "https://etherscan.io/tx/0x{{txId}}",
+            "min_withdrawal_amount": 0.0001,
+            "max_withdrawal_amount": 40000.0,
+            "network_confirmations": 14,
+            "processing_time_seconds": 0,
+            "destination_tag_regex": ""
+          }
+        ]
+      },
+      {
+        "id": "EUR",
+        "name": "Euro",
+        "display_name": "EUR",
+        "min_size": 0.01,
+        "status": "online",
+        "status_message": "",
+        "max_precision": 0.01,
+        "convertible_to": [
+          "EURC"
+        ],
+        "details": {},
+        "default_network": "",
+        "supported_networks": []
+      }
+    ]
+  }
+]
