@@ -153,6 +153,35 @@ func (s *Stream) buildMapForUserDataStream(channel2LocalSymbolsMap map[types.Cha
 	// - order life cycle events: receive, open, done, change, activate(for stop orders)
 	// - order match
 	channel2LocalSymbolsMap[userChannel] = privateChannelLocalSymbols
+
+	// query account id for the symbols
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	defer cancel()
+	markets, err := s.exchange.QueryMarkets(ctx)
+	if err != nil {
+		panic("fail to query markets")
+	}
+	accountIDsMap, err := s.exchange.QueryAccountID(ctx)
+	if err != nil {
+		panic("fail to query account IDs for private symbols")
+	}
+	dedupAccountIDs := make(map[string]struct{})
+	for _, localSymbol := range privateChannelLocalSymbols {
+		symbol := toGlobalSymbol(localSymbol)
+		market, ok := markets[symbol]
+		if !ok {
+			panic("fail to find market for private symbol: " + symbol)
+		}
+		baseAccountId := accountIDsMap[market.BaseCurrency]
+		quoteAccountId := accountIDsMap[market.QuoteCurrency]
+		dedupAccountIDs[baseAccountId] = struct{}{}
+		dedupAccountIDs[quoteAccountId] = struct{}{}
+	}
+	balanceAccountIDs := make([]string, 0)
+	for accountId := range dedupAccountIDs {
+		balanceAccountIDs = append(balanceAccountIDs, accountId)
+	}
+	channel2LocalSymbolsMap[balanceChannel] = balanceAccountIDs
 }
 
 func (s *Stream) buildMapForMarketStream(channel2LocalSymbolsMap map[types.Channel][]string) {

@@ -120,6 +120,19 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return balances, nil
 }
 
+func (e *Exchange) QueryAccountID(ctx context.Context) (map[string]string, error) {
+	req := e.client.NewGetBalancesRequest()
+	accounts, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	accountIDsMap := make(map[string]string)
+	for _, account := range accounts {
+		accountIDsMap[account.Currency] = account.ID
+	}
+	return accountIDsMap, nil
+}
+
 // ExchangeTradeService
 // For the stop-limit order, we only support the long position
 // For the market order, though Coinbase supports both funds and size, we only support size in order to simplify the stream handler logic
