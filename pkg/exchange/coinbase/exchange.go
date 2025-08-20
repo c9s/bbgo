@@ -128,10 +128,12 @@ func (e *Exchange) queryAccountIDsBySymbols(ctx context.Context, symbols []strin
 	if err != nil {
 		return nil, fmt.Errorf("[coinbase] fail to query markets: %w", err)
 	}
+	// accountIDsMap is a map from currency (ex: BTC) to its account ID
 	accountIDsMap, err := e.queryAccountIDsMap(timedCtx)
 	if err != nil {
 		return nil, fmt.Errorf("[coinbase] fail to query account IDs for private symbols: %w", err)
 	}
+	// deduplicate currencies of the symbols
 	dedupAccountIDs := make(map[string]struct{})
 	for _, symbol := range symbols {
 		market, ok := markets[symbol]
@@ -146,6 +148,7 @@ func (e *Exchange) queryAccountIDsBySymbols(ctx context.Context, symbols []strin
 			dedupAccountIDs[quoteAccountId] = struct{}{}
 		}
 	}
+	// balanceAccountIDs is a map from currencies of the given symbols to its account ID
 	balanceAccountIDs := make([]string, 0)
 	for accountId := range dedupAccountIDs {
 		balanceAccountIDs = append(balanceAccountIDs, accountId)
