@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -433,9 +434,12 @@ func TestExchange_queryAccountIDsBySymbols(t *testing.T) {
 	defer saveRecord()
 
 	accountIDs, err := ex.queryAccountIDsBySymbols(context.Background(), symbols)
+	sort.Slice(accountIDs, func(i, j int) bool {
+		return accountIDs[i] < accountIDs[j]
+	})
 	assert.NoError(t, err)
 	assert.NotNil(t, accountIDs)
-	assert.Equal(t, 4, len(accountIDs))
+	assert.Equal(t, []string{"<BTC_ACCOUNT_ID>", "<ETH_ACCOUNT_ID>", "<USDT_ACCOUNT_ID>", "<USD_ACCOUNT_ID>"}, accountIDs)
 }
 
 func getExchangeOrSkip(t *testing.T) (*Exchange, func()) {
