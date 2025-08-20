@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/core/klinedriver"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -84,16 +83,9 @@ func (s *Stream) handleConnect() {
 	if s.klineCancel == nil {
 		s.klineCtx, s.klineCancel = context.WithCancel(context.Background())
 	}
-	// channel2LocalSymbolsMap is a map from channel to local symbols
-	channel2LocalSymbolsMap := make(map[types.Channel][]string)
 
-	// user data stream, subscribe to user channel for the user order/trade updates
-	if !s.PublicOnly {
-		s.buildMapForUserDataStream(channel2LocalSymbolsMap)
-	} else {
-		s.buildMapForMarketStream(channel2LocalSymbolsMap)
-	}
-	s.writeSubscribeJson(channel2LocalSymbolsMap)
+	// write subscribe json
+	s.writeSubscribeJson(s.channel2LocalSymbolsMap)
 
 	s.clearSequenceNumber()
 	s.clearWorkingOrders()
@@ -115,7 +107,7 @@ func (s *Stream) handleConnect() {
 		// query account balances for user stream
 		balances, err := s.exchange.QueryAccountBalances(ctx)
 		if err != nil {
-			logStream.WithError(err).Warn("failed to query account balances, the balance snapshot is initialized with empty balances")
+			s.logger.WithError(err).Warn("failed to query account balances, the balance snapshot is initialized with empty balances")
 			balances = make(types.BalanceMap)
 		}
 		s.EmitBalanceSnapshot(balances)
@@ -128,7 +120,7 @@ func (s *Stream) handleConnect() {
 		// empty status array -> all orders that are open or un-settled
 		workingRawOrders, err := s.exchange.queryOrdersByPagination(ctx, "", nil, nil, []string{})
 		if err != nil {
-			logStream.WithError(err).Warn("failed to query open orders, the orders snapshot is initialized with empty orders")
+			s.logger.WithError(err).Warn("failed to query open orders, the orders snapshot is initialized with empty orders")
 		} else {
 			openOrders := make([]types.Order, 0, len(workingRawOrders))
 			for _, rawOrder := range workingRawOrders {
@@ -138,151 +130,6 @@ func (s *Stream) handleConnect() {
 		}
 
 	}()
-}
-
-func (s *Stream) buildMapForUserDataStream(channel2LocalSymbolsMap map[types.Channel][]string) {
-	if !s.authEnabled {
-		panic("user channel requires authentication")
-	}
-	privateChannelLocalSymbols := s.privateChannelLocalSymbols()
-	if len(privateChannelLocalSymbols) == 0 {
-		panic("user channel requires at least one private symbol")
-	}
-	// subscribe private symbols to user channel
-	// Once subscribe to the user channel, it will receive events for the following types:
-	// - order life cycle events: receive, open, done, change, activate(for stop orders)
-	// - order match
-	channel2LocalSymbolsMap[userChannel] = privateChannelLocalSymbols
-
-	// query account id for the symbols
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
-	defer cancel()
-	markets, err := s.exchange.QueryMarkets(ctx)
-	if err != nil {
-		logStream.WithError(err).Warn("fail to query markets")
-	}
-	accountIDsMap, err := s.exchange.queryAccountIDs(ctx)
-	if err != nil {
-		logStream.WithError(err).Warn("fail to query account IDs for private symbols")
-	}
-	dedupAccountIDs := make(map[string]struct{})
-	for _, localSymbol := range privateChannelLocalSymbols {
-		symbol := toGlobalSymbol(localSymbol)
-		market, ok := markets[symbol]
-		if !ok {
-			logStream.Warnf("fail to find market for private symbol: %s", symbol)
-			continue
-		}
-		if baseAccountId, ok := accountIDsMap[market.BaseCurrency]; ok {
-			dedupAccountIDs[baseAccountId] = struct{}{}
-		}
-		if quoteAccountId, ok := accountIDsMap[market.QuoteCurrency]; ok {
-			dedupAccountIDs[quoteAccountId] = struct{}{}
-		}
-	}
-	balanceAccountIDs := make([]string, 0)
-	for accountId := range dedupAccountIDs {
-		balanceAccountIDs = append(balanceAccountIDs, accountId)
-	}
-	channel2LocalSymbolsMap[balanceChannel] = balanceAccountIDs
-}
-
-func (s *Stream) buildMapForMarketStream(channel2LocalSymbolsMap map[types.Channel][]string) {
-	// market data stream: subscribe to channels
-	if len(s.Subscriptions) == 0 {
-		return
-	}
-	// bridge bbgo channels to coinbase channels
-	// auth required: level2, full, user
-	dedupLocalSymbols := make(map[types.Channel]map[string]struct{})
-	// klineOptionsMap: map from **global symbol** to kline options
-	// this map will be used to create kline workers which build klines by market trades
-	klineOptionsMap := make(map[string][]types.SubscribeOptions)
-
-	for _, sub := range s.Subscriptions {
-		if _, ok := dedupLocalSymbols[sub.Channel]; !ok {
-			dedupLocalSymbols[sub.Channel] = make(map[string]struct{})
-		}
-		localSymbol := toLocalSymbol(sub.Symbol)
-		dedupLocalSymbols[sub.Channel][localSymbol] = struct{}{}
-		if sub.Channel == types.KLineChannel {
-			klineOptionsMap[sub.Symbol] = append(klineOptionsMap[sub.Symbol], sub.Options)
-		}
-	}
-	// temp helper function to extract keys from map
-	keys := func(mm map[string]struct{}) (localSymbols []string) {
-		localSymbols = make([]string, 0, len(mm))
-		for product := range mm {
-			localSymbols = append(localSymbols, product)
-		}
-		return
-	}
-	// populate channel2LocalSymbolsMap
-	for channel, dedupLocalSymbols := range dedupLocalSymbols {
-		switch channel {
-		case types.BookChannel:
-			// bridge to level2 channel, which provides order book snapshot and book updates
-			logStream.Infof("bridge %s to level2_batch channel", channel)
-			channel2LocalSymbolsMap[level2BatchChannel] = keys(dedupLocalSymbols)
-		case types.MarketTradeChannel:
-			// matches: all trades
-			channel2LocalSymbolsMap[matchesChannel] = keys(dedupLocalSymbols)
-			logStream.Infof("bridge %s to %s", channel, matchesChannel)
-		case types.BookTickerChannel:
-			// ticker channel provides feeds on best bid/ask prices
-			channel2LocalSymbolsMap[tickerChannel] = keys(dedupLocalSymbols)
-			logStream.Infof("bridge %s to %s", channel, tickerChannel)
-		case types.KLineChannel:
-			// kline stream is available on Advanced Trade API only: https://docs.cdp.coinbase.com/advanced-trade/docs/ws-channels#candles-channel
-			// We implement the subscription to kline channel by market trade feeds for now
-			// symbols for kline channel will be added to match later with deduplication so we do nothing here
-		case types.AggTradeChannel, types.ForceOrderChannel, types.MarkPriceChannel, types.LiquidationOrderChannel, types.ContractInfoChannel:
-			logStream.Warnf("coinbase stream does not support subscription to %s, skipped", channel)
-		default:
-			// rfqMatchChannel allow empty symbol
-			for _, localSymbol := range keys(dedupLocalSymbols) {
-				if channel != rfqMatchChannel && channel != statusChannel && len(localSymbol) == 0 {
-					logStream.Warnf("do not support subscription to %s without symbol, skipped", channel)
-					continue
-				}
-				channel2LocalSymbolsMap[channel] = append(channel2LocalSymbolsMap[channel], localSymbol)
-			}
-		}
-	}
-
-	if len(klineOptionsMap) > 0 {
-		// adding symbols to matches channel for market trades
-		seenMatchSymbols, ok := dedupLocalSymbols[matchesChannel]
-		if !ok {
-			seenMatchSymbols = make(map[string]struct{})
-			dedupLocalSymbols[matchesChannel] = seenMatchSymbols
-		}
-		for symbol := range klineOptionsMap {
-			if _, ok := seenMatchSymbols[symbol]; !ok {
-				channel2LocalSymbolsMap[matchesChannel] = append(channel2LocalSymbolsMap[matchesChannel], toLocalSymbol(symbol))
-			}
-		}
-
-		// binding serial market store
-		for symbol, options := range klineOptionsMap {
-			klineDriver := klinedriver.NewTickKLineDriver(
-				symbol, time.Second*5,
-			)
-			for _, option := range options {
-				logStream.Debugf("subscribe to kline %s(%s)", symbol, option.Interval)
-				err := klineDriver.AddInterval(option.Interval)
-				if err != nil {
-					logStream.WithError(err).Warnf("failed to subscribe to kline %s(%s)", symbol, option.Interval)
-					continue
-				}
-			}
-			s.OnMarketTrade(func(trade types.Trade) {
-				klineDriver.AddTrade(trade)
-			})
-			klineDriver.SetKLineEmitter(s)
-			s.klineDrivers = append(s.klineDrivers, klineDriver)
-		}
-	}
 }
 
 func (s *Stream) writeSubscribeJson(channel2LocalSymbolsMap map[types.Channel][]string) {
@@ -296,6 +143,7 @@ func (s *Stream) writeSubscribeJson(channel2LocalSymbolsMap map[types.Channel][]
 			subType = "subscribe"
 		}
 
+		// NOTE: all authentication checks are done at s.beforeConnect, assuming all credentials are valid here
 		var subCmd any
 		switch channel {
 		case statusChannel:
@@ -318,6 +166,7 @@ func (s *Stream) writeSubscribeJson(channel2LocalSymbolsMap map[types.Channel][]
 				},
 			}
 		case matchesChannel:
+			// authorization on match channel is optional
 			subCmd = subscribeMsgType1{
 				Type: subType,
 				Channels: []channelType{
@@ -343,12 +192,6 @@ func (s *Stream) writeSubscribeJson(channel2LocalSymbolsMap map[types.Channel][]
 				ProductIDs: localSymbols,
 			}
 		case fullChannel, userChannel:
-			if !s.authEnabled {
-				panic("full/user channel requires authentication")
-			}
-			if channel == fullChannel && !s.PublicOnly {
-				panic("cannot subscribe to full channel on a private stream")
-			}
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []types.Channel{channel},
@@ -361,9 +204,6 @@ func (s *Stream) writeSubscribeJson(channel2LocalSymbolsMap map[types.Channel][]
 				},
 			}
 		case level2Channel:
-			if !s.authEnabled {
-				panic("level2 channel requires authentication")
-			}
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []types.Channel{channel},
@@ -383,9 +223,6 @@ func (s *Stream) writeSubscribeJson(channel2LocalSymbolsMap map[types.Channel][]
 				ProductIDs: localSymbols,
 			}
 		case balanceChannel:
-			if !s.authEnabled {
-				panic("balance channel requires authentication")
-			}
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []types.Channel{channel},
@@ -423,9 +260,9 @@ func (s *Stream) writeSubscribeJson(channel2LocalSymbolsMap map[types.Channel][]
 	for _, subCmd := range subCmds {
 		err := s.Conn.WriteJSON(subCmd)
 		if err != nil {
-			panic(fmt.Errorf("subscription error for %s: %w", subCmd, err))
+			s.logger.WithError(err).Errorf("subscription error for %s", subCmd)
 		} else {
-			logStream.Infof("subscribed to %s", subCmd)
+			s.logger.Infof("subscribed to %s", subCmd)
 		}
 	}
 }
@@ -543,7 +380,7 @@ func (s *Stream) handleOrderbookUpdateMessage(msg *OrderBookUpdateMessage) {
 				Volume: volume,
 			})
 		default:
-			logStream.Warnf("unknown order book update side: %s", side)
+			s.logger.Warnf("unknown order book update side: %s", side)
 		}
 	}
 	if len(bids) > 0 || len(asks) > 0 {
@@ -565,7 +402,7 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 	}
 	if msg.OrderType == "stop" {
 		// stop order is not supported
-		logStream.Warnf("should not receive stop order via received channel: %s", msg.OrderID)
+		s.logger.Warnf("should not receive stop order via received channel: %s", msg.OrderID)
 		return
 	}
 	// A valid order has been received and is now active.
@@ -590,13 +427,13 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 		// NOTE: the Exchange.SubmitOrder method guarantees that the market order does not support funds.
 		// So we simply check the size for market order here.
 		if msg.Size.IsZero() {
-			logStream.Warnf("received empty order size, dropped: %s", msg.OrderID)
+			s.logger.Warnf("received empty order size, dropped: %s", msg.OrderID)
 			return
 		}
 		orderUpdate.SubmitOrder.Type = types.OrderTypeMarket
 		orderUpdate.SubmitOrder.Quantity = msg.Size
 	default:
-		logStream.Warnf("unknown order type, dropped: %s", msg.OrderType)
+		s.logger.Warnf("unknown order type, dropped: %s", msg.OrderType)
 		return
 	}
 	s.updateWorkingOrders(orderUpdate)
@@ -615,7 +452,7 @@ func (s *Stream) handleOpenMessage(msg *OpenMessage) {
 		// the order is not in the working orders map, retrieve it via the API
 		order, err := s.retrieveOrderById(msg.OrderID)
 		if err != nil {
-			logStream.Warnf(
+			s.logger.Warnf(
 				"the order is not found in the cache and cannot be retrieved via API: %s. Skipped",
 				msg.OrderID,
 			)
@@ -652,7 +489,7 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 		// the order is not in the working orders map, retrieve it via the API
 		order, err := s.retrieveOrderById(msg.OrderID)
 		if err != nil {
-			logStream.Warnf(
+			s.logger.Warnf(
 				"the order is not found in the cache and cannot be retrieved via API: %s. Skipped",
 				msg.OrderID,
 			)
@@ -701,7 +538,7 @@ func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
 		// 2. If the order is submitted before the connection is established, it should be cached in the working orders map
 		//    since the map is created on connection.
 		// Skip the message if not found since it should be orders that are not belong to the user.
-		logStream.Warnf("the order is not found in the cache: %s. Skipped the change", msg.OrderID)
+		s.logger.Warnf("the order is not found in the cache: %s. Skipped the change", msg.OrderID)
 		return
 	}
 	orderUpdate := types.Order{
@@ -729,7 +566,7 @@ func (s *Stream) handleActivateMessage(msg *ActivateMessage) {
 		// the order is not in the working orders map, retrieve it via the API
 		order, err := s.retrieveOrderById(msg.OrderID)
 		if err != nil {
-			logStream.Warnf(
+			s.logger.Warnf(
 				"the order is not found in the cache and cannot be retrieved via API: %s. Skipped",
 				msg.OrderID,
 			)
@@ -842,7 +679,7 @@ func (s *Stream) retrieveOrderById(uuid string) (*types.Order, error) {
 
 	if s.PublicOnly {
 		msg := fmt.Sprintf("retrieve order by id disabled on a public stream: %s", uuid)
-		logStream.Warn(msg)
+		s.logger.Warn(msg)
 		return nil, errors.New(msg)
 	}
 	order, err := s.exchange.QueryOrder(ctx, types.OrderQuery{OrderUUID: uuid})

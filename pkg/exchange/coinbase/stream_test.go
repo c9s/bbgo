@@ -387,39 +387,14 @@ func TestStreamBbgoChannels(t *testing.T) {
 }
 
 func TestStreamInvalidCredentials(t *testing.T) {
-	t.Run("TestBookChannelPanic", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r != nil {
-				return
-			}
-			t.Fatal("Expected panic but got none")
-		}()
-		key := ""
-		secret := ""
-		passphrase := ""
-		exchange := New(key, secret, passphrase, 0)
-		stream := exchange.NewStream()
-		stream.Subscribe(types.BookChannel, "BTCUSD", types.SubscribeOptions{})
-		// should panic
-		_ = stream.Connect(context.Background())
-	})
-
-	t.Run("TestMarketTradeChannelPanic", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r != nil {
-				return
-			}
-			t.Fatal("Expected panic but got none")
-		}()
-		key := ""
-		secret := ""
-		passphrase := ""
-		exchange := New(key, secret, passphrase, 0)
-		stream := exchange.NewStream()
-		stream.Subscribe(types.MarketTradeChannel, "BTCUSD", types.SubscribeOptions{})
-		// should panic
-		_ = stream.Connect(context.Background())
-	})
+	key := ""
+	secret := ""
+	passphrase := ""
+	exchange := New(key, secret, passphrase, 0)
+	stream := exchange.NewStream()
+	// should error
+	err := stream.Connect(context.Background())
+	assert.Error(t, err)
 }
 
 func TestPrivateChannelSymbols(t *testing.T) {
