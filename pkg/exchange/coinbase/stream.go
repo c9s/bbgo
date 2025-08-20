@@ -33,7 +33,7 @@ type Stream struct {
 	passphrase string
 	secretKey  string
 
-	logger *logrus.Entry
+	logger logrus.FieldLogger
 
 	// channel2LocalSymbolsMap is a map from channel to local symbols
 	channel2LocalSymbolsMap map[types.Channel][]string
