@@ -1,0 +1,87 @@
+[
+  {
+    "timestamp": "2025-08-20T10:40:14.752346+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.exchange.coinbase.com/accounts",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Access-Control-Allow-Headers": [
+          "Content-Type, Accept, cb-session, cb-fp, cb-form-factor"
+        ],
+        "Access-Control-Allow-Methods": [
+          "GET,POST,DELETE,PUT"
+        ],
+        "Access-Control-Allow-Origin": [
+          "*"
+        ],
+        "Access-Control-Expose-Headers": [
+          "cb-before, cb-after, cb-gdpr"
+        ],
+        "Access-Control-Max-Age": [
+          "7200"
+        ],
+        "Cache-Control": [
+          "no-store"
+        ],
+        "Cf-Cache-Status": [
+          "MISS"
+        ],
+        "Cf-Ray": [
+          "971e865af8e9826a-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Wed, 20 Aug 2025 02:40:14 GMT"
+        ],
+        "Etag": [
+          "W/\"3307-IHmawMoL8z2V/wHl0Ek2bcLtzps\""
+        ],
+        "Nel": [
+          "{\"success_fraction\":0.01,\"report_to\":\"cf-nel\",\"max_age\":604800}"
+        ],
+        "Report-To": [
+          "<REPORT-TO>"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Set-Cookie": [
+          "<SET-COOKIE>"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=15552000; includeSubDomains"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Dns-Prefetch-Control": [
+          "off"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[{\"id\": \"<BTC_ACCOUNT_ID>\", \"currency\": \"BTC\", \"balance\": \"0.0\", \"hold\": \"0.0\", \"available\": \"0\", \"profile_id\": \"<PROFILE_ID>\", \"trading_enabled\": true, \"pending_deposit\": \"0.0\", \"display_name\": \"BTC\"}, {\"id\": \"<ETH_ACCOUNT_ID>\", \"currency\": \"ETH\", \"balance\": \"0.0\", \"hold\": \"0.0\", \"available\": \"0\", \"profile_id\": \"<PROFILE_ID>\", \"trading_enabled\": true, \"pending_deposit\": \"0.0\", \"display_name\": \"ETH\"}, {\"id\": \"<USD_ACCOUNT_ID>\", \"currency\": \"USD\", \"balance\": \"0.0\", \"hold\": \"0.0\", \"available\": \"0\", \"profile_id\": \"<PROFILE_ID>\", \"trading_enabled\": true, \"pending_deposit\": \"0.0\", \"display_name\": \"USD\"}, {\"id\": \"<USDT_ACCOUNT_ID>\", \"currency\": \"USDT\", \"balance\": \"0.0\", \"hold\": \"0.0\", \"available\": \"0\", \"profile_id\": \"<PROFILE_ID>\", \"trading_enabled\": true, \"pending_deposit\": \"0.0\", \"display_name\": \"USDT\"}]"
+    }
+  }
+]

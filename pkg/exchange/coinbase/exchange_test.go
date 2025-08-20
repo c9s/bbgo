@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -425,6 +426,45 @@ func TestExchange_QueryWithdrawHistory(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, withdraws)
 	assert.Greater(t, len(withdraws), 0)
+}
+
+func TestExchange_QueryAccountIDs(t *testing.T) {
+	symbols := []string{"BTCUSD", "BTCUSDT", "ETHUSD"}
+
+	t.Run(
+		"Test_queryAccountIDsMap",
+		func(t *testing.T) {
+			ex, saveRecord := getExchangeOrSkip(t)
+			defer saveRecord()
+
+			accountIDsMap, err := ex.queryAccountIDsMap(context.Background())
+			assert.NoError(t, err)
+			assert.NotNil(t, accountIDsMap)
+			expectedMap := map[string]string{
+				"BTC":  "<BTC_ACCOUNT_ID>",
+				"USDT": "<USDT_ACCOUNT_ID>",
+				"ETH":  "<ETH_ACCOUNT_ID>",
+				"USD":  "<USD_ACCOUNT_ID>",
+			}
+			assert.Equal(t, expectedMap, accountIDsMap)
+		},
+	)
+
+	t.Run(
+		"Test_queryAccountIDsBySymbols",
+		func(t *testing.T) {
+			ex, saveRecord := getExchangeOrSkip(t)
+			defer saveRecord()
+
+			accountIDs, err := ex.queryAccountIDsBySymbols(context.Background(), symbols)
+			sort.Slice(accountIDs, func(i, j int) bool {
+				return accountIDs[i] < accountIDs[j]
+			})
+			assert.NoError(t, err)
+			assert.NotNil(t, accountIDs)
+			assert.Equal(t, []string{"<BTC_ACCOUNT_ID>", "<ETH_ACCOUNT_ID>", "<USDT_ACCOUNT_ID>", "<USD_ACCOUNT_ID>"}, accountIDs)
+		},
+	)
 }
 
 func getExchangeOrSkip(t *testing.T) (*Exchange, func()) {

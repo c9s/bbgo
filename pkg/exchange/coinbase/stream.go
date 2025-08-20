@@ -17,10 +17,6 @@ import (
 
 // https://docs.cdp.coinbase.com/exchange/docs/websocket-overview
 const wsFeedUrl = "wss://ws-feed.exchange.coinbase.com" // ws feeds available without auth
-var logStream = logrus.WithFields(logrus.Fields{
-	"exchange": ID,
-	"module":   "stream",
-})
 
 var (
 	// interface implementations compile-time check
@@ -36,6 +32,11 @@ type Stream struct {
 	apiKey     string
 	passphrase string
 	secretKey  string
+
+	logger logrus.FieldLogger
+
+	// channel2LocalSymbolsMap is a map from channel to local symbols
+	channel2LocalSymbolsMap map[types.Channel][]string
 
 	// callbacks
 	errorMessageCallbacks             []func(m *ErrorMessage)
@@ -62,6 +63,7 @@ type Stream struct {
 	lockWorkingOrderMap sync.Mutex // lock to protect lastOrderMap
 	workingOrdersMap    map[string]types.Order
 
+	// privateChannelSymbols is a list of global symbols
 	privateChannelSymbols []string
 
 	klineCtx     context.Context
@@ -76,23 +78,28 @@ func NewStream(
 	passphrase string,
 ) *Stream {
 	s := Stream{
-		StandardStream:     types.NewStandardStream(),
-		exchange:           exchange,
-		apiKey:             apiKey,
-		passphrase:         passphrase,
-		secretKey:          secretKey,
-		authEnabled:        len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
-		lastSequenceMsgMap: make(map[string]SequenceNumberType),
-		workingOrdersMap:   make(map[string]types.Order),
+		StandardStream: types.NewStandardStream(),
+		exchange:       exchange,
+		apiKey:         apiKey,
+		passphrase:     passphrase,
+		secretKey:      secretKey,
+		logger: logrus.WithFields(logrus.Fields{
+			"exchange": ID,
+			"module":   "stream",
+		}),
+		authEnabled:             len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
+		lastSequenceMsgMap:      make(map[string]SequenceNumberType),
+		workingOrdersMap:        make(map[string]types.Order),
+		channel2LocalSymbolsMap: make(map[types.Channel][]string),
 	}
 	s.SetParser(parseMessage)
 	s.SetDispatcher(s.dispatchEvent)
 	s.SetEndpointCreator(s.createEndpoint)
-	s.SetHeartBeat(ping)
+	s.SetHeartBeat(s.ping)
 
 	// private handlers
-	s.OnErrorMessage(logErrorMessage)
-	s.OnSubscriptions(logSubscriptions)
+	s.OnErrorMessage(s.logErrorMessage)
+	s.OnSubscriptions(s.logSubscriptions)
 	s.OnTickerMessage(s.handleTickerMessage)
 	s.OnMatchMessage(s.handleMatchMessage)
 	s.OnOrderbookSnapshotMessage(s.handleOrderBookSnapshotMessage)
@@ -105,6 +112,7 @@ func NewStream(
 	s.OnActivateMessage(s.handleActivateMessage)
 
 	// public handlers
+	s.SetBeforeConnect(s.beforeConnect)
 	s.OnConnect(s.handleConnect)
 	s.OnDisconnect(s.handleDisconnect)
 	return &s
@@ -122,20 +130,20 @@ func (s *Stream) privateChannelLocalSymbols() (localSymbols []string) {
 	return
 }
 
-func logSubscriptions(m *SubscriptionsMessage) {
+func (s *Stream) logSubscriptions(m *SubscriptionsMessage) {
 	if m == nil {
 		return
 	}
 	for _, channel := range m.Channels {
-		logStream.Infof("Confirmed subscription to channel: %s (product ids: %s)", channel.Name, channel.ProductIDs)
+		s.logger.Infof("Confirmed subscription to channel: %s (product ids: %s)", channel.Name, channel.ProductIDs)
 	}
 }
 
-func logErrorMessage(m *ErrorMessage) {
+func (s *Stream) logErrorMessage(m *ErrorMessage) {
 	if m == nil {
 		return
 	}
-	logStream.Errorf("Get error message: %s", m.Reason)
+	s.logger.Errorf("Get error message: %s", m.Reason)
 }
 
 func (s *Stream) dispatchEvent(e interface{}) {
@@ -171,7 +179,7 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	case *OrderBookUpdateMessage:
 		s.EmitOrderbookUpdateMessage(e)
 	default:
-		logStream.Warnf("skip dispatching msg due to unknown message type: %T", e)
+		s.logger.Warnf("skip dispatching msg due to unknown message type: %T", e)
 	}
 }
 
@@ -192,7 +200,7 @@ func (s *Stream) generateSignature() (string, string) {
 	// Decode base64 secret
 	secretBytes, err := base64.StdEncoding.DecodeString(s.secretKey)
 	if err != nil {
-		logStream.WithError(err).Error("failed to decode secret key")
+		s.logger.WithError(err).Error("failed to decode secret key")
 		return "", ""
 	}
 
@@ -206,12 +214,12 @@ func (s *Stream) generateSignature() (string, string) {
 	return signature, ts
 }
 
-func ping(conn *websocket.Conn) error {
+func (s *Stream) ping(conn *websocket.Conn) error {
 	writeWait := 10 * time.Second
 
 	err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
 	if err != nil {
-		logStream.WithError(err).Error("ping error")
+		s.logger.WithError(err).Error("ping error")
 		return err
 	}
 	return nil
