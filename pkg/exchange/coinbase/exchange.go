@@ -120,7 +120,42 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return balances, nil
 }
 
-func (e *Exchange) queryAccountIDs(ctx context.Context) (map[string]string, error) {
+func (e *Exchange) queryAccountIDsBySymbols(ctx context.Context, symbols []string) ([]string, error) {
+	timedCtx, cancel := context.WithTimeout(ctx, time.Second*20)
+	defer cancel()
+
+	markets, err := e.QueryMarkets(timedCtx)
+	if err != nil {
+		return nil, fmt.Errorf("[coinbase] fail to query markets: %w", err)
+	}
+	accountIDsMap, err := e.queryAccountIDsMap(timedCtx)
+	if err != nil {
+		return nil, fmt.Errorf("[coinbase] fail to query account IDs for private symbols: %w", err)
+	}
+	dedupAccountIDs := make(map[string]struct{})
+	for _, symbol := range symbols {
+		market, ok := markets[symbol]
+		if !ok {
+			log.Warnf("fail to find market for symbol: %s", symbol)
+			continue
+		}
+		if baseAccountId, ok := accountIDsMap[market.BaseCurrency]; ok {
+			dedupAccountIDs[baseAccountId] = struct{}{}
+		}
+		if quoteAccountId, ok := accountIDsMap[market.QuoteCurrency]; ok {
+			dedupAccountIDs[quoteAccountId] = struct{}{}
+		}
+	}
+	balanceAccountIDs := make([]string, 0)
+	for accountId := range dedupAccountIDs {
+		balanceAccountIDs = append(balanceAccountIDs, accountId)
+	}
+	return balanceAccountIDs, nil
+}
+
+// queryAccountIDsMap queries the account IDs for all currencies
+// It returns a map of currency to its account ID.
+func (e *Exchange) queryAccountIDsMap(ctx context.Context) (map[string]string, error) {
 	req := e.client.NewGetBalancesRequest()
 	accounts, err := req.Do(ctx)
 	if err != nil {

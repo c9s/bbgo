@@ -427,6 +427,17 @@ func TestExchange_QueryWithdrawHistory(t *testing.T) {
 	assert.Greater(t, len(withdraws), 0)
 }
 
+func TestExchange_queryAccountIDsBySymbols(t *testing.T) {
+	symbols := []string{"BTCUSD", "BTCUSDT", "ETHUSD"}
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
+
+	accountIDs, err := ex.queryAccountIDsBySymbols(context.Background(), symbols)
+	assert.NoError(t, err)
+	assert.NotNil(t, accountIDs)
+	assert.Equal(t, 4, len(accountIDs))
+}
+
 func getExchangeOrSkip(t *testing.T) (*Exchange, func()) {
 	key, secret, passphrase, ok := IntegrationTestWithPassphraseConfigured(t, "COINBASE")
 	ex := New(key, secret, passphrase, 0)
