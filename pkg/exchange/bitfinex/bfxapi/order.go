@@ -1,5 +1,10 @@
 package bfxapi
 
+import (
+	"encoding/json"
+	"strings"
+)
+
 //go:generate mapgen -type OrderFlag
 type OrderFlag int
 
@@ -12,6 +17,9 @@ const (
 	OrderFlagNoVarRate  OrderFlag = 524288
 )
 
+// OrderStatus represents the status of an order in Bitfinex.
+// https://docs.bitfinex.com/docs/abbreviations-glossary#order-status
+//
 //go:generate mapgen -type OrderStatus
 type OrderStatus string
 
@@ -30,6 +38,53 @@ const (
 	OrderStatusPending           OrderStatus = "PENDING"            // order pending
 	OrderStatusPartiallyCanceled OrderStatus = "PARTIALLY CANCELED" // order partially canceled
 )
+
+// UnmarshalJSON implements custom unmarshaling for OrderStatus.
+// It parses status strings like "EXECUTED @ 107.6(-0.2)", "CANCELED was: PARTIALLY FILLED @ ...", etc.
+func (s *OrderStatus) UnmarshalJSON(data []byte) error {
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	raw = strings.ToUpper(raw)
+
+	// direct match for known statuses
+	switch {
+	case strings.HasPrefix(raw, "ACTIVE"):
+		*s = OrderStatusActive
+	case strings.HasPrefix(raw, "EXECUTED") || strings.HasPrefix(raw, "FILLED"):
+		*s = OrderStatusExecuted
+	case strings.HasPrefix(raw, "PARTIALLY FILLED") || strings.HasPrefix(raw, "PARTIALLY EXECUTED"):
+		*s = OrderStatusPartiallyFilled
+	case strings.HasPrefix(raw, "CANCELED") || strings.HasPrefix(raw, "CANCELLED"):
+		*s = OrderStatusCanceled
+	case strings.HasPrefix(raw, "REJECTED"):
+		*s = OrderStatusRejected
+	case strings.HasPrefix(raw, "EXPIRED"):
+		*s = OrderStatusExpired
+	case strings.HasPrefix(raw, "INSUFFICIENT BAL") || strings.HasPrefix(raw, "NOT ENOUGH BALANCE") || strings.HasPrefix(raw, "INSUFFICIENT MARGIN"):
+		*s = OrderStatusInsufficientBal
+	case strings.HasPrefix(raw, "STOPPED"):
+		*s = OrderStatusStopped
+	case strings.HasPrefix(raw, "POSTPONED"):
+		*s = OrderStatusPostponed
+	case strings.HasPrefix(raw, "PENDING"):
+		*s = OrderStatusPending
+	case strings.HasPrefix(raw, "PARTIALLY CANCELED"):
+		*s = OrderStatusPartiallyCanceled
+	case strings.HasPrefix(raw, "NOT FOUND"):
+		*s = OrderStatusNotFound
+	case strings.HasPrefix(raw, "RSN_DUST") || strings.HasPrefix(raw, "RSN_PAUSE"):
+		// treat as rejected
+		*s = OrderStatusRejected
+	default:
+		// fallback: use the raw string
+		*s = OrderStatus(raw)
+	}
+
+	return nil
+}
 
 //go:generate mapgen -type OrderType
 type OrderType string
