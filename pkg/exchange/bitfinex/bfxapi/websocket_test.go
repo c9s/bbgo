@@ -391,7 +391,7 @@ func TestParser_Parse(t *testing.T) {
 				assert.Equal(t, "tBTCUST", order.Symbol)
 				assert.InDelta(t, 0.001, order.Amount.Float64(), 1e-8)
 				assert.InDelta(t, 10000, order.Price.Float64(), 1e-8)
-				assert.Equal(t, "EXCHANGE LIMIT", order.OrderType)
+				assert.Equal(t, OrderTypeExchangeLimit, order.OrderType)
 				assert.Equal(t, "ACTIVE", order.Status)
 				assert.Equal(t, "API>BFX", *order.Routing)
 				if assert.NotNil(t, order.Meta) {

@@ -905,8 +905,8 @@ type UserOrder struct {
 	Amount     fixedpoint.Value           // [6] AMOUNT
 	AmountOrig fixedpoint.Value           // [7] AMOUNT_ORIG
 
-	OrderType string  // [8] ORDER_TYPE
-	TypePrev  *string // [9] TYPE_PREV
+	OrderType OrderType // [8] ORDER_TYPE
+	TypePrev  *string   // [9] TYPE_PREV
 
 	// MtsTif - Millisecond epoch timestamp for TIF (Time-In-Force)
 	MtsTIF *int64 // [10] MTS_TIF

@@ -83,7 +83,7 @@ func convertOrder(o bfxapi.Order) *types.Order {
 			Symbol:   toGlobalSymbol(o.Symbol),
 			Price:    o.Price,
 			Quantity: o.AmountOrig,
-			Type:     convertOrderType(o.OrderType),
+			Type:     toGlobalOrderType(o.OrderType),
 
 			AveragePrice: o.PriceAvg,
 		},
@@ -160,9 +160,9 @@ func convertTicker(t bfxapi.Ticker) *types.Ticker {
 	}
 }
 
-// convertOrderType maps bfxapi.OrderType to types.OrderType.
+// toGlobalOrderType maps bfxapi.OrderType to types.OrderType.
 // It normalizes Bitfinex order type string to bbgo's types.OrderType.
-func convertOrderType(t bfxapi.OrderType) types.OrderType {
+func toGlobalOrderType(t bfxapi.OrderType) types.OrderType {
 	switch t {
 	case bfxapi.OrderTypeLimit, bfxapi.OrderTypeExchangeLimit:
 		return types.OrderTypeLimit
