@@ -420,6 +420,22 @@ func (e *Exchange) QueryClosedOrders(
 	return orders, nil
 }
 
+// QueryDepth query the order book depth of a symbol
+func (e *Exchange) QueryDepth(
+	ctx context.Context, symbol string,
+) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	response, err := e.client.NewGetBookRequest().
+		Symbol(toLocalSymbol(symbol)).
+		Precision("P0").
+		Length(100).
+		Do(ctx)
+	if err != nil {
+		return snapshot, finalUpdateID, err
+	}
+
+	return convertDepth(response), 0, nil
+}
+
 func MapSlice[T, M any](input []T, f func(T) M) []M {
 	result := make([]M, len(input))
 	for i, v := range input {
