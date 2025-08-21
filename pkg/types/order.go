@@ -173,6 +173,14 @@ type SubmitOrder struct {
 	Tag string `json:"tag,omitempty" db:"-"`
 }
 
+// AsOrder converts SubmitOrder to Order
+func (o SubmitOrder) AsOrder() *Order {
+	return &Order{
+		SubmitOrder: o,
+		Exchange:    o.Market.Exchange,
+	}
+}
+
 func (o *SubmitOrder) LogFields() logrus.Fields {
 	fields := logrus.Fields{
 		"symbol": o.Symbol,
