@@ -74,25 +74,24 @@ func toLocalCurrency(c string) string {
 	return c
 }
 
-// convertOrder converts bfxapi.Order to types.Order
-func convertOrder(o bfxapi.Order) *types.Order {
-
+// toGlobalOrder converts bfxapi.Order to types.Order
+func toGlobalOrder(o bfxapi.Order) *types.Order {
 	// map bfxapi.Order to types.Order using struct literal
 	order := &types.Order{
 		SubmitOrder: types.SubmitOrder{
-			Symbol:   toGlobalSymbol(o.Symbol),
-			Price:    o.Price,
-			Quantity: o.AmountOrig,
-			Type:     toGlobalOrderType(o.OrderType),
-
+			Symbol:       toGlobalSymbol(o.Symbol),
+			Price:        o.Price,
+			Quantity:     o.AmountOrig,
+			Type:         toGlobalOrderType(o.OrderType),
 			AveragePrice: o.PriceAvg,
 		},
 		OrderID:          uint64(o.OrderID),
 		ExecutedQuantity: o.AmountOrig.Sub(o.Amount),
-		Status:           convertOrderStatus(o.Status),
+		Status:           toGlobalOrderStatus(o.Status),
 		CreationTime:     types.Time(o.CreatedAt),
 		UpdateTime:       types.Time(o.UpdatedAt),
-		UUID:             "", // Bitfinex does not provide UUID field
+		OriginalStatus:   string(o.Status), // keep original status for reference
+		UUID:             "",               // Bitfinex does not provide UUID field
 		Exchange:         types.ExchangeBitfinex,
 	}
 
@@ -103,13 +102,12 @@ func convertOrder(o bfxapi.Order) *types.Order {
 
 	// set IsWorking based on status
 	order.IsWorking = order.Status == types.OrderStatusNew || order.Status == types.OrderStatusPartiallyFilled
-
 	return order
 }
 
-// convertOrderStatus maps bfxapi.OrderStatus to types.OrderStatus
-func convertOrderStatus(status bfxapi.OrderStatus) types.OrderStatus {
-	// normalize and map Bitfinex order status to bbgo order status
+// toGlobalOrderStatus maps bfxapi.OrderStatus to types.OrderStatus.
+// It normalizes Bitfinex order status string to bbgo's types.OrderStatus.
+func toGlobalOrderStatus(status bfxapi.OrderStatus) types.OrderStatus {
 	switch status {
 	case bfxapi.OrderStatusActive:
 		return types.OrderStatusNew
@@ -119,13 +117,14 @@ func convertOrderStatus(status bfxapi.OrderStatus) types.OrderStatus {
 		return types.OrderStatusPartiallyFilled
 	case bfxapi.OrderStatusCanceled, bfxapi.OrderStatusPartiallyCanceled:
 		return types.OrderStatusCanceled
-	case bfxapi.OrderStatusRejected:
+	case bfxapi.OrderStatusRejected, bfxapi.OrderStatusInsufficientBal:
 		return types.OrderStatusRejected
 	case bfxapi.OrderStatusExpired:
 		return types.OrderStatusExpired
+	case bfxapi.OrderStatusPending:
+		return types.OrderStatusNew
 	default:
-		// fallback: treat unknown status as rejected
-		return types.OrderStatusRejected
+		return types.OrderStatusNew // fallback to new
 	}
 }
 
@@ -133,17 +132,24 @@ func convertOrderStatus(status bfxapi.OrderStatus) types.OrderStatus {
 func convertTrade(trade bfxapi.OrderTradeDetail) *types.Trade {
 	// map bfxapi.OrderTradeDetail to types.Trade using struct literal
 	return &types.Trade{
-		ID:          uint64(trade.TradeID),
-		OrderID:     uint64(trade.OrderID),
-		Exchange:    types.ExchangeBitfinex,
-		Price:       trade.ExecPrice,
-		Quantity:    trade.ExecAmount,
-		Symbol:      toGlobalSymbol(trade.Symbol),
+		ID:            uint64(trade.TradeID),
+		OrderID:       uint64(trade.OrderID),
+		Exchange:      types.ExchangeBitfinex,
+		Price:         trade.ExecPrice,
+		Quantity:      trade.ExecAmount,
+		QuoteQuantity: trade.ExecPrice.Mul(trade.ExecAmount),
+		Symbol:        toGlobalSymbol(trade.Symbol),
+		Side: func() types.SideType {
+			if trade.ExecAmount.Sign() > 0 {
+				return types.SideTypeBuy
+			}
+			return types.SideTypeSell
+		}(),
+		IsBuyer:     trade.ExecAmount.Sign() > 0,
 		IsMaker:     trade.Maker == 1,
 		Time:        types.Time(trade.Time),
 		Fee:         trade.Fee,
 		FeeCurrency: trade.FeeCurrency,
-		// ClientOrderID is not present in types.Trade, so skip
 	}
 }
 
