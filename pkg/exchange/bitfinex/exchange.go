@@ -13,6 +13,11 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+func init() {
+	_ = types.Exchange(&Exchange{})
+	_ = types.ExchangeTradeHistoryService(&Exchange{})
+}
+
 type Exchange struct {
 	apiKey, apiSecret string
 
@@ -263,7 +268,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		return order.AsOrder(), fmt.Errorf("no order data returned from bitfinex")
 	}
 
-	return convertOrder(resp.Data[0]), nil
+	return toGlobalOrder(resp.Data[0]), nil
 }
 
 // QueryOpenOrders queries open orders for a symbol from Bitfinex.
@@ -276,7 +281,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	}
 
 	for _, o := range resp.Orders {
-		order := convertOrder(o)
+		order := toGlobalOrder(o)
 
 		if symbol != "" && order.Symbol != symbol {
 			// If a symbol is specified, filter out orders that do not match
@@ -318,17 +323,102 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 		req.Id(orderID)
 	}
 
-	trades, err := req.Do(ctx)
+	bfxOrderTrades, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var result []types.Trade
-	for _, t := range trades {
+	var trades []types.Trade
+	for _, t := range bfxOrderTrades {
 		trade := convertTrade(t)
-		result = append(result, *trade)
+		trades = append(trades, *trade)
 	}
-	return result, nil
+	return trades, nil
+}
+
+func (e *Exchange) QueryTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) ([]types.Trade, error) {
+
+	req := e.client.NewGetTradeHistoryBySymbolRequest().Symbol(symbol)
+
+	if options != nil {
+		if options.StartTime != nil {
+			req.Start(*options.StartTime)
+		}
+
+		if options.EndTime != nil {
+			req.End(*options.EndTime)
+		}
+	}
+
+	if options != nil && options.Limit > 0 {
+		req.Limit(int(options.Limit))
+	} else {
+		req.Limit(2500) // Default limit if no options provided
+	}
+
+	// +1: sort in ascending order | -1: sort in descending order (by MTS field).
+	req.Sort(1)
+
+	bfxTrades, err := req.Do(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to query trades from bitfinex: %w", err)
+	}
+
+	var trades []types.Trade
+	for _, t := range bfxTrades {
+		trade := convertTrade(t)
+
+		if symbol != "" && trade.Symbol != symbol {
+			// If a symbol is specified, filter out trades that do not match
+			continue
+		}
+
+		if options != nil && options.LastTradeID > 0 && trade.ID < options.LastTradeID {
+			// If lastTradeID is specified, filter out trades that are older than lastTradeID
+			continue
+		}
+
+		trades = append(trades, *trade)
+	}
+
+	return trades, nil
+}
+
+func (e *Exchange) QueryClosedOrders(
+	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
+) (orders []types.Order, err error) {
+	req := e.client.NewGetOrderHistoryBySymbolRequest().
+		Symbol(toLocalSymbol(symbol)).
+		Limit(2500)
+
+	if !since.IsZero() {
+		req.Start(since)
+	}
+
+	if !until.IsZero() {
+		req.End(until)
+	}
+
+	bfxOrders, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query trades from bitfinex: %w", err)
+	}
+
+	for _, o := range bfxOrders {
+		order := toGlobalOrder(o)
+
+		if lastOrderID > 0 && order.OrderID <= lastOrderID {
+			// If lastOrderID is specified, filter out orders that are older than lastOrderID
+			continue
+		}
+
+		orders = append(orders, *order)
+	}
+
+	return orders, nil
 }
 
 func MapSlice[T, M any](input []T, f func(T) M) []M {
