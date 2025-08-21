@@ -23,8 +23,14 @@ type Stream struct {
 
 	depthBuffers map[string]*depth.Buffer
 
-	tickerEventCallbacks      []func(e *bfxapi.TickerEvent)
-	bookEventCallbacks        []func(e *bfxapi.BookEvent)
+	tickerEventCallbacks []func(e *bfxapi.TickerEvent)
+
+	bookUpdateEventCallbacks   []func(e *bfxapi.BookUpdateEvent)
+	bookSnapshotEventCallbacks []func(e *bfxapi.BookSnapshotEvent)
+
+	fundingBookEventCallbacks         []func(e *bfxapi.FundingBookUpdateEvent)
+	fundingBookSnapshotEventCallbacks []func(e *bfxapi.FundingBookSnapshotEvent)
+
 	candleEventCallbacks      []func(e *bfxapi.CandleEvent)
 	statusEventCallbacks      []func(e *bfxapi.StatusEvent)
 	marketTradeEventCallbacks []func(e *bfxapi.MarketTradeEvent)
@@ -93,6 +99,13 @@ func (s *Stream) onConnect() {
 // dispatchEvent dispatches parsed events to corresponding callbacks.
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch evt := e.(type) {
+
+	case *bfxapi.BookUpdateEvent: // book snapshot
+		s.EmitBookUpdateEvent(evt)
+
+	case *bfxapi.BookSnapshotEvent:
+		s.EmitBookSnapshotEvent(evt)
+
 	case []bfxapi.WalletResponse:
 		s.EmitBalanceUpdate(convertWalletResponse(evt...))
 

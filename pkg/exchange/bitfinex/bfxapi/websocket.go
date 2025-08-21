@@ -160,24 +160,27 @@ type FundingTickerEvent struct {
 	FRRAmountAvailable fixedpoint.Value
 }
 
-// BookEvent represents an order book update or snapshot event.
-type BookEvent struct {
+// BookUpdateEvent represents an order book update or snapshot event.
+type BookUpdateEvent struct {
 	ChannelID int64
 
-	// Trading book
-	Price  fixedpoint.Value
-	Count  int64
-	Amount fixedpoint.Value
+	Entry BookEntry
 }
 
-// FundingBookEvent represents a funding book entry event.
-type FundingBookEvent struct {
+type BookSnapshotEvent struct {
 	ChannelID int64
+	Entries   []BookEntry
+}
 
-	Rate   fixedpoint.Value
-	Period int64
-	Count  int64
-	Amount fixedpoint.Value
+// FundingBookUpdateEvent represents a funding book entry event.
+type FundingBookUpdateEvent struct {
+	ChannelID int64
+	Entry     FundingBookEntry
+}
+
+type FundingBookSnapshotEvent struct {
+	ChannelID int64
+	Entries   []FundingBookEntry
 }
 
 // CandleEvent represents a kline/candle update or snapshot event.
@@ -532,6 +535,42 @@ func parseTickerEvent(channelID int64, payload json.RawMessage) (interface{}, er
 	return nil, nil
 }
 
+// parseBookSnapshotEvent parses trading book entries from a snapshot array.
+func parseBookSnapshotEvent(channelID int64, entries [][]json.RawMessage) (*BookSnapshotEvent, error) {
+	var snapshot = BookSnapshotEvent{ChannelID: channelID}
+
+	for _, entry := range entries {
+		if len(entry) != 3 {
+			continue
+		}
+		be := BookEntry{}
+		if err := parseRawArray(entry, &be, 0); err != nil {
+			return nil, err
+		}
+
+		snapshot.Entries = append(snapshot.Entries, be)
+	}
+	return &snapshot, nil
+}
+
+// parseFundingBookSnapshotEvent parses funding book entries from a snapshot array.
+func parseFundingBookSnapshotEvent(channelID int64, entries [][]json.RawMessage) (*FundingBookSnapshotEvent, error) {
+	var snapshot = FundingBookSnapshotEvent{ChannelID: channelID}
+
+	for _, entry := range entries {
+		if len(entry) != 4 {
+			continue
+		}
+		fbe := FundingBookEntry{}
+		if err := parseRawArray(entry, &fbe, 0); err != nil {
+			return nil, err
+		}
+		snapshot.Entries = append(snapshot.Entries, fbe)
+	}
+
+	return &snapshot, nil
+}
+
 // parseBookEvent parses book update or snapshot.
 // It supports both trading and funding book entries.
 func parseBookEvent(channelID int64, payload json.RawMessage) (interface{}, error) {
@@ -540,57 +579,51 @@ func parseBookEvent(channelID int64, payload json.RawMessage) (interface{}, erro
 		return nil, fmt.Errorf("failed to parse book event: %w", err)
 	}
 
-	// snapshot: array of arrays
+	// snapshot: array of arrays, the internal element is an array of book entries
 	if len(arr) > 0 && arr[0][0] == '[' {
 		var entries [][]json.RawMessage
 		if err := json.Unmarshal(payload, &entries); err != nil {
 			return nil, fmt.Errorf("failed to parse book snapshot event: %w", err)
 		}
-		var books []BookEvent
-		var fundingBooks []FundingBookEvent
-		for _, entry := range entries {
-			if len(entry) == 3 {
-				be := BookEvent{ChannelID: channelID}
-				if err := parseRawArray(entry, &be, 1); err != nil {
-					return nil, fmt.Errorf("failed to parse book snapshot event: %w", err)
-				}
 
-				books = append(books, be)
-			} else if len(entry) == 4 {
-				fbe := FundingBookEvent{ChannelID: channelID}
-				if err := parseRawArray(entry, &fbe, 1); err != nil {
-					return nil, fmt.Errorf("failed to parse book snapshot event: %w", err)
-				}
+		if len(entries) == 0 {
+			return nil, nil
+		}
 
-				fundingBooks = append(fundingBooks, fbe)
-			} else {
-				log.Errorf("unknown book snapshot entry length: %d, entry: %s", len(entry), entry)
-				continue
-			}
+		if len(entries[0]) == 3 {
+			return parseBookSnapshotEvent(channelID, entries)
+		} else if len(entries[0]) == 4 {
+			return parseFundingBookSnapshotEvent(channelID, entries)
+		} else {
+			return nil, fmt.Errorf("unexpected error, unknown book snapshot entry length: %d, data: %s", len(entries[0]), entries[0])
 		}
-		if len(fundingBooks) > 0 {
-			return fundingBooks, nil
-		}
-		return books, nil
 	}
 
 	// update: single array
 	if len(arr) == 3 {
-		be := &BookEvent{ChannelID: channelID}
-		if err := parseRawArray(arr, be, 1); err != nil {
+		entry := BookEntry{}
+		if err := parseRawArray(arr, &entry, 0); err != nil {
 			return nil, fmt.Errorf("failed to parse book update event: %w", err)
 		}
-		return be, nil
+
+		return &BookUpdateEvent{
+			ChannelID: channelID,
+			Entry:     entry,
+		}, nil
+
 	} else if len(arr) == 4 {
-		fbe := &FundingBookEvent{ChannelID: channelID}
-		if err := parseRawArray(arr, fbe, 1); err != nil {
+		entry := FundingBookEntry{}
+		if err := parseRawArray(arr, &entry, 0); err != nil {
 			return nil, fmt.Errorf("failed to parse funding book update event: %w", err)
 		}
-		return fbe, nil
-	} else {
-		log.Warnf("unknown book update length: %d, arr: %s", len(arr), arr)
-		return nil, nil
+		return &FundingBookUpdateEvent{
+			ChannelID: channelID,
+			Entry:     entry,
+		}, nil
 	}
+
+	log.Warnf("unknown book update length: %d, arr: %s", len(arr), arr)
+	return nil, nil
 }
 
 // parseCandleEvent parses candle update or snapshot.

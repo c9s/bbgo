@@ -189,13 +189,11 @@ func toGlobalOrderType(t bfxapi.OrderType) types.OrderType {
 	}
 }
 
-// convertDepth converts bfxapi.BookResponse to types.SliceOrderBook.
+// convertBookEntries converts a slice of bfxapi.BookEntry to types.SliceOrderBook.
 // It maps Bitfinex book entries to the standard SliceOrderBook fields.
-func convertDepth(resp *bfxapi.BookResponse) types.SliceOrderBook {
+func convertBookEntries(entries []bfxapi.BookEntry) types.SliceOrderBook {
 	var ob types.SliceOrderBook
-	for _, entry := range resp.BookEntries {
-		// entry.Count is not used in bbgo, so we ignore it
-		// we can add it to the global type later if needed
+	for _, entry := range entries {
 		if entry.Amount.Sign() > 0 {
 			ob.Bids = append(ob.Bids, types.PriceVolume{
 				Price:  entry.Price,
@@ -209,4 +207,10 @@ func convertDepth(resp *bfxapi.BookResponse) types.SliceOrderBook {
 		}
 	}
 	return ob
+}
+
+// convertDepth converts bfxapi.BookResponse to types.SliceOrderBook.
+// It delegates to convertBookEntries for BookEntries.
+func convertDepth(resp *bfxapi.BookResponse) types.SliceOrderBook {
+	return convertBookEntries(resp.BookEntries)
 }
