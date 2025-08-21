@@ -49,8 +49,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 
 // NewStream ...
 func (e *Exchange) NewStream() types.Stream {
-	//TODO implement me
-	panic("implement me")
+	return NewStream(e)
 }
 
 // QueryMarkets queries available markets from Bitfinex.
