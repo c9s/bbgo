@@ -35,7 +35,7 @@ func TestClient_movementHistory(t *testing.T) {
 		req := client.NewGetMovementHistoryRequest()
 		req.Currency("UST")
 
-		// Optionally, you can add filters like ID, GID, CID, etc.
+		// Optionally, you can add filters like ID, GID, ClientOrderID, etc.
 		// req.AddId(123456789) // example order ID
 		resp, err := req.Do(ctx)
 		if assert.NoError(t, err) {
@@ -67,7 +67,7 @@ func TestClient_userApis(t *testing.T) {
 
 	t.Run("GetUserInfoRequest", func(t *testing.T) {
 		req := client.NewGetUserInfoRequest()
-		// Optionally, you can add filters like ID, GID, CID, etc.
+		// Optionally, you can add filters like ID, GID, ClientOrderID, etc.
 		// req.AddId(123456789) // example order ID
 		resp, err := req.Do(ctx)
 		if assert.NoError(t, err) {
@@ -108,7 +108,7 @@ func TestClient_orderApis(t *testing.T) {
 
 	t.Run("RetrieveOrderRequest", func(t *testing.T) {
 		req := client.NewRetrieveOrderRequest()
-		// Optionally, you can add filters like ID, GID, CID, etc.
+		// Optionally, you can add filters like ID, GID, ClientOrderID, etc.
 		// req.AddId(123456789) // example order ID
 		resp, err := req.Do(ctx)
 		if assert.NoError(t, err) {

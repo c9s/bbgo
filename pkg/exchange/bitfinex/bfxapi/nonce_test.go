@@ -8,7 +8,7 @@ import (
 )
 
 func TestNonce_GetString(t *testing.T) {
-	ng := NewNonce()
+	ng := NewNonce(time.Now())
 
 	// Generate a nonce string
 	nonceStr := ng.GetString()
@@ -24,7 +24,7 @@ func TestNonce_GetString(t *testing.T) {
 }
 
 func TestNonce_GetInt64(t *testing.T) {
-	ng := NewNonce()
+	ng := NewNonce(time.Now())
 
 	// Generate a nonce int64
 	nonce := ng.GetInt64()
@@ -34,7 +34,7 @@ func TestNonce_GetInt64(t *testing.T) {
 }
 
 func TestNonce_Concurrency(t *testing.T) {
-	ng := NewNonce()
+	ng := NewNonce(time.Now())
 	var wg sync.WaitGroup
 	nonces := sync.Map{}
 
@@ -63,14 +63,15 @@ func TestNonce_Concurrency(t *testing.T) {
 }
 
 func TestNonce_NewNonce(t *testing.T) {
-	ng := NewNonce()
+	now := time.Now()
+	ng := NewNonce(now)
 	if ng.current <= 0 {
 		t.Errorf("expected positive initial nonce, got %d", ng.current)
 	}
 
 	// Ensure the initial nonce is based on current time
-	currentTime := time.Now().UnixMilli() * 1000
+	currentTime := now.UnixMilli() * 1000
 	if ng.current < currentTime {
-		t.Errorf("expected initial nonce to be >= current time, got %d", ng.current)
+		t.Errorf("expected initial nonce (%d) to be >= current time (%d), got %d", ng.current, currentTime, ng.current)
 	}
 }

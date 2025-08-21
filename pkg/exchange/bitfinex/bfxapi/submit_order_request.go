@@ -78,12 +78,15 @@ type Order struct {
 	TypePrev  *string
 
 	// MtsTif - Millisecond epoch timestamp for TIF (Time-In-Force)
-	MtsTif        *int64
-	_             any
-	Flags         OrderFlag
-	Status        OrderStatus
-	_             any
-	_             any
+	MtsTif *int64
+
+	_      any
+	Flags  OrderFlag
+	Status OrderStatus
+
+	_ any
+	_ any
+
 	Price         fixedpoint.Value
 	PriceAvg      fixedpoint.Value
 	PriceTrailing fixedpoint.Value

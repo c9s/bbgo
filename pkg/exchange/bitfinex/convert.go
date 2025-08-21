@@ -1,13 +1,78 @@
 package bitfinex
 
 import (
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitfinex/bfxapi"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 //go:generate go run generate_symbol_map.go
+var stableCoinRE = regexp.MustCompile(`(TUSD|USD[TC]*)`)
+
+var primaryLocalCurrencyMap = map[string]string{
+	"USDC": "UDC",
+	"USDT": "UST",
+	"TUSD": "TSD",
+	"MANA": "MNA",
+	"WBTC": "WBT",
+}
+
+func toGlobalSymbol(symbol string) string {
+	symbol = strings.TrimLeft(symbol, "tf")
+	s, ok := localSymbolMap[symbol]
+	if ok {
+		return s
+	}
+
+	return symbol
+}
+
+func toLocalSymbol(symbol string) string {
+	s, ok := globalSymbolMap[symbol]
+	if ok {
+		return "t" + s
+	}
+
+	indexes := stableCoinRE.FindStringSubmatchIndex(symbol)
+	if len(indexes) < 1 {
+		// if the symbol does not match the expected format, return it as is
+		return "t" + symbol
+	}
+
+	if indexes[0] == 0 {
+		return "t" + toLocalCurrency(symbol[indexes[0]:indexes[1]]) + toLocalCurrency(symbol[indexes[1]:])
+	}
+
+	return "t" + toLocalCurrency(symbol[:indexes[0]]) + toLocalCurrency(symbol[indexes[0]:])
+}
+
+func toGlobalCurrency(c string) string {
+	c = strings.TrimLeft(c, "tf")
+
+	s, ok := localCurrencyMap[c]
+	if ok {
+		return s
+	}
+
+	return c
+}
+
+func toLocalCurrency(c string) string {
+	s, ok := primaryLocalCurrencyMap[c]
+	if ok {
+		return s
+	}
+
+	s, ok = globalCurrencyMap[c]
+	if ok {
+		return s
+	}
+
+	return c
+}
 
 // convertOrder converts bfxapi.Order to types.Order
 func convertOrder(o bfxapi.Order) *types.Order {
@@ -18,7 +83,7 @@ func convertOrder(o bfxapi.Order) *types.Order {
 			Symbol:   toGlobalSymbol(o.Symbol),
 			Price:    o.Price,
 			Quantity: o.AmountOrig,
-			Type:     convertOrderType(o.OrderType),
+			Type:     toGlobalOrderType(o.OrderType),
 
 			AveragePrice: o.PriceAvg,
 		},
@@ -95,9 +160,9 @@ func convertTicker(t bfxapi.Ticker) *types.Ticker {
 	}
 }
 
-// convertOrderType maps bfxapi.OrderType to types.OrderType.
+// toGlobalOrderType maps bfxapi.OrderType to types.OrderType.
 // It normalizes Bitfinex order type string to bbgo's types.OrderType.
-func convertOrderType(t bfxapi.OrderType) types.OrderType {
+func toGlobalOrderType(t bfxapi.OrderType) types.OrderType {
 	switch t {
 	case bfxapi.OrderTypeLimit, bfxapi.OrderTypeExchangeLimit:
 		return types.OrderTypeLimit

@@ -9,7 +9,7 @@ import (
 // API: https://docs.bitfinex.com/reference/rest-auth-cancel-order
 // CancelOrderRequest represents a Bitfinex order cancellation request.
 //
-// CancelOrderRequest is used to cancel an order by ID, GID, or CID.
+// CancelOrderRequest is used to cancel an order by ID, GID, or ClientOrderID.
 //
 //go:generate requestgen -type CancelOrderRequest -method POST -url "/v2/auth/w/order/cancel" -responseType .CancelOrderResponse
 type CancelOrderRequest struct {

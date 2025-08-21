@@ -15,11 +15,13 @@ type OrderTradeDetail struct {
 	ExecAmount fixedpoint.Value           // executed amount
 	ExecPrice  fixedpoint.Value           // executed price
 
+	// OrderTradeDetail doesn't have a field for OrderType and OrderPrice
 	_ any
 	_ any
 
 	// Maker field: 1 if true, -1 if false
-	Maker         int              // maker flag
+	Maker int // maker flag
+
 	Fee           fixedpoint.Value // fee amount
 	FeeCurrency   string           // fee currency
 	ClientOrderID int64            // client order ID

@@ -204,11 +204,13 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	req := e.client.NewSubmitOrderRequest()
 	req.Symbol(toLocalSymbol(order.Symbol))
 
+	quantity := order.Quantity
+
 	switch order.Side {
 	case types.SideTypeBuy:
-		req.Amount(order.Quantity.String())
+		req.Amount(quantity.String())
 	case types.SideTypeSell:
-		req.Amount(order.Quantity.Neg().String())
+		req.Amount(quantity.Neg().String())
 	}
 
 	if !order.Price.IsZero() {
@@ -234,13 +236,31 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 
 	}
 
+	var clientOrderID int64
+	if order.ClientOrderID != "" {
+		if i, err := strconv.ParseInt(order.ClientOrderID, 10, 64); err != nil {
+			return nil, err
+		} else {
+			clientOrderID = i
+		}
+	} else {
+		clientOrderID = time.Now().UnixMilli()
+	}
+
+	// Update the client order ID in the order object
+	order.ClientOrderID = strconv.FormatInt(clientOrderID, 10)
+
+	if clientOrderID > 0 {
+		req.ClientOrderId(clientOrderID)
+	}
+
 	resp, err := req.Do(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to submit order to bitfinex: %w", err)
+		return order.AsOrder(), fmt.Errorf("failed to submit order to bitfinex: %w", err)
 	}
 
 	if len(resp.Data) == 0 {
-		return nil, fmt.Errorf("no order data returned from bitfinex")
+		return order.AsOrder(), fmt.Errorf("no order data returned from bitfinex")
 	}
 
 	return convertOrder(resp.Data[0]), nil
