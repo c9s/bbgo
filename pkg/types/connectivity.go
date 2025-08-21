@@ -53,6 +53,12 @@ func (c *Connectivity) IsConnected() (conn bool) {
 	return conn
 }
 
+func (c *Connectivity) GetStream() Stream {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.stream
+}
+
 func (c *Connectivity) IsAuthed() (authed bool) {
 	c.mu.Lock()
 	authed = c.authed

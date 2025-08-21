@@ -2533,6 +2533,7 @@ func (s *Strategy) CrossRun(
 		case <-ctx.Done():
 
 		case <-time.After(3 * time.Minute):
+			s.connectivityGroup.DebugStates()
 			s.logger.Panicf("authentication timeout, exiting...")
 
 		case <-s.connectivityGroup.AllAuthedC(ctx):

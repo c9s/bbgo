@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 //go:generate callbackgen -type ConnectivityGroup
@@ -171,6 +173,25 @@ func (g *ConnectivityGroup) Add(con *Connectivity) {
 	con.OnAuth(func() {
 		g.setState(_con, ConnectivityStateAuthed)
 	})
+}
+
+func (g *ConnectivityGroup) DebugStates() {
+	logrus.Infof("ConnectivityGroup: %d connections, state: %d",
+		len(g.connections), g.GetState())
+
+	for con, state := range g.states {
+		stream := con.GetStream()
+		switch state {
+		case ConnectivityStateDisconnected:
+			logrus.Infof("Connectivity: %T is disconnected", stream)
+		case ConnectivityStateConnected:
+			logrus.Infof("Connectivity: %T is connected", stream)
+		case ConnectivityStateAuthed:
+			logrus.Infof("Connectivity: %T is authed", stream)
+		default:
+			logrus.Infof("Connectivity: %T has unknown state %d", stream, state)
+		}
+	}
 }
 
 func (g *ConnectivityGroup) waitForState(ctx context.Context, c chan struct{}, expected ConnectivityState) {
