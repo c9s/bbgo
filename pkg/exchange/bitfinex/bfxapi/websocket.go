@@ -120,7 +120,7 @@ type WebSocketResponse struct {
 }
 
 type WalletSnapshotEvent struct {
-	Wallets []WalletResponse
+	Wallets []Wallet
 }
 
 // TickerEvent represents a ticker update or snapshot event.
@@ -910,7 +910,7 @@ func parseWalletSnapshot(arrJson json.RawMessage) (*WalletSnapshotEvent, error) 
 		return nil, fmt.Errorf("failed to unmarshal wallet snapshot array: %w", err)
 	}
 
-	wallets := make([]WalletResponse, 0, len(walletArrs))
+	wallets := make([]Wallet, 0, len(walletArrs))
 	for _, fields := range walletArrs {
 		wallet, err := parseWallet(fields)
 		if err != nil {
@@ -926,9 +926,9 @@ func parseWalletSnapshot(arrJson json.RawMessage) (*WalletSnapshotEvent, error) 
 	}, nil
 }
 
-// parseWallet parses Bitfinex wallet update message into WalletResponse.
-func parseWallet(arrJson json.RawMessage) (*WalletResponse, error) {
-	var wallet WalletResponse
+// parseWallet parses Bitfinex wallet update message into Wallet.
+func parseWallet(arrJson json.RawMessage) (*Wallet, error) {
+	var wallet Wallet
 	if err := parseJsonArray(arrJson, &wallet, 0); err != nil {
 		return nil, fmt.Errorf("failed to parse wallet update fields: %w", err)
 	}

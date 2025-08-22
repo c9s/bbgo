@@ -27,7 +27,7 @@ const (
 	WalletTypeFunding  WalletType = "funding"
 )
 
-// WalletResponse represents the response structure for the authenticated wallets endpoint.
+// Wallet represents the response structure for the authenticated wallets endpoint.
 // API response example:
 // [
 //
@@ -55,7 +55,7 @@ const (
 //	    "trade_amount":"0.01"
 //	  } //META
 //	] //WALLET_ARRAY
-type WalletResponse struct {
+type Wallet struct {
 	Type               WalletType       // Wallet type (e.g., "exchange", "margin", etc.)
 	Currency           string           // Currency code (e.g., "UST", "BTC", etc.)
 	Balance            fixedpoint.Value // Total balance
@@ -65,8 +65,8 @@ type WalletResponse struct {
 	LastChangeMetaData *WalletMetaData
 }
 
-// UnmarshalJSON maps the JSON array response to the WalletResponse struct fields.
-func (r *WalletResponse) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON maps the JSON array response to the Wallet struct fields.
+func (r *Wallet) UnmarshalJSON(data []byte) error {
 	return parseJsonArray(data, r, 0)
 }
 
@@ -102,7 +102,7 @@ func (m *WalletMetaData) UnmarshalJSON(data []byte) error {
 // GetWalletsRequest represents the request structure for the authenticated wallets endpoint.
 // API: https://docs.bitfinex.com/reference/rest-auth-wallets
 //
-//go:generate requestgen -type GetWalletsRequest -method POST -url "/v2/auth/r/wallets" -responseType []WalletResponse
+//go:generate requestgen -type GetWalletsRequest -method POST -url "/v2/auth/r/wallets" -responseType []Wallet
 type GetWalletsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
