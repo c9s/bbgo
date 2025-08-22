@@ -11,19 +11,25 @@ import (
 	"regexp"
 )
 
-// Length sets
+/*
+ * Length sets
+ */
 func (g *GetBookRequest) Length(length int) *GetBookRequest {
 	g.length = length
 	return g
 }
 
-// Symbol sets
+/*
+ * Symbol sets
+ */
 func (g *GetBookRequest) Symbol(symbol string) *GetBookRequest {
 	g.symbol = symbol
 	return g
 }
 
-// Precision sets
+/*
+ * Precision sets
+ */
 func (g *GetBookRequest) Precision(precision string) *GetBookRequest {
 	g.precision = precision
 	return g
@@ -54,6 +60,7 @@ func (g *GetBookRequest) GetParameters() (map[string]interface{}, error) {
 	length := g.length
 
 	// TEMPLATE check-required
+
 	if length == 0 {
 		length = 100
 	}
@@ -115,6 +122,7 @@ func (g *GetBookRequest) GetSlugParameters() (map[string]interface{}, error) {
 
 	// TEMPLATE check-required
 	if len(precision) == 0 {
+
 		precision = "P0"
 	}
 	// END TEMPLATE check-required

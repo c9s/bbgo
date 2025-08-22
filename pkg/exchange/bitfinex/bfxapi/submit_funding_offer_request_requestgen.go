@@ -11,55 +11,73 @@ import (
 	"regexp"
 )
 
-// Symbol sets
+/*
+ * Symbol sets
+ */
 func (s *SubmitFundingOfferRequest) Symbol(symbol string) *SubmitFundingOfferRequest {
 	s.symbol = symbol
 	return s
 }
 
-// Amount sets
+/*
+ * Amount sets
+ */
 func (s *SubmitFundingOfferRequest) Amount(amount string) *SubmitFundingOfferRequest {
 	s.amount = amount
 	return s
 }
 
-// Rate sets
+/*
+ * Rate sets
+ */
 func (s *SubmitFundingOfferRequest) Rate(rate string) *SubmitFundingOfferRequest {
 	s.rate = rate
 	return s
 }
 
-// Period sets
+/*
+ * Period sets
+ */
 func (s *SubmitFundingOfferRequest) Period(period int) *SubmitFundingOfferRequest {
 	s.period = period
 	return s
 }
 
-// OfferType sets
+/*
+ * OfferType sets
+ */
 func (s *SubmitFundingOfferRequest) OfferType(offerType FundingOfferType) *SubmitFundingOfferRequest {
 	s.offerType = offerType
 	return s
 }
 
-// Flags sets
+/*
+ * Flags sets
+ */
 func (s *SubmitFundingOfferRequest) Flags(flags int64) *SubmitFundingOfferRequest {
 	s.flags = &flags
 	return s
 }
 
-// AutoRenew sets
+/*
+ * AutoRenew sets
+ */
 func (s *SubmitFundingOfferRequest) AutoRenew(autoRenew bool) *SubmitFundingOfferRequest {
 	s.autoRenew = &autoRenew
 	return s
 }
 
-// Hidden sets
+/*
+ * Hidden sets
+ */
 func (s *SubmitFundingOfferRequest) Hidden(hidden bool) *SubmitFundingOfferRequest {
 	s.hidden = &hidden
 	return s
 }
 
-// Notify sets
+/*
+ * Notify sets
+ */
 func (s *SubmitFundingOfferRequest) Notify(notify bool) *SubmitFundingOfferRequest {
 	s.notify = &notify
 	return s
@@ -123,6 +141,7 @@ func (s *SubmitFundingOfferRequest) GetParameters() (map[string]interface{}, err
 	period := s.period
 
 	// TEMPLATE check-required
+
 	if period == 0 {
 		return nil, fmt.Errorf("period is required, 0 given")
 	}
@@ -157,6 +176,7 @@ func (s *SubmitFundingOfferRequest) GetParameters() (map[string]interface{}, err
 		flags := *s.flags
 
 		// TEMPLATE check-required
+
 		if flags == 0 {
 		}
 		// END TEMPLATE check-required

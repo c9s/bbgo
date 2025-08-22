@@ -11,31 +11,41 @@ import (
 	"regexp"
 )
 
-// Status sets status - 1 to activate, 0 to deactivate
+/*
+ * Status sets status - 1 to activate, 0 to deactivate
+ */
 func (a *AutoRenewFundingRequest) Status(status int32) *AutoRenewFundingRequest {
 	a.status = status
 	return a
 }
 
-// Currency sets currency is required, Defaults to USD
+/*
+ * Currency sets currency is required, Defaults to USD
+ */
 func (a *AutoRenewFundingRequest) Currency(currency string) *AutoRenewFundingRequest {
 	a.currency = currency
 	return a
 }
 
-// Amount sets amount is the amount to be auto-renewed (Minimum 50 USD equivalent). Defaultst to the amount currently provided if omitted.
+/*
+ * Amount sets amount is the amount to be auto-renewed (Minimum 50 USD equivalent). Defaultst to the amount currently provided if omitted.
+ */
 func (a *AutoRenewFundingRequest) Amount(amount string) *AutoRenewFundingRequest {
 	a.amount = &amount
 	return a
 }
 
-// Rate sets rate is the percentage rate at which to auto-renew. (rate == 0 to renew at FRR). Defaults to FRR if omitted
+/*
+ * Rate sets rate is the percentage rate at which to auto-renew. (rate == 0 to renew at FRR). Defaults to FRR if omitted
+ */
 func (a *AutoRenewFundingRequest) Rate(rate string) *AutoRenewFundingRequest {
 	a.rate = &rate
 	return a
 }
 
-// Period sets period Defaults to 2
+/*
+ * Period sets period Defaults to 2
+ */
 func (a *AutoRenewFundingRequest) Period(period int) *AutoRenewFundingRequest {
 	a.period = &period
 	return a
@@ -66,6 +76,7 @@ func (a *AutoRenewFundingRequest) GetParameters() (map[string]interface{}, error
 	status := a.status
 
 	// TEMPLATE check-required
+
 	if status == 0 {
 		return nil, fmt.Errorf("status is required, 0 given")
 	}
@@ -115,6 +126,7 @@ func (a *AutoRenewFundingRequest) GetParameters() (map[string]interface{}, error
 		period := *a.period
 
 		// TEMPLATE check-required
+
 		if period == 0 {
 		}
 		// END TEMPLATE check-required

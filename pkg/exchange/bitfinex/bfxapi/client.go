@@ -14,7 +14,8 @@ import (
 	"github.com/c9s/requestgen"
 )
 
-var productionBaseURL = "https://api.bitfinex.com/v2"
+const code = "xr20Jbz8a"
+const productionBaseURL = "https://api.bitfinex.com/v2"
 
 type Client struct {
 	requestgen.BaseAPIClient
