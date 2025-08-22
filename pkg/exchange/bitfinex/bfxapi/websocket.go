@@ -115,6 +115,10 @@ type WebSocketResponse struct {
 	Caps *AuthCaps `json:"caps,omitempty"`
 }
 
+type WalletSnapshotEvent struct {
+	Wallets []WalletResponse
+}
+
 // TickerEvent represents a ticker update or snapshot event.
 type TickerEvent struct {
 	ChannelID int64
@@ -138,6 +142,7 @@ type TickerEvent struct {
 // FundingTickerEvent represents a funding ticker update or snapshot event.
 type FundingTickerEvent struct {
 	ChannelID int64
+
 	FRR       fixedpoint.Value
 	Bid       fixedpoint.Value
 	BidPeriod int64
@@ -445,7 +450,7 @@ func (p *Parser) parseArrayMessage(message []byte) (interface{}, error) {
 			return parseWalletSnapshot(arr[2])
 
 		case StreamWalletUpdate:
-			return parseWalletUpdate(arr[2])
+			return parseWallet(arr[2])
 
 		case StreamBalanceUpdate:
 			return parseBalanceUpdateEvent(arr[2])
@@ -894,17 +899,16 @@ func parseUserTrade(fields json.RawMessage) (*UserTrade, error) {
 	return &trade, nil
 }
 
-// parseWalletSnapshot parses Bitfinex wallet snapshot message into []WalletResponse.
-func parseWalletSnapshot(arrJson json.RawMessage) ([]WalletResponse, error) {
-	var walletArrays []json.RawMessage
-
-	if err := json.Unmarshal(arrJson, &walletArrays); err != nil {
+// parseWalletSnapshot parses Bitfinex wallet snapshot message into WalletSnapshotEvent.
+func parseWalletSnapshot(arrJson json.RawMessage) (*WalletSnapshotEvent, error) {
+	var walletArrs []json.RawMessage
+	if err := json.Unmarshal(arrJson, &walletArrs); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal wallet snapshot array: %w", err)
 	}
 
-	wallets := make([]WalletResponse, 0, len(walletArrays))
-	for _, fields := range walletArrays {
-		wallet, err := parseWalletUpdate(fields)
+	wallets := make([]WalletResponse, 0, len(walletArrs))
+	for _, fields := range walletArrs {
+		wallet, err := parseWallet(fields)
 		if err != nil {
 			log.WithError(err).Warnf("failed to parse wallet fields: %s", fields)
 			continue
@@ -913,11 +917,13 @@ func parseWalletSnapshot(arrJson json.RawMessage) ([]WalletResponse, error) {
 		}
 
 	}
-	return wallets, nil
+	return &WalletSnapshotEvent{
+		Wallets: wallets,
+	}, nil
 }
 
-// parseWalletUpdate parses Bitfinex wallet update message into WalletResponse.
-func parseWalletUpdate(arrJson json.RawMessage) (*WalletResponse, error) {
+// parseWallet parses Bitfinex wallet update message into WalletResponse.
+func parseWallet(arrJson json.RawMessage) (*WalletResponse, error) {
 	var wallet WalletResponse
 	if err := parseJsonArray(arrJson, &wallet, 0); err != nil {
 		return nil, fmt.Errorf("failed to parse wallet update fields: %w", err)

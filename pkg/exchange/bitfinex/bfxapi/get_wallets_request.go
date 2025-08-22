@@ -18,6 +18,15 @@ type WalletTradeDetail struct {
 	OrderGid    int64            `json:"order_gid"`
 }
 
+// Wallet type could be (exchange, margin, funding)
+type WalletType string
+
+const (
+	WalletTypeExchange WalletType = "exchange"
+	WalletTypeMargin   WalletType = "margin"
+	WalletTypeFunding  WalletType = "funding"
+)
+
 // WalletResponse represents the response structure for the authenticated wallets endpoint.
 // API response example:
 // [
@@ -47,7 +56,7 @@ type WalletTradeDetail struct {
 //	  } //META
 //	] //WALLET_ARRAY
 type WalletResponse struct {
-	Type               string           // Wallet type (e.g., "exchange", "margin", etc.)
+	Type               WalletType       // Wallet type (e.g., "exchange", "margin", etc.)
 	Currency           string           // Currency code (e.g., "UST", "BTC", etc.)
 	Balance            fixedpoint.Value // Total balance
 	UnsettledInterest  fixedpoint.Value // Unsettled interest
