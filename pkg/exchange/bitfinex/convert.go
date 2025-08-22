@@ -2,6 +2,7 @@ package bitfinex
 
 import (
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -232,6 +233,14 @@ func convertBookEntries(entries []bfxapi.BookEntry) types.SliceOrderBook {
 			})
 		}
 	}
+	sort.Slice(ob.Bids, func(i, j int) bool {
+		return ob.Bids[i].Price.Compare(ob.Bids[j].Price) >= 0
+	})
+
+	sort.Slice(ob.Asks, func(i, j int) bool {
+		return ob.Asks[i].Price.Compare(ob.Asks[j].Price) <= 0
+	})
+
 	return ob
 }
 
