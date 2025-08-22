@@ -1,12 +1,187 @@
 [
   {
-    "timestamp": "2025-08-13T17:37:34.77857+08:00",
+    "timestamp": "2025-08-23T04:30:50.585799+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.bitfinex.com/v2/conf/pub:info:pair",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Age": [
+          "281"
+        ],
+        "Cf-Cache-Status": [
+          "HIT"
+        ],
+        "Cf-Ray": [
+          "9735215e8b95a33d-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 22 Aug 2025 20:30:50 GMT"
+        ],
+        "Last-Modified": [
+          "Fri, 22 Aug 2025 20:26:09 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[[\"AAVE:USD\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,null,null,null,null]],[\"AAVE:UST\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,null,null,null,null]],[\"ADABTC\",[null,null,null,\"4.0\",\"250000.0\",null,null,null,0.3,0.15,null,null]],[\"ADAUSD\",[null,null,null,\"4.0\",\"250000.0\",null,null,null,0.3,0.15,null,null]],[\"ADAUST\",[null,null,null,\"4.0\",\"250000.0\",null,null,null,0.3,0.15,null,null]],[\"AIOZ:USD\",[null,null,null,\"0.001\",\"65000.0\",null,null,null,null,null,null,null]],[\"ALGUSD\",[null,null,null,\"8.0\",\"150000.0\",null,null,null,0.5,0.25,null,null]],[\"ALT11M250830:USD\",[null,null,null,\"0.001\",\"100.0\",null,null,null,null,null,null,null]],[\"ALT11M250830:UST\",[null,null,null,\"0.001\",\"100.0\",null,null,null,null,null,null,null]],[\"ALT11M251029:USD\",[null,null,null,\"0.001\",\"100.0\",null,null,null,null,null,null,null]],[\"ALT11M251029:UST\",[null,null,null,\"0.001\",\"100.0\",null,null,null,null,null,null,null]],[\"ALT2612:USD\",[null,null,null,\"0.02\",\"360000.0\",null,null,null,null,null,null,null]],[\"ALT2612:UST\",[null,null,null,\"0.02\",\"360000.0\",null,null,null,null,null,null,null]],[\"AMPUSD\",[null,null,null,\"2.0\",\"25000.0\",null,null,null,null,null,null,null]],[\"AMPUST\",[null,null,null,\"2.0\",\"25000.0\",null,null,null,null,null,null,null]],[\"APENFT:USD\",[null,null,null,\"3669724.0\",\"40000000000.0\",null,null,null,null,null,null,null]],[\"APEUSD\",[null,null,null,\"0.8\",\"50000.0\",null,null,null,0.6,0.3,null,null]],[\"APEUST\",[null,null,null,\"0.8\",\"50000.0\",null,null,null,0.6,0.3,null,null]],[\"APTUSD\",[null,null,null,\"0.2\",\"30000.0\",null,null,null,0.3,0.15,null,null]],[\"APTUST\",[null,null,null,\"0.2\",\"30000.0\",null,null,null,0.3,0.15,null,null]],[\"ARBUSD\",[null,null,null,\"1.0\",\"75000.0\",null,null,null,null,null,null,null]],[\"ARBUST\",[null,null,null,\"1.0\",\"75000.0\",null,null,null,null,null,null,null]],[\"ATHUSD\",[null,null,null,\"0.001\",\"1300000.0\",null,null,null,null,null,null,null]],[\"ATHUST\",[null,null,null,\"0.001\",\"1300000.0\",null,null,null,null,null,null,null]],[\"ATOUSD\",[null,null,null,\"0.2\",\"100000.0\",null,null,null,0.5,0.25,null,null]],[\"ATOUST\",[null,null,null,\"0.2\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"AUSDT:USD\",[null,null,null,\"0.001\",\"5000000.0\",null,null,null,null,null,null,null]],[\"AUSDT:UST\",[null,null,null,\"0.001\",\"5000000.0\",null,null,null,null,null,null,null]],[\"AVAX:BTC\",[null,null,null,\"0.08\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"AVAX:USD\",[null,null,null,\"0.08\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"AVAX:UST\",[null,null,null,\"0.08\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"B2MUSD\",[null,null,null,\"210.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"B2MUST\",[null,null,null,\"210.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"BCHN:USD\",[null,null,null,\"0.006\",\"1000.0\",null,null,null,0.3,0.15,null,null]],[\"BGBUSD\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"BGBUST\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"BMN2:BTC\",[null,null,null,\"0.001\",\"1000.0\",null,null,null,null,null,null,null]],[\"BMN2:USD\",[null,null,null,\"0.001\",\"1000.0\",null,null,null,null,null,null,null]],[\"BONK:USD\",[null,null,null,\"79634.0\",\"2000000000.0\",null,null,null,null,null,null,null]],[\"BONK:UST\",[null,null,null,\"79634.0\",\"2000000000.0\",null,null,null,null,null,null,null]],[\"BTC:EURQ\",[null,null,null,\"0.00004\",\"100.0\",null,null,null,null,null,null,null]],[\"BTC:EURR\",[null,null,null,\"0.00004\",\"100.0\",null,null,null,null,null,null,null]],[\"BTC:USDQ\",[null,null,null,\"0.00004\",\"100.0\",null,null,null,null,null,null,null]],[\"BTC:USDR\",[null,null,null,\"0.00004\",\"100.0\",null,null,null,null,null,null,null]],[\"BTC:XAUT\",[null,null,null,\"0.00004\",\"250.0\",null,null,null,null,null,null,null]],[\"BTCEUR\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.2,0.1,null,null]],[\"BTCGBP\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.3,0.15,null,null]],[\"BTCJPY\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.3,0.15,null,null]],[\"BTCTRY\",[null,null,null,\"0.00004\",\"500000.0\",null,null,null,null,null,null,null]],[\"BTCUSD\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.1,0.05,null,null]],[\"BTCUST\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.1,0.05,null,null]],[\"BTTUSD\",[null,null,null,\"1970444.0\",\"25000000000.0\",null,null,null,null,null,null,null]],[\"CELO:USD\",[null,null,null,\"2.0\",\"65000.0\",null,null,null,null,null,null,null]],[\"CELO:UST\",[null,null,null,\"2.0\",\"65000.0\",null,null,null,null,null,null,null]],[\"CHZUSD\",[null,null,null,\"16.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"CHZUST\",[null,null,null,\"16.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"CNHT:USD\",[null,null,null,\"34.0\",\"350000.0\",null,null,null,null,null,null,null]],[\"COMP:USD\",[null,null,null,\"0.04\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"COMP:UST\",[null,null,null,\"0.04\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"CRVUSD\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"CRVUST\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"DAIUSD\",[null,null,null,\"2.0\",\"200000.0\",null,null,null,0.66,0.33,null,null]],[\"DOGE:BTC\",[null,null,null,\"22.0\",\"1500000.0\",null,null,null,0.3,0.15,null,null]],[\"DOGE:USD\",[null,null,null,\"22.0\",\"1500000.0\",null,null,null,0.3,0.15,null,null]],[\"DOGE:UST\",[null,null,null,\"22.0\",\"1500000.0\",null,null,null,0.3,0.15,null,null]],[\"DOTUSD\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"DOTUST\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"DSHBTC\",[null,null,null,\"0.06\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"DSHUSD\",[null,null,null,\"0.06\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"DYMUSD\",[null,null,null,\"0.4\",\"11000.0\",null,null,null,null,null,null,null]],[\"DYMUST\",[null,null,null,\"0.4\",\"11000.0\",null,null,null,null,null,null,null]],[\"EGLD:USD\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"EGLD:UST\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"EIGEN:USD\",[null,null,null,\"0.001\",\"14000.0\",null,null,null,null,null,null,null]],[\"EIGEN:UST\",[null,null,null,\"0.001\",\"14000.0\",null,null,null,null,null,null,null]],[\"ENAUSD\",[null,null,null,\"0.001\",\"300000.0\",null,null,null,null,null,null,null]],[\"ENAUST\",[null,null,null,\"0.001\",\"300000.0\",null,null,null,null,null,null,null]],[\"EOSBTC\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"EOSUSD\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"EOSUST\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"ETCBTC\",[null,null,null,\"0.1\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"ETCUSD\",[null,null,null,\"0.1\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"ETCUST\",[null,null,null,\"0.1\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"ETH2X:ETH\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,null,null,null,null]],[\"ETH2X:USD\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,null,null,null,null]],[\"ETH2X:UST\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,null,null,null,null]],[\"ETH:XAUT\",[null,null,null,\"0.0008\",\"2500.0\",null,null,null,null,null,null,null]],[\"ETHBTC\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,0.2,0.1,null,null]],[\"ETHEUR\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"ETHGBP\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"ETHJPY\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"ETHUSD\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,0.2,0.1,null,null]],[\"ETHUST\",[null,null,null,\"0.0008\",\"2000.0\",null,null,null,0.2,0.1,null,null]],[\"EURQ:EUR\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"EURQ:USD\",[null,null,null,\"0.001\",\"50000.0\",null,null,null,null,null,null,null]],[\"EURQ:UST\",[null,null,null,\"0.001\",\"50000.0\",null,null,null,null,null,null,null]],[\"EURR:EUR\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"EURR:USD\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"EURR:UST\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"EURUST\",[null,null,null,\"2.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"EUTUSD\",[null,null,null,\"2.0\",\"100000.0\",null,null,null,null,null,null,null]],[\"EUTUST\",[null,null,null,\"2.0\",\"100000.0\",null,null,null,null,null,null,null]],[\"FETUSD\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"FETUST\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"FILUSD\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,0.3,0.15,null,null]],[\"FILUST\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,0.3,0.15,null,null]],[\"FLOKI:USD\",[null,null,null,\"14046.0\",\"2500000000.0\",null,null,null,null,null,null,null]],[\"FLOKI:UST\",[null,null,null,\"14046.0\",\"2500000000.0\",null,null,null,null,null,null,null]],[\"GALA:USD\",[null,null,null,\"44.0\",\"500000.0\",null,null,null,null,null,null,null]],[\"GALA:UST\",[null,null,null,\"44.0\",\"500000.0\",null,null,null,null,null,null,null]],[\"GBPUST\",[null,null,null,\"2.0\",\"500000.0\",null,null,null,null,null,null,null]],[\"GOMINING:USD\",[null,null,null,\"6.0\",\"360000.0\",null,null,null,null,null,null,null]],[\"GOMINING:UST\",[null,null,null,\"6.0\",\"360000.0\",null,null,null,null,null,null,null]],[\"GTXUSD\",[null,null,null,\"0.6\",\"10000.0\",null,null,null,null,null,null,null]],[\"GTXUST\",[null,null,null,\"0.6\",\"10000.0\",null,null,null,null,null,null,null]],[\"GUNUSD\",[null,null,null,\"0.001\",\"2000000.0\",null,null,null,null,null,null,null]],[\"GUNUST\",[null,null,null,\"0.001\",\"2000000.0\",null,null,null,null,null,null,null]],[\"HILSV:USD\",[null,null,null,\"0.001\",\"100.0\",null,null,null,null,null,null,null]],[\"HIXUSD\",[null,null,null,\"3618.0\",\"300000000.0\",null,null,null,null,null,null,null]],[\"HIXUST\",[null,null,null,\"3618.0\",\"300000000.0\",null,null,null,null,null,null,null]],[\"HTXDAO:USD\",[null,null,null,\"0.001\",\"20000000000.0\",null,null,null,null,null,null,null]],[\"HTXDAO:UST\",[null,null,null,\"0.001\",\"20000000000.0\",null,null,null,null,null,null,null]],[\"ICPUSD\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,null,null,null,null]],[\"ICPUST\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,null,null,null,null]],[\"IOTBTC\",[null,null,null,\"6.0\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"IOTUSD\",[null,null,null,\"6.0\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"JASMY:USD\",[null,null,null,\"144.0\",\"2500000.0\",null,null,null,null,null,null,null]],[\"JASMY:UST\",[null,null,null,\"144.0\",\"2500000.0\",null,null,null,null,null,null,null]],[\"JPYUST\",[null,null,null,\"300.0\",\"100000000.0\",null,null,null,null,null,null,null]],[\"JSTUSD\",[null,null,null,\"52.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"JSTUST\",[null,null,null,\"52.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"JUPUSD\",[null,null,null,\"4.0\",\"350000.0\",null,null,null,null,null,null,null]],[\"JUPUST\",[null,null,null,\"4.0\",\"350000.0\",null,null,null,null,null,null,null]],[\"JUSTICE:USD\",[null,null,null,\"15000.0\",\"300000000.0\",null,null,null,null,null,null,null]],[\"JUSTICE:UST\",[null,null,null,\"15000.0\",\"300000000.0\",null,null,null,null,null,null,null]],[\"JXXUSD\",[null,null,null,\"0.001\",\"400000.0\",null,null,null,null,null,null,null]],[\"JXXUST\",[null,null,null,\"0.001\",\"400000.0\",null,null,null,null,null,null,null]],[\"KAIA:USD\",[null,null,null,\"0.001\",\"400000.0\",null,null,null,null,null,null,null]],[\"KAIA:UST\",[null,null,null,\"0.001\",\"400000.0\",null,null,null,null,null,null,null]],[\"KANUSD\",[null,null,null,\"1556.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"KANUST\",[null,null,null,\"1556.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"KAVA:USD\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"KAVA:UST\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"LDOUSD\",[null,null,null,\"0.6\",\"100000.0\",null,null,null,null,null,null,null]],[\"LDOUST\",[null,null,null,\"0.6\",\"100000.0\",null,null,null,null,null,null,null]],[\"LEOBTC\",[null,null,null,\"0.6\",\"50000.0\",null,null,null,null,null,null,null]],[\"LEOETH\",[null,null,null,\"0.6\",\"50000.0\",null,null,null,null,null,null,null]],[\"LEOUSD\",[null,null,null,\"0.6\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"LEOUST\",[null,null,null,\"0.6\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"LIFIII:USD\",[null,null,null,\"74.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"LIFIII:UST\",[null,null,null,\"74.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"LINK:USD\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"LINK:UST\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"LTCBTC\",[null,null,null,\"0.04\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"LTCUSD\",[null,null,null,\"0.04\",\"5000.0\",null,null,null,0.2,0.1,null,null]],[\"LTCUST\",[null,null,null,\"0.04\",\"2000.0\",null,null,null,0.2,0.1,null,null]],[\"MEWUSD\",[null,null,null,\"0.001\",\"11500000.0\",null,null,null,null,null,null,null]],[\"MEWUST\",[null,null,null,\"0.001\",\"11500000.0\",null,null,null,null,null,null,null]],[\"MIMUSD\",[null,null,null,\"2.0\",\"100000.0\",null,null,null,null,null,null,null]],[\"MIMUST\",[null,null,null,\"2.0\",\"100000.0\",null,null,null,null,null,null,null]],[\"MKRUSD\",[null,null,null,\"0.002\",\"2500.0\",null,null,null,0.3,0.15,null,null]],[\"MKRUST\",[null,null,null,\"0.002\",\"2500.0\",null,null,null,null,null,null,null]],[\"MXNT:USD\",[null,null,null,\"34.0\",\"10000000.0\",null,null,null,null,null,null,null]],[\"NEAR:USD\",[null,null,null,\"0.4\",\"25000.0\",null,null,null,null,null,null,null]],[\"NEAR:UST\",[null,null,null,\"0.4\",\"25000.0\",null,null,null,null,null,null,null]],[\"NEOUSD\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,0.3,0.15,null,null]],[\"NEOUST\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,0.3,0.15,null,null]],[\"NEXO:BTC\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"NEXO:USD\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"NEXO:UST\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"NYMUSD\",[null,null,null,\"0.001\",\"600000.0\",null,null,null,null,null,null,null]],[\"NYMUST\",[null,null,null,\"0.001\",\"600000.0\",null,null,null,null,null,null,null]],[\"OMNUSD\",[null,null,null,\"0.8\",\"20000.0\",null,null,null,null,null,null,null]],[\"OPXUSD\",[null,null,null,\"0.6\",\"250000.0\",null,null,null,null,null,null,null]],[\"OPXUST\",[null,null,null,\"0.6\",\"250000.0\",null,null,null,null,null,null,null]],[\"PEPE:USD\",[null,null,null,\"392156.0\",\"50000000000.0\",null,null,null,null,null,null,null]],[\"PEPE:UST\",[null,null,null,\"392156.0\",\"50000000000.0\",null,null,null,null,null,null,null]],[\"PNKUSD\",[null,null,null,\"52.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"POLUSD\",[null,null,null,\"0.001\",\"65000.0\",null,null,null,null,null,null,null]],[\"POLUST\",[null,null,null,\"0.001\",\"65000.0\",null,null,null,null,null,null,null]],[\"RRTUSD\",[null,null,null,\"4.0\",\"100000.0\",null,null,null,null,null,null,null]],[\"SEIUSD\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"SEIUST\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"SHIB:USD\",[null,null,null,\"141010.0\",\"5000000000.0\",null,null,null,0.3,0.15,null,null]],[\"SHIB:UST\",[null,null,null,\"141010.0\",\"5000000000.0\",null,null,null,0.3,0.15,null,null]],[\"SHMUSD\",[null,null,null,\"0.001\",\"250000.0\",null,null,null,null,null,null,null]],[\"SHMUST\",[null,null,null,\"0.001\",\"250000.0\",null,null,null,null,null,null,null]],[\"SOLBTC\",[null,null,null,\"0.02\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SOLUSD\",[null,null,null,\"0.02\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SOLUST\",[null,null,null,\"0.02\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SONIC:USD\",[null,null,null,\"0.001\",\"70000.0\",null,null,null,null,null,null,null]],[\"SONIC:UST\",[null,null,null,\"0.001\",\"70000.0\",null,null,null,null,null,null,null]],[\"SPEC:USD\",[null,null,null,\"0.001\",\"22000.0\",null,null,null,null,null,null,null]],[\"SPEC:UST\",[null,null,null,\"0.001\",\"22000.0\",null,null,null,null,null,null,null]],[\"SPELL:USD\",[null,null,null,\"1640.0\",\"2500000.0\",null,null,null,null,null,null,null]],[\"SPELL:UST\",[null,null,null,\"1640.0\",\"2500000.0\",null,null,null,null,null,null,null]],[\"STGUSD\",[null,null,null,\"4.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"STGUST\",[null,null,null,\"4.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"STRK:USD\",[null,null,null,\"2.0\",\"30000.0\",null,null,null,null,null,null,null]],[\"STRK:UST\",[null,null,null,\"2.0\",\"30000.0\",null,null,null,null,null,null,null]],[\"STXUSD\",[null,null,null,\"0.001\",\"75000.0\",null,null,null,null,null,null,null]],[\"STXUST\",[null,null,null,\"0.001\",\"75000.0\",null,null,null,null,null,null,null]],[\"SUIUSD\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SUIUST\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SUNUSD\",[null,null,null,\"216.0\",\"10000000.0\",null,null,null,null,null,null,null]],[\"SUNUST\",[null,null,null,\"216.0\",\"10000000.0\",null,null,null,null,null,null,null]],[\"SUSHI:USD\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SUSHI:UST\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SWEAT:USD\",[null,null,null,\"168.0\",\"7000000.0\",null,null,null,null,null,null,null]],[\"SWEAT:UST\",[null,null,null,\"168.0\",\"7000000.0\",null,null,null,null,null,null,null]],[\"TESTADA:TESTUSD\",[null,null,null,\"4.0\",\"250000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTALGO:TESTUSD\",[null,null,null,\"8.0\",\"150000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTAPT:TESTUSD\",[null,null,null,\"0.2\",\"30000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTAVAX:TESTUSD\",[null,null,null,\"0.08\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTBTC:TESTUSD\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTBTC:TESTUSDT\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTDOGE:TESTUSD\",[null,null,null,\"22.0\",\"1500000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTDOT:TESTUSD\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTEOS:TESTUSD\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"TESTETH:TESTUSD\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTFIL:TESTUSD\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTLTC:TESTUSD\",[null,null,null,\"0.04\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTNEAR:TESTUSD\",[null,null,null,\"0.4\",\"25000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTSOL:TESTUSD\",[null,null,null,\"0.02\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTXAUT:TESTUSD\",[null,null,null,\"0.002\",\"400.0\",null,null,null,0.3,0.15,null,null]],[\"TESTXTZ:TESTUSD\",[null,null,null,\"2.0\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"TIAUSD\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,null,null,null,null]],[\"TIAUST\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,null,null,null,null]],[\"TITAN1:GBP\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"TITAN1:USD\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"TITAN2:GBP\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"TITAN2:USD\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"TOKEN:USD\",[null,null,null,\"0.001\",\"650000.0\",null,null,null,null,null,null,null]],[\"TOKEN:UST\",[null,null,null,\"0.001\",\"650000.0\",null,null,null,null,null,null,null]],[\"TONUSD\",[null,null,null,\"1.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"TONUST\",[null,null,null,\"1.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"TRXBTC\",[null,null,null,\"22.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"TRXEUR\",[null,null,null,\"22.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"TRXUSD\",[null,null,null,\"22.0\",\"1000000.0\",null,null,null,0.3,0.15,null,null]],[\"TRXUST\",[null,null,null,\"22.0\",\"1000000.0\",null,null,null,0.3,0.15,null,null]],[\"TRYUST\",[null,null,null,\"62.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"TSDUSD\",[null,null,null,\"2.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"TSDUST\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"UDCUSD\",[null,null,null,\"2.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"UDCUST\",[null,null,null,\"2.0\",\"500000.0\",null,null,null,null,null,null,null]],[\"UNIUSD\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"UNIUST\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"UOSBTC\",[null,null,null,\"4.0\",\"400000.0\",null,null,null,null,null,null,null]],[\"UOSUSD\",[null,null,null,\"4.0\",\"400000.0\",null,null,null,null,null,null,null]],[\"USDF:USD\",[null,null,null,\"0.001\",\"50000.0\",null,null,null,null,null,null,null]],[\"USDF:UST\",[null,null,null,\"0.001\",\"50000.0\",null,null,null,null,null,null,null]],[\"USDQ:USD\",[null,null,null,\"0.001\",\"50000.0\",null,null,null,null,null,null,null]],[\"USDQ:UST\",[null,null,null,\"0.001\",\"50000.0\",null,null,null,null,null,null,null]],[\"USDR:USD\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"USDR:UST\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"UST:CNHT\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"UST:MXNT\",[null,null,null,\"2.0\",\"10000000.0\",null,null,null,null,null,null,null]],[\"USTBL:USD\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"USTBL:UST\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"USTUSD\",[null,null,null,\"2.0\",\"5000000.0\",null,null,null,0.1,0.05,null,null]],[\"UXLINK:USD\",[null,null,null,\"0.001\",\"500000.0\",null,null,null,null,null,null,null]],[\"UXLINK:UST\",[null,null,null,\"0.001\",\"500000.0\",null,null,null,null,null,null,null]],[\"WBTBTC\",[null,null,null,\"0.00004\",\"10.0\",null,null,null,null,null,null,null]],[\"WBTUSD\",[null,null,null,\"0.00004\",\"10.0\",null,null,null,null,null,null,null]],[\"WHBT:USD\",[null,null,null,\"0.2\",\"12500.0\",null,null,null,null,null,null,null]],[\"WHBT:UST\",[null,null,null,\"0.2\",\"12500.0\",null,null,null,null,null,null,null]],[\"WIFUSD\",[null,null,null,\"2.0\",\"10000.0\",null,null,null,null,null,null,null]],[\"WIFUST\",[null,null,null,\"2.0\",\"10000.0\",null,null,null,null,null,null,null]],[\"WOOUSD\",[null,null,null,\"4.0\",\"2500000.0\",null,null,null,null,null,null,null]],[\"WOOUST\",[null,null,null,\"4.0\",\"2500000.0\",null,null,null,null,null,null,null]],[\"XAUT:BTC\",[null,null,null,\"0.002\",\"400.0\",null,null,null,0.2,0.1,null,null]],[\"XAUT:USD\",[null,null,null,\"0.002\",\"400.0\",null,null,null,0.2,0.1,null,null]],[\"XAUT:UST\",[null,null,null,\"0.002\",\"400.0\",null,null,null,0.2,0.1,null,null]],[\"XDCUSD\",[null,null,null,\"54.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"XDCUST\",[null,null,null,\"54.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"XLMBTC\",[null,null,null,\"14.0\",\"1000000.0\",null,null,null,0.5,0.25,null,null]],[\"XLMUSD\",[null,null,null,\"14.0\",\"1000000.0\",null,null,null,0.5,0.25,null,null]],[\"XLMUST\",[null,null,null,\"14.0\",\"1000000.0\",null,null,null,0.5,0.25,null,null]],[\"XMRBTC\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"XMRUSD\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"XMRUST\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"XRDBTC\",[null,null,null,\"44.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"XRDUSD\",[null,null,null,\"44.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"XRPBTC\",[null,null,null,\"4.0\",\"2000000.0\",null,null,null,0.2,0.1,null,null]],[\"XRPUSD\",[null,null,null,\"4.0\",\"2000000.0\",null,null,null,0.2,0.1,null,null]],[\"XRPUST\",[null,null,null,\"4.0\",\"2000000.0\",null,null,null,0.3,0.15,null,null]],[\"XTZUSD\",[null,null,null,\"2.0\",\"100000.0\",null,null,null,null,null,null,null]],[\"YFIUSD\",[null,null,null,\"0.0002\",\"100.0\",null,null,null,null,null,null,null]],[\"YFIUST\",[null,null,null,\"0.0002\",\"100.0\",null,null,null,null,null,null,null]],[\"ZECBTC\",[null,null,null,\"0.06\",\"20000.0\",null,null,null,0.3,0.15,null,null]],[\"ZECUSD\",[null,null,null,\"0.06\",\"20000.0\",null,null,null,0.3,0.15,null,null]],[\"ZKXUSD\",[null,null,null,\"0.001\",\"200000.0\",null,null,null,null,null,null,null]],[\"ZKXUST\",[null,null,null,\"0.001\",\"200000.0\",null,null,null,null,null,null,null]],[\"ZROUSD\",[null,null,null,\"0.001\",\"10000.0\",null,null,null,null,null,null,null]],[\"ZROUST\",[null,null,null,\"0.001\",\"10000.0\",null,null,null,null,null,null,null]],[\"ZRXUSD\",[null,null,null,\"6.0\",\"200000.0\",null,null,null,0.3,0.15,null,null]]]]"
+    }
+  },
+  {
+    "timestamp": "2025-08-23T04:30:50.81492+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/r/wallets",
+      "header": {
+        "Bfx-Signature": [
+          "efa8b1083de96570038e31f240c66c6fcc355e3e82d6c3b7359920b9e50e55f043c9b636659c905c279f4489603f8602"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "9735215ebbada33d-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 22 Aug 2025 20:30:50 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[\"exchange\",\"UST\",833.61904883,0,723.62186513,\"Trading fees for 0.00004 BTC (BTCUST) @ 117080.0 on BFX (0.06%)\",null],[\"exchange\",\"BTC\",8.3e-7,0,8.3e-7,\"Exchange 0.00004 BTC for UST @ 117080.0\",{\"reason\":\"TRADE\",\"order_id\":215558872442,\"order_id_oppo\":215559652315,\"trade_price\":\"117080.0\",\"trade_amount\":\"-0.00004\",\"order_cid\":1755894539028,\"order_gid\":null}],[\"funding\",\"UST\",150.00291226,0,0.000001,null,null],[\"exchange\",\"USD\",21.15999405,0,21.15999405,\"Exchange 0.00008688 BTC for USD @ 113950.0\",{\"reason\":\"TRADE\",\"order_id\":215377088549,\"order_id_oppo\":215376062980,\"trade_price\":\"113950.0\",\"trade_amount\":\"0.00008688\",\"order_cid\":1755757984210,\"order_gid\":null}]]"
+    }
+  },
+  {
+    "timestamp": "2025-08-23T04:30:51.076156+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.bitfinex.com/v2/ticker/tBTCUST",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "EXPIRED"
+        ],
+        "Cf-Ray": [
+          "973521602c43a33d-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 22 Aug 2025 20:30:51 GMT"
+        ],
+        "Last-Modified": [
+          "Fri, 22 Aug 2025 20:30:51 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[117100,11.95683625,117120,13.688028,4260,0.03774922,117110,331.10043064,117450,111740]"
+    }
+  },
+  {
+    "timestamp": "2025-08-23T04:30:51.311114+08:00",
     "request": {
       "method": "POST",
       "url": "https://api.bitfinex.com/v2/auth/w/order/submit",
       "header": {
         "Bfx-Signature": [
-          "67d56866e95a60e26bfb0b33663473c04def2679cf882d944b82d0010c2a787f16a96e79c65ae5ce9557c9207afdd404"
+          "6129d8a6ee5f2c5a6e1d30d7d32008a54922dccb6b3e21a989e4d917dda1e1bb75bb29b82d8c41ff916c4cb53e9c8132"
         ],
         "Content-Type": [
           "application/json"
@@ -21,13 +196,13 @@
           "DYNAMIC"
         ],
         "Cf-Ray": [
-          "96e73c0fc9fc4a86-TPE"
+          "97352161ccf5a33d-TPE"
         ],
         "Content-Type": [
           "application/json; charset=utf-8"
         ],
         "Date": [
-          "Wed, 13 Aug 2025 09:37:34 GMT"
+          "Fri, 22 Aug 2025 20:30:51 GMT"
         ],
         "Referrer-Policy": [
           "same-origin"
@@ -54,17 +229,17 @@
           "1; mode=block"
         ]
       },
-      "body": "[1755077854,\"on-req\",null,null,[[214604224150,null,1755077854822,\"tBTCUST\",1755077854822,1755077854822,0.0001,0.0001,\"EXCHANGE LIMIT\",null,null,null,0,\"ACTIVE\",null,null,10000,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}]],null,\"SUCCESS\",\"Submitting 1 orders.\"]"
+      "body": "[1755894651,\"on-req\",null,null,[[215557190547,null,1755894651076,\"tBTCUST\",1755894651279,1755894651279,0.00008,0.00008,\"EXCHANGE LIMIT\",null,null,null,0,\"ACTIVE\",null,null,117120,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"aff_code\":\"xr20Jbz8a\",\"source\":\"api\"}]],null,\"SUCCESS\",\"Submitting 1 orders.\"]"
     }
   },
   {
-    "timestamp": "2025-08-13T17:37:35.017811+08:00",
+    "timestamp": "2025-08-23T04:30:52.55229+08:00",
     "request": {
       "method": "POST",
-      "url": "https://api.bitfinex.com/v2/auth/w/order/cancel",
+      "url": "https://api.bitfinex.com/v2/auth/r/orders/tBTCUST",
       "header": {
         "Bfx-Signature": [
-          "5e7fca4005d548d95ce306d6451bbf1b9aa5a9263dcf98966898fd6dad9e35ed6525d1e3067b12da1d78cc18289031db"
+          "182fdd69e1bb66390bb2b16e5d1813b4f27e576e54c98fa8bd7cff2c8846fe39776c286801be72370c22f83d1f473f65"
         ],
         "Content-Type": [
           "application/json"
@@ -79,13 +254,16 @@
           "DYNAMIC"
         ],
         "Cf-Ray": [
-          "96e73c115c724a86-TPE"
+          "973521698fc7a33d-TPE"
+        ],
+        "Content-Length": [
+          "2"
         ],
         "Content-Type": [
           "application/json; charset=utf-8"
         ],
         "Date": [
-          "Wed, 13 Aug 2025 09:37:35 GMT"
+          "Fri, 22 Aug 2025 20:30:52 GMT"
         ],
         "Referrer-Policy": [
           "same-origin"
@@ -112,7 +290,123 @@
           "1; mode=block"
         ]
       },
-      "body": "[1755077855064,\"oc-req\",null,null,[214604224150,null,1755077854822,\"tBTCUST\",1755077854822,1755077854824,0.0001,0.0001,\"EXCHANGE LIMIT\",null,null,null,0,\"ACTIVE\",null,null,10000,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}],null,\"SUCCESS\",\"Submitted for cancellation; waiting for confirmation (ID: 214604224150).\"]"
+      "body": "[]"
+    }
+  },
+  {
+    "timestamp": "2025-08-23T04:30:52.786435+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/r/orders/tBTCUST/hist",
+      "header": {
+        "Bfx-Signature": [
+          "de0a117e6b15e6c143bcf06c26c715f6a9c9aa0022ed99b64c31de977af8e510eeac78b2d74cb759f3a058859db8c5e4"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "9735216b085ea33d-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 22 Aug 2025 20:30:52 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[215557190547,null,1755894651076,\"tBTCUST\",1755894651279,1755894651282,0,0.00008,\"EXCHANGE LIMIT\",null,null,null,0,\"EXECUTED @ 117120.0(0.00008)\",null,null,117120,117120,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"aff_code\":\"xr20Jbz8a\",\"source\":\"api\"}]]"
+    }
+  },
+  {
+    "timestamp": "2025-08-23T04:30:53.021688+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/r/order/tBTCUST:215557190547/trades",
+      "header": {
+        "Bfx-Signature": [
+          "ad2efe9f901c954dcbab74555902992b722f6f87eb6578335c65c9ca0911d2fd1bbdf6a493eb438e16512f94dc82a441"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "9735216c78dda33d-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 22 Aug 2025 20:30:53 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[1798134905,\"tBTCUST\",1755894651281,215557190547,0.00008,117120,\"EXCHANGE LIMIT\",117120,-1,-4.8e-8,\"BTC\",1755894651076]]"
     }
   }
 ]

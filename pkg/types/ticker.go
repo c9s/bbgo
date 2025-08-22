@@ -80,3 +80,27 @@ func (t *Ticker) GetPrice(side SideType, p PriceType) fixedpoint.Value {
 
 	return price
 }
+
+// Validate checks if the Ticker fields are correctly set.
+// It returns an error if any required field is not set or invalid.
+func (t *Ticker) Validate() error {
+	if t == nil {
+		return fmt.Errorf("ticker is nil")
+	}
+	if t.Time.IsZero() {
+		return fmt.Errorf("ticker time is zero")
+	}
+	if t.Last.IsZero() && t.Buy.IsZero() && t.Sell.IsZero() && t.Open.IsZero() {
+		return fmt.Errorf("ticker has no valid price")
+	}
+	if t.High.IsZero() {
+		return fmt.Errorf("ticker high price is zero")
+	}
+	if t.Low.IsZero() {
+		return fmt.Errorf("ticker low price is zero")
+	}
+	if t.Volume.IsZero() {
+		return fmt.Errorf("ticker volume is zero")
+	}
+	return nil
+}

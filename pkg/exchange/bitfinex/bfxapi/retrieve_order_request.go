@@ -17,13 +17,13 @@ type RetrieveOrderRequest struct {
 	id []int64 `param:"id,omitempty"`
 
 	// gid filters results based on Group ID
-	gid int64 `param:"gid,omitempty"`
+	gid *int64 `param:"gid,omitempty"`
 
 	// cid filters based on Client ID (requires cid_date)
-	cid string `param:"cid,omitempty"`
+	cid *string `param:"cid,omitempty"`
 
 	// cid_date must be provided with cid, format: "YYYY-MM-DD"
-	cidDate string `param:"cid_date,omitempty"`
+	cidDate *string `param:"cid_date,omitempty"`
 }
 
 // NewRetrieveOrderRequest creates a new RetrieveOrderRequest.

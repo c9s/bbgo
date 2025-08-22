@@ -17,6 +17,7 @@ const ID types.ExchangeName = "bitfinex"
 func init() {
 	_ = types.Exchange(&Exchange{})
 	_ = types.ExchangeTradeHistoryService(&Exchange{})
+	_ = types.ExchangeOrderQueryService(&Exchange{})
 
 	if types.ExchangeBitfinex != ID {
 		panic(fmt.Sprintf("exchange ID mismatch: expected %s, got %s", types.ExchangeBitfinex, ID))
@@ -72,10 +73,11 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			continue
 		}
 
+		symbol := toGlobalSymbol(pair.Pair)
 		base, quote := splitLocalSymbol(pair.Pair)
-		markets[pair.Pair] = types.Market{
+		markets[symbol] = types.Market{
 			Exchange:        ID,
-			Symbol:          toGlobalSymbol(pair.Pair),
+			Symbol:          symbol,
 			BaseCurrency:    toGlobalCurrency(base),
 			QuoteCurrency:   toGlobalCurrency(quote),
 			MinQuantity:     pair.MinOrderSize,
@@ -83,6 +85,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			MinNotional:     fixedpoint.NewFromFloat(10.0),
 			PricePrecision:  8,
 			VolumePrecision: 8,
+			StepSize:        fixedpoint.NewFromFloat(0.00001), // manually customized step size for bitfinex
 		}
 	}
 	return markets, nil
@@ -91,7 +94,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 // QueryTicker queries ticker for a symbol from Bitfinex.
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
 	req := e.client.NewGetTickerRequest()
-	req.Symbol(symbol)
+	req.Symbol(toLocalSymbol(symbol))
 	resp, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -121,7 +124,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 	result := make(map[string]types.Ticker)
 	for _, t := range resp.TradingTickers {
 		ticker := convertTicker(t)
-		result[t.Symbol] = *ticker
+		result[toGlobalSymbol(t.Symbol)] = *ticker
 	}
 
 	return result, nil
@@ -183,7 +186,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	account := types.NewAccount()
 
 	for _, w := range resp {
-		if w.Type == "exchange" || w.Type == "deposit" {
+		if w.Type == bfxapi.WalletTypeExchange {
 			account.SetBalance(w.Currency, types.Balance{
 				Currency:  w.Currency,
 				Available: w.AvailableBalance,
@@ -206,9 +209,10 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 
 	balances := make(types.BalanceMap)
 	for _, w := range resp {
-		if w.Type == "exchange" || w.Type == "deposit" {
-			balances[w.Currency] = types.Balance{
-				Currency:  w.Currency,
+		if w.Type == bfxapi.WalletTypeExchange {
+			cu := toGlobalCurrency(w.Currency)
+			balances[cu] = types.Balance{
+				Currency:  cu,
 				Available: w.AvailableBalance,
 				Locked:    w.Balance.Sub(w.AvailableBalance),
 				Interest:  w.UnsettledInterest,
@@ -223,6 +227,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	req.Symbol(toLocalSymbol(order.Symbol))
 
 	quantity := order.Quantity
+	if order.Market.Symbol != "" {
+		quantity = order.Market.TruncateQuantity(quantity)
+	}
 
 	switch order.Side {
 	case types.SideTypeBuy:
@@ -286,7 +293,8 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 
 // QueryOpenOrders queries open orders for a symbol from Bitfinex.
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	req := e.client.NewRetrieveOrderRequest()
+	req := e.client.NewRetrieveOrderBySymbolRequest()
+	req.Symbol(toLocalSymbol(symbol))
 
 	resp, err := req.Do(ctx)
 	if err != nil {
@@ -320,12 +328,91 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 	return nil
 }
 
+func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	// check if it's still an active order
+	req := e.client.NewRetrieveOrderBySymbolRequest()
+	if q.Symbol != "" {
+		req.Symbol(toLocalSymbol(q.Symbol))
+	}
+
+	if q.OrderID != "" {
+		orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		req.AddId(orderID)
+	} else if q.ClientOrderID != "" {
+		clientOrderID, err := strconv.ParseInt(q.ClientOrderID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid client order ID %s: %w", q.ClientOrderID, err)
+		}
+
+		if clientOrderID <= 0 {
+			return nil, fmt.Errorf("client order ID must be a positive integer, got %d", clientOrderID)
+		}
+
+		cidTime := time.UnixMilli(clientOrderID)
+		cidDate := cidTime.Format("2006-01-02")
+		req.Cid(q.ClientOrderID)
+		req.CidDate(cidDate)
+	}
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query order from bitfinex: %w", err)
+	}
+
+	if len(resp.Orders) > 0 {
+		return toGlobalOrder(resp.Orders[0]), nil
+	}
+
+	// fallback to query closed orders
+	return e.queryClosedOrderByID(ctx, q)
+}
+
+func (e *Exchange) queryClosedOrderByID(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	if q.Symbol == "" {
+		return nil, fmt.Errorf("symbol is required to query closed orders")
+	}
+
+	req := e.client.NewGetOrderHistoryBySymbolRequest().
+		Symbol(toLocalSymbol(q.Symbol)).
+		Limit(1)
+
+	var orderID int64
+	var err error
+	if q.OrderID != "" {
+		orderID, err = strconv.ParseInt(q.OrderID, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		req.AddOrderId(orderID)
+	} else if q.ClientOrderID != "" {
+		return nil, fmt.Errorf("client order ID is not supported for closed orders")
+	}
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query closed orders from bitfinex: %w", err)
+	}
+
+	for _, o := range resp {
+		if o.OrderID == orderID {
+			return toGlobalOrder(o), nil
+		}
+	}
+
+	return nil, fmt.Errorf("order %d not found in closed orders", orderID)
+}
+
 // QueryOrderTrades queries trades for a specific order using Bitfinex API.
 func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
 	req := e.client.NewGetOrderTradesRequest()
 
 	if q.Symbol != "" {
-		req.Symbol(q.Symbol)
+		req.Symbol(toLocalSymbol(q.Symbol))
 	}
 
 	if q.OrderID != "" {

@@ -69,6 +69,10 @@ func (m Market) IsDustQuantity(quantity, price fixedpoint.Value) bool {
 
 // TruncateQuantity uses the step size to truncate floating number, in order to avoid the rounding issue
 func (m Market) TruncateQuantity(quantity fixedpoint.Value) fixedpoint.Value {
+	if m.StepSize.IsZero() {
+		return quantity
+	}
+
 	var ts = m.StepSize.Float64()
 	var prec = int(math.Round(math.Log10(ts) * -1.0))
 	var pow10 = math.Pow10(prec)

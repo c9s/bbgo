@@ -13,10 +13,11 @@ import (
 type GetOrderHistoryBySymbolRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	symbol string     `param:"symbol,slug"`          // Trading pair symbol (e.g., "tBTCUSD")
-	start  *time.Time `param:"start,milliseconds"`   // Start timestamp in ms
-	end    *time.Time `param:"end,milliseconds"`     // End timestamp in ms
-	limit  *int       `param:"limit" default:"2500"` // Limit number of results
+	symbol string `param:"symbol,slug"` // Trading pair symbol (e.g., "tBTCUSD")
+
+	start *time.Time `param:"start,milliseconds"`   // Start timestamp in ms
+	end   *time.Time `param:"end,milliseconds"`     // End timestamp in ms
+	limit *int       `param:"limit" default:"2500"` // Limit number of results
 
 	orderId []int64 `param:"id,omitempty"` // Order ID to filter results
 }

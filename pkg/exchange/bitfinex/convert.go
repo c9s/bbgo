@@ -5,8 +5,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitfinex/bfxapi"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -101,6 +103,13 @@ func toLocalCurrency(c string) string {
 	return c
 }
 
+func toGlobalSide(amt fixedpoint.Value) types.SideType {
+	if amt.Sign() > 0 {
+		return types.SideTypeBuy
+	}
+	return types.SideTypeSell
+}
+
 // toGlobalOrder converts bfxapi.Order to types.Order
 func toGlobalOrder(o bfxapi.Order) *types.Order {
 	// map bfxapi.Order to types.Order using struct literal
@@ -108,12 +117,13 @@ func toGlobalOrder(o bfxapi.Order) *types.Order {
 		SubmitOrder: types.SubmitOrder{
 			Symbol:       toGlobalSymbol(o.Symbol),
 			Price:        o.Price,
-			Quantity:     o.AmountOrig,
+			Quantity:     o.AmountOrig.Abs(),
+			Side:         toGlobalSide(o.AmountOrig),
 			Type:         toGlobalOrderType(o.OrderType),
 			AveragePrice: o.PriceAvg,
 		},
 		OrderID:          uint64(o.OrderID),
-		ExecutedQuantity: o.AmountOrig.Sub(o.Amount),
+		ExecutedQuantity: o.AmountOrig.Abs().Sub(o.Amount.Abs()),
 		Status:           toGlobalOrderStatus(o.Status),
 		CreationTime:     types.Time(o.CreatedAt),
 		UpdateTime:       types.Time(o.UpdatedAt),
@@ -163,20 +173,15 @@ func convertTrade(trade bfxapi.OrderTradeDetail) *types.Trade {
 		OrderID:       uint64(trade.OrderID),
 		Exchange:      ID,
 		Price:         trade.ExecPrice,
-		Quantity:      trade.ExecAmount,
-		QuoteQuantity: trade.ExecPrice.Mul(trade.ExecAmount),
+		Quantity:      trade.ExecAmount.Abs(),
+		QuoteQuantity: trade.ExecPrice.Mul(trade.ExecAmount.Abs()),
 		Symbol:        toGlobalSymbol(trade.Symbol),
-		Side: func() types.SideType {
-			if trade.ExecAmount.Sign() > 0 {
-				return types.SideTypeBuy
-			}
-			return types.SideTypeSell
-		}(),
-		IsBuyer:     trade.ExecAmount.Sign() > 0,
-		IsMaker:     trade.Maker == 1,
-		Time:        types.Time(trade.Time),
-		Fee:         trade.Fee,
-		FeeCurrency: trade.FeeCurrency,
+		Side:          toGlobalSide(trade.ExecAmount),
+		IsBuyer:       trade.ExecAmount.Sign() > 0,
+		IsMaker:       trade.Maker == 1,
+		Time:          types.Time(trade.Time),
+		Fee:           trade.Fee,
+		FeeCurrency:   trade.FeeCurrency,
 	}
 }
 
@@ -190,6 +195,7 @@ func convertTicker(t bfxapi.Ticker) *types.Ticker {
 		Low:    t.Low,
 		Buy:    t.Bid,
 		Sell:   t.Ask,
+		Time:   time.Now(),
 	}
 }
 

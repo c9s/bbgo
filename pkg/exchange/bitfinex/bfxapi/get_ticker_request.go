@@ -42,8 +42,7 @@ type Ticker struct {
 }
 
 func (r *Ticker) UnmarshalJSON(data []byte) error {
-	// skip one field
-	return parseJsonArray(data, r, 1, 0)
+	return parseJsonArray(data, r, 1)
 }
 
 // API: https://api-pub.bitfinex.com/v2/ticker/{symbol}
