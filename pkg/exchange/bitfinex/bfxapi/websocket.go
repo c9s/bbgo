@@ -113,6 +113,10 @@ type WebSocketResponse struct {
 	AuthID string `json:"auth_id,omitempty"`
 
 	Caps *AuthCaps `json:"caps,omitempty"`
+
+	Message *string `json:"msg,omitempty"`
+
+	Code int64 `json:"code,omitempty"`
 }
 
 type WalletSnapshotEvent struct {

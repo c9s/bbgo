@@ -143,12 +143,32 @@ func TestParserParseFromFile(t *testing.T) {
 
 			switch tr := result.(type) { // tr = typed result
 			case *WebSocketResponse:
-				_ = tr
+				t.Logf("websocket response: %+v from line %s", tr, string(line))
+				switch tr.Event {
+				case "info":
+				case "error":
+					assert.NotZero(t, tr.Code)
+					assert.NotEmpty(t, tr.Message)
+				case "auth":
+					assert.Equal(t, "OK", tr.Status)
+				}
+
+			case *WalletSnapshotEvent:
+				assert.NotEmpty(t, tr.Wallets)
 
 			case *UserTrade:
 				numUserTrade++
+				assert.NotZero(t, tr.ID)
+				assert.NotEmpty(t, tr.Symbol)
+				assert.False(t, tr.ExecAmount.IsZero())
+				assert.False(t, tr.ExecPrice.IsZero())
+
 			case *UserOrder:
 				numUserOrder++
+				assert.NotZero(t, tr.OrderID)
+				assert.NotEmpty(t, tr.Symbol)
+				assert.False(t, tr.AmountOrig.IsZero(), string(line))
+				assert.False(t, tr.Price.IsZero(), string(line))
 
 			}
 		}
@@ -290,7 +310,7 @@ func TestParser_Parse(t *testing.T) {
 		assert.NoError(t, err)
 		if assert.NotNil(t, msg) {
 			snapshot, ok := msg.(*WalletSnapshotEvent)
-			assert.True(t, ok, "expected []WalletResponse type")
+			assert.True(t, ok, "expected *WalletSnapshotEvent type")
 
 			wallets := snapshot.Wallets
 			assert.Len(t, wallets, 3)
