@@ -11,13 +11,17 @@ import (
 	"regexp"
 )
 
-// Symbol sets
+/*
+ * Symbol sets
+ */
 func (g *GetOrderTradesRequest) Symbol(symbol string) *GetOrderTradesRequest {
 	g.symbol = symbol
 	return g
 }
 
-// Id sets
+/*
+ * Id sets
+ */
 func (g *GetOrderTradesRequest) Id(id int64) *GetOrderTradesRequest {
 	g.id = id
 	return g
@@ -98,6 +102,7 @@ func (g *GetOrderTradesRequest) GetSlugParameters() (map[string]interface{}, err
 	id := g.id
 
 	// TEMPLATE check-required
+
 	if id == 0 {
 		return nil, fmt.Errorf("id is required, 0 given")
 	}

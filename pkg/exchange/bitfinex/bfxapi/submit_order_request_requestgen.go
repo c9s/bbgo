@@ -11,67 +11,89 @@ import (
 	"regexp"
 )
 
-// Symbol sets
+/*
+ * Symbol sets
+ */
 func (s *SubmitOrderRequest) Symbol(symbol string) *SubmitOrderRequest {
 	s.symbol = symbol
 	return s
 }
 
-// Amount sets
+/*
+ * Amount sets
+ */
 func (s *SubmitOrderRequest) Amount(amount string) *SubmitOrderRequest {
 	s.amount = amount
 	return s
 }
 
-// Price sets
+/*
+ * Price sets
+ */
 func (s *SubmitOrderRequest) Price(price string) *SubmitOrderRequest {
 	s.price = &price
 	return s
 }
 
-// OrderType sets
+/*
+ * OrderType sets
+ */
 func (s *SubmitOrderRequest) OrderType(orderType OrderType) *SubmitOrderRequest {
 	s.orderType = orderType
 	return s
 }
 
-// PriceAuxLimit sets
+/*
+ * PriceAuxLimit sets
+ */
 func (s *SubmitOrderRequest) PriceAuxLimit(priceAuxLimit string) *SubmitOrderRequest {
 	s.priceAuxLimit = &priceAuxLimit
 	return s
 }
 
-// PriceOcoStop sets
+/*
+ * PriceOcoStop sets
+ */
 func (s *SubmitOrderRequest) PriceOcoStop(priceOcoStop string) *SubmitOrderRequest {
 	s.priceOcoStop = &priceOcoStop
 	return s
 }
 
-// GroupId sets
+/*
+ * GroupId sets
+ */
 func (s *SubmitOrderRequest) GroupId(groupId int64) *SubmitOrderRequest {
 	s.groupId = &groupId
 	return s
 }
 
-// ClientOrderId sets
+/*
+ * ClientOrderId sets
+ */
 func (s *SubmitOrderRequest) ClientOrderId(clientOrderId int64) *SubmitOrderRequest {
 	s.clientOrderId = &clientOrderId
 	return s
 }
 
-// Flags sets
+/*
+ * Flags sets
+ */
 func (s *SubmitOrderRequest) Flags(flags OrderFlag) *SubmitOrderRequest {
 	s.flags = &flags
 	return s
 }
 
-// Tif sets Time-In-Force: datetime for automatic order cancellation (e.g. 2020-01-15 10:45:23).
+/*
+ * Tif sets Time-In-Force: datetime for automatic order cancellation (e.g. 2020-01-15 10:45:23).
+ */
 func (s *SubmitOrderRequest) Tif(tif string) *SubmitOrderRequest {
 	s.tif = &tif
 	return s
 }
 
-// Meta sets
+/*
+ * Meta sets
+ */
 func (s *SubmitOrderRequest) Meta(meta Meta) *SubmitOrderRequest {
 	s.meta = &meta
 	return s
@@ -138,6 +160,7 @@ func (s *SubmitOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// TEMPLATE check-required
 	if len(orderType) == 0 {
+
 		orderType = "EXCHANGE LIMIT"
 	}
 	// END TEMPLATE check-required
@@ -186,6 +209,7 @@ func (s *SubmitOrderRequest) GetParameters() (map[string]interface{}, error) {
 		groupId := *s.groupId
 
 		// TEMPLATE check-required
+
 		if groupId == 0 {
 		}
 		// END TEMPLATE check-required
@@ -199,6 +223,7 @@ func (s *SubmitOrderRequest) GetParameters() (map[string]interface{}, error) {
 		clientOrderId := *s.clientOrderId
 
 		// TEMPLATE check-required
+
 		if clientOrderId == 0 {
 		}
 		// END TEMPLATE check-required
@@ -212,6 +237,7 @@ func (s *SubmitOrderRequest) GetParameters() (map[string]interface{}, error) {
 		flags := *s.flags
 
 		// TEMPLATE check-required
+
 		if flags == 0 {
 		}
 		// END TEMPLATE check-required
@@ -254,6 +280,11 @@ func (s *SubmitOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of meta
 		params["meta"] = meta
 	} else {
+		// assign default of meta
+
+		meta := s.GetDefaultMeta()
+		// assign parameter of meta
+		params["meta"] = meta
 	}
 
 	return params, nil

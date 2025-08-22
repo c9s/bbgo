@@ -11,7 +11,9 @@ import (
 	"regexp"
 )
 
-// Id sets id is the Offer ID (retrievable via the Funding Loans and Funding Credits endpoints)
+/*
+ * Id sets id is the Offer ID (retrievable via the Funding Loans and Funding Credits endpoints)
+ */
 func (c *CloseFundingRequest) Id(id int64) *CloseFundingRequest {
 	c.id = id
 	return c
@@ -42,6 +44,7 @@ func (c *CloseFundingRequest) GetParameters() (map[string]interface{}, error) {
 	id := c.id
 
 	// TEMPLATE check-required
+
 	if id == 0 {
 		return nil, fmt.Errorf("id is required, 0 given")
 	}

@@ -11,37 +11,49 @@ import (
 	"regexp"
 )
 
-// Sort sets sort: +1: sort in ascending order | -1: sort in descending order (by MTS field).
+/*
+ * Sort sets sort: +1: sort in ascending order | -1: sort in descending order (by MTS field).
+ */
 func (g *GetCandlesRequest) Sort(sort int) *GetCandlesRequest {
 	g.sort = sort
 	return g
 }
 
-// Start sets start: If start is given, only records with MTS >= start (milliseconds) will be given as response.
+/*
+ * Start sets start: If start is given, only records with MTS >= start (milliseconds) will be given as response.
+ */
 func (g *GetCandlesRequest) Start(start int64) *GetCandlesRequest {
 	g.start = start
 	return g
 }
 
-// End sets end: If end is given, only records with MTS <= end (milliseconds) will be given as response.
+/*
+ * End sets end: If end is given, only records with MTS <= end (milliseconds) will be given as response.
+ */
 func (g *GetCandlesRequest) End(end int64) *GetCandlesRequest {
 	g.end = end
 	return g
 }
 
-// Limit sets limit: Number of records in response (max. 10000).
+/*
+ * Limit sets limit: Number of records in response (max. 10000).
+ */
 func (g *GetCandlesRequest) Limit(limit int) *GetCandlesRequest {
 	g.limit = limit
 	return g
 }
 
-// Candle sets
+/*
+ * Candle sets
+ */
 func (g *GetCandlesRequest) Candle(candle string) *GetCandlesRequest {
 	g.candle = candle
 	return g
 }
 
-// Section sets
+/*
+ * Section sets
+ */
 func (g *GetCandlesRequest) Section(section string) *GetCandlesRequest {
 	g.section = section
 	return g
@@ -72,6 +84,7 @@ func (g *GetCandlesRequest) GetParameters() (map[string]interface{}, error) {
 	sort := g.sort
 
 	// TEMPLATE check-required
+
 	if sort == 0 {
 	}
 	// END TEMPLATE check-required
@@ -82,6 +95,7 @@ func (g *GetCandlesRequest) GetParameters() (map[string]interface{}, error) {
 	start := g.start
 
 	// TEMPLATE check-required
+
 	if start == 0 {
 	}
 	// END TEMPLATE check-required
@@ -92,6 +106,7 @@ func (g *GetCandlesRequest) GetParameters() (map[string]interface{}, error) {
 	end := g.end
 
 	// TEMPLATE check-required
+
 	if end == 0 {
 	}
 	// END TEMPLATE check-required
@@ -102,6 +117,7 @@ func (g *GetCandlesRequest) GetParameters() (map[string]interface{}, error) {
 	limit := g.limit
 
 	// TEMPLATE check-required
+
 	if limit == 0 {
 	}
 	// END TEMPLATE check-required

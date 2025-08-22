@@ -13,25 +13,33 @@ import (
 	"time"
 )
 
-// Start sets
+/*
+ * Start sets
+ */
 func (g *GetOrderHistoryRequest) Start(start time.Time) *GetOrderHistoryRequest {
 	g.start = &start
 	return g
 }
 
-// End sets
+/*
+ * End sets
+ */
 func (g *GetOrderHistoryRequest) End(end time.Time) *GetOrderHistoryRequest {
 	g.end = &end
 	return g
 }
 
-// Limit sets
+/*
+ * Limit sets
+ */
 func (g *GetOrderHistoryRequest) Limit(limit int) *GetOrderHistoryRequest {
 	g.limit = &limit
 	return g
 }
 
-// OrderId sets
+/*
+ * OrderId sets
+ */
 func (g *GetOrderHistoryRequest) OrderId(orderId []int64) *GetOrderHistoryRequest {
 	g.orderId = orderId
 	return g
@@ -68,6 +76,9 @@ func (g *GetOrderHistoryRequest) GetParameters() (map[string]interface{}, error)
 		start := *g.start
 
 		// TEMPLATE check-required
+
+		if start.IsZero() {
+		}
 		// END TEMPLATE check-required
 
 		// assign parameter of start
@@ -80,6 +91,9 @@ func (g *GetOrderHistoryRequest) GetParameters() (map[string]interface{}, error)
 		end := *g.end
 
 		// TEMPLATE check-required
+
+		if end.IsZero() {
+		}
 		// END TEMPLATE check-required
 
 		// assign parameter of end
@@ -92,6 +106,7 @@ func (g *GetOrderHistoryRequest) GetParameters() (map[string]interface{}, error)
 		limit := *g.limit
 
 		// TEMPLATE check-required
+
 		if limit == 0 {
 			limit = 2500
 		}
