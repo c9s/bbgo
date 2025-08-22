@@ -7,15 +7,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/c9s/bbgo/pkg/exchange/bitfinex/bfxapi"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+const ID types.ExchangeName = "bitfinex"
 
 func init() {
 	_ = types.Exchange(&Exchange{})
 	_ = types.ExchangeTradeHistoryService(&Exchange{})
+
+	if types.ExchangeBitfinex != ID {
+		panic(fmt.Sprintf("exchange ID mismatch: expected %s, got %s", types.ExchangeBitfinex, ID))
+	}
 }
 
 type Exchange struct {
@@ -39,12 +44,12 @@ func New(apiKey, apiSecret string) *Exchange {
 }
 
 func (e *Exchange) Name() types.ExchangeName {
-	return types.ExchangeBitfinex
+	return ID
 }
 
 // PlatformFeeCurrency returns the platform fee currency for Bitfinex.
 func (e *Exchange) PlatformFeeCurrency() string {
-	return "USD"
+	return ""
 }
 
 // NewStream ...
@@ -57,18 +62,27 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	req := e.client.NewGetPairConfigRequest()
 	resp, err := req.Do(ctx)
 	if err != nil {
-		logrus.WithError(err).Error("failed to query markets from bitfinex")
-		return nil, err
+		return nil, fmt.Errorf("failed to query markets from bitfinex: %w", err)
 	}
+
 	markets := make(types.MarketMap)
 	for _, pair := range resp.Pairs {
+		if pair.Pair == "" {
+			log.Errorf("empty pair found in bitfinex pair config, skipping")
+			continue
+		}
+
+		base, quote := splitLocalSymbol(pair.Pair)
 		markets[pair.Pair] = types.Market{
-			Symbol: pair.Pair,
-			// FIXME: Base and Quote currencies are not available in the response.
-			// BaseCurrency:  pair.Base,
-			// QuoteCurrency: pair.Quote,
-			MinQuantity: pair.MinOrderSize,
-			MaxQuantity: pair.MaxOrderSize,
+			Exchange:        ID,
+			Symbol:          toGlobalSymbol(pair.Pair),
+			BaseCurrency:    toGlobalCurrency(base),
+			QuoteCurrency:   toGlobalCurrency(quote),
+			MinQuantity:     pair.MinOrderSize,
+			MaxQuantity:     pair.MaxOrderSize,
+			MinNotional:     fixedpoint.NewFromFloat(10.0),
+			PricePrecision:  8,
+			VolumePrecision: 8,
 		}
 	}
 	return markets, nil

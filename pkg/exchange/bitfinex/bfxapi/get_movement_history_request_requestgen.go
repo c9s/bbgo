@@ -12,25 +12,33 @@ import (
 	"time"
 )
 
-// Start sets
+/*
+ * Start sets
+ */
 func (g *GetMovementHistoryRequest) Start(start time.Time) *GetMovementHistoryRequest {
 	g.start = &start
 	return g
 }
 
-// End sets
+/*
+ * End sets
+ */
 func (g *GetMovementHistoryRequest) End(end time.Time) *GetMovementHistoryRequest {
 	g.end = &end
 	return g
 }
 
-// Limit sets
+/*
+ * Limit sets
+ */
 func (g *GetMovementHistoryRequest) Limit(limit int) *GetMovementHistoryRequest {
 	g.limit = &limit
 	return g
 }
 
-// Id sets
+/*
+ * Id sets
+ */
 func (g *GetMovementHistoryRequest) Id(id []int64) *GetMovementHistoryRequest {
 	g.id = id
 	return g
@@ -41,13 +49,17 @@ func (g *GetMovementHistoryRequest) AddId(id ...int64) *GetMovementHistoryReques
 	return g
 }
 
-// Address sets
+/*
+ * Address sets
+ */
 func (g *GetMovementHistoryRequest) Address(address string) *GetMovementHistoryRequest {
 	g.address = &address
 	return g
 }
 
-// Currency sets
+/*
+ * Currency sets
+ */
 func (g *GetMovementHistoryRequest) Currency(currency string) *GetMovementHistoryRequest {
 	g.currency = currency
 	return g
@@ -79,6 +91,9 @@ func (g *GetMovementHistoryRequest) GetParameters() (map[string]interface{}, err
 		start := *g.start
 
 		// TEMPLATE check-required
+
+		if start.IsZero() {
+		}
 		// END TEMPLATE check-required
 
 		// assign parameter of start
@@ -90,6 +105,9 @@ func (g *GetMovementHistoryRequest) GetParameters() (map[string]interface{}, err
 		end := *g.end
 
 		// TEMPLATE check-required
+
+		if end.IsZero() {
+		}
 		// END TEMPLATE check-required
 
 		// assign parameter of end
@@ -101,6 +119,7 @@ func (g *GetMovementHistoryRequest) GetParameters() (map[string]interface{}, err
 		limit := *g.limit
 
 		// TEMPLATE check-required
+
 		if limit == 0 {
 		}
 		// END TEMPLATE check-required

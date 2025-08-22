@@ -143,12 +143,32 @@ func TestParserParseFromFile(t *testing.T) {
 
 			switch tr := result.(type) { // tr = typed result
 			case *WebSocketResponse:
-				_ = tr
+				t.Logf("websocket response: %+v from line %s", tr, string(line))
+				switch tr.Event {
+				case "info":
+				case "error":
+					assert.NotZero(t, tr.Code)
+					assert.NotEmpty(t, tr.Message)
+				case "auth":
+					assert.Equal(t, "OK", tr.Status)
+				}
+
+			case *WalletSnapshotEvent:
+				assert.NotEmpty(t, tr.Wallets)
 
 			case *UserTrade:
 				numUserTrade++
+				assert.NotZero(t, tr.ID)
+				assert.NotEmpty(t, tr.Symbol)
+				assert.False(t, tr.ExecAmount.IsZero())
+				assert.False(t, tr.ExecPrice.IsZero())
+
 			case *UserOrder:
 				numUserOrder++
+				assert.NotZero(t, tr.OrderID)
+				assert.NotEmpty(t, tr.Symbol)
+				assert.False(t, tr.AmountOrig.IsZero(), string(line))
+				assert.False(t, tr.Price.IsZero(), string(line))
 
 			}
 		}
@@ -289,16 +309,18 @@ func TestParser_Parse(t *testing.T) {
 		msg, err := p.Parse([]byte(body))
 		assert.NoError(t, err)
 		if assert.NotNil(t, msg) {
-			wallets, ok := msg.([]WalletResponse)
-			assert.True(t, ok, "expected []WalletResponse type")
+			snapshot, ok := msg.(*WalletSnapshotEvent)
+			assert.True(t, ok, "expected *WalletSnapshotEvent type")
+
+			wallets := snapshot.Wallets
 			assert.Len(t, wallets, 3)
 
-			assert.Equal(t, "exchange", wallets[0].Type)
+			assert.Equal(t, WalletTypeExchange, wallets[0].Type)
 			assert.Equal(t, "UST", wallets[0].Currency)
 			assert.InDelta(t, 239.02464552, wallets[0].Balance.Float64(), 1e-8)
 			assert.True(t, wallets[0].AvailableBalance.IsZero())
 
-			assert.Equal(t, "exchange", wallets[1].Type)
+			assert.Equal(t, WalletTypeExchange, wallets[1].Type)
 			assert.Equal(t, "BTC", wallets[1].Currency)
 			assert.InDelta(t, 0.0009982, wallets[1].Balance.Float64(), 1e-8)
 			assert.Equal(t, "Exchange 0.00156 BTC for UST @ 121790.0", wallets[1].LastChange)
@@ -315,7 +337,7 @@ func TestParser_Parse(t *testing.T) {
 				}
 			}
 
-			assert.Equal(t, "funding", wallets[2].Type)
+			assert.Equal(t, WalletTypeFunding, wallets[2].Type)
 			assert.Equal(t, "UST", wallets[2].Currency)
 			assert.InDelta(t, 150.00146503, wallets[2].Balance.Float64(), 1e-8)
 		}
@@ -327,9 +349,9 @@ func TestParser_Parse(t *testing.T) {
 		msg, err := p.Parse([]byte(body))
 		assert.NoError(t, err)
 		if assert.NotNil(t, msg) {
-			wallet, ok := msg.(*WalletResponse)
-			assert.True(t, ok, "expected WalletResponse type")
-			assert.Equal(t, "exchange", wallet.Type)
+			wallet, ok := msg.(*Wallet)
+			assert.True(t, ok, "expected Wallet type")
+			assert.Equal(t, WalletTypeExchange, wallet.Type)
 			assert.Equal(t, "UST", wallet.Currency)
 			assert.InDelta(t, 239.02464552, wallet.Balance.Float64(), 1e-8)
 			assert.InDelta(t, 239.02464552, wallet.AvailableBalance.Float64(), 1e-8)
@@ -343,9 +365,9 @@ func TestParser_Parse(t *testing.T) {
 		msg, err := p.Parse([]byte(body))
 		assert.NoError(t, err)
 		if assert.NotNil(t, msg) {
-			wallet, ok := msg.(*WalletResponse)
-			assert.True(t, ok, "expected WalletResponse type")
-			assert.Equal(t, "exchange", wallet.Type)
+			wallet, ok := msg.(*Wallet)
+			assert.True(t, ok, "expected Wallet type")
+			assert.Equal(t, WalletTypeExchange, wallet.Type)
 			assert.Equal(t, "BTC", wallet.Currency)
 			assert.InDelta(t, 0.0009982, wallet.Balance.Float64(), 1e-8)
 			assert.InDelta(t, 0.0009982, wallet.AvailableBalance.Float64(), 1e-8)
@@ -371,9 +393,9 @@ func TestParser_Parse(t *testing.T) {
 		msg, err := p.Parse([]byte(body))
 		assert.NoError(t, err)
 		if assert.NotNil(t, msg) {
-			wallet, ok := msg.(*WalletResponse)
-			assert.True(t, ok, "expected WalletResponse type")
-			assert.Equal(t, "funding", wallet.Type)
+			wallet, ok := msg.(*Wallet)
+			assert.True(t, ok, "expected Wallet type")
+			assert.Equal(t, WalletTypeFunding, wallet.Type)
 			assert.Equal(t, "UST", wallet.Currency)
 			assert.InDelta(t, 150.00146503, wallet.Balance.Float64(), 1e-8)
 			assert.InDelta(t, 0.0014660299999889048, wallet.AvailableBalance.Float64(), 1e-8)

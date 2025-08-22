@@ -11,25 +11,33 @@ import (
 	"regexp"
 )
 
-// OrderID sets orderID is the order ID to cancel
+/*
+ * OrderID sets orderID is the order ID to cancel
+ */
 func (c *CancelOrderRequest) OrderID(orderID int64) *CancelOrderRequest {
 	c.orderID = &orderID
 	return c
 }
 
-// GroupID sets groupID is the group ID to cancel
+/*
+ * GroupID sets groupID is the group ID to cancel
+ */
 func (c *CancelOrderRequest) GroupID(groupID int64) *CancelOrderRequest {
 	c.groupID = &groupID
 	return c
 }
 
-// ClientOrderID sets clientOrderID is the client order ID to cancel
+/*
+ * ClientOrderID sets clientOrderID is the client order ID to cancel
+ */
 func (c *CancelOrderRequest) ClientOrderID(clientOrderID int64) *CancelOrderRequest {
 	c.clientOrderID = &clientOrderID
 	return c
 }
 
-// ClientOrderIDDate sets cid_date is required if cid is used, format: "YYYY-MM-DD"
+/*
+ * ClientOrderIDDate sets cid_date is required if cid is used, format: "YYYY-MM-DD"
+ */
 func (c *CancelOrderRequest) ClientOrderIDDate(clientOrderIDDate string) *CancelOrderRequest {
 	c.clientOrderIDDate = clientOrderIDDate
 	return c
@@ -61,6 +69,7 @@ func (c *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 		orderID := *c.orderID
 
 		// TEMPLATE check-required
+
 		if orderID == 0 {
 		}
 		// END TEMPLATE check-required
@@ -74,6 +83,7 @@ func (c *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 		groupID := *c.groupID
 
 		// TEMPLATE check-required
+
 		if groupID == 0 {
 		}
 		// END TEMPLATE check-required
@@ -87,6 +97,7 @@ func (c *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 		clientOrderID := *c.clientOrderID
 
 		// TEMPLATE check-required
+
 		if clientOrderID == 0 {
 		}
 		// END TEMPLATE check-required

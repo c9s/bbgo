@@ -11,19 +11,25 @@ import (
 	"regexp"
 )
 
-// Wallet sets wallet - Select the wallet from which to transfer (exchange, margin, funding (can also use the old labels which are exchange, trading and deposit respectively))
+/*
+ * Wallet sets wallet - Select the wallet from which to transfer (exchange, margin, funding (can also use the old labels which are exchange, trading and deposit respectively))
+ */
 func (g *GetDepositAddressRequest) Wallet(wallet string) *GetDepositAddressRequest {
 	g.wallet = wallet
 	return g
 }
 
-// Method sets method - method of deposit (methods accepted: “bitcoin”, “litecoin”, “ethereum”, ...) For an up-to-date listing of supported currencies see: https://api-pub.bitfinex.com//v2/conf/pub:map:tx:method
+/*
+ * Method sets method - method of deposit (methods accepted: “bitcoin”, “litecoin”, “ethereum”, ...) For an up-to-date listing of supported currencies see: https://api-pub.bitfinex.com//v2/conf/pub:map:tx:method
+ */
 func (g *GetDepositAddressRequest) Method(method string) *GetDepositAddressRequest {
 	g.method = method
 	return g
 }
 
-// OpRenew sets opRenew - Input 1 to generate a new deposit address (old addresses remain valid). Defaults to 0 if omitted, which will return the existing deposit address
+/*
+ * OpRenew sets opRenew - Input 1 to generate a new deposit address (old addresses remain valid). Defaults to 0 if omitted, which will return the existing deposit address
+ */
 func (g *GetDepositAddressRequest) OpRenew(opRenew int) *GetDepositAddressRequest {
 	g.opRenew = &opRenew
 	return g
@@ -75,6 +81,7 @@ func (g *GetDepositAddressRequest) GetParameters() (map[string]interface{}, erro
 		opRenew := *g.opRenew
 
 		// TEMPLATE check-required
+
 		if opRenew == 0 {
 		}
 		// END TEMPLATE check-required

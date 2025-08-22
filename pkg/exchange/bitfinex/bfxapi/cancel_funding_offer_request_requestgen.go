@@ -11,7 +11,9 @@ import (
 	"regexp"
 )
 
-// Id sets
+/*
+ * Id sets
+ */
 func (c *CancelFundingOfferRequest) Id(id int64) *CancelFundingOfferRequest {
 	c.id = id
 	return c
@@ -42,6 +44,7 @@ func (c *CancelFundingOfferRequest) GetParameters() (map[string]interface{}, err
 	id := c.id
 
 	// TEMPLATE check-required
+
 	if id == 0 {
 		return nil, fmt.Errorf("id is required, 0 given")
 	}

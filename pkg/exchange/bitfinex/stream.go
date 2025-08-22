@@ -106,8 +106,8 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	case *bfxapi.BookSnapshotEvent:
 		s.EmitBookSnapshotEvent(evt)
 
-	case []bfxapi.WalletResponse:
-		s.EmitBalanceUpdate(convertWalletResponse(evt...))
+	case *bfxapi.WalletSnapshotEvent:
+		s.EmitBalanceUpdate(convertWallets(evt.Wallets...))
 
 	case []bfxapi.UserOrder: // order snapshot
 		for _, uo := range evt {
@@ -117,8 +117,8 @@ func (s *Stream) dispatchEvent(e interface{}) {
 			}
 		}
 
-	case *bfxapi.WalletResponse:
-		s.EmitBalanceUpdate(convertWalletResponse(*evt))
+	case *bfxapi.Wallet: // wallet update
+		s.EmitBalanceUpdate(convertWallets(*evt))
 
 	case *bfxapi.UserOrder:
 		order := convertWsUserOrder(evt)
@@ -136,9 +136,9 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	}
 }
 
-// convertWalletResponse converts a Bitfinex WalletResponse to a types.Balance.
-// It maps fields from WalletResponse to types.Balance.
-func convertWalletResponse(ws ...bfxapi.WalletResponse) types.BalanceMap {
+// convertWallets converts a Bitfinex Wallet to a types.Balance.
+// It maps fields from Wallet to types.Balance.
+func convertWallets(ws ...bfxapi.Wallet) types.BalanceMap {
 	bm := types.BalanceMap{}
 	for _, w := range ws {
 		cu := toGlobalCurrency(w.Currency)

@@ -10,7 +10,7 @@ import (
 )
 
 //go:generate go run generate_symbol_map.go
-var stableCoinRE = regexp.MustCompile(`(TUSD|USD[TC]*)`)
+var stableCoinRE = regexp.MustCompile(`(EUR|GBP|TUSD|UST|UDC|USD[TC]*)`)
 
 var primaryLocalCurrencyMap = map[string]string{
 	"USDC": "UDC",
@@ -28,6 +28,32 @@ func toGlobalSymbol(symbol string) string {
 	}
 
 	return symbol
+}
+
+func splitLocalSymbol(symbol string) (string, string) {
+	symbol = strings.TrimLeft(symbol, "tf")
+
+	// if the symbol contains ":", we can split it directly
+	if strings.Contains(symbol, ":") {
+		parts := strings.SplitN(symbol, ":", 2)
+		if len(parts) != 2 {
+			log.Errorf("unable to handle symbol: %s", symbol)
+		} else {
+			return parts[0], parts[1]
+		}
+	}
+
+	indexes := stableCoinRE.FindStringSubmatchIndex(symbol)
+	if len(indexes) < 1 {
+		// if the symbol does not match the expected format, return it as is
+		return symbol, ""
+	}
+
+	if indexes[0] == 0 {
+		return toLocalCurrency(symbol[indexes[0]:indexes[1]]), toLocalCurrency(symbol[indexes[1]:])
+	}
+
+	return toLocalCurrency(symbol[:indexes[0]]), toLocalCurrency(symbol[indexes[0]:])
 }
 
 func toLocalSymbol(symbol string) string {
@@ -92,7 +118,7 @@ func toGlobalOrder(o bfxapi.Order) *types.Order {
 		UpdateTime:       types.Time(o.UpdatedAt),
 		OriginalStatus:   string(o.Status), // keep original status for reference
 		UUID:             "",               // Bitfinex does not provide UUID field
-		Exchange:         types.ExchangeBitfinex,
+		Exchange:         ID,
 	}
 
 	// map ClientOrderID if present
@@ -134,7 +160,7 @@ func convertTrade(trade bfxapi.OrderTradeDetail) *types.Trade {
 	return &types.Trade{
 		ID:            uint64(trade.TradeID),
 		OrderID:       uint64(trade.OrderID),
-		Exchange:      types.ExchangeBitfinex,
+		Exchange:      ID,
 		Price:         trade.ExecPrice,
 		Quantity:      trade.ExecAmount,
 		QuoteQuantity: trade.ExecPrice.Mul(trade.ExecAmount),

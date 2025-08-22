@@ -11,7 +11,9 @@ import (
 	"regexp"
 )
 
-// Symbol sets
+/*
+ * Symbol sets
+ */
 func (g *GetActiveFundingOffersRequest) Symbol(symbol string) *GetActiveFundingOffersRequest {
 	g.symbol = symbol
 	return g

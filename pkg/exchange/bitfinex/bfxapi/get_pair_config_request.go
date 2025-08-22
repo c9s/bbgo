@@ -2,9 +2,9 @@ package bfxapi
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"github.com/c9s/requestgen"
-	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
@@ -52,20 +52,23 @@ func (r *PairConfigResponse) UnmarshalJSON(data []byte) error {
 
 			var pair PairConfig
 
-			symbol := raw[0]
+			// first element is the pair symbol
+			symbol, _ := strconv.Unquote(string(raw[0]))
 			if len(symbol) == 0 {
 				continue // skip empty pairs
 			}
 
-			pair.Pair = string(symbol[0]) // first element is the pair symbol
+			// raw:
+			// ["SUSHI:USD" [null,null,null,"2.0","50000.0",null,null,null,0.3,0.15,null,null]]
+			pair.Pair = symbol
 
 			if len(raw[1]) < 10 {
-				logrus.Errorf("pair config for %s is incomplete, input: %s", pair, raw[1])
+				log.Errorf("pair config for %s is incomplete, input: %s", pair, raw[1])
 				continue // skip incomplete config
 			}
 
 			if err := parseJsonArray(raw[1], &pair, 1); err != nil {
-				logrus.Errorf("failed to parse pair config for %v, input: %s", err, raw[1])
+				log.WithError(err).Errorf("failed to parse pair config, input: %s", raw[1])
 				return err
 			}
 

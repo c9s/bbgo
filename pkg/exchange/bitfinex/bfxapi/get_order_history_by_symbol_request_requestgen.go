@@ -13,25 +13,33 @@ import (
 	"time"
 )
 
-// Start sets
+/*
+ * Start sets
+ */
 func (g *GetOrderHistoryBySymbolRequest) Start(start time.Time) *GetOrderHistoryBySymbolRequest {
 	g.start = &start
 	return g
 }
 
-// End sets
+/*
+ * End sets
+ */
 func (g *GetOrderHistoryBySymbolRequest) End(end time.Time) *GetOrderHistoryBySymbolRequest {
 	g.end = &end
 	return g
 }
 
-// Limit sets
+/*
+ * Limit sets
+ */
 func (g *GetOrderHistoryBySymbolRequest) Limit(limit int) *GetOrderHistoryBySymbolRequest {
 	g.limit = &limit
 	return g
 }
 
-// OrderId sets
+/*
+ * OrderId sets
+ */
 func (g *GetOrderHistoryBySymbolRequest) OrderId(orderId []int64) *GetOrderHistoryBySymbolRequest {
 	g.orderId = orderId
 	return g
@@ -42,7 +50,9 @@ func (g *GetOrderHistoryBySymbolRequest) AddOrderId(orderId ...int64) *GetOrderH
 	return g
 }
 
-// Symbol sets
+/*
+ * Symbol sets
+ */
 func (g *GetOrderHistoryBySymbolRequest) Symbol(symbol string) *GetOrderHistoryBySymbolRequest {
 	g.symbol = symbol
 	return g
@@ -74,6 +84,9 @@ func (g *GetOrderHistoryBySymbolRequest) GetParameters() (map[string]interface{}
 		start := *g.start
 
 		// TEMPLATE check-required
+
+		if start.IsZero() {
+		}
 		// END TEMPLATE check-required
 
 		// assign parameter of start
@@ -86,6 +99,9 @@ func (g *GetOrderHistoryBySymbolRequest) GetParameters() (map[string]interface{}
 		end := *g.end
 
 		// TEMPLATE check-required
+
+		if end.IsZero() {
+		}
 		// END TEMPLATE check-required
 
 		// assign parameter of end
@@ -98,6 +114,7 @@ func (g *GetOrderHistoryBySymbolRequest) GetParameters() (map[string]interface{}
 		limit := *g.limit
 
 		// TEMPLATE check-required
+
 		if limit == 0 {
 			limit = 2500
 		}

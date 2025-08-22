@@ -13,31 +13,41 @@ import (
 	"time"
 )
 
-// Start sets
+/*
+ * Start sets
+ */
 func (g *GetTradeHistoryBySymbolRequest) Start(start time.Time) *GetTradeHistoryBySymbolRequest {
 	g.start = &start
 	return g
 }
 
-// End sets
+/*
+ * End sets
+ */
 func (g *GetTradeHistoryBySymbolRequest) End(end time.Time) *GetTradeHistoryBySymbolRequest {
 	g.end = &end
 	return g
 }
 
-// Limit sets
+/*
+ * Limit sets
+ */
 func (g *GetTradeHistoryBySymbolRequest) Limit(limit int) *GetTradeHistoryBySymbolRequest {
 	g.limit = &limit
 	return g
 }
 
-// Sort sets
+/*
+ * Sort sets
+ */
 func (g *GetTradeHistoryBySymbolRequest) Sort(sort int) *GetTradeHistoryBySymbolRequest {
 	g.sort = &sort
 	return g
 }
 
-// Symbol sets
+/*
+ * Symbol sets
+ */
 func (g *GetTradeHistoryBySymbolRequest) Symbol(symbol string) *GetTradeHistoryBySymbolRequest {
 	g.symbol = symbol
 	return g
@@ -69,6 +79,9 @@ func (g *GetTradeHistoryBySymbolRequest) GetParameters() (map[string]interface{}
 		start := *g.start
 
 		// TEMPLATE check-required
+
+		if start.IsZero() {
+		}
 		// END TEMPLATE check-required
 
 		// assign parameter of start
@@ -81,6 +94,9 @@ func (g *GetTradeHistoryBySymbolRequest) GetParameters() (map[string]interface{}
 		end := *g.end
 
 		// TEMPLATE check-required
+
+		if end.IsZero() {
+		}
 		// END TEMPLATE check-required
 
 		// assign parameter of end
@@ -93,6 +109,7 @@ func (g *GetTradeHistoryBySymbolRequest) GetParameters() (map[string]interface{}
 		limit := *g.limit
 
 		// TEMPLATE check-required
+
 		if limit == 0 {
 			limit = 2500
 		}
@@ -111,6 +128,7 @@ func (g *GetTradeHistoryBySymbolRequest) GetParameters() (map[string]interface{}
 		sort := *g.sort
 
 		// TEMPLATE check-required
+
 		if sort == 0 {
 			sort = -1
 		}

@@ -11,7 +11,9 @@ import (
 	"regexp"
 )
 
-// Symbols sets
+/*
+ * Symbols sets
+ */
 func (g *GetTickersRequest) Symbols(symbols string) *GetTickersRequest {
 	g.symbols = symbols
 	return g

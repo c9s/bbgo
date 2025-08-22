@@ -1244,7 +1244,7 @@ func (s *Strategy) debugGridOrders(submitOrders []types.SubmitOrder, lastPrice f
 	}
 	sb.WriteString("] END OF GRID ORDERS")
 
-	s.logger.Infof(sb.String())
+	s.logger.Info(sb.String())
 }
 
 func (s *Strategy) debugOrders(desc string, orders []types.Order) {
@@ -1264,7 +1264,7 @@ func (s *Strategy) debugOrders(desc string, orders []types.Order) {
 	}
 	sb.WriteString("]")
 
-	s.logger.Infof(sb.String())
+	s.logger.Info(sb.String())
 }
 
 func (s *Strategy) debugLog(format string, args ...interface{}) {

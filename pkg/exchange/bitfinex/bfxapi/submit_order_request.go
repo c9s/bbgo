@@ -41,7 +41,11 @@ type SubmitOrderRequest struct {
 	// Time-In-Force: datetime for automatic order cancellation (e.g. 2020-01-15 10:45:23).
 	tif *string `param:"tif"`
 
-	meta *Meta `param:"meta"`
+	meta *Meta `param:"meta" defaultValuer:"method"`
+}
+
+func (r *SubmitOrderRequest) GetDefaultMeta() *Meta {
+	return &Meta{AffCode: code}
 }
 
 // NewSubmitOrderRequest creates a new SubmitOrderRequest.
