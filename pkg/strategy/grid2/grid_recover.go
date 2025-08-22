@@ -110,7 +110,10 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 	return nil
 }
 
-func (s *Strategy) getFilledOrdersByScanningTrades(ctx context.Context, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, openOrdersOnGrid []types.Order) ([]types.Order, error) {
+func (s *Strategy) getFilledOrdersByScanningTrades(
+	ctx context.Context, queryTradesService types.ExchangeTradeHistoryService,
+	queryOrderService types.ExchangeOrderQueryService, openOrdersOnGrid []types.Order,
+) ([]types.Order, error) {
 	// set grid
 	grid := s.newGrid()
 	s.setGrid(grid)
@@ -222,7 +225,10 @@ func (s *Strategy) buildTwinOrderMap(pins []Pin, openOrders []types.Order) (Twin
 
 // buildFilledTwinOrderMapFromTrades will query the trades from last 24 hour and use them to build a pin order map
 // It will skip the orders on pins at which open orders are already
-func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, twinOrdersOpen TwinOrderMap, expectedFillNum int) (TwinOrderMap, error) {
+func (s *Strategy) buildFilledTwinOrderMapFromTrades(
+	ctx context.Context, queryTradesService types.ExchangeTradeHistoryService,
+	queryOrderService types.ExchangeOrderQueryService, twinOrdersOpen TwinOrderMap, expectedFillNum int,
+) (TwinOrderMap, error) {
 	twinOrdersFilled := make(TwinOrderMap)
 
 	// existedOrders is used to avoid re-query the same orders
@@ -266,7 +272,11 @@ func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryT
 	return twinOrdersFilled, nil
 }
 
-func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, twinOrdersOpen, twinOrdersFilled TwinOrderMap, existedOrders *types.SyncOrderMap, since, until time.Time) error {
+func (s *Strategy) queryTradesToUpdateTwinOrdersMap(
+	ctx context.Context, queryTradesService types.ExchangeTradeHistoryService,
+	queryOrderService types.ExchangeOrderQueryService, twinOrdersOpen, twinOrdersFilled TwinOrderMap,
+	existedOrders *types.SyncOrderMap, since, until time.Time,
+) error {
 	var fromTradeID uint64 = 0
 	var limit int64 = 1000
 	for {
@@ -288,12 +298,13 @@ func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTr
 				return nil
 			}
 
-			s.debugLog(trade.String())
+			s.debugLog("%s", trade.String())
 
 			if existedOrders.Exists(trade.OrderID) {
 				// already queries, skip
 				continue
 			}
+
 			order, err := retry.QueryOrderUntilSuccessful(ctx, queryOrderService, types.OrderQuery{
 				Symbol:  trade.Symbol,
 				OrderID: strconv.FormatUint(trade.OrderID, 10),
@@ -303,7 +314,7 @@ func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTr
 				return errors.Wrapf(err, "failed to query order by trade (trade id: %d, order id: %d)", trade.ID, trade.OrderID)
 			}
 
-			s.debugLog(order.String())
+			s.debugLog("%s", order.String())
 			// avoid query this order again
 			existedOrders.Add(*order)
 			// add 1 to avoid duplicate
