@@ -82,3 +82,31 @@ func TestToGlobalCurrency(t *testing.T) {
 		}
 	}
 }
+
+func Test_splitLocalSymbol(t *testing.T) {
+	tests := []struct {
+		input     string
+		wantBase  string
+		wantQuote string
+	}{
+		{"tBTCUSD", "BTC", "USD"},
+		{"tETHUSD", "ETH", "USD"},
+		{"tBTC:USD", "BTC", "USD"},
+		{"tUSDTUSD", "UST", "USD"},
+		{"tBTCUST", "BTC", "UST"},
+		{"tMANAUSD", "MNA", "USD"},
+		{"tWBTCUSD", "WBT", "USD"},
+		{"tBTC", "BTC", ""},
+		{"tBTC:UST", "BTC", "UST"},
+		{"BTCUSD", "BTC", "USD"},
+		{"BTC:USD", "BTC", "USD"},
+		{"BTC", "BTC", ""},
+	}
+
+	for _, tt := range tests {
+		base, quote := splitLocalSymbol(tt.input)
+		if base != tt.wantBase || quote != tt.wantQuote {
+			t.Errorf("splitLocalSymbol(%q) = (%q, %q), want (%q, %q)", tt.input, base, quote, tt.wantBase, tt.wantQuote)
+		}
+	}
+}

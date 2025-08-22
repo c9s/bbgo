@@ -117,7 +117,7 @@ func (s *Stream) dispatchEvent(e interface{}) {
 			}
 		}
 
-	case *bfxapi.Wallet:
+	case *bfxapi.Wallet: // wallet update
 		s.EmitBalanceUpdate(convertWallets(*evt))
 
 	case *bfxapi.UserOrder:
