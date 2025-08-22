@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/exchange/bitfinex"
 	"github.com/c9s/bbgo/pkg/exchange/bitget"
 	"github.com/c9s/bbgo/pkg/exchange/bybit"
 	"github.com/c9s/bbgo/pkg/exchange/coinbase"
@@ -54,6 +55,12 @@ var factories = map[types.ExchangeName]Factory{
 		EnvLoader: DefaultEnvVarLoader,
 		Constructor: func(options Options) (types.Exchange, error) {
 			return okex.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret], options[OptionKeyAPIPassphrase]), nil
+		},
+	},
+	types.ExchangeBitfinex: {
+		EnvLoader: DefaultEnvVarLoader,
+		Constructor: func(options Options) (types.Exchange, error) {
+			return bitfinex.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret]), nil
 		},
 	},
 	types.ExchangeKucoin: {

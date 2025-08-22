@@ -227,25 +227,28 @@ func TestParserParseFromFile(t *testing.T) {
 				assert.NotZero(t, tr.ChannelID)
 				assert.NotZero(t, tr.ID)
 				assert.False(t, tr.Amount.IsZero(), "amount should not be zero for funding trades")
-			case *FundingBookEvent:
+
+			case *FundingBookUpdateEvent:
 				assert.NotZero(t, tr.ChannelID)
-				assert.NotZero(t, tr.Period)
-				assert.False(t, tr.Amount.IsZero(), "amount should not be zero for funding book events")
-				assert.False(t, tr.Rate.IsZero(), "rate should not be zero for funding book events")
-			case []FundingBookEvent:
-				for _, fundingBookEvent := range tr {
-					assert.NotZero(t, fundingBookEvent.ChannelID)
+				assert.NotZero(t, tr.Entry.Period)
+				assert.False(t, tr.Entry.Amount.IsZero(), "amount should not be zero for funding book events")
+				assert.False(t, tr.Entry.Rate.IsZero(), "rate should not be zero for funding book events")
+
+			case *FundingBookSnapshotEvent:
+				assert.NotZero(t, tr.ChannelID)
+				for _, fundingBookEvent := range tr.Entries {
 					assert.NotZero(t, fundingBookEvent.Period)
 					assert.False(t, fundingBookEvent.Amount.IsZero(), "amount should not be zero for funding book events")
 					assert.False(t, fundingBookEvent.Rate.IsZero(), "rate should not be zero for funding book events")
 				}
-			case *BookEvent:
+
+			case *BookUpdateEvent:
 				assert.NotZero(t, tr.ChannelID)
-				assert.False(t, tr.Price.IsZero(), "price should not be zero for book events")
-				assert.False(t, tr.Amount.IsZero(), "amount should not be zero for book events")
-			case []BookEvent:
-				for _, bookEvent := range tr {
-					assert.NotZero(t, bookEvent.ChannelID)
+				assert.False(t, tr.Entry.Price.IsZero(), "price should not be zero for book events")
+				assert.False(t, tr.Entry.Amount.IsZero(), "amount should not be zero for book events")
+			case *BookSnapshotEvent:
+				assert.NotZero(t, tr.ChannelID)
+				for _, bookEvent := range tr.Entries {
 					assert.False(t, bookEvent.Price.IsZero(), "price should not be zero for book events")
 					assert.False(t, bookEvent.Amount.IsZero(), "amount should not be zero for book events")
 				}
