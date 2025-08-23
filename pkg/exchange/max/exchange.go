@@ -749,7 +749,7 @@ func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder
 
 			switch responseErr.StatusCode {
 			case 404:
-				// 404 not found, return nil error to stop retrying
+				// 404 not found, stop retrying
 				return nil
 			default:
 				if responseErr.StatusCode >= 400 && responseErr.StatusCode < 500 {
@@ -761,8 +761,15 @@ func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder
 		return err2
 	}
 
+	// at this point, order and err can be both nil since we try to return an error to break the retry
 	err = retry.GeneralBackoff(ctx, op)
-	return order, err
+	if order != nil {
+		return order, nil
+	}
+	if err == nil {
+		err = errors.New("order still not found after recovery")
+	}
+	return nil, err
 }
 
 // PlatformFeeCurrency
