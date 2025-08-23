@@ -195,19 +195,13 @@ type FundingBookSnapshotEvent struct {
 // CandleEvent represents a kline/candle update or snapshot event.
 type CandleEvent struct {
 	ChannelID int64
-	Symbol    string
-	MTS       types.MillisecondTimestamp
-	Open      fixedpoint.Value
-	Close     fixedpoint.Value
-	High      fixedpoint.Value
-	Low       fixedpoint.Value
-	Volume    fixedpoint.Value
-	Closed    bool
+
+	Candle Candle
 }
 
 type CandleSnapshotEvent struct {
 	ChannelID int64
-	Candles   []CandleEvent
+	Candles   []Candle
 }
 
 // StatusEvent represents a status channel event.
@@ -465,6 +459,7 @@ func (p *Parser) parseArrayMessage(message []byte) (interface{}, error) {
 
 		case StreamFundingInfoUpdate:
 			return parseFundingInfoEvent(arr[2])
+
 		case StreamFundingTradeExecuted, StreamFundingTradeUpdate:
 			return nil, nil
 
@@ -654,11 +649,12 @@ func parseCandleEvent(channelID int64, payload json.RawMessage) (interface{}, er
 	}
 
 	// update: single array
-	ce := &CandleEvent{ChannelID: channelID}
-	if err := parseRawArray(arrData, ce, 1); err != nil {
+	var candle Candle
+	if err := parseRawArray(arrData, &candle, 0); err != nil {
 		return nil, err
 	}
-	return ce, nil
+
+	return &CandleEvent{ChannelID: channelID, Candle: candle}, nil
 }
 
 func parseCandleSnapshotEvent(channelID int64, entries [][]json.RawMessage) (*CandleSnapshotEvent, error) {
@@ -669,12 +665,12 @@ func parseCandleSnapshotEvent(channelID int64, entries [][]json.RawMessage) (*Ca
 			continue
 		}
 
-		ce := CandleEvent{ChannelID: channelID}
-		if err := parseRawArray(entry, &ce, 1); err != nil {
+		var candle Candle
+		if err := parseRawArray(entry, &candle, 0); err != nil {
 			return nil, err
 		}
 
-		snapshot.Candles = append(snapshot.Candles, ce)
+		snapshot.Candles = append(snapshot.Candles, candle)
 	}
 
 	return &snapshot, nil

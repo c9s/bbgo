@@ -64,6 +64,40 @@ func NewStream(ex *Exchange) *Stream {
 	stream.SetEndpointCreator(stream.getEndpoint)
 	stream.OnConnect(stream.onConnect)
 
+	stream.OnTickerEvent(func(e *bfxapi.TickerEvent) {
+
+	})
+
+	stream.OnCandleEvent(func(e *bfxapi.CandleEvent) {
+		// TODO: we need to get the response "key" to get the symbol and timeframe
+		// e.g. "key": "trade:1m:tBTCUSD"
+		stream.EmitKLine(convertCandle(e.Candle, "tBTCUSD", types.Interval1m))
+	})
+
+	stream.OnCandleSnapshotEvent(func(e *bfxapi.CandleSnapshotEvent) {})
+
+	stream.OnStatusEvent(func(e *bfxapi.StatusEvent) {})
+
+	stream.OnMarketTradeEvent(func(e *bfxapi.MarketTradeEvent) {
+
+	})
+
+	stream.OnBookSnapshotEvent(func(e *bfxapi.BookSnapshotEvent) {
+		book := convertBookEntries(e.Entries)
+		stream.EmitBookSnapshot(book)
+	})
+
+	stream.OnBookUpdateEvent(func(e *bfxapi.BookUpdateEvent) {
+		var book types.SliceOrderBook
+		if e.Entry.Amount.Sign() < 0 {
+			book.Asks = types.PriceVolumeSlice{convertBookEntry(e.Entry)}
+		} else {
+			book.Bids = types.PriceVolumeSlice{convertBookEntry(e.Entry)}
+		}
+
+		stream.EmitBookUpdate(book)
+	})
+
 	stream.OnWalletSnapshotEvent(func(e *bfxapi.WalletSnapshotEvent) {
 		stream.EmitBalanceUpdate(convertWallets(e.Wallets...))
 	})
