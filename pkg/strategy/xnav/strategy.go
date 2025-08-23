@@ -51,6 +51,11 @@ func (m DebtAssetMap) PlainText() (out string) {
 		netAssetInUSD = netAssetInUSD.Add(a.NetAssetInUSD)
 	}
 
+	// add check to prevent division by zero
+	if netAssetInUSD.IsZero() {
+		return fmt.Sprintf("No asset (Debt %s)", debtInUSD)
+	}
+
 	for _, a := range assets {
 		if a.DebtInUSD.IsZero() {
 			continue
