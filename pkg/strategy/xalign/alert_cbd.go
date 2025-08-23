@@ -103,10 +103,14 @@ func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
 			Short: true,
 		})
 	}
+	text := "Please check the balances"
+	if m.SlackAlert != nil && len(m.SlackAlert.Mentions) > 0 {
+		text = strings.Join(m.SlackAlert.Mentions, " ") + " " + text
+	}
 	return slack.Attachment{
 		Color:  color,
 		Title:  title,
-		Text:   strings.Join(m.SlackAlert.Mentions, " ") + " Please check the balances",
+		Text:   text,
 		Footer: fmt.Sprintf("strategy: %s", ID),
 		Fields: fields,
 	}
