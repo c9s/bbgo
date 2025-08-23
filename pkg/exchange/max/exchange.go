@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"sort"
@@ -678,11 +679,26 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		}
 	}
 
+	logger := log.WithFields(o.LogFields())
 	retOrder, err := req.Do(ctx)
 	if err != nil {
+		logger.WithError(err).Errorf("submit order error, now trying to recover the order: %+v", o)
+
+		if errors.Is(err, io.EOF) {
+			recoveredOrder, recoverErr := e.recoverOrder(ctx, o)
+			if recoverErr != nil {
+				return nil, fmt.Errorf("unable to recover order, error: %w", recoverErr)
+			} else if recoveredOrder == nil {
+				return nil, fmt.Errorf("unable to recover order, error: %w", err)
+			}
+
+			// note, recoveredOrder could be nil if the order is not found
+			return recoveredOrder, nil
+		}
+
 		var responseErr *requestgen.ErrResponse
 		if errors.As(err, &responseErr) {
-			log.WithFields(o.LogFields()).Warnf("submit order error: %s, status code: %d, now trying to recover the order with query %+v",
+			logger.WithError(err).Errorf("submit order api responded an error: %s, status code: %d, now trying to recover the order with query %+v",
 				responseErr.Error(),
 				responseErr.StatusCode,
 				o.AsQuery(),
@@ -691,7 +707,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 			if responseErr.StatusCode >= 400 {
 				recoveredOrder, recoverErr := e.recoverOrder(ctx, o)
 				if recoverErr != nil {
-					return createdOrder, fmt.Errorf("unable to recover order, error: %w", recoverErr)
+					return nil, fmt.Errorf("unable to recover order, error: %w", recoverErr)
+				} else if recoveredOrder == nil {
+					return nil, fmt.Errorf("unable to recover order, error: %w", err)
 				}
 
 				// note, recoveredOrder could be nil if the order is not found
@@ -703,7 +721,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	}
 
 	if retOrder == nil {
-		return createdOrder, errors.New("returned nil order")
+		return createdOrder, errors.New("api returned a nil order")
 	}
 
 	createdOrder, err = toGlobalOrder(*retOrder)
@@ -711,8 +729,8 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 }
 
 func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder) (*types.Order, error) {
-	var err error = nil
-	var order *types.Order = nil
+	var err error
+	var order *types.Order
 	var query = orderForm.AsQuery()
 	var logFields = orderForm.LogFields()
 
@@ -721,7 +739,7 @@ func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder
 	var op = func() (err2 error) {
 		order, err2 = e.QueryOrder(ctx, query)
 
-		if err2 == nil && order != nil {
+		if err2 == nil {
 			return nil
 		}
 
@@ -743,8 +761,15 @@ func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder
 		return err2
 	}
 
+	// at this point, order and err can be both nil since we try to return an error to break the retry
 	err = retry.GeneralBackoff(ctx, op)
-	return order, err
+	if order != nil {
+		return order, nil
+	}
+	if err == nil {
+		err = errors.New("order still not found after recovery")
+	}
+	return nil, err
 }
 
 // PlatformFeeCurrency
