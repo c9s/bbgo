@@ -156,6 +156,10 @@ func TestParserParseFromFile(t *testing.T) {
 			case *WalletSnapshotEvent:
 				assert.NotEmpty(t, tr.Wallets)
 
+			case *UserOrderSnapshotEvent:
+
+			case *UserPositionSnapshotEvent:
+
 			case *UserTrade:
 				numUserTrade++
 				assert.NotZero(t, tr.ID)

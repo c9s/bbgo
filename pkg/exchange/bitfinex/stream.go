@@ -23,17 +23,23 @@ type Stream struct {
 
 	depthBuffers map[string]*depth.Buffer
 
-	tickerEventCallbacks []func(e *bfxapi.TickerEvent)
-
-	bookUpdateEventCallbacks   []func(e *bfxapi.BookUpdateEvent)
-	bookSnapshotEventCallbacks []func(e *bfxapi.BookSnapshotEvent)
-
+	tickerEventCallbacks              []func(e *bfxapi.TickerEvent)
+	candleEventCallbacks              []func(e *bfxapi.CandleEvent)
+	statusEventCallbacks              []func(e *bfxapi.StatusEvent)
+	marketTradeEventCallbacks         []func(e *bfxapi.MarketTradeEvent)
+	bookUpdateEventCallbacks          []func(e *bfxapi.BookUpdateEvent)
+	bookSnapshotEventCallbacks        []func(e *bfxapi.BookSnapshotEvent)
 	fundingBookEventCallbacks         []func(e *bfxapi.FundingBookUpdateEvent)
 	fundingBookSnapshotEventCallbacks []func(e *bfxapi.FundingBookSnapshotEvent)
 
-	candleEventCallbacks      []func(e *bfxapi.CandleEvent)
-	statusEventCallbacks      []func(e *bfxapi.StatusEvent)
-	marketTradeEventCallbacks []func(e *bfxapi.MarketTradeEvent)
+	walletSnapshotEventCallbacks   []func(e *bfxapi.WalletSnapshotEvent)
+	walletUpdateEventCallbacks     []func(e *bfxapi.Wallet)
+	positionSnapshotEventCallbacks []func(e *bfxapi.UserPositionSnapshotEvent)
+	positionUpdateEventCallbacks   []func(e *bfxapi.UserPosition)
+
+	orderSnapshotEventCallbacks []func(e *bfxapi.UserOrderSnapshotEvent)
+	orderUpdateEventCallbacks   []func(e *bfxapi.UserOrder)
+	tradeUpdateEventCallbacks   []func(e *bfxapi.UserTrade)
 
 	parser *bfxapi.Parser
 	logger logrus.FieldLogger
@@ -54,6 +60,37 @@ func NewStream(ex *Exchange) *Stream {
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.getEndpoint)
 	stream.OnConnect(stream.onConnect)
+
+	stream.OnWalletSnapshotEvent(func(e *bfxapi.WalletSnapshotEvent) {
+		stream.EmitBalanceUpdate(convertWallets(e.Wallets...))
+	})
+	stream.OnWalletUpdateEvent(func(e *bfxapi.Wallet) {
+		stream.EmitBalanceUpdate(convertWallets(*e))
+	})
+
+	stream.OnOrderSnapshotEvent(func(e *bfxapi.UserOrderSnapshotEvent) {
+		for _, uo := range e.Orders {
+			order := convertWsUserOrder(&uo)
+			if order != nil {
+				stream.EmitOrderUpdate(*order)
+			}
+		}
+	})
+
+	stream.OnOrderUpdateEvent(func(e *bfxapi.UserOrder) {
+		order := convertWsUserOrder(e)
+		if order != nil {
+			stream.EmitOrderUpdate(*order)
+		}
+	})
+
+	stream.OnTradeUpdateEvent(func(e *bfxapi.UserTrade) {
+		trade := convertWsUserTrade(e)
+		if trade != nil {
+			stream.EmitTradeUpdate(*trade)
+		}
+	})
+
 	return stream
 }
 
@@ -107,30 +144,26 @@ func (s *Stream) dispatchEvent(e interface{}) {
 		s.EmitBookSnapshotEvent(evt)
 
 	case *bfxapi.WalletSnapshotEvent:
-		s.EmitBalanceUpdate(convertWallets(evt.Wallets...))
+		s.EmitWalletSnapshotEvent(evt)
 
-	case []bfxapi.UserOrder: // order snapshot
-		for _, uo := range evt {
-			order := convertWsUserOrder(&uo)
-			if order != nil {
-				s.EmitOrderUpdate(*order)
-			}
-		}
+	case *bfxapi.UserPositionSnapshotEvent:
+		s.EmitPositionSnapshotEvent(evt)
+
+	case *bfxapi.UserPosition:
+		s.EmitPositionUpdateEvent(evt)
+
+	case *bfxapi.UserOrderSnapshotEvent:
+		s.EmitOrderSnapshotEvent(evt)
 
 	case *bfxapi.Wallet: // wallet update
-		s.EmitBalanceUpdate(convertWallets(*evt))
+		s.EmitWalletUpdateEvent(evt)
 
 	case *bfxapi.UserOrder:
-		order := convertWsUserOrder(evt)
-		if order != nil {
-			s.EmitOrderUpdate(*order)
-		}
+		s.EmitOrderUpdateEvent(evt)
 
 	case *bfxapi.UserTrade:
-		trade := convertWsUserTrade(evt)
-		if trade != nil {
-			s.EmitTradeUpdate(*trade)
-		}
+		s.EmitTradeUpdateEvent(evt)
+
 	default:
 		s.logger.Warnf("unhandled %T event: %+v", evt, evt)
 	}

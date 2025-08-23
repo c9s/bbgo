@@ -421,13 +421,10 @@ func (p *Parser) parseArrayMessage(message []byte) (interface{}, error) {
 
 		switch StreamName(streamName) {
 		case StreamOrderSnapshot:
-			orders, err := parseUserOrderSnapshot(arr[2])
-			if err != nil {
-				return nil, fmt.Errorf("unable to parse user order snapshot: %w", err)
-			}
-			return orders, nil
+			return parseUserOrderSnapshot(arr[2])
+
 		case StreamOrderUpdate, StreamOrderNew, StreamOrderCancel:
-			return parseUserOrder(arr[2])
+			return parseUserOrderUpdate(arr[2])
 
 		case StreamPositionSnapshot:
 			return parseUserPositionSnapshot(arr[2])
@@ -806,9 +803,17 @@ func GenerateAuthRequest(apiKey, apiSecret string, filter ...Filter) WebSocketAu
 	}
 }
 
-// parseUserOrder parses a single Bitfinex user order array into a UserOrder struct.
+type UserPositionSnapshotEvent struct {
+	Positions []UserPosition
+}
+
+type UserOrderSnapshotEvent struct {
+	Orders []UserOrder
+}
+
+// parseUserOrderUpdate parses a single Bitfinex user order array into a UserOrder struct.
 // It uses parseRawArray for field mapping.
-func parseUserOrder(arrJson json.RawMessage) (*UserOrder, error) {
+func parseUserOrderUpdate(arrJson json.RawMessage) (*UserOrder, error) {
 	var order UserOrder
 
 	if err := parseJsonArray(arrJson, &order, 0); err != nil {
@@ -820,24 +825,24 @@ func parseUserOrder(arrJson json.RawMessage) (*UserOrder, error) {
 
 // parseUserOrderSnapshot parses Bitfinex private user order snapshot message.
 // It returns a slice of UserOrder objects.
-func parseUserOrderSnapshot(arrJson json.RawMessage) ([]UserOrder, error) {
+func parseUserOrderSnapshot(arrJson json.RawMessage) (*UserOrderSnapshotEvent, error) {
+	var evt UserOrderSnapshotEvent
 	var orderArrays []json.RawMessage
 	if err := json.Unmarshal(arrJson, &orderArrays); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal order snapshot array: %w", err)
 	}
 
-	orders := make([]UserOrder, 0, len(orderArrays))
 	for _, jsonArr := range orderArrays {
-		order, err := parseUserOrder(jsonArr)
+		order, err := parseUserOrderUpdate(jsonArr)
 		if err != nil {
 			log.WithError(err).Warnf("failed to parse order fields: %s", jsonArr)
 			continue
 		} else if order != nil {
-			orders = append(orders, *order)
+			evt.Orders = append(evt.Orders, *order)
 		}
 	}
 
-	return orders, nil
+	return &evt, nil
 }
 
 // UserPosition represents a Bitfinex user position from private WS API.
@@ -874,24 +879,25 @@ func parseUserPosition(fields json.RawMessage) (*UserPosition, error) {
 }
 
 // parseUserPositionSnapshot parses Bitfinex private user position snapshot message.
-func parseUserPositionSnapshot(arrJson json.RawMessage) ([]UserPosition, error) {
+func parseUserPositionSnapshot(arrJson json.RawMessage) (*UserPositionSnapshotEvent, error) {
+	var evt UserPositionSnapshotEvent
 	var posArrays []json.RawMessage
 
 	if err := json.Unmarshal(arrJson, &posArrays); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal position snapshot array: %w", err)
 	}
 
-	positions := make([]UserPosition, 0, len(posArrays))
 	for _, fields := range posArrays {
 		pos, err := parseUserPosition(fields)
 		if err != nil {
 			log.WithError(err).Warnf("failed to parse position fields: %s", fields)
 			continue
 		} else if pos != nil {
-			positions = append(positions, *pos)
+			evt.Positions = append(evt.Positions, *pos)
 		}
 	}
-	return positions, nil
+
+	return &evt, nil
 }
 
 // parseUserTrade parses a single Bitfinex user trade array into a UserTrade struct.
