@@ -122,7 +122,7 @@ func (m *CriticalBalanceDiscrepancyAlert) ObjectID() string {
 		cbdDateCache.notifyDate = now.Truncate(time.Hour * 24)
 	} else if time.Since(cbdDateCache.notifyDate) > time.Hour*24 {
 		// update the notify date cache if it's a new day
-		cbdDateCache.notifyDate = now
+		cbdDateCache.notifyDate = now.Truncate(time.Hour * 24)
 	}
 
 	dateString := cbdDateCache.notifyDate.Format(time.DateOnly)
