@@ -79,7 +79,6 @@ func NewStream(ex *Exchange) *Stream {
 	stream.OnStatusEvent(func(e *bfxapi.StatusEvent) {})
 
 	stream.OnMarketTradeEvent(func(e *bfxapi.MarketTradeEvent) {
-
 	})
 
 	stream.OnBookSnapshotEvent(func(e *bfxapi.BookSnapshotEvent) {

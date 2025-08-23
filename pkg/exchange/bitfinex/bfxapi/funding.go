@@ -79,6 +79,14 @@ func (s FundingOfferStatus) String() string {
 	return string(s)
 }
 
+type MarketFundingTrade struct {
+	ID        int64
+	CreatedAt types.MillisecondTimestamp
+	Amount    fixedpoint.Value
+	Rate      fixedpoint.Value
+	Period    int
+}
+
 // FundingTrade represents a single funding trade returned by Bitfinex.
 type FundingTrade struct {
 	ID        int64
@@ -88,8 +96,8 @@ type FundingTrade struct {
 	Amount    fixedpoint.Value
 	Rate      fixedpoint.Value
 	Period    int
-	// Placeholder field for the last element, nullable
-	Placeholder any
+
+	_ any
 }
 
 // UnmarshalJSON parses the JSON array into the FundingTrade struct fields.

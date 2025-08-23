@@ -237,7 +237,10 @@ type StatusEvent struct {
 // MarketTradeEvent represents a trade update or snapshot event.
 type MarketTradeEvent struct {
 	ChannelID int64
+	Trade     MarketTrade
+}
 
+type MarketTrade struct {
 	ID     int64
 	Time   types.MillisecondTimestamp
 	Amount fixedpoint.Value
@@ -710,7 +713,7 @@ func parseTradeEvent(channelID int64, payload json.RawMessage, arr ...[]json.Raw
 				}
 				if (msgType == "te" || msgType == "tu") && len(tradeArr) == 4 {
 					te := &MarketTradeEvent{ChannelID: channelID}
-					if err := parseRawArray(tradeArr, te, 1); err != nil {
+					if err := parseRawArray(tradeArr, &te.Trade, 0); err != nil {
 						return nil, fmt.Errorf("failed to parse trade execution event: %w", err)
 					}
 					return te, nil
@@ -772,7 +775,7 @@ func parseTradeEvent(channelID int64, payload json.RawMessage, arr ...[]json.Raw
 		trades := make([]MarketTradeEvent, 0, len(entries))
 		for _, entry := range entries {
 			te := MarketTradeEvent{ChannelID: channelID}
-			if err := parseRawArray(entry, &te, 1); err != nil {
+			if err := parseRawArray(entry, &te.Trade, 0); err != nil {
 				return nil, fmt.Errorf("failed to parse trade snapshot event: %w", err)
 			}
 
@@ -783,7 +786,7 @@ func parseTradeEvent(channelID int64, payload json.RawMessage, arr ...[]json.Raw
 
 	// update: single array
 	te := &MarketTradeEvent{ChannelID: channelID}
-	if err := parseRawArray(arrData, te, 1); err != nil {
+	if err := parseRawArray(arrData, &te.Trade, 0); err != nil {
 		return nil, fmt.Errorf("failed to parse trade update event: %w", err)
 	}
 
