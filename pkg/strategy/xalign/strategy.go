@@ -85,8 +85,10 @@ func (s *Strategy) ID() string {
 func (s *Strategy) InstanceID() string {
 	var cs []string
 
-	for cur := range s.ExpectedBalances {
-		cs = append(cs, cur)
+	if s.ExpectedBalances != nil {
+		for cur := range s.ExpectedBalances {
+			cs = append(cs, cur)
+		}
 	}
 
 	return ID + strings.Join(s.PreferredSessions, "-") + strings.Join(cs, "-")
@@ -109,17 +111,21 @@ func (s *Strategy) Defaults() error {
 		s.Duration = types.Duration(15 * time.Minute)
 	}
 
+	if s.ExpectedBalances == nil {
+		s.ExpectedBalances = make(map[string]fixedpoint.Value)
+	}
+
 	return nil
 }
 
 func (s *Strategy) Initialize() error {
 	s.activeTransferNotificationLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
-	s.deviationDetectors = make(map[string]*detector.DeviationDetector[types.Balance])
 
 	s.sessions = make(map[string]*bbgo.ExchangeSession)
 	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
 	s.orderStore = core.NewOrderStore("")
 
+	s.deviationDetectors = make(map[string]*detector.DeviationDetector[types.Balance])
 	for currency, expectedValue := range s.ExpectedBalances {
 		s.deviationDetectors[currency] = detector.NewDeviationDetector(
 			types.Balance{Currency: currency, NetAsset: expectedValue}, // Expected value
@@ -157,6 +163,10 @@ func (s *Strategy) Validate() error {
 		return errors.New("quoteCurrencies is not defined")
 	}
 
+	if s.ExpectedBalances == nil || len(s.ExpectedBalances) == 0 {
+		return errors.New("expectedBalances is not defined")
+	}
+
 	return nil
 }
 
@@ -173,7 +183,11 @@ func (s *Strategy) selectSessionForCurrency(
 	}
 
 	for _, sessionName := range s.PreferredSessions {
-		session := sessions[sessionName]
+		session, ok := sessions[sessionName]
+		if !ok {
+			log.Errorf("session %s not found, please check the preferredSessions settings", sessionName)
+			continue
+		}
 
 		for _, fromQuoteCurrency := range quoteCurrencies {
 			// skip the same currency, because there is no such USDT/USDT market
@@ -425,6 +439,10 @@ func (s *Strategy) initializePriceResolver(allMarkets types.MarketMap) *pricesol
 }
 
 func (s *Strategy) subscribePrices(sessions map[string]*bbgo.ExchangeSession) {
+	if s.ExpectedBalances == nil {
+		return
+	}
+
 	possibleQuoteCurrencies := append(s.PreferredQuoteCurrencies.Buy, s.PreferredQuoteCurrencies.Sell...)
 	for asset := range s.ExpectedBalances {
 		for _, quote := range possibleQuoteCurrencies {
@@ -449,6 +467,10 @@ func (s *Strategy) subscribePrices(sessions map[string]*bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) resetFaultBalanceRecords(currency string) {
+	if s.deviationDetectors == nil {
+		return
+	}
+
 	if d, ok := s.deviationDetectors[currency]; ok {
 		d.ClearRecords()
 	}
@@ -456,6 +478,10 @@ func (s *Strategy) resetFaultBalanceRecords(currency string) {
 
 // recordBalances records the balances for each currency in the totalBalances map.
 func (s *Strategy) recordBalances(totalBalances types.BalanceMap, now time.Time) {
+	if s.ExpectedBalances == nil {
+		return
+	}
+
 	for currency := range s.ExpectedBalances {
 		balance, hasBal := totalBalances[currency]
 		if d, ok := s.deviationDetectors[currency]; ok {
