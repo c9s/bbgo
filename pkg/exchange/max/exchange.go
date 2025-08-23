@@ -729,8 +729,8 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 }
 
 func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder) (*types.Order, error) {
-	var err error = nil
-	var order *types.Order = nil
+	var err error
+	var order *types.Order
 	var query = orderForm.AsQuery()
 	var logFields = orderForm.LogFields()
 
@@ -739,7 +739,7 @@ func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder
 	var op = func() (err2 error) {
 		order, err2 = e.QueryOrder(ctx, query)
 
-		if err2 == nil && order != nil {
+		if err2 == nil {
 			return nil
 		}
 
@@ -750,7 +750,7 @@ func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder
 			switch responseErr.StatusCode {
 			case 404:
 				// 404 not found, stop retrying
-				return nil
+				return errors.New("order still not found after EOF")
 			default:
 				if responseErr.StatusCode >= 400 && responseErr.StatusCode < 500 {
 					return err2
