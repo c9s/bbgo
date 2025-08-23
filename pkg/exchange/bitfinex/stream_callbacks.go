@@ -26,6 +26,16 @@ func (s *Stream) EmitCandleEvent(e *bfxapi.CandleEvent) {
 	}
 }
 
+func (s *Stream) OnCandleSnapshotEvent(cb func(e *bfxapi.CandleSnapshotEvent)) {
+	s.candleSnapshotEventCallbacks = append(s.candleSnapshotEventCallbacks, cb)
+}
+
+func (s *Stream) EmitCandleSnapshotEvent(e *bfxapi.CandleSnapshotEvent) {
+	for _, cb := range s.candleSnapshotEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnStatusEvent(cb func(e *bfxapi.StatusEvent)) {
 	s.statusEventCallbacks = append(s.statusEventCallbacks, cb)
 }
@@ -146,11 +156,11 @@ func (s *Stream) EmitOrderUpdateEvent(e *bfxapi.UserOrder) {
 	}
 }
 
-func (s *Stream) OnTradeUpdateEvent(cb func(e *bfxapi.UserTrade)) {
+func (s *Stream) OnTradeUpdateEvent(cb func(e *bfxapi.TradeUpdateEvent)) {
 	s.tradeUpdateEventCallbacks = append(s.tradeUpdateEventCallbacks, cb)
 }
 
-func (s *Stream) EmitTradeUpdateEvent(e *bfxapi.UserTrade) {
+func (s *Stream) EmitTradeUpdateEvent(e *bfxapi.TradeUpdateEvent) {
 	for _, cb := range s.tradeUpdateEventCallbacks {
 		cb(e)
 	}

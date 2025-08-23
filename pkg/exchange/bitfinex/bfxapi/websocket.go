@@ -205,6 +205,11 @@ type CandleEvent struct {
 	Closed    bool
 }
 
+type CandleSnapshotEvent struct {
+	ChannelID int64
+	Candles   []CandleEvent
+}
+
 // StatusEvent represents a status channel event.
 type StatusEvent struct {
 	ChannelID            int64
@@ -433,7 +438,7 @@ func (p *Parser) parseArrayMessage(message []byte) (interface{}, error) {
 			return parseUserPosition(arr[2])
 
 		case StreamTradeExecuted, StreamTradeUpdate:
-			return parseUserTrade(arr[2])
+			return parseTradeUpdate(arr[2])
 
 		case StreamFundingOfferSnapshot:
 			return parseFundingOfferSnapshot(arr[2])
@@ -451,7 +456,7 @@ func (p *Parser) parseArrayMessage(message []byte) (interface{}, error) {
 			return parseWalletSnapshot(arr[2])
 
 		case StreamWalletUpdate:
-			return parseWallet(arr[2])
+			return parseWalletUpdate(arr[2])
 
 		case StreamBalanceUpdate:
 			return parseBalanceUpdateEvent(arr[2])
@@ -644,22 +649,35 @@ func parseCandleEvent(channelID int64, payload json.RawMessage) (interface{}, er
 		if err := json.Unmarshal(payload, &entries); err != nil {
 			return nil, err
 		}
-		candles := make([]CandleEvent, 0, len(entries))
-		for _, entry := range entries {
-			ce := CandleEvent{ChannelID: channelID}
-			if err := parseRawArray(entry, &ce, 1); err != nil {
-				return nil, err
-			}
-			candles = append(candles, ce)
-		}
-		return candles, nil
+
+		return parseCandleSnapshotEvent(channelID, entries)
 	}
+
 	// update: single array
 	ce := &CandleEvent{ChannelID: channelID}
 	if err := parseRawArray(arrData, ce, 1); err != nil {
 		return nil, err
 	}
 	return ce, nil
+}
+
+func parseCandleSnapshotEvent(channelID int64, entries [][]json.RawMessage) (*CandleSnapshotEvent, error) {
+	var snapshot = CandleSnapshotEvent{ChannelID: channelID}
+
+	for _, entry := range entries {
+		if len(entry) != 6 {
+			continue
+		}
+
+		ce := CandleEvent{ChannelID: channelID}
+		if err := parseRawArray(entry, &ce, 1); err != nil {
+			return nil, err
+		}
+
+		snapshot.Candles = append(snapshot.Candles, ce)
+	}
+
+	return &snapshot, nil
 }
 
 // parseStatusEvent parses status update.
@@ -900,9 +918,9 @@ func parseUserPositionSnapshot(arrJson json.RawMessage) (*UserPositionSnapshotEv
 	return &evt, nil
 }
 
-// parseUserTrade parses a single Bitfinex user trade array into a UserTrade struct.
-func parseUserTrade(fields json.RawMessage) (*UserTrade, error) {
-	var trade UserTrade
+// parseTradeUpdate parses a single Bitfinex user trade array into a TradeUpdateEvent struct.
+func parseTradeUpdate(fields json.RawMessage) (*TradeUpdateEvent, error) {
+	var trade TradeUpdateEvent
 	if err := parseJsonArray(fields, &trade, 0); err != nil {
 		return nil, err
 	}
@@ -918,7 +936,7 @@ func parseWalletSnapshot(arrJson json.RawMessage) (*WalletSnapshotEvent, error) 
 
 	wallets := make([]Wallet, 0, len(walletArrs))
 	for _, fields := range walletArrs {
-		wallet, err := parseWallet(fields)
+		wallet, err := parseWalletUpdate(fields)
 		if err != nil {
 			log.WithError(err).Warnf("failed to parse wallet fields: %s", fields)
 			continue
@@ -932,8 +950,8 @@ func parseWalletSnapshot(arrJson json.RawMessage) (*WalletSnapshotEvent, error) 
 	}, nil
 }
 
-// parseWallet parses Bitfinex wallet update message into Wallet.
-func parseWallet(arrJson json.RawMessage) (*Wallet, error) {
+// parseWalletUpdate parses Bitfinex wallet update message into Wallet.
+func parseWalletUpdate(arrJson json.RawMessage) (*Wallet, error) {
 	var wallet Wallet
 	if err := parseJsonArray(arrJson, &wallet, 0); err != nil {
 		return nil, fmt.Errorf("failed to parse wallet update fields: %w", err)
@@ -985,8 +1003,8 @@ type UserOrder struct {
 	Meta          map[string]any   // [31] META (object)
 }
 
-// UserTrade represents a Bitfinex user trade from private WS API.
-type UserTrade struct {
+// TradeUpdateEvent represents a Bitfinex user trade from private WS API.
+type TradeUpdateEvent struct {
 	ID         int64                      // [0] TRADE ID
 	Symbol     string                     // [1] SYMBOL
 	Time       types.MillisecondTimestamp // [2] MTS_CREATE

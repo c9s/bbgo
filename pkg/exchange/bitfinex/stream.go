@@ -23,12 +23,15 @@ type Stream struct {
 
 	depthBuffers map[string]*depth.Buffer
 
-	tickerEventCallbacks              []func(e *bfxapi.TickerEvent)
-	candleEventCallbacks              []func(e *bfxapi.CandleEvent)
-	statusEventCallbacks              []func(e *bfxapi.StatusEvent)
-	marketTradeEventCallbacks         []func(e *bfxapi.MarketTradeEvent)
-	bookUpdateEventCallbacks          []func(e *bfxapi.BookUpdateEvent)
-	bookSnapshotEventCallbacks        []func(e *bfxapi.BookSnapshotEvent)
+	tickerEventCallbacks         []func(e *bfxapi.TickerEvent)
+	candleSnapshotEventCallbacks []func(e *bfxapi.CandleSnapshotEvent)
+	candleEventCallbacks         []func(e *bfxapi.CandleEvent)
+
+	statusEventCallbacks       []func(e *bfxapi.StatusEvent)
+	marketTradeEventCallbacks  []func(e *bfxapi.MarketTradeEvent)
+	bookUpdateEventCallbacks   []func(e *bfxapi.BookUpdateEvent)
+	bookSnapshotEventCallbacks []func(e *bfxapi.BookSnapshotEvent)
+
 	fundingBookEventCallbacks         []func(e *bfxapi.FundingBookUpdateEvent)
 	fundingBookSnapshotEventCallbacks []func(e *bfxapi.FundingBookSnapshotEvent)
 
@@ -39,7 +42,7 @@ type Stream struct {
 
 	orderSnapshotEventCallbacks []func(e *bfxapi.UserOrderSnapshotEvent)
 	orderUpdateEventCallbacks   []func(e *bfxapi.UserOrder)
-	tradeUpdateEventCallbacks   []func(e *bfxapi.UserTrade)
+	tradeUpdateEventCallbacks   []func(e *bfxapi.TradeUpdateEvent)
 
 	parser *bfxapi.Parser
 	logger logrus.FieldLogger
@@ -84,7 +87,7 @@ func NewStream(ex *Exchange) *Stream {
 		}
 	})
 
-	stream.OnTradeUpdateEvent(func(e *bfxapi.UserTrade) {
+	stream.OnTradeUpdateEvent(func(e *bfxapi.TradeUpdateEvent) {
 		trade := convertWsUserTrade(e)
 		if trade != nil {
 			stream.EmitTradeUpdate(*trade)
@@ -137,12 +140,6 @@ func (s *Stream) onConnect() {
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch evt := e.(type) {
 
-	case *bfxapi.BookUpdateEvent: // book snapshot
-		s.EmitBookUpdateEvent(evt)
-
-	case *bfxapi.BookSnapshotEvent:
-		s.EmitBookSnapshotEvent(evt)
-
 	case *bfxapi.WalletSnapshotEvent:
 		s.EmitWalletSnapshotEvent(evt)
 
@@ -161,8 +158,36 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	case *bfxapi.UserOrder:
 		s.EmitOrderUpdateEvent(evt)
 
-	case *bfxapi.UserTrade:
+	case *bfxapi.TradeUpdateEvent:
 		s.EmitTradeUpdateEvent(evt)
+
+	/* public data event */
+	case *bfxapi.TickerEvent:
+		s.EmitTickerEvent(evt)
+
+	case *bfxapi.CandleSnapshotEvent:
+		s.EmitCandleSnapshotEvent(evt)
+
+	case *bfxapi.CandleEvent:
+		s.EmitCandleEvent(evt)
+
+	case *bfxapi.BookUpdateEvent:
+		s.EmitBookUpdateEvent(evt)
+
+	case *bfxapi.BookSnapshotEvent:
+		s.EmitBookSnapshotEvent(evt)
+
+	case *bfxapi.StatusEvent:
+		s.EmitStatusEvent(evt)
+
+	case *bfxapi.MarketTradeEvent:
+		s.EmitMarketTradeEvent(evt)
+
+	case *bfxapi.FundingBookSnapshotEvent:
+		s.EmitFundingBookSnapshotEvent(evt)
+
+	case *bfxapi.FundingBookUpdateEvent:
+		s.EmitFundingBookEvent(evt)
 
 	default:
 		s.logger.Warnf("unhandled %T event: %+v", evt, evt)
@@ -211,9 +236,9 @@ func convertWsUserOrder(uo *bfxapi.UserOrder) *types.Order {
 	}
 }
 
-// convertWsUserTrade converts a Bitfinex websocket UserTrade to a types.Trade.
-// It maps fields from *bfxapi.UserTrade to types.Trade.
-func convertWsUserTrade(ut *bfxapi.UserTrade) *types.Trade {
+// convertWsUserTrade converts a Bitfinex websocket TradeUpdateEvent to a types.Trade.
+// It maps fields from *bfxapi.TradeUpdateEvent to types.Trade.
+func convertWsUserTrade(ut *bfxapi.TradeUpdateEvent) *types.Trade {
 	return &types.Trade{
 		ID:       uint64(ut.ID),
 		OrderID:  uint64(ut.OrderID),

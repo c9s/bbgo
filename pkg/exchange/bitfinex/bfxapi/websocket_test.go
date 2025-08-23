@@ -160,7 +160,7 @@ func TestParserParseFromFile(t *testing.T) {
 
 			case *UserPositionSnapshotEvent:
 
-			case *UserTrade:
+			case *TradeUpdateEvent:
 				numUserTrade++
 				assert.NotZero(t, tr.ID)
 				assert.NotEmpty(t, tr.Symbol)
@@ -232,6 +232,8 @@ func TestParserParseFromFile(t *testing.T) {
 				assert.NotZero(t, tr.ChannelID)
 				assert.False(t, tr.Ask.IsZero())
 				assert.False(t, tr.Bid.IsZero())
+			case *CandleSnapshotEvent:
+
 			case *FundingTickerEvent:
 				assert.NotZero(t, tr.ChannelID)
 				assert.False(t, tr.FRR.IsZero())
@@ -437,7 +439,7 @@ func TestParser_Parse(t *testing.T) {
 		msg, err := p.Parse([]byte(body))
 		assert.NoError(t, err)
 		if assert.NotNil(t, msg) {
-			trade, ok := msg.(*UserTrade)
+			trade, ok := msg.(*TradeUpdateEvent)
 			assert.True(t, ok, "expected TradeUpdate type")
 			assert.Equal(t, int64(17972), trade.ID)
 			assert.Equal(t, "tBTCUSD", trade.Symbol)
@@ -461,7 +463,7 @@ func TestParser_Parse(t *testing.T) {
 		msg, err := p.Parse([]byte(body))
 		assert.NoError(t, err)
 		if assert.NotNil(t, msg) {
-			trade, ok := msg.(*UserTrade)
+			trade, ok := msg.(*TradeUpdateEvent)
 			assert.True(t, ok, "expected TradeExecute type")
 			assert.Equal(t, int64(17972), trade.ID)
 			assert.Equal(t, "tBTCUSD", trade.Symbol)
