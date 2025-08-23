@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/envvar"
@@ -18,10 +19,15 @@ import (
 )
 
 var DefaultSubmitOrderRetryTimeout = 5 * time.Minute
+var batchOrderConcurrent = false
 
 func init() {
 	if du, ok := envvar.Duration("BBGO_SUBMIT_ORDER_RETRY_TIMEOUT", 5*time.Minute); ok && du > 0 {
 		DefaultSubmitOrderRetryTimeout = du
+	}
+
+	if value, ok := envvar.Bool("BBGO_BATCH_ORDER_ENABLE_CONCURRENT"); ok {
+		batchOrderConcurrent = value
 	}
 }
 
@@ -321,30 +327,59 @@ func (c *BasicRiskController) ProcessOrders(
 
 type OrderCallback func(order types.Order)
 
+type batchOrderStatus struct {
+	Index int
+	Order *types.Order
+	Err   error
+}
+
 // BatchPlaceOrder
 func BatchPlaceOrder(
 	ctx context.Context, exchange types.Exchange, orderCallback OrderCallback, submitOrders ...types.SubmitOrder,
 ) (types.OrderSlice, []int, error) {
-	var createdOrders types.OrderSlice
-	var err error
+	results := make([]batchOrderStatus, len(submitOrders))
 
-	var errIndexes []int
-	for i, submitOrder := range submitOrders {
-		createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrder)
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-			errIndexes = append(errIndexes, i)
+	submitOrder := func(i int, order types.SubmitOrder, execCtx context.Context) {
+		createdOrder, err := exchange.SubmitOrder(execCtx, order)
+		if orderCallback != nil && createdOrder != nil && createdOrder.OrderID > 0 {
+			createdOrder.Tag = order.Tag
+			orderCallback(*createdOrder)
 		}
 
-		// if createdOrder is not nil and has a valid OrderID, we should add it to the createdOrders
-		if createdOrder != nil && createdOrder.OrderID > 0 {
-			createdOrder.Tag = submitOrder.Tag
+		results[i] = batchOrderStatus{Index: i, Order: createdOrder, Err: err}
+	}
 
-			if orderCallback != nil {
-				orderCallback(*createdOrder)
-			}
+	if batchOrderConcurrent {
+		g, gCtx := errgroup.WithContext(ctx)
+		for i, order := range submitOrders {
+			i, order := i, order
+			g.Go(func() error {
+				submitOrder(i, order, gCtx)
+				return nil
+			})
+		}
 
-			createdOrders = append(createdOrders, *createdOrder)
+		if err := g.Wait(); err != nil {
+			log.Errorf("failed to place batch orders: %v", err)
+		}
+	} else {
+		for i, order := range submitOrders {
+			submitOrder(i, order, ctx)
+		}
+	}
+
+	var (
+		createdOrders types.OrderSlice
+		errIndexes    []int
+		err           error
+	)
+
+	for _, result := range results {
+		if result.Err != nil {
+			err = multierr.Append(err, result.Err)
+			errIndexes = append(errIndexes, result.Index)
+		} else if result.Order != nil {
+			createdOrders = append(createdOrders, *result.Order)
 		}
 	}
 

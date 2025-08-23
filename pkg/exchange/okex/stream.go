@@ -202,7 +202,7 @@ func (s *Stream) subscribePrivateChannels(next func()) func() {
 		instType := s.exchange.getInstrumentType()
 		var subs = []WebsocketSubscription{
 			{Channel: ChannelAccount},
-			{Channel: "orders", InstrumentType: string(instType)},
+			{Channel: ChannelOrderTrades, InstrumentType: string(instType)},
 		}
 
 		// https://www.okx.com/docs-v5/zh/#overview-websocket-connect
