@@ -117,18 +117,15 @@ func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
 }
 
 func (m *CriticalBalanceDiscrepancyAlert) ObjectID() string {
+	now := time.Now()
 	if cbdDateCache.notifyDate.IsZero() {
-		cbdDateCache.notifyDate = time.Now().Round(time.Hour * 24)
-	}
-	var dateString string
-	currentTime := time.Now()
-	if currentTime.Sub(cbdDateCache.notifyDate) <= time.Hour*24 {
-		dateString = cbdDateCache.notifyDate.Format(time.DateOnly)
-	} else {
-		cbdDateCache.notifyDate = currentTime
-		dateString = currentTime.Format(time.DateOnly)
+		cbdDateCache.notifyDate = now.Truncate(time.Hour * 24)
+	} else if time.Since(cbdDateCache.notifyDate) > time.Hour*24 {
+		// update the notify date cache if it's a new day
+		cbdDateCache.notifyDate = now
 	}
 
+	dateString := cbdDateCache.notifyDate.Format(time.DateOnly)
 	return fmt.Sprintf(
 		"critical-balance-discrepancy-%s%s-%s-%s",
 		m.BaseCurrency,
