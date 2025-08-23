@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"sort"
@@ -678,11 +679,24 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		}
 	}
 
+	logger := log.WithFields(o.LogFields())
 	retOrder, err := req.Do(ctx)
 	if err != nil {
+		logger.WithError(err).Errorf("submit order error, now trying to recover the order: %+v", o)
+
+		if errors.Is(err, io.EOF) {
+			recoveredOrder, recoverErr := e.recoverOrder(ctx, o)
+			if recoverErr != nil {
+				return nil, fmt.Errorf("unable to recover order, error: %w", recoverErr)
+			}
+
+			// note, recoveredOrder could be nil if the order is not found
+			return recoveredOrder, nil
+		}
+
 		var responseErr *requestgen.ErrResponse
 		if errors.As(err, &responseErr) {
-			log.WithFields(o.LogFields()).Warnf("submit order error: %s, status code: %d, now trying to recover the order with query %+v",
+			logger.WithError(err).Errorf("submit order api responded an error: %s, status code: %d, now trying to recover the order with query %+v",
 				responseErr.Error(),
 				responseErr.StatusCode,
 				o.AsQuery(),
@@ -691,7 +705,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 			if responseErr.StatusCode >= 400 {
 				recoveredOrder, recoverErr := e.recoverOrder(ctx, o)
 				if recoverErr != nil {
-					return createdOrder, fmt.Errorf("unable to recover order, error: %w", recoverErr)
+					return nil, fmt.Errorf("unable to recover order, error: %w", recoverErr)
 				}
 
 				// note, recoveredOrder could be nil if the order is not found
@@ -703,7 +717,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	}
 
 	if retOrder == nil {
-		return createdOrder, errors.New("returned nil order")
+		return createdOrder, errors.New("api returned a nil order")
 	}
 
 	createdOrder, err = toGlobalOrder(*retOrder)
