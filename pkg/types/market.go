@@ -328,11 +328,13 @@ func (m MarketMap) FindPair(asset, quote string) (Market, bool) {
 }
 
 // FindAssetMarkets returns the markets that contains the given asset
-func (m MarketMap) FindAssetMarkets(asset string) MarketMap {
+func (m MarketMap) FindAssetMarkets(assets ...string) MarketMap {
 	var markets = make(MarketMap)
 	for symbol, market := range m {
-		if market.BaseCurrency == asset {
-			markets[symbol] = market
+		for _, asset := range assets {
+			if market.BaseCurrency == asset {
+				markets[symbol] = market
+			}
 		}
 	}
 
