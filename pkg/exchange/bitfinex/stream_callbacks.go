@@ -16,22 +16,22 @@ func (s *Stream) EmitTickerEvent(e *bfxapi.TickerEvent) {
 	}
 }
 
-func (s *Stream) OnCandleEvent(cb func(e *bfxapi.CandleEvent)) {
-	s.candleEventCallbacks = append(s.candleEventCallbacks, cb)
-}
-
-func (s *Stream) EmitCandleEvent(e *bfxapi.CandleEvent) {
-	for _, cb := range s.candleEventCallbacks {
-		cb(e)
-	}
-}
-
 func (s *Stream) OnCandleSnapshotEvent(cb func(e *bfxapi.CandleSnapshotEvent)) {
 	s.candleSnapshotEventCallbacks = append(s.candleSnapshotEventCallbacks, cb)
 }
 
 func (s *Stream) EmitCandleSnapshotEvent(e *bfxapi.CandleSnapshotEvent) {
 	for _, cb := range s.candleSnapshotEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnCandleEvent(cb func(e *bfxapi.CandleEvent)) {
+	s.candleEventCallbacks = append(s.candleEventCallbacks, cb)
+}
+
+func (s *Stream) EmitCandleEvent(e *bfxapi.CandleEvent) {
+	for _, cb := range s.candleEventCallbacks {
 		cb(e)
 	}
 }
@@ -46,12 +46,22 @@ func (s *Stream) EmitStatusEvent(e *bfxapi.StatusEvent) {
 	}
 }
 
-func (s *Stream) OnMarketTradeEvent(cb func(e *bfxapi.PublicTradeEvent)) {
-	s.marketTradeEventCallbacks = append(s.marketTradeEventCallbacks, cb)
+func (s *Stream) OnPublicTradeEvent(cb func(e *bfxapi.PublicTradeEvent)) {
+	s.publicTradeEventCallbacks = append(s.publicTradeEventCallbacks, cb)
 }
 
-func (s *Stream) EmitMarketTradeEvent(e *bfxapi.PublicTradeEvent) {
-	for _, cb := range s.marketTradeEventCallbacks {
+func (s *Stream) EmitPublicTradeEvent(e *bfxapi.PublicTradeEvent) {
+	for _, cb := range s.publicTradeEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnPublicTradeSnapshotEvent(cb func(e *bfxapi.PublicTradeSnapshotEvent)) {
+	s.publicTradeSnapshotEventCallbacks = append(s.publicTradeSnapshotEventCallbacks, cb)
+}
+
+func (s *Stream) EmitPublicTradeSnapshotEvent(e *bfxapi.PublicTradeSnapshotEvent) {
+	for _, cb := range s.publicTradeSnapshotEventCallbacks {
 		cb(e)
 	}
 }

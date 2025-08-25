@@ -27,8 +27,11 @@ type Stream struct {
 	candleSnapshotEventCallbacks []func(e *bfxapi.CandleSnapshotEvent)
 	candleEventCallbacks         []func(e *bfxapi.CandleEvent)
 
-	statusEventCallbacks       []func(e *bfxapi.StatusEvent)
-	marketTradeEventCallbacks  []func(e *bfxapi.PublicTradeEvent)
+	statusEventCallbacks []func(e *bfxapi.StatusEvent)
+
+	publicTradeEventCallbacks         []func(e *bfxapi.PublicTradeEvent)
+	publicTradeSnapshotEventCallbacks []func(e *bfxapi.PublicTradeSnapshotEvent)
+
 	bookUpdateEventCallbacks   []func(e *bfxapi.BookUpdateEvent)
 	bookSnapshotEventCallbacks []func(e *bfxapi.BookSnapshotEvent)
 
@@ -214,7 +217,10 @@ func (s *Stream) dispatchEvent(e interface{}) {
 		s.EmitStatusEvent(evt)
 
 	case *bfxapi.PublicTradeEvent:
-		s.EmitMarketTradeEvent(evt)
+		s.EmitPublicTradeEvent(evt)
+
+	case *bfxapi.PublicTradeSnapshotEvent:
+		s.EmitPublicTradeSnapshotEvent(evt)
 
 	case *bfxapi.FundingBookSnapshotEvent:
 		s.EmitFundingBookSnapshotEvent(evt)
