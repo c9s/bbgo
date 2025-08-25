@@ -292,10 +292,9 @@ func TestParserParseFromFile(t *testing.T) {
 
 		t.Logf("total parse errors: %d", errorCount)
 	})
-
 }
 
-func TestParser_Parse(t *testing.T) {
+func TestParser_ParsePrivateMessages(t *testing.T) {
 	t.Run("auth response", func(t *testing.T) {
 		body := `{"event":"auth","status":"OK","chanId":0,"userId":99999,"auth_id":"0c9d85ec-1eef-4079-9703-1f2ef19feb90","caps":{"bfxpay":{"read":0,"write":0},"orders":{"read":1,"write":1},"account":{"read":1,"write":0},"funding":{"read":1,"write":1},"history":{"read":1,"write":0},"wallets":{"read":1,"write":0},"settings":{"read":1,"write":0},"withdraw":{"read":0,"write":0},"positions":{"read":1,"write":1},"ui_withdraw":{"read":0,"write":0}}}`
 		p := NewParser()
@@ -750,4 +749,83 @@ func newLimitOrderRequest(client *Client, symbol string, price fixedpoint.Value)
 
 func n(value float64) fixedpoint.Value {
 	return fixedpoint.NewFromFloat(value)
+}
+
+func TestParser_ParsePublicTradeMessages(t *testing.T) {
+	t.Run("public trade snapshot - trading pair", func(t *testing.T) {
+		body := `[17470,[[401597393,1574694475039,0.005,7244.9],[401597394,1574694476000,-0.002,7245.0]]]`
+		p := NewParser()
+		p.registerChannel(17470, ChannelTrades)
+		msg, err := p.Parse([]byte(body))
+		assert.NoError(t, err)
+		if assert.NotNil(t, msg) {
+			snapshot, ok := msg.(*PublicTradeSnapshotEvent)
+			assert.True(t, ok, "expected PublicTradeSnapshotEvent type")
+			assert.Len(t, snapshot.Trades, 2)
+			assert.Equal(t, int64(401597393), snapshot.Trades[0].ID)
+			assert.Equal(t, int64(1574694475039), snapshot.Trades[0].Time.Time().UnixMilli())
+			assert.InDelta(t, 0.005, snapshot.Trades[0].Amount.Float64(), 1e-8)
+			assert.InDelta(t, 7244.9, snapshot.Trades[0].Price.Float64(), 1e-8)
+			assert.Equal(t, int64(401597394), snapshot.Trades[1].ID)
+			assert.InDelta(t, -0.002, snapshot.Trades[1].Amount.Float64(), 1e-8)
+			assert.InDelta(t, 7245.0, snapshot.Trades[1].Price.Float64(), 1e-8)
+		}
+	})
+
+	t.Run("public trade snapshot - funding currency", func(t *testing.T) {
+		body := `[339521,[[133323072,1574694245478,-258.7458086,0.0002587,2],[133323073,1574694246000,100.0,0.0002600,30]]]`
+		p := NewParser()
+		p.registerChannel(339521, ChannelTrades)
+		msg, err := p.Parse([]byte(body))
+		assert.NoError(t, err)
+		if assert.NotNil(t, msg) {
+			snapshot, ok := msg.(*PublicFundingTradeSnapshotEvent)
+			assert.True(t, ok, "expected PublicFundingTradeSnapshotEvent type")
+			assert.Len(t, snapshot.Trades, 2)
+			assert.Equal(t, int64(133323072), snapshot.Trades[0].ID)
+			assert.Equal(t, int64(1574694245478), snapshot.Trades[0].CreatedAt.Time().UnixMilli())
+			assert.InDelta(t, -258.7458086, snapshot.Trades[0].Amount.Float64(), 1e-8)
+			assert.InDelta(t, 0.0002587, snapshot.Trades[0].Rate.Float64(), 1e-8)
+			assert.Equal(t, (2), snapshot.Trades[0].Period)
+			assert.Equal(t, int64(133323073), snapshot.Trades[1].ID)
+			assert.InDelta(t, 100.0, snapshot.Trades[1].Amount.Float64(), 1e-8)
+			assert.InDelta(t, 0.0002600, snapshot.Trades[1].Rate.Float64(), 1e-8)
+			assert.Equal(t, (30), snapshot.Trades[1].Period)
+		}
+	})
+
+	t.Run("public trade execute - trading pair", func(t *testing.T) {
+		body := `[17470,"te",[401597395,1574694478808,0.005,7245.3]]`
+		p := NewParser()
+		p.registerChannel(17470, ChannelTrades)
+		msg, err := p.Parse([]byte(body))
+		assert.NoError(t, err)
+		if assert.NotNil(t, msg) {
+			event, ok := msg.(*PublicTradeEvent)
+			assert.True(t, ok, "expected PublicTradeEvent type")
+			assert.Equal(t, int64(17470), event.ChannelID)
+			assert.Equal(t, int64(401597395), event.Trade.ID)
+			assert.Equal(t, int64(1574694478808), event.Trade.Time.Time().UnixMilli())
+			assert.InDelta(t, 0.005, event.Trade.Amount.Float64(), 1e-8)
+			assert.InDelta(t, 7245.3, event.Trade.Price.Float64(), 1e-8)
+		}
+	})
+
+	t.Run("public funding trade execute", func(t *testing.T) {
+		body := `[337371,"fte",[133323543,1574694605000,-59.84,0.00023647,2]]`
+		p := NewParser()
+		p.registerChannel(337371, ChannelTrades)
+		msg, err := p.Parse([]byte(body))
+		assert.NoError(t, err)
+		if assert.NotNil(t, msg) {
+			event, ok := msg.(*PublicFundingTradeEvent)
+			assert.True(t, ok, "expected PublicFundingTradeEvent type")
+			assert.Equal(t, int64(337371), event.ChannelID)
+			assert.Equal(t, int64(133323543), event.Trade.ID)
+			assert.Equal(t, int64(1574694605000), event.Trade.CreatedAt.Time().UnixMilli())
+			assert.InDelta(t, -59.84, event.Trade.Amount.Float64(), 1e-8)
+			assert.InDelta(t, 0.00023647, event.Trade.Rate.Float64(), 1e-8)
+			assert.Equal(t, (2), event.Trade.Period)
+		}
+	})
 }

@@ -241,6 +241,10 @@ type PublicTradeEvent struct {
 	Trade PublicTrade
 }
 
+type PublicTradeSnapshotEvent struct {
+	Trades []PublicTrade
+}
+
 type PublicTrade struct {
 	ID     int64
 	Time   types.MillisecondTimestamp
@@ -253,6 +257,10 @@ type PublicFundingTradeEvent struct {
 	ChannelID int64
 
 	Trade PublicFundingTrade
+}
+
+type PublicFundingTradeSnapshotEvent struct {
+	Trades []PublicFundingTrade
 }
 
 // HeartBeatEvent represents a heartbeat event from Bitfinex WebSocket.
@@ -693,51 +701,9 @@ func parseStatusEvent(channelID int64, payload json.RawMessage) (interface{}, er
 
 // parseTradeEvent parses trade update or snapshot, including trade execution events ("te", "fte") and funding trade snapshot events.
 // If arr is provided and arr[1] is "te" or "fte", it parses arr[2] as a trade execution event.
-func parseTradeEvent(channelID int64, payload json.RawMessage, arr ...[]json.RawMessage) (interface{}, error) {
-	if len(arr) > 0 && len(arr[0]) > 1 {
-		var msgType string
-		if err := json.Unmarshal(arr[0][1], &msgType); err == nil {
-			// parse trade execution event
-			var tradeArr []json.RawMessage
-			if err := json.Unmarshal(arr[0][2], &tradeArr); err != nil {
-				return nil, err
-			}
-
-			switch msgType {
-			case "fte", "ftu":
-				if len(tradeArr) < 5 {
-					return nil, fmt.Errorf("unexpected funding trade execution array length: %d", len(tradeArr))
-				}
-
-				event := &PublicFundingTradeEvent{ChannelID: channelID}
-				if err := parseRawArray(tradeArr, &event.Trade, 0); err != nil {
-					return nil, fmt.Errorf("failed to parse funding trade execution event: %w", err)
-				}
-				return event, nil
-
-			case "te", "tu":
-				if len(tradeArr) < 4 {
-					return nil, fmt.Errorf("unexpected trade execution array length: %d", len(tradeArr))
-				}
-
-				event := &PublicTradeEvent{ChannelID: channelID}
-				if err := parseRawArray(tradeArr, &event.Trade, 0); err != nil {
-					return nil, fmt.Errorf("failed to parse trade execution event: %w", err)
-				}
-				return event, nil
-			}
-
-		}
-	}
-
-	// snapshot: array of arrays
-	var arrData []json.RawMessage
-	if err := json.Unmarshal(payload, &arrData); err != nil {
-		log.WithError(err).Errorf("unable to parse trade snapshot: %s", payload)
-		return nil, fmt.Errorf("failed to parse trade snapshot: %w", err)
-	}
-
-	if len(arrData) > 0 && arrData[0][0] == '[' {
+func parseTradeEvent(channelID int64, payload json.RawMessage, arr []json.RawMessage) (interface{}, error) {
+	// if it looks like a nested array: [[...], [...], ...]
+	if payload[0] == '[' {
 		var entries [][]json.RawMessage
 		if err := json.Unmarshal(payload, &entries); err != nil {
 			log.WithError(err).Errorf(
@@ -748,13 +714,16 @@ func parseTradeEvent(channelID int64, payload json.RawMessage, arr ...[]json.Raw
 			return nil, fmt.Errorf("failed to parse trade snapshot: %w", err)
 		}
 
-		// determine if funding trade snapshot by entry length
-		if len(entries) > 0 && len(entries[0]) == 5 {
-			fundingTrades := make([]PublicFundingTradeEvent, 0, len(entries))
-			for _, entry := range entries {
-				fte := PublicFundingTradeEvent{ChannelID: channelID}
-				if err := parseRawArray(entry, &fte, 1); err != nil {
+		if len(entries) == 0 {
+			return nil, nil
+		}
 
+		// determine if funding trade snapshot by entry length
+		if len(entries[0]) == 5 {
+			fundingTrades := make([]PublicFundingTrade, 0, len(entries))
+			for _, entry := range entries {
+				var fte PublicFundingTrade
+				if err := parseRawArray(entry, &fte, 0); err != nil {
 					log.WithError(err).Errorf(
 						"unable to parse funding trade snapshot entry: %s",
 						entry,
@@ -766,29 +735,69 @@ func parseTradeEvent(channelID int64, payload json.RawMessage, arr ...[]json.Raw
 				fundingTrades = append(fundingTrades, fte)
 			}
 
-			return fundingTrades, nil
-		}
+			return &PublicFundingTradeSnapshotEvent{
+				Trades: fundingTrades,
+			}, nil
+		} else if len(entries[0]) == 4 {
+			// normal market trade snapshot (4 fields)
+			trades := make([]PublicTrade, 0, len(entries))
+			for _, entry := range entries {
+				var trade PublicTrade
+				if err := parseRawArray(entry, &trade, 0); err != nil {
+					return nil, fmt.Errorf("failed to parse trade snapshot event: %w", err)
+				}
 
-		// normal market trade snapshot (4 fields)
-		trades := make([]PublicTradeEvent, 0, len(entries))
-		for _, entry := range entries {
-			te := PublicTradeEvent{ChannelID: channelID}
-			if err := parseRawArray(entry, &te.Trade, 0); err != nil {
-				return nil, fmt.Errorf("failed to parse trade snapshot event: %w", err)
+				trades = append(trades, trade)
 			}
 
-			trades = append(trades, te)
+			return &PublicTradeSnapshotEvent{Trades: trades}, nil
+		} else {
+			return nil, fmt.Errorf("unexpected trade snapshot entry length: %d", len(entries[0]))
 		}
-		return trades, nil
 	}
 
-	// update: single array
-	te := &PublicTradeEvent{ChannelID: channelID}
-	if err := parseRawArray(arrData, &te.Trade, 0); err != nil {
-		return nil, fmt.Errorf("failed to parse trade update event: %w", err)
+	var msgType string
+	if err := json.Unmarshal(payload, &msgType); err != nil {
+		return nil, fmt.Errorf("failed to parse trade message type as a string: %w", err)
 	}
 
-	return te, nil
+	if len(arr) == 0 || len(arr) < 3 {
+		return nil, fmt.Errorf("invalid trade message format, empty payload, input: %s", arr)
+	}
+
+	// parse trade execution event
+	var tradeArr []json.RawMessage
+	if err := json.Unmarshal(arr[2], &tradeArr); err != nil {
+		return nil, err
+	}
+
+	switch msgType {
+	case "fte", "ftu":
+		if len(tradeArr) < 5 {
+			return nil, fmt.Errorf("unexpected funding trade execution array length: %d", len(tradeArr))
+		}
+
+		event := &PublicFundingTradeEvent{ChannelID: channelID}
+		if err := parseRawArray(tradeArr, &event.Trade, 0); err != nil {
+			return nil, fmt.Errorf("failed to parse funding trade event: %w", err)
+		}
+		return event, nil
+
+	case "te", "tu":
+		if len(tradeArr) < 4 {
+			return nil, fmt.Errorf("unexpected trade array length: %d", len(tradeArr))
+		}
+
+		event := &PublicTradeEvent{ChannelID: channelID}
+		if err := parseRawArray(tradeArr, &event.Trade, 0); err != nil {
+			return nil, fmt.Errorf("failed to parse trade event: %w", err)
+		}
+
+		return event, nil
+
+	default:
+		return nil, fmt.Errorf("unknown trade message type: %s", msgType)
+	}
 }
 
 // WebSocketAuthRequest represents Bitfinex private websocket authentication request.
