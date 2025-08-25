@@ -310,22 +310,27 @@ func (c *AuthCaps) UnmarshalJSON(data []byte) error {
 
 // Parser maintains channelID mapping and parses Bitfinex messages.
 type Parser struct {
-	mu         sync.RWMutex
+	mu sync.RWMutex
+
 	channelMap map[int64]Channel // channelID -> channelType
+
+	channelResponseMap map[int64]*WebSocketResponse // channelID -> WebSocketResponse
 }
 
 // NewParser creates a new Bitfinex Parser.
 func NewParser() *Parser {
 	return &Parser{
-		channelMap: make(map[int64]Channel),
+		channelMap:         make(map[int64]Channel),
+		channelResponseMap: make(map[int64]*WebSocketResponse),
 	}
 }
 
 // registerChannel registers a channelID and its type.
-func (p *Parser) registerChannel(channelID int64, channelType Channel) {
+func (p *Parser) registerChannel(channelID int64, channelType Channel, resp *WebSocketResponse) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.channelMap[channelID] = channelType
+	p.channelResponseMap[channelID] = resp
 }
 
 // unregisterChannel removes a channelID from the mapping.
@@ -333,6 +338,7 @@ func (p *Parser) unregisterChannel(channelID int64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	delete(p.channelMap, channelID)
+	delete(p.channelResponseMap, channelID)
 }
 
 // getChannelType returns the channel type for a channelID.
@@ -341,6 +347,13 @@ func (p *Parser) getChannelType(channelID int64) (Channel, bool) {
 	defer p.mu.RUnlock()
 	typeStr, ok := p.channelMap[channelID]
 	return typeStr, ok
+}
+
+func (p *Parser) getChannelResponse(channelID int64) (*WebSocketResponse, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	resp, ok := p.channelResponseMap[channelID]
+	return resp, ok
 }
 
 // isJSONObject returns true if the message starts with '{'.
@@ -386,18 +399,19 @@ func (p *Parser) parseObjectMessage(message []byte) (interface{}, error) {
 	if resp.ChanId != nil && resp.Channel != "" {
 		switch v := resp.ChanId.(type) {
 		case int64:
-			p.registerChannel(v, resp.Channel)
+			p.registerChannel(v, resp.Channel, &resp)
 		case float64:
-			p.registerChannel(int64(v), resp.Channel)
+			p.registerChannel(int64(v), resp.Channel, &resp)
 		case string:
 			channelID, err := strconv.ParseInt(v, 10, 64)
 			if err == nil {
-				p.registerChannel(channelID, resp.Channel)
+				p.registerChannel(channelID, resp.Channel, &resp)
 			}
 		default:
 			return nil, fmt.Errorf("unknown channel ID type: %T", v)
 		}
 	}
+
 	return &resp, nil
 }
 

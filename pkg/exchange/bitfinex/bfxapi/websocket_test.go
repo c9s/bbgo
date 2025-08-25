@@ -755,7 +755,7 @@ func TestParser_ParsePublicTradeMessages(t *testing.T) {
 	t.Run("public trade snapshot - trading pair", func(t *testing.T) {
 		body := `[17470,[[401597393,1574694475039,0.005,7244.9],[401597394,1574694476000,-0.002,7245.0]]]`
 		p := NewParser()
-		p.registerChannel(17470, ChannelTrades)
+		p.registerChannel(17470, ChannelTrades, nil)
 		msg, err := p.Parse([]byte(body))
 		assert.NoError(t, err)
 		if assert.NotNil(t, msg) {
@@ -775,7 +775,7 @@ func TestParser_ParsePublicTradeMessages(t *testing.T) {
 	t.Run("public trade snapshot - funding currency", func(t *testing.T) {
 		body := `[339521,[[133323072,1574694245478,-258.7458086,0.0002587,2],[133323073,1574694246000,100.0,0.0002600,30]]]`
 		p := NewParser()
-		p.registerChannel(339521, ChannelTrades)
+		p.registerChannel(339521, ChannelTrades, nil)
 		msg, err := p.Parse([]byte(body))
 		assert.NoError(t, err)
 		if assert.NotNil(t, msg) {
@@ -797,7 +797,7 @@ func TestParser_ParsePublicTradeMessages(t *testing.T) {
 	t.Run("public trade execute - trading pair", func(t *testing.T) {
 		body := `[17470,"te",[401597395,1574694478808,0.005,7245.3]]`
 		p := NewParser()
-		p.registerChannel(17470, ChannelTrades)
+		p.registerChannel(17470, ChannelTrades, nil)
 		msg, err := p.Parse([]byte(body))
 		assert.NoError(t, err)
 		if assert.NotNil(t, msg) {
@@ -814,7 +814,7 @@ func TestParser_ParsePublicTradeMessages(t *testing.T) {
 	t.Run("public funding trade execute", func(t *testing.T) {
 		body := `[337371,"fte",[133323543,1574694605000,-59.84,0.00023647,2]]`
 		p := NewParser()
-		p.registerChannel(337371, ChannelTrades)
+		p.registerChannel(337371, ChannelTrades, nil)
 		msg, err := p.Parse([]byte(body))
 		assert.NoError(t, err)
 		if assert.NotNil(t, msg) {
