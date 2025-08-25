@@ -232,8 +232,8 @@ func TestParserParseFromFile(t *testing.T) {
 				}
 			case *TickerEvent:
 				assert.NotZero(t, tr.ChannelID)
-				assert.False(t, tr.Ask.IsZero())
-				assert.False(t, tr.Bid.IsZero())
+				assert.False(t, tr.Ticker.Ask.IsZero())
+				assert.False(t, tr.Ticker.Bid.IsZero())
 			case *CandleSnapshotEvent:
 
 			case *FundingTickerEvent:

@@ -71,7 +71,19 @@ func NewStream(ex *Exchange) *Stream {
 	stream.OnConnect(stream.onConnect)
 
 	stream.OnTickerEvent(func(e *bfxapi.TickerEvent) {
+		resp, ok := stream.parser.GetChannelResponse(e.ChannelID)
+		if !ok {
+			log.Errorf("unable to find channel response for channel ID: %d, ticker event: %+v", e.ChannelID, e)
+			return
+		}
 
+		stream.EmitBookTickerUpdate(types.BookTicker{
+			Symbol:   resp.Symbol,
+			Buy:      e.Ticker.Bid,
+			BuySize:  e.Ticker.BidSize,
+			Sell:     e.Ticker.Ask,
+			SellSize: e.Ticker.AskSize,
+		})
 	})
 
 	stream.OnCandleEvent(func(e *bfxapi.CandleEvent) {

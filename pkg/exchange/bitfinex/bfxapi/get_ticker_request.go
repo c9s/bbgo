@@ -25,7 +25,8 @@ Ticker JSON response:
 
 // Ticker for trading pairs (symbol starts with 't')
 type Ticker struct {
-	Symbol  string
+	Symbol string
+
 	Bid     fixedpoint.Value
 	BidSize fixedpoint.Value
 
@@ -34,11 +35,12 @@ type Ticker struct {
 
 	DailyChange         fixedpoint.Value
 	DailyChangeRelative fixedpoint.Value
-	LastPrice           fixedpoint.Value
 
-	Volume fixedpoint.Value
-	High   fixedpoint.Value
-	Low    fixedpoint.Value
+	LastPrice fixedpoint.Value
+	Volume    fixedpoint.Value
+
+	High fixedpoint.Value
+	Low  fixedpoint.Value
 }
 
 func (r *Ticker) UnmarshalJSON(data []byte) error {

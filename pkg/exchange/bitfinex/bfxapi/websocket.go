@@ -128,20 +128,7 @@ type WalletSnapshotEvent struct {
 type TickerEvent struct {
 	ChannelID int64
 
-	Bid     fixedpoint.Value
-	BidSize fixedpoint.Value
-
-	Ask     fixedpoint.Value
-	AskSize fixedpoint.Value
-
-	DailyChange         fixedpoint.Value
-	DailyChangeRelative fixedpoint.Value
-
-	LastPrice fixedpoint.Value
-	Volume    fixedpoint.Value
-
-	High fixedpoint.Value
-	Low  fixedpoint.Value
+	Ticker Ticker
 }
 
 // FundingTickerEvent represents a funding ticker update or snapshot event.
@@ -553,7 +540,7 @@ func parseTickerEvent(channelID int64, payload json.RawMessage) (interface{}, er
 	// trading ticker event
 	if len(data) >= 10 {
 		evt := &TickerEvent{ChannelID: channelID}
-		if err := parseRawArray(data, evt, 1); err != nil {
+		if err := parseRawArray(data, &evt.Ticker, 1); err != nil {
 			return nil, fmt.Errorf("failed to parse ticker event: %w", err)
 		}
 
