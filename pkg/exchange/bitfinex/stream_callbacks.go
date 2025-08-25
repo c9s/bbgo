@@ -66,6 +66,26 @@ func (s *Stream) EmitPublicTradeSnapshotEvent(e *bfxapi.PublicTradeSnapshotEvent
 	}
 }
 
+func (s *Stream) OnPublicFundingTradeEvent(cb func(e *bfxapi.PublicFundingTradeEvent)) {
+	s.publicFundingTradeEventCallbacks = append(s.publicFundingTradeEventCallbacks, cb)
+}
+
+func (s *Stream) EmitPublicFundingTradeEvent(e *bfxapi.PublicFundingTradeEvent) {
+	for _, cb := range s.publicFundingTradeEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnPublicFundingTradeSnapshotEvent(cb func(e *bfxapi.PublicFundingTradeSnapshotEvent)) {
+	s.publicFundingTradeSnapshotEventCallbacks = append(s.publicFundingTradeSnapshotEventCallbacks, cb)
+}
+
+func (s *Stream) EmitPublicFundingTradeSnapshotEvent(e *bfxapi.PublicFundingTradeSnapshotEvent) {
+	for _, cb := range s.publicFundingTradeSnapshotEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnBookUpdateEvent(cb func(e *bfxapi.BookUpdateEvent)) {
 	s.bookUpdateEventCallbacks = append(s.bookUpdateEventCallbacks, cb)
 }
