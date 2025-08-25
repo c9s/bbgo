@@ -9,8 +9,8 @@ import (
 )
 
 type PublicTradeHistoryResponse struct {
-	Trades        []MarketTrade
-	FundingTrades []MarketFundingTrade
+	Trades        []PublicTrade
+	FundingTrades []PublicFundingTrade
 }
 
 func (r *PublicTradeHistoryResponse) UnmarshalJSON(data []byte) error {
@@ -25,9 +25,9 @@ func (r *PublicTradeHistoryResponse) UnmarshalJSON(data []byte) error {
 
 	if len(raws[0]) >= 5 {
 		// If the first element has 6 items, it's likely a FundingTrade
-		var fundingTrades []MarketFundingTrade
+		var fundingTrades []PublicFundingTrade
 		for _, rawSlice := range raws {
-			var ft MarketFundingTrade
+			var ft PublicFundingTrade
 			if err := parseRawArray(rawSlice, &ft, 0); err != nil {
 				return err
 			}
@@ -38,10 +38,10 @@ func (r *PublicTradeHistoryResponse) UnmarshalJSON(data []byte) error {
 		r.FundingTrades = fundingTrades
 		return nil
 	} else if len(raws[0]) == 4 {
-		// If the first element has 4 items, it's likely a MarketTrade
-		var trades []MarketTrade
+		// If the first element has 4 items, it's likely a PublicTrade
+		var trades []PublicTrade
 		for _, rawSlice := range raws {
-			var mt MarketTrade
+			var mt PublicTrade
 			if err := parseRawArray(rawSlice, &mt, 0); err != nil {
 				return err
 			}

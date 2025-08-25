@@ -239,11 +239,11 @@ func TestParserParseFromFile(t *testing.T) {
 			case *FundingTickerEvent:
 				assert.NotZero(t, tr.ChannelID)
 				assert.False(t, tr.FRR.IsZero())
-			case *MarketTradeEvent:
+			case *PublicTradeEvent:
 				assert.NotZero(t, tr.ChannelID)
 				assert.NotZero(t, tr.Trade.ID)
 				assert.True(t, !tr.Trade.Price.IsZero())
-			case []MarketTradeEvent: // trade snapshot
+			case []PublicTradeEvent: // trade snapshot
 				for _, trade := range tr {
 					assert.NotZero(t, trade.ChannelID)
 					assert.NotZero(t, trade.Trade.ID)
@@ -251,10 +251,10 @@ func TestParserParseFromFile(t *testing.T) {
 					assert.False(t, trade.Trade.Amount.IsZero(), "amount should not be zero for market trades")
 				}
 
-			case *FundingMarketTradeEvent:
+			case *PublicFundingTradeEvent:
 				assert.NotZero(t, tr.ChannelID)
-				assert.NotZero(t, tr.ID)
-				assert.False(t, tr.Amount.IsZero(), "amount should not be zero for funding trades")
+				assert.NotZero(t, tr.Trade.ID)
+				assert.False(t, tr.Trade.Amount.IsZero(), "amount should not be zero for funding trades")
 
 			case *FundingBookUpdateEvent:
 				assert.NotZero(t, tr.ChannelID)

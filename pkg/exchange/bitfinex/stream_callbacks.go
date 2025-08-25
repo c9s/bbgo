@@ -46,11 +46,11 @@ func (s *Stream) EmitStatusEvent(e *bfxapi.StatusEvent) {
 	}
 }
 
-func (s *Stream) OnMarketTradeEvent(cb func(e *bfxapi.MarketTradeEvent)) {
+func (s *Stream) OnMarketTradeEvent(cb func(e *bfxapi.PublicTradeEvent)) {
 	s.marketTradeEventCallbacks = append(s.marketTradeEventCallbacks, cb)
 }
 
-func (s *Stream) EmitMarketTradeEvent(e *bfxapi.MarketTradeEvent) {
+func (s *Stream) EmitMarketTradeEvent(e *bfxapi.PublicTradeEvent) {
 	for _, cb := range s.marketTradeEventCallbacks {
 		cb(e)
 	}

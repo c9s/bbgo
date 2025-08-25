@@ -79,12 +79,19 @@ func (s FundingOfferStatus) String() string {
 	return string(s)
 }
 
-type MarketFundingTrade struct {
-	ID        int64
+type PublicFundingTrade struct {
+	// ID of the trade
+	ID int64
+
+	// CreatedAt is the Millisecond epoch timestamp
 	CreatedAt types.MillisecondTimestamp
-	Amount    fixedpoint.Value
-	Rate      fixedpoint.Value
-	Period    int
+
+	// Amount is How much was bought (positive) or sold (negative)
+	Amount fixedpoint.Value
+
+	Rate fixedpoint.Value
+
+	Period int
 }
 
 // FundingTrade represents a single funding trade returned by Bitfinex.
