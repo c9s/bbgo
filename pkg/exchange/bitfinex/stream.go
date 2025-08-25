@@ -75,9 +75,23 @@ func NewStream(ex *Exchange) *Stream {
 	})
 
 	stream.OnCandleEvent(func(e *bfxapi.CandleEvent) {
-		// TODO: we need to get the response "key" to get the symbol and timeframe
+		// we need to get the response "key" to get the symbol and timeframe
 		// e.g. "key": "trade:1m:tBTCUSD"
-		stream.EmitKLine(convertCandle(e.Candle, "tBTCUSD", types.Interval1m))
+		resp, ok := stream.parser.GetChannelResponse(e.ChannelID)
+		if !ok {
+			log.Errorf("unable to find channel response for channel ID: %d, candle event: %+v", e.ChannelID, e)
+			return
+		}
+
+		if resp.Key == "" {
+			log.Errorf("unable to find channel response key for channel ID: %d, candle event: %+v", e.ChannelID, e)
+			return
+		}
+
+		// parse the key in format like "trade:1m:tBTCUSD"
+		parts := bfxapi.ParseChannelKey(resp.Key)
+		_, interval, symbol := parts[0], parts[1], parts[2]
+		stream.EmitKLine(convertCandle(e.Candle, symbol, types.Interval(interval)))
 	})
 
 	stream.OnCandleSnapshotEvent(func(e *bfxapi.CandleSnapshotEvent) {})

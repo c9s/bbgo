@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -349,7 +350,7 @@ func (p *Parser) getChannelType(channelID int64) (Channel, bool) {
 	return typeStr, ok
 }
 
-func (p *Parser) getChannelResponse(channelID int64) (*WebSocketResponse, bool) {
+func (p *Parser) GetChannelResponse(channelID int64) (*WebSocketResponse, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	resp, ok := p.channelResponseMap[channelID]
@@ -1144,4 +1145,20 @@ func parseFundingInfoEvent(arrJson json.RawMessage) (*FundingInfoEvent, error) {
 	}
 
 	return &event, nil
+}
+
+// ParseChannelKey splits a Bitfinex channel key string by ':' and returns non-empty parts.
+// Example: "trade:1m:tBTCUSD" => ["trade", "1m", "tBTCUSD"]
+func ParseChannelKey(key string) []string {
+	if key == "" {
+		return nil
+	}
+	rawParts := strings.Split(key, ":")
+	var parts []string
+	for _, part := range rawParts {
+		if part != "" {
+			parts = append(parts, part)
+		}
+	}
+	return parts
 }
