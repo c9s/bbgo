@@ -23,7 +23,17 @@ type Stream struct {
 
 	depthBuffers map[string]*depth.Buffer
 
-	tickerEventCallbacks []func(e *bfxapi.TickerEvent)
+	tickerEventCallbacks         []func(e *bfxapi.TickerEvent)
+	candleSnapshotEventCallbacks []func(e *bfxapi.CandleSnapshotEvent)
+	candleEventCallbacks         []func(e *bfxapi.CandleEvent)
+
+	statusEventCallbacks []func(e *bfxapi.StatusEvent)
+
+	publicTradeEventCallbacks         []func(e *bfxapi.PublicTradeEvent)
+	publicTradeSnapshotEventCallbacks []func(e *bfxapi.PublicTradeSnapshotEvent)
+
+	publicFundingTradeEventCallbacks         []func(e *bfxapi.PublicFundingTradeEvent)
+	publicFundingTradeSnapshotEventCallbacks []func(e *bfxapi.PublicFundingTradeSnapshotEvent)
 
 	bookUpdateEventCallbacks   []func(e *bfxapi.BookUpdateEvent)
 	bookSnapshotEventCallbacks []func(e *bfxapi.BookSnapshotEvent)
@@ -31,9 +41,14 @@ type Stream struct {
 	fundingBookEventCallbacks         []func(e *bfxapi.FundingBookUpdateEvent)
 	fundingBookSnapshotEventCallbacks []func(e *bfxapi.FundingBookSnapshotEvent)
 
-	candleEventCallbacks      []func(e *bfxapi.CandleEvent)
-	statusEventCallbacks      []func(e *bfxapi.StatusEvent)
-	marketTradeEventCallbacks []func(e *bfxapi.MarketTradeEvent)
+	walletSnapshotEventCallbacks   []func(e *bfxapi.WalletSnapshotEvent)
+	walletUpdateEventCallbacks     []func(e *bfxapi.Wallet)
+	positionSnapshotEventCallbacks []func(e *bfxapi.UserPositionSnapshotEvent)
+	positionUpdateEventCallbacks   []func(e *bfxapi.UserPosition)
+
+	orderSnapshotEventCallbacks []func(e *bfxapi.UserOrderSnapshotEvent)
+	orderUpdateEventCallbacks   []func(e *bfxapi.UserOrder)
+	tradeUpdateEventCallbacks   []func(e *bfxapi.TradeUpdateEvent)
 
 	parser *bfxapi.Parser
 	logger logrus.FieldLogger
@@ -54,6 +69,96 @@ func NewStream(ex *Exchange) *Stream {
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.getEndpoint)
 	stream.OnConnect(stream.onConnect)
+
+	stream.OnTickerEvent(func(e *bfxapi.TickerEvent) {
+		resp, ok := stream.parser.GetChannelResponse(e.ChannelID)
+		if !ok {
+			log.Errorf("unable to find channel response for channel ID: %d, ticker event: %+v", e.ChannelID, e)
+			return
+		}
+
+		stream.EmitBookTickerUpdate(types.BookTicker{
+			Symbol:   resp.Symbol,
+			Buy:      e.Ticker.Bid,
+			BuySize:  e.Ticker.BidSize,
+			Sell:     e.Ticker.Ask,
+			SellSize: e.Ticker.AskSize,
+		})
+	})
+
+	stream.OnCandleEvent(func(e *bfxapi.CandleEvent) {
+		// we need to get the response "key" to get the symbol and timeframe
+		// e.g. "key": "trade:1m:tBTCUSD"
+		resp, ok := stream.parser.GetChannelResponse(e.ChannelID)
+		if !ok {
+			log.Errorf("unable to find channel response for channel ID: %d, candle event: %+v", e.ChannelID, e)
+			return
+		}
+
+		if resp.Key == "" {
+			log.Errorf("unable to find channel response key for channel ID: %d, candle event: %+v", e.ChannelID, e)
+			return
+		}
+
+		// parse the key in format like "trade:1m:tBTCUSD"
+		parts := bfxapi.ParseChannelKey(resp.Key)
+		_, interval, symbol := parts[0], parts[1], parts[2]
+		stream.EmitKLine(convertCandle(e.Candle, symbol, types.Interval(interval)))
+	})
+
+	stream.OnCandleSnapshotEvent(func(e *bfxapi.CandleSnapshotEvent) {})
+
+	stream.OnStatusEvent(func(e *bfxapi.StatusEvent) {})
+
+	stream.OnPublicTradeEvent(func(e *bfxapi.PublicTradeEvent) {
+	})
+
+	stream.OnBookSnapshotEvent(func(e *bfxapi.BookSnapshotEvent) {
+		book := convertBookEntries(e.Entries)
+		stream.EmitBookSnapshot(book)
+	})
+
+	stream.OnBookUpdateEvent(func(e *bfxapi.BookUpdateEvent) {
+		var book types.SliceOrderBook
+		if e.Entry.Amount.Sign() < 0 {
+			book.Asks = types.PriceVolumeSlice{convertBookEntry(e.Entry)}
+		} else {
+			book.Bids = types.PriceVolumeSlice{convertBookEntry(e.Entry)}
+		}
+
+		stream.EmitBookUpdate(book)
+	})
+
+	stream.OnWalletSnapshotEvent(func(e *bfxapi.WalletSnapshotEvent) {
+		stream.EmitBalanceUpdate(convertWallets(e.Wallets...))
+	})
+	stream.OnWalletUpdateEvent(func(e *bfxapi.Wallet) {
+		stream.EmitBalanceUpdate(convertWallets(*e))
+	})
+
+	stream.OnOrderSnapshotEvent(func(e *bfxapi.UserOrderSnapshotEvent) {
+		for _, uo := range e.Orders {
+			order := convertWsUserOrder(&uo)
+			if order != nil {
+				stream.EmitOrderUpdate(*order)
+			}
+		}
+	})
+
+	stream.OnOrderUpdateEvent(func(e *bfxapi.UserOrder) {
+		order := convertWsUserOrder(e)
+		if order != nil {
+			stream.EmitOrderUpdate(*order)
+		}
+	})
+
+	stream.OnTradeUpdateEvent(func(e *bfxapi.TradeUpdateEvent) {
+		trade := convertWsUserTrade(e)
+		if trade != nil {
+			stream.EmitTradeUpdate(*trade)
+		}
+	})
+
 	return stream
 }
 
@@ -100,37 +205,64 @@ func (s *Stream) onConnect() {
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch evt := e.(type) {
 
-	case *bfxapi.BookUpdateEvent: // book snapshot
+	case *bfxapi.WalletSnapshotEvent:
+		s.EmitWalletSnapshotEvent(evt)
+
+	case *bfxapi.UserPositionSnapshotEvent:
+		s.EmitPositionSnapshotEvent(evt)
+
+	case *bfxapi.UserPosition:
+		s.EmitPositionUpdateEvent(evt)
+
+	case *bfxapi.UserOrderSnapshotEvent:
+		s.EmitOrderSnapshotEvent(evt)
+
+	case *bfxapi.Wallet: // wallet update
+		s.EmitWalletUpdateEvent(evt)
+
+	case *bfxapi.UserOrder:
+		s.EmitOrderUpdateEvent(evt)
+
+	case *bfxapi.TradeUpdateEvent:
+		s.EmitTradeUpdateEvent(evt)
+
+	/* public data event */
+	case *bfxapi.TickerEvent:
+		s.EmitTickerEvent(evt)
+
+	case *bfxapi.CandleSnapshotEvent:
+		s.EmitCandleSnapshotEvent(evt)
+
+	case *bfxapi.CandleEvent:
+		s.EmitCandleEvent(evt)
+
+	case *bfxapi.BookUpdateEvent:
 		s.EmitBookUpdateEvent(evt)
 
 	case *bfxapi.BookSnapshotEvent:
 		s.EmitBookSnapshotEvent(evt)
 
-	case *bfxapi.WalletSnapshotEvent:
-		s.EmitBalanceUpdate(convertWallets(evt.Wallets...))
+	case *bfxapi.StatusEvent:
+		s.EmitStatusEvent(evt)
 
-	case []bfxapi.UserOrder: // order snapshot
-		for _, uo := range evt {
-			order := convertWsUserOrder(&uo)
-			if order != nil {
-				s.EmitOrderUpdate(*order)
-			}
-		}
+	case *bfxapi.PublicTradeEvent:
+		s.EmitPublicTradeEvent(evt)
 
-	case *bfxapi.Wallet: // wallet update
-		s.EmitBalanceUpdate(convertWallets(*evt))
+	case *bfxapi.PublicTradeSnapshotEvent:
+		s.EmitPublicTradeSnapshotEvent(evt)
 
-	case *bfxapi.UserOrder:
-		order := convertWsUserOrder(evt)
-		if order != nil {
-			s.EmitOrderUpdate(*order)
-		}
+	case *bfxapi.PublicFundingTradeEvent:
+		s.EmitPublicFundingTradeEvent(evt)
 
-	case *bfxapi.UserTrade:
-		trade := convertWsUserTrade(evt)
-		if trade != nil {
-			s.EmitTradeUpdate(*trade)
-		}
+	case *bfxapi.PublicFundingTradeSnapshotEvent:
+		s.EmitPublicFundingTradeSnapshotEvent(evt)
+
+	case *bfxapi.FundingBookSnapshotEvent:
+		s.EmitFundingBookSnapshotEvent(evt)
+
+	case *bfxapi.FundingBookUpdateEvent:
+		s.EmitFundingBookEvent(evt)
+
 	default:
 		s.logger.Warnf("unhandled %T event: %+v", evt, evt)
 	}
@@ -178,9 +310,9 @@ func convertWsUserOrder(uo *bfxapi.UserOrder) *types.Order {
 	}
 }
 
-// convertWsUserTrade converts a Bitfinex websocket UserTrade to a types.Trade.
-// It maps fields from *bfxapi.UserTrade to types.Trade.
-func convertWsUserTrade(ut *bfxapi.UserTrade) *types.Trade {
+// convertWsUserTrade converts a Bitfinex websocket TradeUpdateEvent to a types.Trade.
+// It maps fields from *bfxapi.TradeUpdateEvent to types.Trade.
+func convertWsUserTrade(ut *bfxapi.TradeUpdateEvent) *types.Trade {
 	return &types.Trade{
 		ID:       uint64(ut.ID),
 		OrderID:  uint64(ut.OrderID),

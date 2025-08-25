@@ -146,7 +146,8 @@ func (e *Exchange) QueryKLines(
 	}
 
 	// format "trade:1m:tBTCUSD"
-	candleKey := "trade:" + intervalStr + ":" + symbol
+	localSymbol := toLocalSymbol(symbol)
+	candleKey := "trade:" + intervalStr + ":" + localSymbol
 	req := e.client.NewGetCandlesRequest().
 		Candle(candleKey).
 		Section("hist")
@@ -160,20 +161,12 @@ func (e *Exchange) QueryKLines(
 		return nil, fmt.Errorf("failed to query klines from bitfinex: %w", err)
 	}
 
-	var result []types.KLine
+	var kLines []types.KLine
 	for _, c := range resp {
-		result = append(result, types.KLine{
-			StartTime: types.Time(c.Time.Time()),
-			EndTime:   types.Time(c.Time.Time().Add(interval.Duration() - time.Millisecond)),
-
-			Open:   c.Open,
-			High:   c.High,
-			Low:    c.Low,
-			Close:  c.Close,
-			Volume: c.Volume,
-		})
+		kLines = append(kLines, convertCandle(c, localSymbol, interval))
 	}
-	return result, nil
+
+	return kLines, nil
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {

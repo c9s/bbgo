@@ -222,23 +222,32 @@ func toGlobalOrderType(t bfxapi.OrderType) types.OrderType {
 	}
 }
 
+func convertBookEntry(entry bfxapi.BookEntry) types.PriceVolume {
+	if entry.Amount.Sign() < 0 {
+		return types.PriceVolume{
+			Price:  entry.Price,
+			Volume: entry.Amount.Neg(),
+		}
+	}
+
+	return types.PriceVolume{
+		Price:  entry.Price,
+		Volume: entry.Amount.Abs(),
+	}
+}
+
 // convertBookEntries converts a slice of bfxapi.BookEntry to types.SliceOrderBook.
 // It maps Bitfinex book entries to the standard SliceOrderBook fields.
 func convertBookEntries(entries []bfxapi.BookEntry) types.SliceOrderBook {
 	var ob types.SliceOrderBook
 	for _, entry := range entries {
 		if entry.Amount.Sign() > 0 {
-			ob.Bids = append(ob.Bids, types.PriceVolume{
-				Price:  entry.Price,
-				Volume: entry.Amount,
-			})
+			ob.Bids = append(ob.Bids, convertBookEntry(entry))
 		} else if entry.Amount.Sign() < 0 {
-			ob.Asks = append(ob.Asks, types.PriceVolume{
-				Price:  entry.Price,
-				Volume: entry.Amount.Neg(),
-			})
+			ob.Asks = append(ob.Asks, convertBookEntry(entry))
 		}
 	}
+
 	sort.Slice(ob.Bids, func(i, j int) bool {
 		return ob.Bids[i].Price.Compare(ob.Bids[j].Price) >= 0
 	})
@@ -254,4 +263,18 @@ func convertBookEntries(entries []bfxapi.BookEntry) types.SliceOrderBook {
 // It delegates to convertBookEntries for BookEntries.
 func convertDepth(resp *bfxapi.BookResponse) types.SliceOrderBook {
 	return convertBookEntries(resp.BookEntries)
+}
+
+// convertCandle converts bfxapi.Candle to types.KLine.
+func convertCandle(c bfxapi.Candle, symbol string, interval types.Interval) types.KLine {
+	return types.KLine{
+		Symbol:    toGlobalSymbol(symbol),
+		StartTime: types.Time(c.Time.Time()),
+		EndTime:   types.Time(c.Time.Time().Add(interval.Duration() - time.Millisecond)),
+		Open:      c.Open,
+		High:      c.High,
+		Low:       c.Low,
+		Close:     c.Close,
+		Volume:    c.Volume,
+	}
 }
