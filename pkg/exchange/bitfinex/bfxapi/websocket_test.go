@@ -311,6 +311,30 @@ func TestParser_Parse(t *testing.T) {
 		}
 	})
 
+	t.Run("failed auth response", func(t *testing.T) {
+		body := `{"event":"auth","status":"FAIL","chanId":0}`
+		p := NewParser()
+		msg, err := p.Parse([]byte(body))
+		assert.NoError(t, err)
+		if assert.NotNil(t, msg) {
+			authMessage, ok := msg.(*WebSocketResponse)
+			assert.True(t, ok, "expected WebSocketResponse type")
+			assert.Equal(t, "auth", authMessage.Event, "expected auth event")
+			assert.Equal(t, "FAIL", authMessage.Status, "expected OK status")
+		}
+	})
+
+	t.Run("wallet snapshot drop incorrect entries", func(t *testing.T) {
+		body := `[0,"ws",[["exchange","UST",null],["exchange","BTC",0.0009982,0,null,"Exchange 0.00156 BTC for UST @ 121790.0",{"reason":"TRADE","order_id":22334,"order_id_oppo":12234,"trade_price":"121790.0","trade_amount":"-0.00156","order_cid":33445,"order_gid":null}],["funding","UST",150.00146503,0,null,null,null]]]`
+		p := NewParser()
+		msg, err := p.Parse([]byte(body))
+		assert.NoError(t, err)
+
+		snapshot, ok := msg.(*WalletSnapshotEvent)
+		assert.True(t, ok, "expected *WalletSnapshotEvent type")
+		assert.Len(t, snapshot.Wallets, 2)
+	})
+
 	t.Run("wallet snapshot", func(t *testing.T) {
 		body := `[0,"ws",[["exchange","UST",239.02464552,0,null,null,null],["exchange","BTC",0.0009982,0,null,"Exchange 0.00156 BTC for UST @ 121790.0",{"reason":"TRADE","order_id":22334,"order_id_oppo":12234,"trade_price":"121790.0","trade_amount":"-0.00156","order_cid":33445,"order_gid":null}],["funding","UST",150.00146503,0,null,null,null]]]`
 		p := NewParser()
@@ -435,6 +459,20 @@ func TestParser_Parse(t *testing.T) {
 		}
 	})
 
+	t.Run("order new amount type error", func(t *testing.T) {
+		body := `[0,"on",[215271,null,1755668711760,"tBTCUST",1755668711760,1755668711762,"notanumber",0.001,"EXCHANGE LIMIT",null,null,null,0,"ACTIVE",null,null,10000,0,0,0,null,null,null,0,0,null,null,null,"API>BFX",null,null,{"source":"api"}]]`
+		p := NewParser()
+		_, err := p.Parse([]byte(body))
+		assert.Error(t, err)
+	})
+
+	t.Run("order new null fields", func(t *testing.T) {
+		body := `[0,"on",[215271,null,1755668711760,"tBTCUST",null,null,0.001,null,"EXCHANGE LIMIT",null,null,null,0,"ACTIVE",null,null,10000,0,0,0,null,null,null,0,0,null,null,null,"API>BFX",null,null,{"source":"api"}]]`
+		p := NewParser()
+		_, err := p.Parse([]byte(body))
+		assert.Error(t, err)
+	})
+
 	t.Run("trade update", func(t *testing.T) {
 		body := `[0,"tu",[17972,"tBTCUSD",1755671464700,15268096239,-0.00008867,113910,"EXCHANGE LIMIT",113910,-1,-0.00606023982,"USD",1755671464699]]`
 		p := NewParser()
@@ -476,6 +514,30 @@ func TestParser_Parse(t *testing.T) {
 			assert.Equal(t, "EXCHANGE LIMIT", trade.OrderType)
 			assert.Equal(t, int64(1755671464699), trade.ClientOrderID)
 		}
+	})
+
+	t.Run("invalid trade update - missing fields", func(t *testing.T) {
+		body := `[0,"tu",[17972,"tBTCUSD",1755671464700]]` // missing fields
+		p := NewParser()
+		msg, err := p.Parse([]byte(body))
+		assert.Error(t, err)
+		assert.Nil(t, msg)
+	})
+
+	t.Run("invalid trade update - wrong type", func(t *testing.T) {
+		body := `[0,"tu",["not-an-int","tBTCUSD","not-a-timestamp",15268096239,-0.00008867,113910,"EXCHANGE LIMIT",113910,-1,-0.00606023982,"USD",1755671464699]]`
+		p := NewParser()
+		msg, err := p.Parse([]byte(body))
+		assert.Error(t, err)
+		assert.Nil(t, msg)
+	})
+
+	t.Run("invalid trade update - wrong array order", func(t *testing.T) {
+		body := `[0,"tu",["tBTCUSD",17972,1755671464700,15268096239,-0.00008867,113910,"EXCHANGE LIMIT",113910,-1,-0.00606023982,"USD",1755671464699]]`
+		p := NewParser()
+		msg, err := p.Parse([]byte(body))
+		assert.Error(t, err)
+		assert.Nil(t, msg)
 	})
 
 	t.Run("funding offer snapshot", func(t *testing.T) {

@@ -937,7 +937,7 @@ func parseWalletSnapshot(arrJson json.RawMessage) (*WalletSnapshotEvent, error) 
 	for _, fields := range walletArrs {
 		wallet, err := parseWalletUpdate(fields)
 		if err != nil {
-			log.WithError(err).Warnf("failed to parse wallet fields: %s", fields)
+			log.WithError(err).Errorf("failed to parse wallet fields: %s, dropping the wallet", fields)
 			continue
 		} else if wallet != nil {
 			wallets = append(wallets, *wallet)
