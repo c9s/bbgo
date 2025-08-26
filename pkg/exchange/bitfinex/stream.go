@@ -23,6 +23,9 @@ type Stream struct {
 
 	depthBuffers map[string]*depth.Buffer
 
+	responseCallbacks  []func(resp *bfxapi.WebSocketResponse)
+	heartBeatCallbacks []func(e *bfxapi.HeartBeatEvent)
+
 	tickerEventCallbacks         []func(e *bfxapi.TickerEvent)
 	candleSnapshotEventCallbacks []func(e *bfxapi.CandleSnapshotEvent)
 	candleEventCallbacks         []func(e *bfxapi.CandleEvent)
@@ -123,7 +126,16 @@ func NewStream(ex *Exchange) *Stream {
 	})
 
 	stream.OnBookSnapshotEvent(func(e *bfxapi.BookSnapshotEvent) {
-		book := convertBookEntries(e.Entries)
+		resp, ok := stream.parser.GetChannelResponse(e.ChannelID)
+		if !ok {
+			log.Errorf("unable to find channel response for channel ID: %d, event %T: %+v", e.ChannelID, e, e)
+			return
+		} else if resp.Symbol == "" {
+			log.Errorf("unable to find channel response key for channel ID: %d, event %T: %+v", e.ChannelID, e, e)
+			return
+		}
+
+		book := convertBookEntries(e.Entries, resp)
 		stream.EmitBookSnapshot(book)
 	})
 
@@ -249,6 +261,12 @@ func (s *Stream) writeSubscriptions() error {
 // dispatchEvent dispatches parsed events to corresponding callbacks.
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch evt := e.(type) {
+
+	case *bfxapi.WebSocketResponse:
+		s.EmitResponse(evt)
+
+	case *bfxapi.HeartBeatEvent:
+		s.EmitHeartBeat(evt)
 
 	case *bfxapi.WalletSnapshotEvent:
 		s.EmitWalletSnapshotEvent(evt)

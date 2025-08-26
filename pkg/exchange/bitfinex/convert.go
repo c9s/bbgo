@@ -238,8 +238,15 @@ func convertBookEntry(entry bfxapi.BookEntry) types.PriceVolume {
 
 // convertBookEntries converts a slice of bfxapi.BookEntry to types.SliceOrderBook.
 // It maps Bitfinex book entries to the standard SliceOrderBook fields.
-func convertBookEntries(entries []bfxapi.BookEntry) types.SliceOrderBook {
-	var ob types.SliceOrderBook
+func convertBookEntries(entries []bfxapi.BookEntry, resp *bfxapi.WebSocketResponse) types.SliceOrderBook {
+	var ob = types.SliceOrderBook{
+		Time: time.Now(),
+	}
+
+	if resp != nil {
+		ob.Symbol = toGlobalSymbol(resp.Symbol)
+	}
+
 	for _, entry := range entries {
 		if entry.Amount.Sign() > 0 {
 			ob.Bids = append(ob.Bids, convertBookEntry(entry))
@@ -262,7 +269,7 @@ func convertBookEntries(entries []bfxapi.BookEntry) types.SliceOrderBook {
 // convertDepth converts bfxapi.BookResponse to types.SliceOrderBook.
 // It delegates to convertBookEntries for BookEntries.
 func convertDepth(resp *bfxapi.BookResponse) types.SliceOrderBook {
-	return convertBookEntries(resp.BookEntries)
+	return convertBookEntries(resp.BookEntries, nil)
 }
 
 // convertCandle converts bfxapi.Candle to types.KLine.

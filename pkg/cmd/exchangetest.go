@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -166,15 +167,103 @@ var exchangeTestCmd = &cobra.Command{
 			marketDataStream.Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
 				Depth: types.DepthLevelFull,
 			})
+			marketDataStream.Subscribe(types.KLineChannel, "BTCUSDT", types.SubscribeOptions{
+				Interval: types.Interval1m,
+			})
+			marketDataStream.Subscribe(types.MarketTradeChannel, "BTCUSDT", types.SubscribeOptions{})
 
+			tradeCount := 0
+			klineCount := 0
+			bookSnapshotCount := 0
+			bookUpdateCount := 0
+
+			var tradeSamples []types.Trade
+			var klineSamples []types.KLine
+			var bookSnapshotSamples []types.SliceOrderBook
+			var bookUpdateSamples []types.SliceOrderBook
+
+			marketDataStream.OnMarketTrade(func(trade types.Trade) {
+				tradeCount++
+				tradeSamples = append(tradeSamples, trade)
+				log.Infof("market trade: %+v", trade)
+			})
+			marketDataStream.OnKLine(func(kline types.KLine) {
+				klineCount++
+				klineSamples = append(klineSamples, kline)
+				log.Infof("kline: %+v", kline)
+			})
 			marketDataStream.OnBookSnapshot(func(book types.SliceOrderBook) {
+				bookSnapshotCount++
+				bookSnapshotSamples = append(bookSnapshotSamples, book)
 				log.Infof("book snapshot: %+v", book)
 			})
 			marketDataStream.OnBookUpdate(func(book types.SliceOrderBook) {
+				bookUpdateCount++
+				bookUpdateSamples = append(bookUpdateSamples, book)
 				log.Infof("book update: %+v", book)
 			})
-			err := marketDataStream.Connect(ctx)
+
+			marketDataCtx, cancelMarketData := context.WithCancel(ctx)
+			defer cancelMarketData()
+
+			marketDataDone := make(chan struct{})
+			go func() {
+				defer close(marketDataDone)
+				select {
+				case <-marketDataCtx.Done():
+					return
+				case <-time.After(3 * time.Minute):
+					cancelMarketData()
+				}
+			}()
+
+			err := marketDataStream.Connect(marketDataCtx)
 			if noError(err, "marketDataStream.Connect") {
+				<-marketDataDone
+			
+				// check statistics and data correctness
+				if tradeCount == 0 {
+					log.Errorf("no market trade received")
+				}
+				if klineCount == 0 {
+					log.Errorf("no kline received")
+				}
+				if bookSnapshotCount == 0 {
+					log.Errorf("no book snapshot received")
+				}
+				if bookUpdateCount == 0 {
+					log.Errorf("no book update received")
+				}
+
+				// check sample data correctness
+				if len(tradeSamples) > 0 {
+					for _, t := range tradeSamples {
+						if t.Price.Sign() < 0 {
+							log.Errorf("invalid trade price: %+v", t)
+						}
+					}
+				}
+				if len(klineSamples) > 0 {
+					for _, k := range klineSamples {
+						if k.Close.Sign() < 0 {
+							log.Errorf("invalid kline close price: %+v", k)
+						}
+					}
+				}
+				if len(bookSnapshotSamples) > 0 {
+					for _, b := range bookSnapshotSamples {
+						if len(b.Bids) == 0 && len(b.Asks) == 0 {
+							log.Errorf("empty book snapshot: %+v", b)
+						}
+					}
+				}
+				if len(bookUpdateSamples) > 0 {
+					for _, b := range bookUpdateSamples {
+						if len(b.Bids) == 0 && len(b.Asks) == 0 {
+							log.Errorf("empty book update: %+v", b)
+						}
+					}
+				}
 			}
 		} else {
 			log.Warnf("types.Exchange is not implemented, some tests will be skipped")

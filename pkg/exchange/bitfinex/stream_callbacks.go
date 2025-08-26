@@ -6,6 +6,26 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/bitfinex/bfxapi"
 )
 
+func (s *Stream) OnResponse(cb func(resp *bfxapi.WebSocketResponse)) {
+	s.responseCallbacks = append(s.responseCallbacks, cb)
+}
+
+func (s *Stream) EmitResponse(resp *bfxapi.WebSocketResponse) {
+	for _, cb := range s.responseCallbacks {
+		cb(resp)
+	}
+}
+
+func (s *Stream) OnHeartBeat(cb func(e *bfxapi.HeartBeatEvent)) {
+	s.heartBeatCallbacks = append(s.heartBeatCallbacks, cb)
+}
+
+func (s *Stream) EmitHeartBeat(e *bfxapi.HeartBeatEvent) {
+	for _, cb := range s.heartBeatCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnTickerEvent(cb func(e *bfxapi.TickerEvent)) {
 	s.tickerEventCallbacks = append(s.tickerEventCallbacks, cb)
 }
