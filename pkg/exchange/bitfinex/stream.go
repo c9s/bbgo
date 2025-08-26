@@ -477,6 +477,7 @@ func convertSubscription(sub types.Subscription) *bfxapi.WebSocketRequest {
 		req.Prec = "P0"
 		req.Frequency = "F0"
 		req.Length = "1" // Number of price points ("1", "25", "100", "250") [default="25"]
+	case types.TickerChannel:
 	}
 
 	return req
@@ -488,10 +489,12 @@ func convertChannel(ch types.Channel) bfxapi.Channel {
 	switch ch {
 	case types.BookChannel:
 		return bfxapi.ChannelBook
+
 	case types.BookTickerChannel:
 		return bfxapi.ChannelBook
 
-		// return bfxapi.ChannelTicker
+	case types.TickerChannel:
+		return bfxapi.ChannelTicker
 
 	case types.MarketTradeChannel:
 		return bfxapi.ChannelTrades
