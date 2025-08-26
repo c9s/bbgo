@@ -527,7 +527,7 @@ func (e *Exchange) QueryDepth(
 		return snapshot, finalUpdateID, err
 	}
 
-	return convertDepth(response), 0, nil
+	return convertDepth(response, symbol), 0, nil
 }
 
 func MapSlice[T, M any](input []T, f func(T) M) []M {

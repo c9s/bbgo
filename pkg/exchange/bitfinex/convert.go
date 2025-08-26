@@ -268,8 +268,8 @@ func convertBookEntries(entries []bfxapi.BookEntry, symbol string) types.SliceOr
 
 // convertDepth converts bfxapi.BookResponse to types.SliceOrderBook.
 // It delegates to convertBookEntries for BookEntries.
-func convertDepth(resp *bfxapi.BookResponse) types.SliceOrderBook {
-	return convertBookEntries(resp.BookEntries, "")
+func convertDepth(resp *bfxapi.BookResponse, symbol string) types.SliceOrderBook {
+	return convertBookEntries(resp.BookEntries, symbol)
 }
 
 // convertCandle converts bfxapi.Candle to types.KLine.
