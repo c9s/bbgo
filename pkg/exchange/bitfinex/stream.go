@@ -384,7 +384,7 @@ func convertWsUserOrder(uo *bfxapi.UserOrder) *types.Order {
 		},
 		OrderID:          uint64(uo.OrderID),
 		ExecutedQuantity: uo.AmountOrig.Abs().Sub(uo.Amount.Abs()),
-		Status:           types.OrderStatus(uo.Status),
+		Status:           toGlobalOrderStatus(uo.Status),
 		CreationTime:     types.Time(uo.CreatedAt.Time()),
 		UpdateTime:       types.Time(uo.UpdatedAt.Time()),
 	}

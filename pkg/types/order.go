@@ -400,6 +400,24 @@ func (o *Order) Validate() error {
 		return fmt.Errorf("order validation failed: invalid order status: %v", o.Status)
 	}
 
+	switch o.Status {
+	case OrderStatusNew:
+		if o.ExecutedQuantity.Sign() != 0 {
+			return fmt.Errorf("order validation failed: executed quantity must be zero for new orders")
+		}
+
+	case OrderStatusPartiallyFilled:
+		if o.ExecutedQuantity.Sign() <= 0 {
+			return fmt.Errorf("order validation failed: executed quantity must be positive for partially filled orders")
+		}
+
+	case OrderStatusFilled:
+		if o.ExecutedQuantity.Compare(o.Quantity) != 0 {
+			return fmt.Errorf("order validation failed: executed quantity must be equal to quantity for filled orders")
+		}
+
+	}
+
 	if !ValidateOrderType(o.Type) {
 		return fmt.Errorf("order validation failed: invalid order type: %v", o.Type)
 	}
