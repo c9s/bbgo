@@ -215,3 +215,13 @@ func (s *Stream) EmitTradeUpdateEvent(e *bfxapi.TradeUpdateEvent) {
 		cb(e)
 	}
 }
+
+func (s *Stream) OnBalanceUpdateEvent(cb func(e *bfxapi.BalanceUpdateEvent)) {
+	s.balanceUpdateEventCallbacks = append(s.balanceUpdateEventCallbacks, cb)
+}
+
+func (s *Stream) EmitBalanceUpdateEvent(e *bfxapi.BalanceUpdateEvent) {
+	for _, cb := range s.balanceUpdateEventCallbacks {
+		cb(e)
+	}
+}

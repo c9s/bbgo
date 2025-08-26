@@ -373,6 +373,28 @@ func (o *Order) Update(update Order) {
 	o.IsWorking = update.IsWorking
 }
 
+// Validate checks if the Order fields are valid and returns an error if not.
+func (o *Order) Validate() error {
+	if o.Symbol == "" {
+		return fmt.Errorf("order validation failed: symbol is required")
+	}
+	if o.Side != SideTypeBuy && o.Side != SideTypeSell {
+		return fmt.Errorf("order validation failed: invalid side: %v", o.Side)
+	}
+	if o.Type == "" {
+		return fmt.Errorf("order validation failed: order type is required")
+	}
+	if o.Quantity.Sign() <= 0 {
+		return fmt.Errorf("order validation failed: quantity must be positive")
+	}
+
+	if o.Type != OrderTypeMarket && o.Price.Sign() <= 0 {
+		return fmt.Errorf("order validation failed: price must be positive for non-market orders")
+	}
+
+	return nil
+}
+
 func (o *Order) GetRemainingQuantity() fixedpoint.Value {
 	return o.Quantity.Sub(o.ExecutedQuantity)
 }

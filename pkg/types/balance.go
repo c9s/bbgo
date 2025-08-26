@@ -315,3 +315,35 @@ func findUSDMarketPrice(currency string, prices map[string]fixedpoint.Value) (st
 	}
 	return "", fixedpoint.Zero, false
 }
+
+// Validate checks if the Balance fields are valid.
+func (b *Balance) Validate() error {
+	if b.Currency == "" {
+		return fmt.Errorf("currency is required")
+	}
+	if b.Available.Sign() < 0 {
+		return fmt.Errorf("available balance cannot be negative")
+	}
+	if b.Locked.Sign() < 0 {
+		return fmt.Errorf("locked balance cannot be negative")
+	}
+	if b.Borrowed.Sign() < 0 {
+		return fmt.Errorf("borrowed amount cannot be negative")
+	}
+	if b.Interest.Sign() < 0 {
+		return fmt.Errorf("interest cannot be negative")
+	}
+	if b.LongAvailableCredit.Sign() < 0 {
+		return fmt.Errorf("long available credit cannot be negative")
+	}
+	if b.ShortAvailableCredit.Sign() < 0 {
+		return fmt.Errorf("short available credit cannot be negative")
+	}
+	if b.NetAsset.Sign() < 0 {
+		return fmt.Errorf("net asset cannot be negative")
+	}
+	if b.MaxWithdrawAmount.Sign() < 0 {
+		return fmt.Errorf("max withdraw amount cannot be negative")
+	}
+	return nil
+}
