@@ -68,9 +68,19 @@ type WebSocketRequest struct {
 	Channel Channel `json:"channel"`
 	Symbol  string  `json:"symbol"`
 
+	// Prec is the level of price aggregation (P0, P1, P2, P3, P4).
+	// The default is P0
 	Prec string `json:"prec,omitempty"`
 
+	// Frequency is the frequency of updates (F0, F1).
+	// F0=realtime / F1=2sec.
+	// The default is F0.
+	Frequency string `json:"freq,omitempty"`
+
 	Key string `json:"key,omitempty"`
+
+	// Length is the number of price points ("1", "25", "100", "250") [default="25"]
+	Length string `json:"length,omitempty"`
 }
 
 type WebSocketResponse struct {
