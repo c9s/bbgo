@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 
@@ -339,4 +340,40 @@ func (m MarketMap) FindAssetMarkets(assets ...string) MarketMap {
 	}
 
 	return markets
+}
+
+// Validate checks if the Market fields are valid.
+func (m *Market) Validate() error {
+	if m.Symbol == "" {
+		return fmt.Errorf("symbol is empty")
+	}
+	if m.BaseCurrency == "" {
+		return fmt.Errorf("baseCurrency is empty")
+	}
+	if m.QuoteCurrency == "" {
+		return fmt.Errorf("quoteCurrency is empty")
+	}
+	if m.PricePrecision < 0 {
+		return fmt.Errorf("pricePrecision is negative")
+	}
+	if m.VolumePrecision < 0 {
+		return fmt.Errorf("volumePrecision is negative")
+	}
+
+	if !m.TickSize.IsZero() && m.TickSize.Sign() <= 0 {
+		return fmt.Errorf("tickSize must be positive")
+	}
+
+	if !m.StepSize.IsZero() && m.StepSize.Sign() <= 0 {
+		return fmt.Errorf("stepSize must be positive")
+	}
+
+	if !m.MinQuantity.IsZero() && m.MinQuantity.Sign() <= 0 {
+		return fmt.Errorf("minQuantity must be positive")
+	}
+	if !m.MinNotional.IsZero() && m.MinNotional.Sign() <= 0 {
+		return fmt.Errorf("minNotional must be positive")
+	}
+
+	return nil
 }

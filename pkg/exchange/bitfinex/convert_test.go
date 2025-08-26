@@ -122,7 +122,7 @@ func Test_convertBookEntries(t *testing.T) {
 		{Price: fixedpoint.NewFromFloat(98.0), Amount: fixedpoint.NewFromFloat(-1)}, // ask
 	}
 
-	ob := convertBookEntries(entries, nil)
+	ob := convertBookEntries(entries, "")
 
 	if len(ob.Bids) != 2 {
 		t.Errorf("expected 2 bids, got %d", len(ob.Bids))

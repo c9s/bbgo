@@ -121,8 +121,7 @@ func NewStream(ex *Exchange) *Stream {
 			return
 		}
 
-		trade := convertPublicTrade(e, resp)
-		stream.EmitMarketTrade(trade)
+		stream.EmitMarketTrade(convertPublicTrade(e, resp))
 	})
 
 	stream.OnBookSnapshotEvent(func(e *bfxapi.BookSnapshotEvent) {
@@ -132,15 +131,24 @@ func NewStream(ex *Exchange) *Stream {
 			return
 		} else if resp.Symbol == "" {
 			log.Errorf("unable to find channel response key for channel ID: %d, event %T: %+v", e.ChannelID, e, e)
-			return
 		}
 
-		book := convertBookEntries(e.Entries, resp)
+		book := convertBookEntries(e.Entries, resp.Symbol)
 		stream.EmitBookSnapshot(book)
 	})
 
 	stream.OnBookUpdateEvent(func(e *bfxapi.BookUpdateEvent) {
+		resp, ok := stream.parser.GetChannelResponse(e.ChannelID)
+		if !ok {
+			log.Errorf("unable to find channel response for channel ID: %d, event %T: %+v", e.ChannelID, e, e)
+			return
+		} else if resp.Symbol == "" {
+			log.Errorf("unable to find channel response key for channel ID: %d, event %T: %+v", e.ChannelID, e, e)
+		}
+
 		var book types.SliceOrderBook
+		book.Symbol = toGlobalSymbol(resp.Symbol)
+
 		if e.Entry.Amount.Sign() < 0 {
 			book.Asks = types.PriceVolumeSlice{convertBookEntry(e.Entry)}
 		} else {
