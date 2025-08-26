@@ -10,6 +10,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type LogLevel int64
+
+const (
+	LogLevelNone LogLevel = iota
+	LogLevelInfo
+	LogLevelWarn
+	LogLevelError
+)
+
 type State int64
 
 const (
@@ -36,7 +45,7 @@ type StateMachine struct {
 	// closeC is used to signal the state machine to stop processing.
 	closeC chan struct{}
 	// stateTransitionFunc is a map of state transitions, where each key is a current state
-	stateTransitionFunc map[State]map[State]func(context.Context) error
+	stateTransitionFunc map[State]map[State]func(context.Context) (error, LogLevel)
 
 	// callbacks
 	startCallbacks []func()
@@ -130,12 +139,12 @@ func (s *StateMachine) WaitForRunningIs(isRunning bool, checkInterval, timeout t
 	}
 }
 
-func (s *StateMachine) RegisterTransitionFunc(from State, to State, fn func(context.Context) error) {
+func (s *StateMachine) RegisterTransitionFunc(from State, to State, fn func(context.Context) (error, LogLevel)) {
 	if s.stateTransitionFunc == nil {
-		s.stateTransitionFunc = make(map[State]map[State]func(context.Context) error)
+		s.stateTransitionFunc = make(map[State]map[State]func(context.Context) (error, LogLevel))
 	}
 	if s.stateTransitionFunc[from] == nil {
-		s.stateTransitionFunc[from] = make(map[State]func(context.Context) error)
+		s.stateTransitionFunc[from] = make(map[State]func(context.Context) (error, LogLevel))
 	}
 	s.stateTransitionFunc[from][to] = fn
 }
@@ -179,8 +188,16 @@ func (s *StateMachine) processStateTransition(ctx context.Context, nextState Sta
 
 	if transitionMap, ok := s.stateTransitionFunc[s.state]; ok {
 		if transitionFunc, ok := transitionMap[nextState]; ok && transitionFunc != nil {
-			if err := transitionFunc(ctx); err != nil {
-				s.logger.WithError(err).Errorf("failed to transition from state %d to %d", s.state, nextState)
+			if err, logLevel := transitionFunc(ctx); err != nil {
+				switch logLevel {
+				case LogLevelInfo:
+					s.logger.WithError(err).Infof("failed to transition from state %d to %d", s.state, nextState)
+				case LogLevelWarn:
+					s.logger.WithError(err).Warnf("failed to transition from state %d to %d", s.state, nextState)
+				case LogLevelError:
+					s.logger.WithError(err).Errorf("failed to transition from state %d to %d", s.state, nextState)
+				}
+
 				return
 			} else {
 				s.state = nextState

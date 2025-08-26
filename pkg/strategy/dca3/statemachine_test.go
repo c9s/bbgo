@@ -49,9 +49,9 @@ func TestStateMachine_RegisterTransitionFunc(t *testing.T) {
 	sm := NewStateMachine(nil)
 
 	callCount := 0
-	transitionFunc := func(ctx context.Context) error {
+	transitionFunc := func(ctx context.Context) (error, LogLevel) {
 		callCount++
-		return nil
+		return nil, LogLevelNone
 	}
 
 	// Register transition function
@@ -61,7 +61,7 @@ func TestStateMachine_RegisterTransitionFunc(t *testing.T) {
 	assert.NotNil(t, sm.stateTransitionFunc[StateIdleWaiting][StateOpenPositionReady])
 
 	// Test transition function call
-	err := sm.stateTransitionFunc[StateIdleWaiting][StateOpenPositionReady](context.Background())
+	err, _ := sm.stateTransitionFunc[StateIdleWaiting][StateOpenPositionReady](context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 1, callCount)
 }
@@ -148,9 +148,9 @@ func TestStateMachine_StateTransition(t *testing.T) {
 	var transitionCalled atomic.Bool
 
 	// Register transition function
-	sm.RegisterTransitionFunc(StateIdleWaiting, StateOpenPositionReady, func(ctx context.Context) error {
+	sm.RegisterTransitionFunc(StateIdleWaiting, StateOpenPositionReady, func(ctx context.Context) (error, LogLevel) {
 		transitionCalled.Store(true)
-		return nil
+		return nil, LogLevelNone
 	})
 
 	// Set initial state
@@ -180,8 +180,8 @@ func TestStateMachine_StateTransitionError(t *testing.T) {
 	expectedError := fmt.Errorf("transition error")
 
 	// Register transition function that returns error
-	sm.RegisterTransitionFunc(StateIdleWaiting, StateOpenPositionReady, func(ctx context.Context) error {
-		return expectedError
+	sm.RegisterTransitionFunc(StateIdleWaiting, StateOpenPositionReady, func(ctx context.Context) (error, LogLevel) {
+		return expectedError, LogLevelError
 	})
 
 	// Set initial state

@@ -10,68 +10,68 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (s *Strategy) openPosition(ctx context.Context) error {
+func (s *Strategy) openPosition(ctx context.Context) (error, LogLevel) {
 	s.logger.Info("try to open position stage")
 	if s.nextRoundPaused {
-		return fmt.Errorf("nextRoundPaused is set to true, not placing open-position orders")
+		return fmt.Errorf("nextRoundPaused is set to true, not placing open-position orders"), LogLevelNone
 	}
 
 	if time.Now().Before(s.startTimeOfNextRound) {
-		return fmt.Errorf("startTimeOfNextRound (%s) is not reached yet, not placing open-position orders", s.startTimeOfNextRound.String())
+		return fmt.Errorf("startTimeOfNextRound (%s) is not reached yet, not placing open-position orders", s.startTimeOfNextRound.String()), LogLevelNone
 	}
 
 	// validate the stage by orders
 	currentRound, err := s.collector.CollectCurrentRound(ctx, recoverSinceLimit)
 	if err != nil {
-		return fmt.Errorf("failed to collect current round: %w", err)
+		return fmt.Errorf("failed to collect current round: %w", err), LogLevelError
 	}
 
 	for _, order := range currentRound.OpenPositionOrders {
 		if types.IsActiveOrder(order) {
-			return fmt.Errorf("there is at least one open-position order #%d is still active, it means we should not open position, please check it", order.OrderID)
+			return fmt.Errorf("there is at least one open-position order #%d is still active, it means we should not open position, please check it", order.OrderID), LogLevelError
 		}
 	}
 
 	for _, order := range currentRound.TakeProfitOrders {
 		if types.IsActiveOrder(order) {
-			return fmt.Errorf("there is at least one take-profit order #%d is still active, it means we should not open position, please check it", order.OrderID)
+			return fmt.Errorf("there is at least one take-profit order #%d is still active, it means we should not open position, please check it", order.OrderID), LogLevelError
 		}
 	}
 
 	s.logger.Info("place open-position orders")
-	if err := s.placeOpenPositionOrders(ctx); err != nil {
-		return fmt.Errorf("failed to place open-position orders: %w", err)
+	if err, logLevel := s.placeOpenPositionOrders(ctx); err != nil {
+		return fmt.Errorf("failed to place open-position orders: %w", err), logLevel
 	}
 
-	return nil
+	return nil, LogLevelNone
 }
 
-func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
+func (s *Strategy) placeOpenPositionOrders(ctx context.Context) (error, LogLevel) {
 	// get the best ask price to place open position orders
 	ticker, err := retry.QueryTickerUntilSuccessful(ctx, s.ExchangeSession.Exchange, s.Symbol)
 	if err != nil {
-		return fmt.Errorf("failed to get best price: %w", err)
+		return fmt.Errorf("failed to get best price: %w", err), LogLevelError
 	}
 
 	if ticker.Sell.IsZero() {
-		return fmt.Errorf("best ask price is zero, cannot place open position orders")
+		return fmt.Errorf("best ask price is zero, cannot place open position orders"), LogLevelError
 	}
 
 	// according to the settings to generate the open position orders
 	s.logger.Infof("generate open position orders for %s, quote investment: %f, profit: %f, price: %f, price deviation: %f, max order count: %d", s.Symbol, s.QuoteInvestment.Float64(), s.ProfitStats.TotalProfit.Float64(), ticker.Sell.Float64(), s.PriceDeviation.Float64(), s.MaxOrderCount)
 	orders, err := generateOpenPositionOrders(s.Market, s.QuoteInvestment, s.ProfitStats.TotalProfit, ticker.Sell, s.PriceDeviation, s.MaxOrderCount, s.OrderGroupID)
 	if err != nil {
-		return fmt.Errorf("failed to generate open position orders: %w", err)
+		return fmt.Errorf("failed to generate open position orders: %w", err), LogLevelWarn
 	}
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orders...)
 	if err != nil {
-		return fmt.Errorf("failed to submit open position orders: %w", err)
+		return fmt.Errorf("failed to submit open position orders: %w", err), LogLevelError
 	}
 
 	debugOrders(s.logger, "CREATED", createdOrders)
 
-	return nil
+	return nil, LogLevelNone
 }
 
 func generateOpenPositionOrders(market types.Market, quoteInvestment, profit, price, priceDeviation fixedpoint.Value, orderNum int64, orderGroupID uint32) ([]types.SubmitOrder, error) {
@@ -132,7 +132,7 @@ func generateOpenPositionOrders(market types.Market, quoteInvestment, profit, pr
 	return submitOrders, nil
 }
 
-func (s *Strategy) cancelOpenPositionOrders(ctx context.Context) error {
+func (s *Strategy) cancelOpenPositionOrders(ctx context.Context) (error, LogLevel) {
 	s.logger.Info("try to cancel open-position orders")
 	var activeOpenPositionOrders types.OrderSlice
 	orders := s.OrderExecutor.ActiveMakerOrders().Orders()
@@ -144,8 +144,12 @@ func (s *Strategy) cancelOpenPositionOrders(ctx context.Context) error {
 
 	if len(activeOpenPositionOrders) == 0 {
 		s.logger.Warn("no active open-position orders to update, nothing to do")
-		return nil
+		return nil, LogLevelNone
 	}
 
-	return s.OrderExecutor.GracefulCancel(ctx, activeOpenPositionOrders...)
+	if err := s.OrderExecutor.GracefulCancel(ctx, activeOpenPositionOrders...); err != nil {
+		return fmt.Errorf("failed to cancel active open-position orders: %w", err), LogLevelError
+	}
+
+	return nil, LogLevelNone
 }
