@@ -996,9 +996,10 @@ type UserOrder struct {
 	// MtsTif - Millisecond epoch timestamp for TIF (Time-In-Force)
 	MtsTIF *int64 // [10] MTS_TIF
 
-	_      any    // [11] PLACEHOLDER
-	Flags  *int64 // [12] FLAGS
-	Status string // [13] STATUS
+	_     any    // [11] PLACEHOLDER
+	Flags *int64 // [12] FLAGS
+
+	Status OrderStatus // [13] STATUS
 
 	_ any // [14] PLACEHOLDER
 	_ any // [15] PLACEHOLDER

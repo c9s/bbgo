@@ -448,7 +448,7 @@ func TestParser_ParsePrivateMessages(t *testing.T) {
 				assert.InDelta(t, 0.001, order.Amount.Float64(), 1e-8)
 				assert.InDelta(t, 10000, order.Price.Float64(), 1e-8)
 				assert.Equal(t, OrderTypeExchangeLimit, order.OrderType)
-				assert.Equal(t, "ACTIVE", order.Status)
+				assert.Equal(t, OrderStatusActive, order.Status)
 				assert.Equal(t, "API>BFX", *order.Routing)
 				if assert.NotNil(t, order.Meta) {
 					t.Logf("order meta: %+v", order.Meta)

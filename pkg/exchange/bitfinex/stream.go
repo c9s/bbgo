@@ -53,6 +53,9 @@ type Stream struct {
 	orderUpdateEventCallbacks   []func(e *bfxapi.UserOrder)
 	tradeUpdateEventCallbacks   []func(e *bfxapi.TradeUpdateEvent)
 
+	// balanceUpdateEventCallbacks (balance update is actually AUM update in Bitfinex, not the "balance" we usually think of)
+	balanceUpdateEventCallbacks []func(e *bfxapi.BalanceUpdateEvent)
+
 	parser *bfxapi.Parser
 	logger logrus.FieldLogger
 
@@ -269,6 +272,7 @@ func (s *Stream) writeSubscriptions() error {
 // dispatchEvent dispatches parsed events to corresponding callbacks.
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch evt := e.(type) {
+	case nil:
 
 	case *bfxapi.WebSocketResponse:
 		s.EmitResponse(evt)
@@ -278,6 +282,10 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *bfxapi.WalletSnapshotEvent:
 		s.EmitWalletSnapshotEvent(evt)
+
+	case *bfxapi.BalanceUpdateEvent:
+		// balance update (balance update is actually AUM update in Bitfinex)
+		s.EmitBalanceUpdateEvent(evt)
 
 	case *bfxapi.UserPositionSnapshotEvent:
 		s.EmitPositionSnapshotEvent(evt)
@@ -363,8 +371,9 @@ func convertWsUserOrder(uo *bfxapi.UserOrder) *types.Order {
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   uo.Symbol,
 			Type:     toGlobalOrderType(uo.OrderType),
+			Side:     toGlobalSide(uo.AmountOrig),
 			Price:    uo.Price,
-			Quantity: uo.AmountOrig,
+			Quantity: uo.AmountOrig.Abs(),
 			ClientOrderID: func() string {
 				if uo.CID != nil {
 					return strconv.FormatInt(*uo.CID, 10)
@@ -374,8 +383,8 @@ func convertWsUserOrder(uo *bfxapi.UserOrder) *types.Order {
 			}(),
 		},
 		OrderID:          uint64(uo.OrderID),
-		ExecutedQuantity: uo.AmountOrig.Sub(uo.Amount),
-		Status:           types.OrderStatus(uo.Status),
+		ExecutedQuantity: uo.AmountOrig.Abs().Sub(uo.Amount.Abs()),
+		Status:           toGlobalOrderStatus(uo.Status),
 		CreationTime:     types.Time(uo.CreatedAt.Time()),
 		UpdateTime:       types.Time(uo.UpdatedAt.Time()),
 	}
@@ -389,14 +398,8 @@ func convertWsUserTrade(ut *bfxapi.TradeUpdateEvent) *types.Trade {
 		OrderID:  uint64(ut.OrderID),
 		Symbol:   ut.Symbol,
 		Price:    ut.ExecPrice,
-		Quantity: ut.ExecAmount,
-		Side: func() types.SideType {
-			if ut.ExecAmount.Sign() > 0 {
-				return types.SideTypeBuy
-			} else {
-				return types.SideTypeSell
-			}
-		}(),
+		Quantity: ut.ExecAmount.Abs(),
+		Side:     toGlobalSide(ut.ExecAmount),
 		Fee: func() fixedpoint.Value {
 			if ut.Fee != nil {
 				return *ut.Fee

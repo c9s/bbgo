@@ -80,6 +80,8 @@ func (t *MarginOrderSideEffectType) UnmarshalJSON(data []byte) error {
 }
 
 // OrderType define order type
+//
+//go:generate mapgen -type OrderType
 type OrderType string
 
 const (
@@ -108,6 +110,7 @@ func (t *OrderType) Scan(v interface{}) error {
 
 const NoClientOrderID = "0"
 
+//go:generate mapgen -type OrderStatus
 type OrderStatus string
 
 const (
@@ -371,6 +374,55 @@ func (o *Order) Update(update Order) {
 		o.Price = update.Price
 	}
 	o.IsWorking = update.IsWorking
+}
+
+// Validate checks if the Order fields are valid and returns an error if not.
+func (o *Order) Validate() error {
+	if o.Symbol == "" {
+		return fmt.Errorf("order validation failed: symbol is required")
+	}
+	if o.Side != SideTypeBuy && o.Side != SideTypeSell {
+		return fmt.Errorf("order validation failed: invalid side: %v", o.Side)
+	}
+	if o.Type == "" {
+		return fmt.Errorf("order validation failed: order type is required")
+	}
+
+	if o.Quantity.Sign() <= 0 {
+		return fmt.Errorf("order validation failed: quantity must be positive")
+	}
+
+	if o.Type != OrderTypeMarket && o.Price.Sign() <= 0 {
+		return fmt.Errorf("order validation failed: price must be positive for non-market orders")
+	}
+
+	if !ValidateOrderStatus(o.Status) {
+		return fmt.Errorf("order validation failed: invalid order status: %v", o.Status)
+	}
+
+	switch o.Status {
+	case OrderStatusNew:
+		if o.ExecutedQuantity.Sign() != 0 {
+			return fmt.Errorf("order validation failed: executed quantity must be zero for new orders")
+		}
+
+	case OrderStatusPartiallyFilled:
+		if o.ExecutedQuantity.Sign() <= 0 {
+			return fmt.Errorf("order validation failed: executed quantity must be positive for partially filled orders")
+		}
+
+	case OrderStatusFilled:
+		if o.ExecutedQuantity.Compare(o.Quantity) != 0 {
+			return fmt.Errorf("order validation failed: executed quantity must be equal to quantity for filled orders")
+		}
+
+	}
+
+	if !ValidateOrderType(o.Type) {
+		return fmt.Errorf("order validation failed: invalid order type: %v", o.Type)
+	}
+
+	return nil
 }
 
 func (o *Order) GetRemainingQuantity() fixedpoint.Value {
