@@ -270,3 +270,25 @@ type TradeKey struct {
 func (k TradeKey) String() string {
 	return k.Exchange.String() + strconv.FormatUint(k.ID, 10) + k.Side.String()
 }
+
+// Validate checks the mandatory fields of Trade and returns an error if any are invalid.
+// Mandatory fields: Symbol, Price, Quantity, Side, Time.
+func (trade Trade) Validate() error {
+	if trade.Symbol == "" {
+		return fmt.Errorf("trade symbol is empty")
+	}
+	if trade.Price.Sign() <= 0 {
+		return fmt.Errorf("trade price must be positive, got %s", trade.Price.String())
+	}
+	if trade.Quantity.Sign() <= 0 {
+		return fmt.Errorf("trade quantity must be positive, got %s", trade.Quantity.String())
+	}
+	if trade.Side != SideTypeBuy && trade.Side != SideTypeSell {
+		return fmt.Errorf("trade side must be buy or sell, got %s", trade.Side.String())
+	}
+	if trade.Time.Time().IsZero() {
+		return fmt.Errorf("trade time is zero")
+	}
+
+	return nil
+}

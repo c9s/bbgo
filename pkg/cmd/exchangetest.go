@@ -185,22 +185,28 @@ var exchangeTestCmd = &cobra.Command{
 			marketDataStream.OnMarketTrade(func(trade types.Trade) {
 				tradeCount++
 				tradeSamples = append(tradeSamples, trade)
-				log.Infof("market trade: %+v", trade)
+				if err := trade.Validate(); err != nil {
+					log.Errorf("invalid trade: %s, trade: %+v", err, trade)
+				}
 			})
 			marketDataStream.OnKLine(func(kline types.KLine) {
 				klineCount++
 				klineSamples = append(klineSamples, kline)
+
 				log.Infof("kline: %+v", kline)
+
+				if err := kline.Validate(); err != nil {
+					log.Errorf("invalid kline: %s, kline: %+v", err, kline)
+				}
 			})
 			marketDataStream.OnBookSnapshot(func(book types.SliceOrderBook) {
 				bookSnapshotCount++
 				bookSnapshotSamples = append(bookSnapshotSamples, book)
-				log.Infof("book snapshot: %+v", book)
 			})
+
 			marketDataStream.OnBookUpdate(func(book types.SliceOrderBook) {
 				bookUpdateCount++
 				bookUpdateSamples = append(bookUpdateSamples, book)
-				log.Infof("book update: %+v", book)
 			})
 
 			marketDataCtx, cancelMarketData := context.WithCancel(ctx)
@@ -214,13 +220,15 @@ var exchangeTestCmd = &cobra.Command{
 					return
 				case <-time.After(3 * time.Minute):
 					cancelMarketData()
+					return
 				}
 			}()
 
 			err := marketDataStream.Connect(marketDataCtx)
 			if noError(err, "marketDataStream.Connect") {
 				<-marketDataDone
-			
+				log.Infof("market data collection done: trades=%d, klines=%d, bookSnapshots=%d, bookUpdates=%d", tradeCount, klineCount, bookSnapshotCount, bookUpdateCount)
+
 				// check statistics and data correctness
 				if tradeCount == 0 {
 					log.Errorf("no market trade received")
@@ -259,8 +267,8 @@ var exchangeTestCmd = &cobra.Command{
 				}
 				if len(bookUpdateSamples) > 0 {
 					for _, b := range bookUpdateSamples {
-						if len(b.Bids) == 0 && len(b.Asks) == 0 {
-							log.Errorf("empty book update: %+v", b)
+						if err := b.Validate(); err != nil {
+							log.Errorf("invalid book update: %s, book: %+v", err, b)
 						}
 					}
 				}
@@ -269,6 +277,7 @@ var exchangeTestCmd = &cobra.Command{
 			log.Warnf("types.Exchange is not implemented, some tests will be skipped")
 		}
 
+		log.Infof("exchange test for %s completed, press Ctrl+C to exit", exchangeName)
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		cancel()
 

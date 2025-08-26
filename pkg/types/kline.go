@@ -712,3 +712,34 @@ func ShrinkSlice[S ~[]E, E comparable](slice S, thresholdLen, newSize int) S {
 	copy(newSlice, slice[start:])
 	return newSlice
 }
+
+// Validate checks the mandatory fields of KLine and returns an error if any are invalid.
+// Mandatory fields: Symbol, Interval, Open, Close, High, Low, StartTime, EndTime.
+func (k *KLine) Validate() error {
+	if k.Symbol == "" {
+		return fmt.Errorf("kline symbol is empty")
+	}
+	if k.Interval == "" {
+		return fmt.Errorf("kline interval is empty")
+	}
+	if k.Open.Sign() <= 0 {
+		return fmt.Errorf("kline open price must be positive, got %s", k.Open.String())
+	}
+	if k.Close.Sign() <= 0 {
+		return fmt.Errorf("kline close price must be positive, got %s", k.Close.String())
+	}
+	if k.High.Sign() <= 0 {
+		return fmt.Errorf("kline high price must be positive, got %s", k.High.String())
+	}
+	if k.Low.Sign() <= 0 {
+		return fmt.Errorf("kline low price must be positive, got %s", k.Low.String())
+	}
+
+	if time.Time(k.StartTime).IsZero() {
+		return fmt.Errorf("kline start time is zero")
+	}
+	if time.Time(k.EndTime).IsZero() {
+		return fmt.Errorf("kline end time is zero")
+	}
+	return nil
+}

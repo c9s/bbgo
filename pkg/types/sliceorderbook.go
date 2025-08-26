@@ -213,3 +213,23 @@ func (b *SliceOrderBook) Copy() OrderBook {
 	book.Asks = b.Asks.Copy()
 	return &book
 }
+
+// Validate checks the mandatory fields of SliceOrderBook and returns an error if any are invalid.
+// Mandatory fields: Symbol, at least one bid or ask, best bid/ask price > 0.
+func (b *SliceOrderBook) Validate() error {
+	if b.Symbol == "" {
+		return fmt.Errorf("order book symbol is empty")
+	}
+	if len(b.Bids) == 0 && len(b.Asks) == 0 {
+		return fmt.Errorf("order book has no bids or asks")
+	}
+	bestBid, hasBid := b.BestBid()
+	bestAsk, hasAsk := b.BestAsk()
+	if hasBid && bestBid.Price.Sign() <= 0 {
+		return fmt.Errorf("best bid price must be positive, got %s", bestBid.Price.String())
+	}
+	if hasAsk && bestAsk.Price.Sign() <= 0 {
+		return fmt.Errorf("best ask price must be positive, got %s", bestAsk.Price.String())
+	}
+	return nil
+}

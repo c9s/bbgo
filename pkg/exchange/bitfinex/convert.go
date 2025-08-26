@@ -276,6 +276,8 @@ func convertDepth(resp *bfxapi.BookResponse) types.SliceOrderBook {
 func convertCandle(c bfxapi.Candle, symbol string, interval types.Interval) types.KLine {
 	return types.KLine{
 		Symbol:    toGlobalSymbol(symbol),
+		Exchange:  ID,
+		Interval:  interval,
 		StartTime: types.Time(c.Time.Time()),
 		EndTime:   types.Time(c.Time.Time().Add(interval.Duration() - time.Millisecond)),
 		Open:      c.Open,
