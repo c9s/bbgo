@@ -154,14 +154,35 @@ var exchangeTestCmd = &cobra.Command{
 			log.Warnf("types.ExchangeMarketDataService is not implemented")
 		}
 
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
 		if ex, ok := exMinimal.(types.Exchange); ok {
 			environ.AddExchange(exchangeName.String(), ex)
 			checked("types.Exchange", "the Exchange interface is implemented")
+
+			marketDataStream := ex.NewStream()
+			marketDataStream.SetPublicOnly()
+			marketDataStream.Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
+				Depth: types.DepthLevelFull,
+			})
+
+			marketDataStream.OnBookSnapshot(func(book types.SliceOrderBook) {
+				log.Infof("book snapshot: %+v", book)
+			})
+			marketDataStream.OnBookUpdate(func(book types.SliceOrderBook) {
+				log.Infof("book update: %+v", book)
+			})
+			err := marketDataStream.Connect(ctx)
+			if noError(err, "marketDataStream.Connect") {
+			}
 		} else {
 			log.Warnf("types.Exchange is not implemented, some tests will be skipped")
 		}
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
+		cancel()
+
 		return nil
 	},
 }

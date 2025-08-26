@@ -53,7 +53,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 	return ""
 }
 
-// NewStream ...
+// NewStream creates a new data stream for Bitfinex.
 func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e)
 }

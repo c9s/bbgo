@@ -91,12 +91,10 @@ func NewStream(ex *Exchange) *Stream {
 		// e.g. "key": "trade:1m:tBTCUSD"
 		resp, ok := stream.parser.GetChannelResponse(e.ChannelID)
 		if !ok {
-			log.Errorf("unable to find channel response for channel ID: %d, candle event: %+v", e.ChannelID, e)
+			log.Errorf("unable to find channel response for channel ID: %d, event %T: %+v", e.ChannelID, e, e)
 			return
-		}
-
-		if resp.Key == "" {
-			log.Errorf("unable to find channel response key for channel ID: %d, candle event: %+v", e.ChannelID, e)
+		} else if resp.Key == "" {
+			log.Errorf("unable to find channel response key for channel ID: %d, event %T: %+v", e.ChannelID, e, e)
 			return
 		}
 
@@ -111,6 +109,17 @@ func NewStream(ex *Exchange) *Stream {
 	stream.OnStatusEvent(func(e *bfxapi.StatusEvent) {})
 
 	stream.OnPublicTradeEvent(func(e *bfxapi.PublicTradeEvent) {
+		resp, ok := stream.parser.GetChannelResponse(e.ChannelID)
+		if !ok {
+			log.Errorf("unable to find channel response for channel ID: %d, event %T: %+v", e.ChannelID, e, e)
+			return
+		} else if resp.Symbol == "" {
+			log.Errorf("unable to find channel response symbol for channel ID: %d, event %T: %+v", e.ChannelID, e, e)
+			return
+		}
+
+		trade := convertPublicTrade(e, resp)
+		stream.EmitMarketTrade(trade)
 	})
 
 	stream.OnBookSnapshotEvent(func(e *bfxapi.BookSnapshotEvent) {
@@ -184,6 +193,13 @@ func (s *Stream) onConnect() {
 		return
 	}
 
+	if s.PublicOnly {
+		if err := s.writeSubscriptions(); err != nil {
+			log.WithError(err).Error("subscribe error")
+		}
+		return
+	}
+
 	if endpoint == bfxapi.PrivateWebSocketURL {
 		apiKey := s.ex.apiKey
 		apiSecret := s.ex.apiSecret
@@ -199,6 +215,35 @@ func (s *Stream) onConnect() {
 
 		s.logger.Info("bitfinex private websocket: sent auth message")
 	}
+}
+
+// writeSubscriptions send the subscription command to the websocket
+// server in order to establish the connection to market data sources
+func (s *Stream) writeSubscriptions() error {
+	var reqs []*bfxapi.WebSocketRequest
+	for _, subscription := range s.Subscriptions {
+		req := convertSubscription(subscription)
+		if req == nil {
+			continue
+		}
+
+		reqs = append(reqs, req)
+	}
+
+	if len(reqs) == 0 {
+		return nil
+	}
+
+	var err error
+	for _, req := range reqs {
+		s.logger.Infof("subscribing to channel: %+v", req)
+		err = s.Conn.WriteJSON(req)
+		if err != nil {
+			s.logger.WithError(err).Errorf("failed to subscribe to channel: %+v", req)
+		}
+	}
+
+	return err
 }
 
 // dispatchEvent dispatches parsed events to corresponding callbacks.
@@ -342,5 +387,93 @@ func convertWsUserTrade(ut *bfxapi.TradeUpdateEvent) *types.Trade {
 		}(),
 		IsMaker: ut.Maker == 1,
 		Time:    types.Time(ut.Time.Time()),
+	}
+}
+
+// convertPublicTrade converts a Bitfinex PublicTradeEvent to types.Trade.
+// It uses the channel response to get the symbol.
+func convertPublicTrade(e *bfxapi.PublicTradeEvent, resp *bfxapi.WebSocketResponse) types.Trade {
+	var side types.SideType
+	if e.Trade.Amount.Sign() >= 0 {
+		side = types.SideTypeBuy
+	} else {
+		side = types.SideTypeSell
+	}
+
+	return types.Trade{
+		ID:       uint64(e.Trade.ID),
+		Exchange: ID,
+		Symbol:   resp.Symbol,
+		Price:    e.Trade.Price,
+		Quantity: e.Trade.Amount.Abs(),
+		Side:     side,
+		IsMaker:  false, // public trade are taker, Bitfinex public trade does not provide maker info
+		Time:     types.Time(e.Trade.Time),
+	}
+}
+
+// convertSubscription converts a types.Subscription to bfxapi.WebSocketRequest.
+// It maps channel, symbol, and options to the request fields.
+// For types.KLineChannel, it builds req.Key as 'trade:TIMEFRAME:SYMBOL'.
+func convertSubscription(sub types.Subscription) *bfxapi.WebSocketRequest {
+	ch := convertChannel(sub.Channel)
+	if ch == "" {
+		return nil
+	}
+
+	req := &bfxapi.WebSocketRequest{
+		Event:   "subscribe",
+		Channel: ch,
+		Symbol:  toLocalSymbol(sub.Symbol),
+	}
+
+	// For kline channel, build the key as 'trade:TIMEFRAME:SYMBOL'
+	switch sub.Channel {
+	case types.KLineChannel:
+		interval := sub.Options.Interval
+		if interval == "" {
+			interval = "1m" // default to 1m if not specified
+		}
+
+		req.Key = "trade:" + interval.String() + ":" + toLocalSymbol(sub.Symbol)
+	case types.BookChannel:
+		req.Prec = "P0"
+		req.Frequency = "F0"
+		switch sub.Options.Depth {
+		case types.DepthLevelMedium:
+			req.Length = "100" // Number of price points ("1", "25", "100", "250") [default="25"]
+		case types.DepthLevelFull:
+			req.Length = "250" // Number of price points ("1", "25", "100", "250") [default="25"]
+		default:
+			req.Length = "25" // Number of price points ("1", "25", "100", "250") [default="25"]
+		}
+	case types.BookTickerChannel:
+		req.Prec = "P0"
+		req.Frequency = "F0"
+		req.Length = "1" // Number of price points ("1", "25", "100", "250") [default="25"]
+	}
+
+	return req
+}
+
+// convertChannel converts types.Channel to bfxapi.Channel.
+// It maps bbgo types.Channel constants to Bitfinex channel names.
+func convertChannel(ch types.Channel) bfxapi.Channel {
+	switch ch {
+	case types.BookChannel:
+		return bfxapi.ChannelBook
+	case types.BookTickerChannel:
+		return bfxapi.ChannelBook
+
+		// return bfxapi.ChannelTicker
+
+	case types.MarketTradeChannel:
+		return bfxapi.ChannelTrades
+
+	case types.KLineChannel:
+		return bfxapi.ChannelCandles
+
+	default:
+		return bfxapi.Channel(ch)
 	}
 }
