@@ -463,6 +463,20 @@ func testUserDataStream(ctx context.Context, ex types.Exchange) {
 
 		assert(len(tradeSamples) > 0, "trade samples are not empty")
 		assert(tradeCount > 0, "trade count is positive")
+		for _, trade := range tradeSamples {
+			switch trade.OrderID {
+			case createdOrder1.OrderID:
+				assert(
+					trade.Side == createdOrder1.Side,
+					"trade side matches createdOrder1 side: %s, %d",
+					createdOrder1.Side, trade.ID)
+			case createdOrder2.OrderID:
+				assert(
+					trade.Side == createdOrder2.Side,
+					"trade side matches createdOrder2 side: %s, %d",
+					createdOrder2.Side, trade.ID)
+			}
+		}
 
 		assert(len(balanceSamples) > 0, "balance samples are not empty")
 		assert(balanceCount > 0, "balance count is positive")
