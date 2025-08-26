@@ -80,6 +80,8 @@ func (t *MarginOrderSideEffectType) UnmarshalJSON(data []byte) error {
 }
 
 // OrderType define order type
+//
+//go:generate mapgen -type OrderType
 type OrderType string
 
 const (
@@ -396,6 +398,10 @@ func (o *Order) Validate() error {
 
 	if !ValidateOrderStatus(o.Status) {
 		return fmt.Errorf("order validation failed: invalid order status: %v", o.Status)
+	}
+
+	if !ValidateOrderType(o.Type) {
+		return fmt.Errorf("order validation failed: invalid order type: %v", o.Type)
 	}
 
 	return nil
