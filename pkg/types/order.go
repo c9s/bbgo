@@ -108,6 +108,7 @@ func (t *OrderType) Scan(v interface{}) error {
 
 const NoClientOrderID = "0"
 
+//go:generate mapgen -type OrderStatus
 type OrderStatus string
 
 const (
@@ -384,12 +385,17 @@ func (o *Order) Validate() error {
 	if o.Type == "" {
 		return fmt.Errorf("order validation failed: order type is required")
 	}
+
 	if o.Quantity.Sign() <= 0 {
 		return fmt.Errorf("order validation failed: quantity must be positive")
 	}
 
 	if o.Type != OrderTypeMarket && o.Price.Sign() <= 0 {
 		return fmt.Errorf("order validation failed: price must be positive for non-market orders")
+	}
+
+	if !ValidateOrderStatus(o.Status) {
+		return fmt.Errorf("order validation failed: invalid order status: %v", o.Status)
 	}
 
 	return nil
