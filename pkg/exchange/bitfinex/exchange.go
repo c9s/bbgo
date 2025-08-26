@@ -76,16 +76,23 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		symbol := toGlobalSymbol(pair.Pair)
 		base, quote := splitLocalSymbol(pair.Pair)
 		markets[symbol] = types.Market{
-			Exchange:        ID,
-			Symbol:          symbol,
-			BaseCurrency:    toGlobalCurrency(base),
-			QuoteCurrency:   toGlobalCurrency(quote),
-			MinQuantity:     pair.MinOrderSize,
-			MaxQuantity:     pair.MaxOrderSize,
-			MinNotional:     fixedpoint.NewFromFloat(10.0),
-			PricePrecision:  8,
+			Exchange:      ID,
+			Symbol:        symbol,
+			BaseCurrency:  toGlobalCurrency(base),
+			QuoteCurrency: toGlobalCurrency(quote),
+			MinQuantity:   pair.MinOrderSize,
+			MaxQuantity:   pair.MaxOrderSize,
+			MinNotional:   fixedpoint.NewFromFloat(10.0),
+
+			// The precision level of all trading prices is based on significant figures.
+			// All pairs on Bitfinex use up to 5 significant digits and up to 8 decimals
+			// (e.g. 1.2345, 123.45, 1234.5, 0.00012345). Prices submit with a precision larger than 5 will be cut by the API.
+			PricePrecision: 8,
+
+			// The amount field allows up to 8 decimals. Anything exceeding this will be rounded to the 8th decimal.
 			VolumePrecision: 8,
 			StepSize:        fixedpoint.NewFromFloat(0.00001), // manually customized step size for bitfinex
+			TickSize:        fixedpoint.NewFromFloat(0.00001), // manually customized tick size for bitfinex
 		}
 	}
 	return markets, nil
