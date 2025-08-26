@@ -11,20 +11,20 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (s *Strategy) startTakeProfitStage(ctx context.Context) error {
+func (s *Strategy) startTakeProfitStage(ctx context.Context) (error, LogLevel) {
 	if s.Position.GetBase().Abs().Compare(s.Market.MinQuantity) < 0 {
-		return fmt.Errorf("position base (%s) is less than min quantity (%s), not placing take-profit order", s.Position.GetBase().String(), s.Market.MinQuantity.String())
+		return fmt.Errorf("position base (%s) is less than min quantity (%s), not placing take-profit order", s.Position.GetBase().String(), s.Market.MinQuantity.String()), LogLevelWarn
 	}
 	s.logger.Info("try to place take-profit order stage")
 
 	currentRound, err := s.collector.CollectCurrentRound(ctx, recoverSinceLimit)
 	if err != nil {
-		return fmt.Errorf("failed to collect current round: %w", err)
+		return fmt.Errorf("failed to collect current round: %w", err), LogLevelError
 	}
 
 	for _, order := range currentRound.TakeProfitOrders {
 		if types.IsActiveOrder(order) {
-			return fmt.Errorf("there is at least one take-profit order #%d is still active, it means we should not place take-profit order again, please check it", order.OrderID)
+			return fmt.Errorf("there is at least one take-profit order #%d is still active, it means we should not place take-profit order again, please check it", order.OrderID), LogLevelError
 		}
 	}
 
@@ -35,14 +35,14 @@ func (s *Strategy) startTakeProfitStage(ctx context.Context) error {
 	}
 
 	if executedQuantity.Compare(s.Market.MinQuantity) < 0 {
-		return fmt.Errorf("executed quantity (%f) is less than min quantity (%f), not placing take-profit order", executedQuantity.Float64(), s.Market.MinQuantity.Float64())
+		return fmt.Errorf("executed quantity (%f) is less than min quantity (%f), not placing take-profit order", executedQuantity.Float64(), s.Market.MinQuantity.Float64()), LogLevelError
 	}
 
 	if err := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
-		return fmt.Errorf("failed to place take-profit order: %w", err)
+		return fmt.Errorf("failed to place take-profit order: %w", err), LogLevelError
 	}
 
-	return nil
+	return nil, LogLevelNone
 }
 
 func (s *Strategy) placeTakeProfitOrder(ctx context.Context, currentRound Round) error {
@@ -110,7 +110,7 @@ func (s *Strategy) placeTakeProfitOrder(ctx context.Context, currentRound Round)
 	return nil
 }
 
-func (s *Strategy) cancelTakeProfitOrders(ctx context.Context) error {
+func (s *Strategy) cancelTakeProfitOrders(ctx context.Context) (error, LogLevel) {
 	s.logger.Info("try to cancel take-profit orders")
 	var activeTakeProfitOrders types.OrderSlice
 	orders := s.OrderExecutor.ActiveMakerOrders().Orders()
@@ -122,27 +122,27 @@ func (s *Strategy) cancelTakeProfitOrders(ctx context.Context) error {
 
 	if len(activeTakeProfitOrders) == 0 {
 		s.logger.Warn("no active take-profit orders to update, nothing to do")
-		return nil
+		return nil, LogLevelNone
 	}
 
 	if err := s.OrderExecutor.GracefulCancel(ctx, activeTakeProfitOrders...); err != nil {
-		return fmt.Errorf("failed to cancel existing take-profit orders: %w", err)
+		return fmt.Errorf("failed to cancel existing take-profit orders: %w", err), LogLevelError
 	}
 
-	return nil
+	return nil, LogLevelNone
 }
 
-func (s *Strategy) updateTakeProfitOrder(ctx context.Context) error {
+func (s *Strategy) updateTakeProfitOrder(ctx context.Context) (error, LogLevel) {
 	s.logger.Info("try to update take-profit order")
-	if err := s.cancelTakeProfitOrders(ctx); err != nil {
-		return fmt.Errorf("failed to cancel existing take-profit orders: %w", err)
+	if err, logLevel := s.cancelTakeProfitOrders(ctx); err != nil {
+		return fmt.Errorf("failed to cancel existing take-profit orders: %w", err), logLevel
 	}
 
 	s.logger.Info("try to place new take-profit order")
 
 	currentRound, err := s.collector.CollectCurrentRound(ctx, recoverSinceLimit)
 	if err != nil {
-		return fmt.Errorf("failed to collect current round: %w", err)
+		return fmt.Errorf("failed to collect current round: %w", err), LogLevelError
 	}
 
 	// make sure the executed quantity of open-position orders is enough
@@ -152,21 +152,25 @@ func (s *Strategy) updateTakeProfitOrder(ctx context.Context) error {
 	}
 
 	if executedQuantity.Compare(s.Market.MinQuantity) < 0 {
-		return fmt.Errorf("executed quantity (%f) is less than min quantity (%f), not placing take-profit order", executedQuantity.Float64(), s.Market.MinQuantity.Float64())
+		return fmt.Errorf("executed quantity (%f) is less than min quantity (%f), not placing take-profit order", executedQuantity.Float64(), s.Market.MinQuantity.Float64()), LogLevelError
 	}
 
-	return s.placeTakeProfitOrder(ctx, currentRound)
+	if err := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
+		return fmt.Errorf("failed to place take-profit order: %w", err), LogLevelError
+	}
+
+	return nil, LogLevelNone
 }
 
-func (s *Strategy) finishTakeProfitStage(ctx context.Context) error {
+func (s *Strategy) finishTakeProfitStage(ctx context.Context) (error, LogLevel) {
 	s.logger.Info("try to finish take-profit stage")
 	if s.OrderExecutor.ActiveMakerOrders().NumOfOrders() > 0 {
-		return fmt.Errorf("there are still active orders so we can't finish take-profit stage, please check it")
+		return fmt.Errorf("there are still active orders so we can't finish take-profit stage, please check it"), LogLevelError
 	}
 
 	// cancel all orders
 	if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
-		return fmt.Errorf("failed to cancel all orders: %w", err)
+		return fmt.Errorf("failed to cancel all orders: %w", err), LogLevelError
 	}
 
 	// wait 3 seconds to avoid position not update
@@ -188,5 +192,5 @@ func (s *Strategy) finishTakeProfitStage(ctx context.Context) error {
 	// set the start time of the next round
 	s.startTimeOfNextRound = time.Now().Add(s.CoolDownInterval.Duration())
 
-	return nil
+	return nil, LogLevelNone
 }

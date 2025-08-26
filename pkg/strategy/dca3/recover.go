@@ -218,7 +218,16 @@ func (s *Strategy) recoverStateTakeProfit(
 	// if there is no executed take-profit order. it means we don't need to cancel open-position orders but only update take-profit order if needed
 	if executedTPQuantity.IsZero() {
 		if tpQuantity.Compare(pendingTPQuantity) > 0 {
-			if err := s.updateTakeProfitOrder(ctx); err != nil {
+			if err, logLevel := s.updateTakeProfitOrder(ctx); err != nil {
+				switch logLevel {
+				case LogLevelInfo:
+					s.logger.WithError(err).Info("failed to update take-profit order when recovering at take-profit stage")
+				case LogLevelWarn:
+					s.logger.WithError(err).Warn("failed to update take-profit order when recovering at take-profit stage")
+				case LogLevelError:
+					s.logger.WithError(err).Error("failed to update take-profit order when recovering at take-profit stage")
+				}
+
 				return None, fmt.Errorf("failed to update take-profit order when recovering at take-profit stage: %w", err)
 			}
 		}
@@ -227,7 +236,15 @@ func (s *Strategy) recoverStateTakeProfit(
 
 	// we need to cancel all open-position orders first because the take-profit order is reached (executedTPQuantity > 0)
 	if len(openedOP) > 0 {
-		if err := s.cancelOpenPositionOrders(ctx); err != nil {
+		if err, logLevel := s.cancelOpenPositionOrders(ctx); err != nil {
+			switch logLevel {
+			case LogLevelInfo:
+				s.logger.WithError(err).Info("failed to cancel open-position orders when recovering at take-profit stage")
+			case LogLevelWarn:
+				s.logger.WithError(err).Warn("failed to cancel open-position orders when recovering at take-profit stage")
+			case LogLevelError:
+				s.logger.WithError(err).Error("failed to cancel open-position orders when recovering at take-profit stage")
+			}
 			return None, fmt.Errorf("failed to cancel open-position orders when recovering at take-profit stage: %w", err)
 		}
 	}
@@ -237,7 +254,15 @@ func (s *Strategy) recoverStateTakeProfit(
 	}
 
 	if tpQuantity.Compare(pendingTPQuantity) > 0 && tpQuantity.Compare(s.Market.MinQuantity) > 0 {
-		if err := s.updateTakeProfitOrder(ctx); err != nil {
+		if err, logLevel := s.updateTakeProfitOrder(ctx); err != nil {
+			switch logLevel {
+			case LogLevelInfo:
+				s.logger.WithError(err).Info("failed to update take-profit order when recovering at take-profit stage")
+			case LogLevelWarn:
+				s.logger.WithError(err).Warn("failed to update take-profit order when recovering at take-profit stage")
+			case LogLevelError:
+				s.logger.WithError(err).Error("failed to update take-profit order when recovering at take-profit stage")
+			}
 			return None, fmt.Errorf("failed to update take-profit order when recovering at take-profit stage: %w", err)
 		}
 	}
