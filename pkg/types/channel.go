@@ -3,8 +3,10 @@ package types
 type Channel string
 
 const (
-	BookChannel        = Channel("book")
-	KLineChannel       = Channel("kline")
+	BookChannel   = Channel("book")
+	KLineChannel  = Channel("kline")
+	TickerChannel = Channel("ticker")
+	
 	BookTickerChannel  = Channel("bookTicker")
 	MarketTradeChannel = Channel("trade")
 	AggTradeChannel    = Channel("aggTrade")
