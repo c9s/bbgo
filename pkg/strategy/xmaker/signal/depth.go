@@ -23,14 +23,15 @@ func init() {
 }
 
 type DepthRatioSignal struct {
+	BaseProvider
+	Logger
+
 	// PriceRange, 2% depth ratio means 2% price range from the mid price
 	PriceRange fixedpoint.Value `json:"priceRange"`
 	MinRatio   float64          `json:"minRatio"`
 
 	symbol string
 	book   *types.StreamOrderBook
-
-	Logger
 }
 
 func (s *DepthRatioSignal) ID() string {

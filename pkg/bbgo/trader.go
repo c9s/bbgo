@@ -273,6 +273,19 @@ func (trader *Trader) injectFieldsAndSubscribe(ctx context.Context) error {
 	return nil
 }
 
+// Run starts the trader, it will run all single exchange strategies and cross exchange strategies.
+// Steps:
+// 1. Register the core interaction
+// 2. Inject fields and subscribe to the exchange sessions
+// 3. Start the environment (prepare data, no network interactions)
+// 4. Run all single exchange strategies:
+//   - For each session, run the strategies attached to the session (call Run())
+//
+// 5. Create an ExchangeOrderExecutionRouter and run all cross exchange strategies
+// 6. Connect to the exchange sessions
+// 7. Start the user data stream
+// 8. Start the order execution router
+// 9. Start the trading loop
 func (trader *Trader) Run(ctx context.Context) error {
 	// before we start the interaction,
 	// register the core interaction, because we can only get the strategies in this scope

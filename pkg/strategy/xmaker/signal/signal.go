@@ -7,14 +7,14 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
-var registry = map[string]types.SignalProvider{}
+var registry = map[string]bbgo.SignalProvider{}
 var registryMutex sync.Mutex
 
 // Register registers a signal provider with the given name.
-func Register(provider types.SignalProvider) {
+func Register(provider bbgo.SignalProvider) {
 	registryMutex.Lock()
 	defer registryMutex.Unlock()
 
@@ -27,7 +27,7 @@ func Register(provider types.SignalProvider) {
 }
 
 // GetProvider retrieves a signal provider by its name.
-func GetProvider(name string) (types.SignalProvider, bool) {
+func GetProvider(name string) (bbgo.SignalProvider, bool) {
 	registryMutex.Lock()
 	defer registryMutex.Unlock()
 
@@ -47,10 +47,16 @@ func init() {
 type ProviderWrapper struct {
 	Weight float64 `json:"weight"`
 
-	Signal types.SignalProvider `json:"-"`
+	Signal bbgo.SignalProvider `json:"-"`
 }
 
 type DynamicConfig struct {
+	// SessionName is the name of the session to use for this signal provider
+	SessionName string `json:"session,omitempty"` // optional session name, if not set, it will use the default session
+
+	// Symbol is the symbol to bind the signal provider to
+	Symbol string `json:"symbol,omitempty"` // symbol to bind the signal provider to, if not set, it will use the default symbol
+
 	Signals []ProviderWrapper
 }
 
@@ -90,7 +96,7 @@ func (c *DynamicConfig) UnmarshalJSON(data []byte) error {
 			return err
 		}
 
-		configEntry.Signal = providerInstanceRef.Interface().(types.SignalProvider)
+		configEntry.Signal = providerInstanceRef.Interface().(bbgo.SignalProvider)
 
 		c.Signals = append(c.Signals, configEntry)
 	}
@@ -109,7 +115,7 @@ type Config struct {
 }
 
 // Get returns the first non-nil signal provider from the config.
-func (c *Config) Get() types.SignalProvider {
+func (c *Config) Get() bbgo.SignalProvider {
 	if c.OrderBookBestPriceSignal != nil {
 		return c.OrderBookBestPriceSignal
 	} else if c.DepthRatioSignal != nil {

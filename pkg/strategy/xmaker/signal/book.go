@@ -26,13 +26,15 @@ type StreamBookSetter interface {
 }
 
 type OrderBookBestPriceVolumeSignal struct {
+	BaseProvider
+	Logger
+
 	RatioThreshold fixedpoint.Value `json:"ratioThreshold"`
 	MinVolume      fixedpoint.Value `json:"minVolume"`
 	MinQuoteVolume fixedpoint.Value `json:"minQuoteVolume"`
 
 	symbol string
 	book   *types.StreamOrderBook
-	Logger
 }
 
 func (s *OrderBookBestPriceVolumeSignal) ID() string {
