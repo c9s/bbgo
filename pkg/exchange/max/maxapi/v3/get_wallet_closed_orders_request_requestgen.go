@@ -24,7 +24,7 @@ func (g *GetWalletClosedOrdersRequest) Timestamp(timestamp time.Time) *GetWallet
 	return g
 }
 
-func (g *GetWalletClosedOrdersRequest) OrderBy(orderBy max.OrderByType) *GetWalletClosedOrdersRequest {
+func (g *GetWalletClosedOrdersRequest) OrderBy(orderBy maxapi.OrderByType) *GetWalletClosedOrdersRequest {
 	g.orderBy = &orderBy
 	return g
 }
@@ -34,7 +34,7 @@ func (g *GetWalletClosedOrdersRequest) Limit(limit uint) *GetWalletClosedOrdersR
 	return g
 }
 
-func (g *GetWalletClosedOrdersRequest) WalletType(walletType max.WalletType) *GetWalletClosedOrdersRequest {
+func (g *GetWalletClosedOrdersRequest) WalletType(walletType maxapi.WalletType) *GetWalletClosedOrdersRequest {
 	g.walletType = walletType
 	return g
 }
@@ -190,7 +190,7 @@ func (g *GetWalletClosedOrdersRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (g *GetWalletClosedOrdersRequest) Do(ctx context.Context) ([]max.Order, error) {
+func (g *GetWalletClosedOrdersRequest) Do(ctx context.Context) ([]maxapi.Order, error) {
 
 	// empty params for GET operation
 	var params interface{}
@@ -219,7 +219,7 @@ func (g *GetWalletClosedOrdersRequest) Do(ctx context.Context) ([]max.Order, err
 		return nil, err
 	}
 
-	var apiResponse []max.Order
+	var apiResponse []maxapi.Order
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error

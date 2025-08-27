@@ -6,141 +6,141 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 )
 
-func (s *Stream) OnAuthEvent(cb func(e max.AuthEvent)) {
+func (s *Stream) OnAuthEvent(cb func(e maxapi.AuthEvent)) {
 	s.authEventCallbacks = append(s.authEventCallbacks, cb)
 }
 
-func (s *Stream) EmitAuthEvent(e max.AuthEvent) {
+func (s *Stream) EmitAuthEvent(e maxapi.AuthEvent) {
 	for _, cb := range s.authEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnBookEvent(cb func(e max.BookEvent)) {
+func (s *Stream) OnBookEvent(cb func(e maxapi.BookEvent)) {
 	s.bookEventCallbacks = append(s.bookEventCallbacks, cb)
 }
 
-func (s *Stream) EmitBookEvent(e max.BookEvent) {
+func (s *Stream) EmitBookEvent(e maxapi.BookEvent) {
 	for _, cb := range s.bookEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnTradeEvent(cb func(e max.PublicTradeEvent)) {
+func (s *Stream) OnTradeEvent(cb func(e maxapi.PublicTradeEvent)) {
 	s.tradeEventCallbacks = append(s.tradeEventCallbacks, cb)
 }
 
-func (s *Stream) EmitTradeEvent(e max.PublicTradeEvent) {
+func (s *Stream) EmitTradeEvent(e maxapi.PublicTradeEvent) {
 	for _, cb := range s.tradeEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnKLineEvent(cb func(e max.KLineEvent)) {
+func (s *Stream) OnKLineEvent(cb func(e maxapi.KLineEvent)) {
 	s.kLineEventCallbacks = append(s.kLineEventCallbacks, cb)
 }
 
-func (s *Stream) EmitKLineEvent(e max.KLineEvent) {
+func (s *Stream) EmitKLineEvent(e maxapi.KLineEvent) {
 	for _, cb := range s.kLineEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnErrorEvent(cb func(e max.ErrorEvent)) {
+func (s *Stream) OnErrorEvent(cb func(e maxapi.ErrorEvent)) {
 	s.errorEventCallbacks = append(s.errorEventCallbacks, cb)
 }
 
-func (s *Stream) EmitErrorEvent(e max.ErrorEvent) {
+func (s *Stream) EmitErrorEvent(e maxapi.ErrorEvent) {
 	for _, cb := range s.errorEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnSubscriptionEvent(cb func(e max.SubscriptionEvent)) {
+func (s *Stream) OnSubscriptionEvent(cb func(e maxapi.SubscriptionEvent)) {
 	s.subscriptionEventCallbacks = append(s.subscriptionEventCallbacks, cb)
 }
 
-func (s *Stream) EmitSubscriptionEvent(e max.SubscriptionEvent) {
+func (s *Stream) EmitSubscriptionEvent(e maxapi.SubscriptionEvent) {
 	for _, cb := range s.subscriptionEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnTradeUpdateEvent(cb func(e max.TradeUpdateEvent)) {
+func (s *Stream) OnTradeUpdateEvent(cb func(e maxapi.TradeUpdateEvent)) {
 	s.tradeUpdateEventCallbacks = append(s.tradeUpdateEventCallbacks, cb)
 }
 
-func (s *Stream) EmitTradeUpdateEvent(e max.TradeUpdateEvent) {
+func (s *Stream) EmitTradeUpdateEvent(e maxapi.TradeUpdateEvent) {
 	for _, cb := range s.tradeUpdateEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnTradeSnapshotEvent(cb func(e max.TradeSnapshotEvent)) {
+func (s *Stream) OnTradeSnapshotEvent(cb func(e maxapi.TradeSnapshotEvent)) {
 	s.tradeSnapshotEventCallbacks = append(s.tradeSnapshotEventCallbacks, cb)
 }
 
-func (s *Stream) EmitTradeSnapshotEvent(e max.TradeSnapshotEvent) {
+func (s *Stream) EmitTradeSnapshotEvent(e maxapi.TradeSnapshotEvent) {
 	for _, cb := range s.tradeSnapshotEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnOrderUpdateEvent(cb func(e max.OrderUpdateEvent)) {
+func (s *Stream) OnOrderUpdateEvent(cb func(e maxapi.OrderUpdateEvent)) {
 	s.orderUpdateEventCallbacks = append(s.orderUpdateEventCallbacks, cb)
 }
 
-func (s *Stream) EmitOrderUpdateEvent(e max.OrderUpdateEvent) {
+func (s *Stream) EmitOrderUpdateEvent(e maxapi.OrderUpdateEvent) {
 	for _, cb := range s.orderUpdateEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnOrderSnapshotEvent(cb func(e max.OrderSnapshotEvent)) {
+func (s *Stream) OnOrderSnapshotEvent(cb func(e maxapi.OrderSnapshotEvent)) {
 	s.orderSnapshotEventCallbacks = append(s.orderSnapshotEventCallbacks, cb)
 }
 
-func (s *Stream) EmitOrderSnapshotEvent(e max.OrderSnapshotEvent) {
+func (s *Stream) EmitOrderSnapshotEvent(e maxapi.OrderSnapshotEvent) {
 	for _, cb := range s.orderSnapshotEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnAdRatioEvent(cb func(e max.ADRatioEvent)) {
+func (s *Stream) OnAdRatioEvent(cb func(e maxapi.ADRatioEvent)) {
 	s.adRatioEventCallbacks = append(s.adRatioEventCallbacks, cb)
 }
 
-func (s *Stream) EmitAdRatioEvent(e max.ADRatioEvent) {
+func (s *Stream) EmitAdRatioEvent(e maxapi.ADRatioEvent) {
 	for _, cb := range s.adRatioEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnDebtEvent(cb func(e max.DebtEvent)) {
+func (s *Stream) OnDebtEvent(cb func(e maxapi.DebtEvent)) {
 	s.debtEventCallbacks = append(s.debtEventCallbacks, cb)
 }
 
-func (s *Stream) EmitDebtEvent(e max.DebtEvent) {
+func (s *Stream) EmitDebtEvent(e maxapi.DebtEvent) {
 	for _, cb := range s.debtEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnAccountSnapshotEvent(cb func(e max.AccountSnapshotEvent)) {
+func (s *Stream) OnAccountSnapshotEvent(cb func(e maxapi.AccountSnapshotEvent)) {
 	s.accountSnapshotEventCallbacks = append(s.accountSnapshotEventCallbacks, cb)
 }
 
-func (s *Stream) EmitAccountSnapshotEvent(e max.AccountSnapshotEvent) {
+func (s *Stream) EmitAccountSnapshotEvent(e maxapi.AccountSnapshotEvent) {
 	for _, cb := range s.accountSnapshotEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnAccountUpdateEvent(cb func(e max.AccountUpdateEvent)) {
+func (s *Stream) OnAccountUpdateEvent(cb func(e maxapi.AccountUpdateEvent)) {
 	s.accountUpdateEventCallbacks = append(s.accountUpdateEventCallbacks, cb)
 }
 
-func (s *Stream) EmitAccountUpdateEvent(e max.AccountUpdateEvent) {
+func (s *Stream) EmitAccountUpdateEvent(e maxapi.AccountUpdateEvent) {
 	for _, cb := range s.accountUpdateEventCallbacks {
 		cb(e)
 	}

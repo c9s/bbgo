@@ -27,7 +27,7 @@ func (g *GetWalletOrderHistoryRequest) Limit(limit uint) *GetWalletOrderHistoryR
 	return g
 }
 
-func (g *GetWalletOrderHistoryRequest) WalletType(walletType max.WalletType) *GetWalletOrderHistoryRequest {
+func (g *GetWalletOrderHistoryRequest) WalletType(walletType maxapi.WalletType) *GetWalletOrderHistoryRequest {
 	g.walletType = walletType
 	return g
 }
@@ -174,7 +174,7 @@ func (g *GetWalletOrderHistoryRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (g *GetWalletOrderHistoryRequest) Do(ctx context.Context) ([]max.Order, error) {
+func (g *GetWalletOrderHistoryRequest) Do(ctx context.Context) ([]maxapi.Order, error) {
 
 	// empty params for GET operation
 	var params interface{}
@@ -203,7 +203,7 @@ func (g *GetWalletOrderHistoryRequest) Do(ctx context.Context) ([]max.Order, err
 		return nil, err
 	}
 
-	var apiResponse []max.Order
+	var apiResponse []maxapi.Order
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error

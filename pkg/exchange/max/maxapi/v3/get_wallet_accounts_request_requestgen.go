@@ -17,7 +17,7 @@ func (g *GetWalletAccountsRequest) Currency(currency string) *GetWalletAccountsR
 	return g
 }
 
-func (g *GetWalletAccountsRequest) WalletType(walletType max.WalletType) *GetWalletAccountsRequest {
+func (g *GetWalletAccountsRequest) WalletType(walletType maxapi.WalletType) *GetWalletAccountsRequest {
 	g.walletType = walletType
 	return g
 }
@@ -145,7 +145,7 @@ func (g *GetWalletAccountsRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (g *GetWalletAccountsRequest) Do(ctx context.Context) ([]max.Account, error) {
+func (g *GetWalletAccountsRequest) Do(ctx context.Context) ([]maxapi.Account, error) {
 
 	// no body params
 	var params interface{}
@@ -174,7 +174,7 @@ func (g *GetWalletAccountsRequest) Do(ctx context.Context) ([]max.Account, error
 		return nil, err
 	}
 
-	var apiResponse []max.Account
+	var apiResponse []maxapi.Account
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error

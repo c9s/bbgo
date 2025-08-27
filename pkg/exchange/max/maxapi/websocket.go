@@ -1,4 +1,4 @@
-package max
+package maxapi
 
 import (
 	"github.com/pkg/errors"

@@ -27,7 +27,7 @@ func (c *CancelWalletOrderAllRequest) GroupID(groupID uint32) *CancelWalletOrder
 	return c
 }
 
-func (c *CancelWalletOrderAllRequest) WalletType(walletType max.WalletType) *CancelWalletOrderAllRequest {
+func (c *CancelWalletOrderAllRequest) WalletType(walletType maxapi.WalletType) *CancelWalletOrderAllRequest {
 	c.walletType = walletType
 	return c
 }

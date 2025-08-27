@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/depth"
-	max "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
+	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -27,30 +27,30 @@ type Stream struct {
 
 	privateChannels []string
 
-	authEventCallbacks         []func(e max.AuthEvent)
-	bookEventCallbacks         []func(e max.BookEvent)
-	tradeEventCallbacks        []func(e max.PublicTradeEvent)
-	kLineEventCallbacks        []func(e max.KLineEvent)
-	errorEventCallbacks        []func(e max.ErrorEvent)
-	subscriptionEventCallbacks []func(e max.SubscriptionEvent)
+	authEventCallbacks         []func(e maxapi.AuthEvent)
+	bookEventCallbacks         []func(e maxapi.BookEvent)
+	tradeEventCallbacks        []func(e maxapi.PublicTradeEvent)
+	kLineEventCallbacks        []func(e maxapi.KLineEvent)
+	errorEventCallbacks        []func(e maxapi.ErrorEvent)
+	subscriptionEventCallbacks []func(e maxapi.SubscriptionEvent)
 
-	tradeUpdateEventCallbacks []func(e max.TradeUpdateEvent)
+	tradeUpdateEventCallbacks []func(e maxapi.TradeUpdateEvent)
 
-	tradeSnapshotEventCallbacks []func(e max.TradeSnapshotEvent)
-	orderUpdateEventCallbacks   []func(e max.OrderUpdateEvent)
-	orderSnapshotEventCallbacks []func(e max.OrderSnapshotEvent)
-	adRatioEventCallbacks       []func(e max.ADRatioEvent)
-	debtEventCallbacks          []func(e max.DebtEvent)
+	tradeSnapshotEventCallbacks []func(e maxapi.TradeSnapshotEvent)
+	orderUpdateEventCallbacks   []func(e maxapi.OrderUpdateEvent)
+	orderSnapshotEventCallbacks []func(e maxapi.OrderSnapshotEvent)
+	adRatioEventCallbacks       []func(e maxapi.ADRatioEvent)
+	debtEventCallbacks          []func(e maxapi.DebtEvent)
 
-	accountSnapshotEventCallbacks []func(e max.AccountSnapshotEvent)
-	accountUpdateEventCallbacks   []func(e max.AccountUpdateEvent)
+	accountSnapshotEventCallbacks []func(e maxapi.AccountSnapshotEvent)
+	accountUpdateEventCallbacks   []func(e maxapi.AccountUpdateEvent)
 
 	fastTradeEnabled bool
 
 	// depthBuffers is used for storing the depth info
 	depthBuffers map[string]*depth.Buffer
 
-	debts map[string]max.Debt
+	debts map[string]maxapi.Debt
 }
 
 func NewStream(ex *Exchange, key, secret string) *Stream {
@@ -60,15 +60,15 @@ func NewStream(ex *Exchange, key, secret string) *Stream {
 		// pragma: allowlist nextline secret
 		secret:       secret,
 		depthBuffers: make(map[string]*depth.Buffer),
-		debts:        make(map[string]max.Debt, 20),
+		debts:        make(map[string]maxapi.Debt, 20),
 	}
 	stream.SetEndpointCreator(stream.getEndpoint)
-	stream.SetParser(max.ParseMessage)
+	stream.SetParser(maxapi.ParseMessage)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.OnConnect(stream.handleConnect)
 	stream.OnDisconnect(stream.handleDisconnect)
 	stream.OnDebtEvent(stream.handleDebtEvent)
-	stream.OnAuthEvent(func(e max.AuthEvent) {
+	stream.OnAuthEvent(func(e maxapi.AuthEvent) {
 		log.Infof("max websocket connection authenticated: %+v", e)
 		stream.EmitAuth()
 	})
@@ -88,7 +88,7 @@ func NewStream(ex *Exchange, key, secret string) *Stream {
 func (s *Stream) getEndpoint(ctx context.Context) (string, error) {
 	url := os.Getenv("MAX_API_WS_URL")
 	if url == "" {
-		url = max.WebSocketURL
+		url = maxapi.WebSocketURL
 	}
 	return url, nil
 }
@@ -124,7 +124,7 @@ func (s *Stream) SetPrivateChannels(channels []string) {
 	s.privateChannels = channels
 }
 
-func ToLocalDepth(depth types.Depth) int {
+func toLocalDepth(depth types.Depth) int {
 	if len(depth) > 0 {
 		switch depth {
 		case types.DepthLevelFull:
@@ -145,13 +145,13 @@ func ToLocalDepth(depth types.Depth) int {
 
 func (s *Stream) handleConnect() {
 	if s.PublicOnly {
-		cmd := &max.WebsocketCommand{
+		cmd := &maxapi.WebsocketCommand{
 			Action: "subscribe",
 		}
 		for _, sub := range s.Subscriptions {
-			depth := ToLocalDepth(sub.Options.Depth)
+			depth := toLocalDepth(sub.Options.Depth)
 
-			cmd.Subscriptions = append(cmd.Subscriptions, max.Subscription{
+			cmd.Subscriptions = append(cmd.Subscriptions, maxapi.Subscription{
 				Channel:    string(sub.Channel),
 				Market:     toLocalSymbol(sub.Symbol),
 				Depth:      depth,
@@ -180,7 +180,7 @@ func (s *Stream) handleConnect() {
 		log.Debugf("user data websocket channels: %v", filters)
 
 		nonce := time.Now().UnixNano() / int64(time.Millisecond)
-		auth := &max.AuthMessage{
+		auth := &maxapi.AuthMessage{
 			// pragma: allowlist nextline secret
 			Action: "auth",
 			// pragma: allowlist nextline secret
@@ -204,7 +204,7 @@ func (s *Stream) handleDisconnect() {
 	}
 }
 
-func (s *Stream) handleKLineEvent(e max.KLineEvent) {
+func (s *Stream) handleKLineEvent(e maxapi.KLineEvent) {
 	kline := e.KLine.KLine()
 	s.EmitKLine(kline)
 	if kline.Closed {
@@ -212,7 +212,7 @@ func (s *Stream) handleKLineEvent(e max.KLineEvent) {
 	}
 }
 
-func (s *Stream) handleOrderSnapshotEvent(e max.OrderSnapshotEvent) {
+func (s *Stream) handleOrderSnapshotEvent(e maxapi.OrderSnapshotEvent) {
 	for _, o := range e.Orders {
 		globalOrder, err := convertWebSocketOrderUpdate(o)
 		if err != nil {
@@ -224,7 +224,7 @@ func (s *Stream) handleOrderSnapshotEvent(e max.OrderSnapshotEvent) {
 	}
 }
 
-func (s *Stream) handleOrderUpdateEvent(e max.OrderUpdateEvent) {
+func (s *Stream) handleOrderUpdateEvent(e maxapi.OrderUpdateEvent) {
 	for _, o := range e.Orders {
 		globalOrder, err := convertWebSocketOrderUpdate(o)
 		if err != nil {
@@ -236,7 +236,7 @@ func (s *Stream) handleOrderUpdateEvent(e max.OrderUpdateEvent) {
 	}
 }
 
-func (s *Stream) handleTradeEvent(e max.TradeUpdateEvent) {
+func (s *Stream) handleTradeEvent(e maxapi.TradeUpdateEvent) {
 	for _, tradeUpdate := range e.Trades {
 		trade, err := convertWebSocketTrade(tradeUpdate)
 		if err != nil {
@@ -250,15 +250,15 @@ func (s *Stream) handleTradeEvent(e max.TradeUpdateEvent) {
 
 // handleBookEvent returns a callback that will be registered to the websocket stream
 // this callback will be called when the websocket stream receives a book event
-func (s *Stream) handleBookEvent(ex *Exchange) func(e max.BookEvent) {
-	return func(e max.BookEvent) {
+func (s *Stream) handleBookEvent(ex *Exchange) func(e maxapi.BookEvent) {
+	return func(e maxapi.BookEvent) {
 		symbol := toGlobalSymbol(e.Market)
 		f, ok := s.depthBuffers[symbol]
 		if !ok {
 			bookDepth := 0
 			for _, subscription := range s.Subscriptions {
 				if subscription.Channel == types.BookChannel && toLocalSymbol(subscription.Symbol) == e.Market {
-					bookDepth = ToLocalDepth(subscription.Options.Depth)
+					bookDepth = toLocalDepth(subscription.Options.Depth)
 					break
 				}
 			}
@@ -294,7 +294,7 @@ func (s *Stream) handleBookEvent(ex *Exchange) func(e max.BookEvent) {
 			return
 		}
 
-		if e.Event == max.BookEventSnapshot {
+		if e.Event == maxapi.BookEventSnapshot {
 			if err := f.SetSnapshot(types.SliceOrderBook{
 				Symbol:       symbol,
 				Time:         e.Time(),
@@ -334,14 +334,14 @@ func (s *Stream) String() string {
 	return ss
 }
 
-func (s *Stream) handleDebtEvent(e max.DebtEvent) {
+func (s *Stream) handleDebtEvent(e maxapi.DebtEvent) {
 	for _, debt := range e.Debts {
 		currency := toGlobalCurrency(debt.Currency)
 		s.debts[currency] = debt
 	}
 }
 
-func (s *Stream) handleAccountSnapshotEvent(e max.AccountSnapshotEvent) {
+func (s *Stream) handleAccountSnapshotEvent(e maxapi.AccountSnapshotEvent) {
 	snapshot := types.BalanceMap{}
 	for _, bm := range e.Balances {
 		bal := types.Balance{
@@ -363,7 +363,7 @@ func (s *Stream) handleAccountSnapshotEvent(e max.AccountSnapshotEvent) {
 	s.EmitBalanceSnapshot(snapshot)
 }
 
-func (s *Stream) handleAccountUpdateEvent(e max.AccountUpdateEvent) {
+func (s *Stream) handleAccountUpdateEvent(e maxapi.AccountUpdateEvent) {
 	snapshot := types.BalanceMap{}
 	for _, bm := range e.Balances {
 		bal := types.Balance{
@@ -388,46 +388,46 @@ func (s *Stream) handleAccountUpdateEvent(e max.AccountUpdateEvent) {
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch e := e.(type) {
 
-	case *max.AuthEvent:
+	case *maxapi.AuthEvent:
 		s.EmitAuthEvent(*e)
 
-	case *max.BookEvent:
+	case *maxapi.BookEvent:
 		s.EmitBookEvent(*e)
 
-	case *max.PublicTradeEvent:
+	case *maxapi.PublicTradeEvent:
 		s.EmitTradeEvent(*e)
 
-	case *max.KLineEvent:
+	case *maxapi.KLineEvent:
 		s.EmitKLineEvent(*e)
 
-	case *max.ErrorEvent:
+	case *maxapi.ErrorEvent:
 		s.EmitErrorEvent(*e)
 
-	case *max.SubscriptionEvent:
+	case *maxapi.SubscriptionEvent:
 		s.EmitSubscriptionEvent(*e)
 
-	case *max.TradeSnapshotEvent:
+	case *maxapi.TradeSnapshotEvent:
 		s.EmitTradeSnapshotEvent(*e)
 
-	case *max.TradeUpdateEvent:
+	case *maxapi.TradeUpdateEvent:
 		s.EmitTradeUpdateEvent(*e)
 
-	case *max.AccountSnapshotEvent:
+	case *maxapi.AccountSnapshotEvent:
 		s.EmitAccountSnapshotEvent(*e)
 
-	case *max.AccountUpdateEvent:
+	case *maxapi.AccountUpdateEvent:
 		s.EmitAccountUpdateEvent(*e)
 
-	case *max.OrderSnapshotEvent:
+	case *maxapi.OrderSnapshotEvent:
 		s.EmitOrderSnapshotEvent(*e)
 
-	case *max.OrderUpdateEvent:
+	case *maxapi.OrderUpdateEvent:
 		s.EmitOrderUpdateEvent(*e)
 
-	case *max.ADRatioEvent:
+	case *maxapi.ADRatioEvent:
 		s.EmitAdRatioEvent(*e)
 
-	case *max.DebtEvent:
+	case *maxapi.DebtEvent:
 		s.EmitDebtEvent(*e)
 
 	default:

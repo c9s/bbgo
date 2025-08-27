@@ -1,4 +1,4 @@
-package max
+package maxapi
 
 //go:generate -command GetRequest requestgen -method GET
 //go:generate -command PostRequest requestgen -method POST

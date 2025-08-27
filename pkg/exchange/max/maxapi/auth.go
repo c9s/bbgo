@@ -1,4 +1,4 @@
-package max
+package maxapi
 
 type AuthMessage struct {
 	Action    string   `json:"action,omitempty"`

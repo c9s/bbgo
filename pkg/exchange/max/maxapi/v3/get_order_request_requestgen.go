@@ -142,7 +142,7 @@ func (g *GetOrderRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (g *GetOrderRequest) Do(ctx context.Context) (*max.Order, error) {
+func (g *GetOrderRequest) Do(ctx context.Context) (*maxapi.Order, error) {
 
 	// empty params for GET operation
 	var params interface{}
@@ -165,7 +165,7 @@ func (g *GetOrderRequest) Do(ctx context.Context) (*max.Order, error) {
 		return nil, err
 	}
 
-	var apiResponse max.Order
+	var apiResponse maxapi.Order
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error
