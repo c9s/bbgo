@@ -22,3 +22,37 @@ There are three modes:
    - Run
 6. Wait for signal to stop process
 7. Graceful Shutdown
+
+# `exchangetest` Command
+
+The `exchangetest` command executes a series of verification checks on the exchange implementation to ensure it behaves as expected.
+
+## `Stream`: Real-Time WebSocket Feeds
+
+A valid `Stream` must implement the `types.Stream` interface.
+
+A `Stream` can operate in two modes:
+- **Public mode**: referred to as the `Market Data Stream` throughout the `bbgo` framework.  
+  - Enable this mode with the `.SetPublicOnly()` method.
+- **Private mode**: referred to as the `User Data Stream` throughout the `bbgo` framework.  
+  - This is the **default mode**.
+
+### Market Data Stream
+
+A market data stream must meet the following requirements:
+
+- Support subscription to `types.BookChannel`  
+  - Provides real-time monitoring of the order book.
+- Support subscription to `types.MarketTradeChannel`  
+  - Provides real-time monitoring of public market trades.
+- Support subscription to `types.BookTickerChannel`  
+  - Provides real-time monitoring of the best bid/ask.
+- Support subscription to `types.KLineChannel`  
+  - Provides real-time monitoring of candlestick (kline) data.
+
+### User Data Stream
+
+A user data stream must function correctly without requiring any `.Subscribe()` calls and must satisfy the following requirements:
+- Receive updates to the user’s orders.
+- Receive updates to trades related to the user’s orders.
+- Receive both incremental updates and full snapshots of the user’s balance.
