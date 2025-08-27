@@ -116,7 +116,7 @@ func (g *GetUserInfoRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (g *GetUserInfoRequest) Do(ctx context.Context) (*max.UserInfo, error) {
+func (g *GetUserInfoRequest) Do(ctx context.Context) (*maxapi.UserInfo, error) {
 
 	// no body params
 	var params interface{}
@@ -136,7 +136,7 @@ func (g *GetUserInfoRequest) Do(ctx context.Context) (*max.UserInfo, error) {
 		return nil, err
 	}
 
-	var apiResponse max.UserInfo
+	var apiResponse maxapi.UserInfo
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error

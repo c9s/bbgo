@@ -142,7 +142,7 @@ func (c *CancelOrderRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (c *CancelOrderRequest) Do(ctx context.Context) (*max.Order, error) {
+func (c *CancelOrderRequest) Do(ctx context.Context) (*maxapi.Order, error) {
 
 	params, err := c.GetParameters()
 	if err != nil {
@@ -164,7 +164,7 @@ func (c *CancelOrderRequest) Do(ctx context.Context) (*max.Order, error) {
 		return nil, err
 	}
 
-	var apiResponse max.Order
+	var apiResponse maxapi.Order
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error

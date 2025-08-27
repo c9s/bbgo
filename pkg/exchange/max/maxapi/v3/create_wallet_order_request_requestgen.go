@@ -27,7 +27,7 @@ func (c *CreateWalletOrderRequest) Volume(volume string) *CreateWalletOrderReque
 	return c
 }
 
-func (c *CreateWalletOrderRequest) OrderType(orderType max.OrderType) *CreateWalletOrderRequest {
+func (c *CreateWalletOrderRequest) OrderType(orderType maxapi.OrderType) *CreateWalletOrderRequest {
 	c.orderType = orderType
 	return c
 }
@@ -52,7 +52,7 @@ func (c *CreateWalletOrderRequest) GroupID(groupID string) *CreateWalletOrderReq
 	return c
 }
 
-func (c *CreateWalletOrderRequest) WalletType(walletType max.WalletType) *CreateWalletOrderRequest {
+func (c *CreateWalletOrderRequest) WalletType(walletType maxapi.WalletType) *CreateWalletOrderRequest {
 	c.walletType = walletType
 	return c
 }
@@ -242,7 +242,7 @@ func (c *CreateWalletOrderRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (c *CreateWalletOrderRequest) Do(ctx context.Context) (*max.Order, error) {
+func (c *CreateWalletOrderRequest) Do(ctx context.Context) (*maxapi.Order, error) {
 
 	params, err := c.GetParameters()
 	if err != nil {
@@ -270,7 +270,7 @@ func (c *CreateWalletOrderRequest) Do(ctx context.Context) (*max.Order, error) {
 		return nil, err
 	}
 
-	var apiResponse max.Order
+	var apiResponse maxapi.Order
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error

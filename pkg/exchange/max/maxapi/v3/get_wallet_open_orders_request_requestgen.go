@@ -24,7 +24,7 @@ func (g *GetWalletOpenOrdersRequest) Timestamp(timestamp time.Time) *GetWalletOp
 	return g
 }
 
-func (g *GetWalletOpenOrdersRequest) OrderBy(orderBy max.OrderByType) *GetWalletOpenOrdersRequest {
+func (g *GetWalletOpenOrdersRequest) OrderBy(orderBy maxapi.OrderByType) *GetWalletOpenOrdersRequest {
 	g.orderBy = &orderBy
 	return g
 }
@@ -34,7 +34,7 @@ func (g *GetWalletOpenOrdersRequest) Limit(limit uint) *GetWalletOpenOrdersReque
 	return g
 }
 
-func (g *GetWalletOpenOrdersRequest) WalletType(walletType max.WalletType) *GetWalletOpenOrdersRequest {
+func (g *GetWalletOpenOrdersRequest) WalletType(walletType maxapi.WalletType) *GetWalletOpenOrdersRequest {
 	g.walletType = walletType
 	return g
 }
@@ -190,7 +190,7 @@ func (g *GetWalletOpenOrdersRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (g *GetWalletOpenOrdersRequest) Do(ctx context.Context) ([]max.Order, error) {
+func (g *GetWalletOpenOrdersRequest) Do(ctx context.Context) ([]maxapi.Order, error) {
 
 	// empty params for GET operation
 	var params interface{}
@@ -219,7 +219,7 @@ func (g *GetWalletOpenOrdersRequest) Do(ctx context.Context) ([]max.Order, error
 		return nil, err
 	}
 
-	var apiResponse []max.Order
+	var apiResponse []maxapi.Order
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error
