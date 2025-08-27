@@ -141,6 +141,8 @@ type BalanceMessage struct {
 	Currency  string           `json:"cu"`
 	Available fixedpoint.Value `json:"av"`
 	Locked    fixedpoint.Value `json:"l"`
+
+	SubAccount string `json:"sa,omitempty"`
 }
 
 func (m *BalanceMessage) Balance() (*types.Balance, error) {
