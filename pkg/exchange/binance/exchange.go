@@ -85,7 +85,8 @@ func init() {
 	}
 
 	if n, ok := envvar.Int("BINANCE_ORDER_RATE_LIMITER"); ok {
-		orderLimiter = rate.NewLimiter(rate.Every(time.Duration(n)*time.Minute), 2)
+		// Rate Limit: n requests per 1 seconds, bucket size: 1
+		orderLimiter = rate.NewLimiter(rate.Every(time.Second/time.Duration(n)), 1)
 	}
 
 	if n, ok := envvar.Int("BINANCE_QUERY_TRADES_RATE_LIMITER"); ok {
