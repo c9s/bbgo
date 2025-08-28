@@ -1,4 +1,4 @@
-package xmaker
+package signal
 
 import (
 	"context"
@@ -23,12 +23,19 @@ func init() {
 }
 
 type DepthRatioSignal struct {
+	BaseProvider
+	Logger
+
 	// PriceRange, 2% depth ratio means 2% price range from the mid price
 	PriceRange fixedpoint.Value `json:"priceRange"`
 	MinRatio   float64          `json:"minRatio"`
 
 	symbol string
 	book   *types.StreamOrderBook
+}
+
+func (s *DepthRatioSignal) ID() string {
+	return "depthRatio"
 }
 
 func (s *DepthRatioSignal) SetStreamBook(book *types.StreamOrderBook) {
@@ -74,7 +81,7 @@ func (s *DepthRatioSignal) CalculateSignal(ctx context.Context) (float64, error)
 		signal = 0.0
 	}
 
-	log.Infof("[DepthRatioSignal] %f bid/ask = %f/%f", signal, bidDepthQuote.Float64(), askDepthQuote.Float64())
+	s.logger.Infof("[DepthRatioSignal] %f bid/ask = %f/%f", signal, bidDepthQuote.Float64(), askDepthQuote.Float64())
 	depthRatioSignalMetrics.WithLabelValues(s.symbol).Set(signal)
 	return signal, nil
 }
