@@ -1,4 +1,4 @@
-package xmaker
+package signal
 
 import (
 	"context"
@@ -22,6 +22,9 @@ func init() {
 }
 
 type BollingerBandTrendSignal struct {
+	BaseProvider
+	Logger
+
 	types.IntervalWindow
 	MinBandWidth float64 `json:"minBandWidth"`
 	MaxBandWidth float64 `json:"maxBandWidth"`
@@ -29,6 +32,26 @@ type BollingerBandTrendSignal struct {
 	indicator *indicatorv2.BOLLStream
 	symbol    string
 	lastK     *types.KLine
+}
+
+func (s *BollingerBandTrendSignal) ID() string {
+	return "bollingerBandTrend"
+}
+
+func (s *BollingerBandTrendSignal) Subscribe(session *bbgo.ExchangeSession, symbol string) {
+	if s.IntervalWindow.Interval == "" {
+		s.IntervalWindow.Interval = types.Interval1m
+	}
+
+	if s.MinBandWidth == 0.0 {
+		s.MinBandWidth = 1.0
+	}
+
+	if s.MaxBandWidth == 0.0 {
+		s.MaxBandWidth = 2.0
+	}
+
+	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.IntervalWindow.Interval})
 }
 
 func (s *BollingerBandTrendSignal) Bind(ctx context.Context, session *bbgo.ExchangeSession, symbol string) error {
@@ -48,6 +71,7 @@ func (s *BollingerBandTrendSignal) Bind(ctx context.Context, session *bbgo.Excha
 	}))
 
 	bollingerBandSignalMetrics.WithLabelValues(s.symbol).Set(0.0)
+
 	return nil
 }
 
@@ -76,7 +100,7 @@ func (s *BollingerBandTrendSignal) CalculateSignal(ctx context.Context) (float64
 		signal = closePrice.Sub(lastUpBand).Float64() / maxBandWidth * 2.0
 	}
 
-	log.Infof("[BollingerBandTrendSignal] %f up/down = %f/%f, close price = %f",
+	s.logger.Infof("[BollingerBandTrendSignal] %f up/down = %f/%f, close price = %f",
 		signal,
 		lastUpBand.Float64(),
 		lastDownBand.Float64(),
