@@ -277,6 +277,8 @@ type Strategy struct {
 
 	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer,omitempty"`
 
+	DryRun bool `json:"dryRun"`
+
 	// --------------------------------
 	// private fields
 	// --------------------------------
@@ -930,7 +932,10 @@ func (s *Strategy) executeHedgeOrder(ctx context.Context, submitOrder types.Subm
 		submitOrder.Quantity.String(),
 		submitOrder.Price.String(),
 	)
-
+	if s.DryRun {
+		s.logger.Infof("[dryRun] hedge order: %+v", submitOrder)
+		return nil
+	}
 	_, err := s.HedgeOrderExecutor.SubmitOrders(ctx, submitOrder)
 	if err != nil {
 		// allocate a new reservation
@@ -1287,6 +1292,10 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 	s.logger.Infof("%d orders are generated, placing...", len(submitOrders))
 	dbg.DebugSubmitOrders(s.logger, submitOrders)
 
+	if s.DryRun {
+		s.logger.Infof("[dryRun] maker order: %+v", submitOrders)
+		return
+	}
 	_, err = s.MakerOrderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
 		s.logger.WithError(err).Errorf("submit order error: %s", err.Error())
