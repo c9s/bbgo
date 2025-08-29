@@ -21,6 +21,6 @@ type GetMarginADRatioRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
 
-func (s *Client) NewGetMarginADRatioRequest() *GetMarginADRatioRequest {
-	return &GetMarginADRatioRequest{client: s.Client}
+func (c *Client) NewGetMarginADRatioRequest() *GetMarginADRatioRequest {
+	return &GetMarginADRatioRequest{client: c.Client}
 }

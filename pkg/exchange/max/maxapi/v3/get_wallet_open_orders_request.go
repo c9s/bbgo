@@ -10,8 +10,8 @@ import (
 //go:generate -command PostRequest requestgen -method POST
 //go:generate -command DeleteRequest requestgen -method DELETE
 
-func (s *Client) NewGetWalletOpenOrdersRequest(walletType WalletType) *GetWalletOpenOrdersRequest {
-	return &GetWalletOpenOrdersRequest{client: s.Client, walletType: walletType}
+func (c *Client) NewGetWalletOpenOrdersRequest(walletType WalletType) *GetWalletOpenOrdersRequest {
+	return &GetWalletOpenOrdersRequest{client: c.Client, walletType: walletType}
 }
 
 //go:generate GetRequest -url "/api/v3/wallet/:walletType/orders/open" -type GetWalletOpenOrdersRequest -responseType []Order

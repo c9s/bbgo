@@ -11,8 +11,16 @@ import (
 	"regexp"
 )
 
+/*
+ * Markets sets
+ */
 func (g *GetTickersRequest) Markets(markets []string) *GetTickersRequest {
 	g.markets = markets
+	return g
+}
+
+func (g *GetTickersRequest) AddMarkets(markets ...string) *GetTickersRequest {
+	g.markets = append(g.markets, markets...)
 	return g
 }
 
@@ -22,8 +30,13 @@ func (g *GetTickersRequest) GetQueryParameters() (url.Values, error) {
 	// check markets field -> json key markets
 	markets := g.markets
 
+	// TEMPLATE check-required
+	// END TEMPLATE check-required
+
 	// assign parameter of markets
-	params["markets"] = markets
+	if len(markets) > 0 {
+		params["markets"] = markets
+	}
 
 	query := url.Values{}
 	for _k, _v := range params {

@@ -14,6 +14,6 @@ type CancelOrderRequest struct {
 	clientOrderID *string `param:"client_oid,omitempty"`
 }
 
-func (s *Client) NewCancelOrderRequest() *CancelOrderRequest {
-	return &CancelOrderRequest{client: s.Client}
+func (c *Client) NewCancelOrderRequest() *CancelOrderRequest {
+	return &CancelOrderRequest{client: c.Client}
 }

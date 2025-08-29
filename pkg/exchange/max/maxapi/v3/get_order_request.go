@@ -6,8 +6,8 @@ package v3
 
 import "github.com/c9s/requestgen"
 
-func (s *Client) NewGetOrderRequest() *GetOrderRequest {
-	return &GetOrderRequest{client: s.Client}
+func (c *Client) NewGetOrderRequest() *GetOrderRequest {
+	return &GetOrderRequest{client: c.Client}
 }
 
 //go:generate GetRequest -url "/api/v3/order" -type GetOrderRequest -responseType .Order
