@@ -34,10 +34,10 @@ type Exchange struct {
 	types.MarginSettings
 
 	key, secret string
-	client      *maxapi.RestClient
+
+	client *maxapi.RestClient
 
 	v3client *v3.Client
-	v3margin *v3.MarginService
 
 	submitOrderLimiter, queryTradeLimiter, accountQueryLimiter, closedOrderQueryLimiter, marketDataLimiter *rate.Limiter
 }
@@ -59,8 +59,7 @@ func New(key, secret, subAccount string) *Exchange {
 		key:    key,
 		// pragma: allowlist nextline secret
 		secret:   secret,
-		v3client: &v3.Client{Client: client},
-		v3margin: &v3.MarginService{Client: client},
+		v3client: v3.NewClient(client),
 
 		queryTradeLimiter: rate.NewLimiter(rate.Every(250*time.Millisecond), 2),
 

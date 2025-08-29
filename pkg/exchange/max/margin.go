@@ -16,7 +16,9 @@ import (
 // types.TransferOut => Margin to Spot
 //
 // to call this method, you must set the IsMargin = true
-func (e *Exchange) TransferMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+func (e *Exchange) TransferMarginAccountAsset(
+	ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection,
+) error {
 	if e.IsIsolatedMargin {
 		return errors.New("isolated margin is not supported")
 	}
@@ -25,8 +27,10 @@ func (e *Exchange) TransferMarginAccountAsset(ctx context.Context, asset string,
 }
 
 // transferCrossMarginAccountAsset transfer asset to the cross margin account or to the main account
-func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
-	req := e.v3margin.NewMarginTransferRequest()
+func (e *Exchange) transferCrossMarginAccountAsset(
+	ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection,
+) error {
+	req := e.v3client.MarginService.NewMarginTransferRequest()
 	req.Currency(toLocalCurrency(asset))
 	req.Amount(amount.String())
 

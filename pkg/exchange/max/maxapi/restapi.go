@@ -125,6 +125,15 @@ type RestClient struct {
 	apiKeyRotator *apikey.RoundTripBalancer
 }
 
+func NewRestClientDefault() *RestClient {
+	baseURL := ProductionAPIURL
+	if override := os.Getenv("MAX_API_BASE_URL"); len(override) > 0 {
+		baseURL = override
+	}
+
+	return NewRestClient(baseURL)
+}
+
 func NewRestClient(baseURL string) *RestClient {
 	u, err := url.Parse(baseURL)
 	if err != nil {
