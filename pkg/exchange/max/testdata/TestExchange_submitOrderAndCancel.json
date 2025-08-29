@@ -1,0 +1,388 @@
+[
+  {
+    "timestamp": "2025-08-29T14:14:16.418965+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://max-api.maicoin.com/api/v2/timestamp",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "10"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Fri, 29 Aug 2025 06:14:16 GMT"
+        ],
+        "Etag": [
+          "W/\"f6d6b8b6c7187fa4dc7dc65cae882626\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b14538-75a2711f0af3b65e44302bce"
+        ],
+        "X-Runtime": [
+          "0.002807"
+        ]
+      },
+      "body": "1756448056"
+    }
+  },
+  {
+    "timestamp": "2025-08-29T14:14:16.420237+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://max-api.maicoin.com/api/v3/markets",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Fri, 29 Aug 2025 06:14:16 GMT"
+        ],
+        "Etag": [
+          "W/\"b0aa7d638eeeaef71d55b1299dc29037\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Accept-Encoding",
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b14538-7aea58ce4448003323373b43"
+        ],
+        "X-Runtime": [
+          "0.004247"
+        ]
+      },
+      "body": "[{\"id\":\"maxtwd\",\"status\":\"active\",\"base_unit\":\"max\",\"base_unit_precision\":2,\"min_base_amount\":25.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":4,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"btctwd\",\"status\":\"active\",\"base_unit\":\"btc\",\"base_unit_precision\":8,\"min_base_amount\":8.0e-05,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":true},{\"id\":\"ethtwd\",\"status\":\"active\",\"base_unit\":\"eth\",\"base_unit_precision\":6,\"min_base_amount\":0.0022,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":true},{\"id\":\"ltctwd\",\"status\":\"active\",\"base_unit\":\"ltc\",\"base_unit_precision\":4,\"min_base_amount\":0.07,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"bchtwd\",\"status\":\"active\",\"base_unit\":\"bch\",\"base_unit_precision\":6,\"min_base_amount\":0.017,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"usdttwd\",\"status\":\"active\",\"base_unit\":\"usdt\",\"base_unit_precision\":2,\"min_base_amount\":8.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":true},{\"id\":\"ethbtc\",\"status\":\"active\",\"base_unit\":\"eth\",\"base_unit_precision\":4,\"min_base_amount\":0.0022,\"quote_unit\":\"btc\",\"quote_unit_precision\":6,\"min_quote_amount\":8.0e-05,\"m_wallet_supported\":true},{\"id\":\"maxusdt\",\"status\":\"active\",\"base_unit\":\"max\",\"base_unit_precision\":2,\"min_base_amount\":25.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"btcusdt\",\"status\":\"active\",\"base_unit\":\"btc\",\"base_unit_precision\":6,\"min_base_amount\":8.0e-05,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":true},{\"id\":\"ethusdt\",\"status\":\"active\",\"base_unit\":\"eth\",\"base_unit_precision\":5,\"min_base_amount\":0.0022,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":true},{\"id\":\"bchusdt\",\"status\":\"active\",\"base_unit\":\"bch\",\"base_unit_precision\":5,\"min_base_amount\":0.017,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"ltcusdt\",\"status\":\"active\",\"base_unit\":\"ltc\",\"base_unit_precision\":5,\"min_base_amount\":0.07,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"xrptwd\",\"status\":\"active\",\"base_unit\":\"xrp\",\"base_unit_precision\":2,\"min_base_amount\":2.7,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"xrpusdt\",\"status\":\"active\",\"base_unit\":\"xrp\",\"base_unit_precision\":2,\"min_base_amount\":2.7,\"quote_unit\":\"usdt\",\"quote_unit_precision\":5,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"usdctwd\",\"status\":\"active\",\"base_unit\":\"usdc\",\"base_unit_precision\":2,\"min_base_amount\":8.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"linktwd\",\"status\":\"active\",\"base_unit\":\"link\",\"base_unit_precision\":2,\"min_base_amount\":0.5,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"comptwd\",\"status\":\"active\",\"base_unit\":\"comp\",\"base_unit_precision\":3,\"min_base_amount\":0.19,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"sandusdt\",\"status\":\"active\",\"base_unit\":\"sand\",\"base_unit_precision\":1,\"min_base_amount\":36.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":5,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"usdcusdt\",\"status\":\"active\",\"base_unit\":\"usdc\",\"base_unit_precision\":2,\"min_base_amount\":8.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"linkusdt\",\"status\":\"active\",\"base_unit\":\"link\",\"base_unit_precision\":2,\"min_base_amount\":0.5,\"quote_unit\":\"usdt\",\"quote_unit_precision\":3,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"grttwd\",\"status\":\"active\",\"base_unit\":\"grt\",\"base_unit_precision\":1,\"min_base_amount\":95.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"yfitwd\",\"status\":\"active\",\"base_unit\":\"yfi\",\"base_unit_precision\":5,\"min_base_amount\":0.0016,\"quote_unit\":\"twd\",\"quote_unit_precision\":0,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"dogetwd\",\"status\":\"active\",\"base_unit\":\"doge\",\"base_unit_precision\":1,\"min_base_amount\":47.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":4,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"dogeusdt\",\"status\":\"active\",\"base_unit\":\"doge\",\"base_unit_precision\":0,\"min_base_amount\":47.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"adatwd\",\"status\":\"active\",\"base_unit\":\"ada\",\"base_unit_precision\":1,\"min_base_amount\":15.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"compusdt\",\"status\":\"active\",\"base_unit\":\"comp\",\"base_unit_precision\":3,\"min_base_amount\":0.19,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"dottwd\",\"status\":\"active\",\"base_unit\":\"dot\",\"base_unit_precision\":2,\"min_base_amount\":2.5,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"dotusdt\",\"status\":\"active\",\"base_unit\":\"dot\",\"base_unit_precision\":2,\"min_base_amount\":2.5,\"quote_unit\":\"usdt\",\"quote_unit_precision\":3,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"poltwd\",\"status\":\"active\",\"base_unit\":\"pol\",\"base_unit_precision\":1,\"min_base_amount\":45.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"polusdt\",\"status\":\"active\",\"base_unit\":\"pol\",\"base_unit_precision\":1,\"min_base_amount\":45.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"adausdt\",\"status\":\"active\",\"base_unit\":\"ada\",\"base_unit_precision\":1,\"min_base_amount\":15.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"soltwd\",\"status\":\"active\",\"base_unit\":\"sol\",\"base_unit_precision\":3,\"min_base_amount\":0.053,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"solusdt\",\"status\":\"active\",\"base_unit\":\"sol\",\"base_unit_precision\":3,\"min_base_amount\":0.053,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"shibtwd\",\"status\":\"active\",\"base_unit\":\"shib\",\"base_unit_precision\":-3,\"min_base_amount\":750890.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":7,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"shibusdt\",\"status\":\"active\",\"base_unit\":\"shib\",\"base_unit_precision\":-3,\"min_base_amount\":750890.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":8,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"sandtwd\",\"status\":\"active\",\"base_unit\":\"sand\",\"base_unit_precision\":1,\"min_base_amount\":36.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":4,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"galatwd\",\"status\":\"active\",\"base_unit\":\"gala\",\"base_unit_precision\":1,\"min_base_amount\":604.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"manatwd\",\"status\":\"active\",\"base_unit\":\"mana\",\"base_unit_precision\":1,\"min_base_amount\":33.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"alicetwd\",\"status\":\"active\",\"base_unit\":\"alice\",\"base_unit_precision\":2,\"min_base_amount\":22.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"lookstwd\",\"status\":\"active\",\"base_unit\":\"looks\",\"base_unit_precision\":1,\"min_base_amount\":418.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"maskusdt\",\"status\":\"active\",\"base_unit\":\"mask\",\"base_unit_precision\":1,\"min_base_amount\":7.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"apetwd\",\"status\":\"active\",\"base_unit\":\"ape\",\"base_unit_precision\":2,\"min_base_amount\":14.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"apeusdt\",\"status\":\"active\",\"base_unit\":\"ape\",\"base_unit_precision\":1,\"min_base_amount\":14.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"xtztwd\",\"status\":\"active\",\"base_unit\":\"xtz\",\"base_unit_precision\":1,\"min_base_amount\":11.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"gmttwd\",\"status\":\"active\",\"base_unit\":\"gmt\",\"base_unit_precision\":2,\"min_base_amount\":193.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"gsttwd\",\"status\":\"active\",\"base_unit\":\"gst\",\"base_unit_precision\":1,\"min_base_amount\":1390.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"bnbtwd\",\"status\":\"active\",\"base_unit\":\"bnb\",\"base_unit_precision\":3,\"min_base_amount\":0.013,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"bnbusdt\",\"status\":\"active\",\"base_unit\":\"bnb\",\"base_unit_precision\":3,\"min_base_amount\":0.013,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"enstwd\",\"status\":\"active\",\"base_unit\":\"ens\",\"base_unit_precision\":2,\"min_base_amount\":0.31,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"etctwd\",\"status\":\"active\",\"base_unit\":\"etc\",\"base_unit_precision\":2,\"min_base_amount\":0.4,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"etcusdt\",\"status\":\"active\",\"base_unit\":\"etc\",\"base_unit_precision\":2,\"min_base_amount\":0.4,\"quote_unit\":\"usdt\",\"quote_unit_precision\":3,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"arbtwd\",\"status\":\"active\",\"base_unit\":\"arb\",\"base_unit_precision\":1,\"min_base_amount\":20.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"arbusdt\",\"status\":\"active\",\"base_unit\":\"arb\",\"base_unit_precision\":1,\"min_base_amount\":20.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"avaxtwd\",\"status\":\"active\",\"base_unit\":\"avax\",\"base_unit_precision\":2,\"min_base_amount\":0.36,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"avaxusdt\",\"status\":\"active\",\"base_unit\":\"avax\",\"base_unit_precision\":2,\"min_base_amount\":0.36,\"quote_unit\":\"usdt\",\"quote_unit_precision\":3,\"min_quote_amount\":8.0,\"m_wallet_supported\":false}]"
+    }
+  },
+  {
+    "timestamp": "2025-08-29T14:14:16.547899+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://max-api.maicoin.com/api/v3/wallet/spot/accounts",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJub25jZSI6MTc1NjQ0ODA1NjAwMSwicGF0aCI6Ii9hcGkvdjMvd2FsbGV0L3Nwb3QvYWNjb3VudHMifQ=="
+        ],
+        "X-Max-Signature": [
+          "d44a0eddd9028dd401dfb1961126d41b612f63ffa5b57d71e4dc5d9e0140b911"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "3357"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Fri, 29 Aug 2025 06:14:16 GMT"
+        ],
+        "Etag": [
+          "W/\"174ca919f971415a87db0467e74d2be4\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b14538-00c36d500165efe81730c0e5"
+        ],
+        "X-Runtime": [
+          "0.048847"
+        ]
+      },
+      "body": "[{\"currency\":\"btc\",\"balance\":\"10.00001972\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"eth\",\"balance\":\"320.02234073\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"ltc\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"bch\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"mith\",\"balance\":\"15.9004212\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"usdt\",\"balance\":\"1790.33384355\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"trx\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"cccx\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"pal\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"eos\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"bat\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"zrx\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"gnt\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"omg\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"knc\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"twdt\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"xrp\",\"balance\":\"0.156866\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"fmf\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"max\",\"balance\":\"1227.56951258\",\"locked\":\"0.0\",\"staked\":\"6000.0\"},{\"currency\":\"seele\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"bcnt\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"sand\",\"balance\":\"0.014475\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"usdc\",\"balance\":\"4.07084922\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"link\",\"balance\":\"0.00098775\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"doge\",\"balance\":\"6.7843875\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"comp\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"dot\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"grt\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"ada\",\"balance\":\"1.565445\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"sol\",\"balance\":\"0.00943016\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"shib\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"mana\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"gala\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"alice\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"pol\",\"balance\":\"0.009\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"yfi\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"rly\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"ape\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"loot\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"looks\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"xtz\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"gmt\",\"balance\":\"0.5937075\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"gst\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"bnb\",\"balance\":\"0.0000045\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"etc\",\"balance\":\"0.00140175\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"ens\",\"balance\":\"0.0009225\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"mask\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"arb\",\"balance\":\"0.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"avax\",\"balance\":\"0.01141875\",\"locked\":\"0.0\",\"staked\":\"0.0\"}]"
+    }
+  },
+  {
+    "timestamp": "2025-08-29T14:14:16.624032+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://max-api.maicoin.com/api/v3/ticker?market=btcusdt",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "253"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Fri, 29 Aug 2025 06:14:16 GMT"
+        ],
+        "Etag": [
+          "W/\"8706597c3fa87b9e6024835bd5d0a22e\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b14538-6557b6f35dab94b84c093327"
+        ],
+        "X-Runtime": [
+          "0.002648"
+        ]
+      },
+      "body": "{\"market\":\"btcusdt\",\"at\":1756448056,\"buy\":\"111191.0\",\"buy_vol\":\"0.004413\",\"sell\":\"111206.25\",\"sell_vol\":\"0.238299\",\"open\":\"112792.02\",\"low\":\"111191.0\",\"high\":\"113450.0\",\"last\":\"111191.0\",\"vol\":\"9.0657\",\"vol_in_btc\":\"9.0657\",\"vol_in_quote\":\"1007833.869\"}"
+    }
+  },
+  {
+    "timestamp": "2025-08-29T14:14:16.779903+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://max-api.maicoin.com/api/v3/wallet/spot/order",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJjbGllbnRfb2lkIjoieC1iYmdvLWUxNjgzN2Y5LTY0MDEtNDBlNy05MzEyLWM2MzRiIiwibWFya2V0IjoiYnRjdXNkdCIsIm5vbmNlIjoxNzU2NDQ4MDU2MDAyLCJvcmRfdHlwZSI6ImxpbWl0IiwicGF0aCI6Ii9hcGkvdjMvd2FsbGV0L3Nwb3Qvb3JkZXIiLCJwcmljZSI6IjExMTIwNi4yNSIsInNpZGUiOiJidXkiLCJ2b2x1bWUiOiIwLjAwMDA4OSJ9"
+        ],
+        "X-Max-Signature": [
+          "728948d11fc41bc92d614962852c4d4d19668b4d98f33d8837a7259bc391c0a5"
+        ]
+      }
+    },
+    "response": {
+      "status": "201 Created",
+      "status_code": 201,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "374"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Fri, 29 Aug 2025 06:14:16 GMT"
+        ],
+        "Etag": [
+          "W/\"78c43b88e7a013a6de3dd7645f586f1a\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b14538-5fe92a9a127d41fc52ffd476"
+        ],
+        "X-Runtime": [
+          "0.079556"
+        ]
+      },
+      "body": "{\"id\":15702555555,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"x-bbgo-e16837f9-6401-40e7-9312-c634b\",\"group_id\":null,\"side\":\"buy\",\"state\":\"wait\",\"ord_type\":\"limit\",\"price\":\"111206.25\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.000089\",\"remaining_volume\":\"0.000089\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1756448056888,\"updated_at\":1756448056888}"
+    }
+  },
+  {
+    "timestamp": "2025-08-29T14:14:17.87678+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://max-api.maicoin.com/api/v3/order?id=15702555555",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJpZCI6IjE1NzAyOTI5NTQ5Iiwibm9uY2UiOjE3NTY0NDgwNTcwMDMsInBhdGgiOiIvYXBpL3YzL29yZGVyIn0="
+        ],
+        "X-Max-Signature": [
+          "11751ba4754677b8ffeb30f0f148870bdd07cc5b2ebe4616b10da6f31b606339"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "380"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Fri, 29 Aug 2025 06:14:18 GMT"
+        ],
+        "Etag": [
+          "W/\"6a6aa42b369e50c3bc6a69054f998e96\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b14539-39957764728ef4b9246c5de5"
+        ],
+        "X-Runtime": [
+          "0.017351"
+        ]
+      },
+      "body": "{\"id\":15702555555,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"x-bbgo-e16837f9-6401-40e7-9312-c634b\",\"group_id\":null,\"side\":\"buy\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"111206.25\",\"stop_price\":null,\"avg_price\":\"111206.25\",\"volume\":\"0.000089\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.000089\",\"trades_count\":1,\"created_at\":1756448056888,\"updated_at\":1756448056973}"
+    }
+  },
+  {
+    "timestamp": "2025-08-29T14:14:18.032786+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://max-api.maicoin.com/api/v3/order/trades?order_id=15702555555",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJub25jZSI6MTc1NjQ0ODA1NzAwNCwib3JkZXJfaWQiOiIxNTcwMjkyOTU0OSIsInBhdGgiOiIvYXBpL3YzL29yZGVyL3RyYWRlcyJ9"
+        ],
+        "X-Max-Signature": [
+          "29db70b2674efc7cdeb4f9cc871f659e336f76b0e5c541617775a91ccc3fc6f4"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "289"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Fri, 29 Aug 2025 06:14:18 GMT"
+        ],
+        "Etag": [
+          "W/\"c4dd07256852234e1517b107e9939c85\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b1453a-56d4eba812ae25de126ee010"
+        ],
+        "X-Runtime": [
+          "0.082127"
+        ]
+      },
+      "body": "[{\"id\":132222222,\"order_id\":15702555555,\"wallet_type\":\"spot\",\"price\":\"111206.25\",\"volume\":\"0.000089\",\"funds\":\"9.89735625\",\"market\":\"btcusdt\",\"market_name\":\"BTC/USDT\",\"side\":\"bid\",\"fee\":\"0.01982968\",\"fee_currency\":\"max\",\"fee_discounted\":true,\"liquidity\":\"taker\",\"created_at\":1756448056925}]"
+    }
+  }
+]
