@@ -20,6 +20,6 @@ type GetSubAccountsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
 
-func (c *Client) NewGetSubAccountsRequest() *GetSubAccountsRequest {
-	return &GetSubAccountsRequest{client: c.Client}
+func (s *SubAccountService) NewGetSubAccountsRequest() *GetSubAccountsRequest {
+	return &GetSubAccountsRequest{client: s.Client}
 }
