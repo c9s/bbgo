@@ -42,7 +42,7 @@ type Exchange struct {
 	submitOrderLimiter, queryTradeLimiter, accountQueryLimiter, closedOrderQueryLimiter, marketDataLimiter *rate.Limiter
 }
 
-func New(key, secret string) *Exchange {
+func New(key, secret, subAccount string) *Exchange {
 	baseURL := maxapi.ProductionAPIURL
 	if override := os.Getenv("MAX_API_BASE_URL"); len(override) > 0 {
 		baseURL = override
@@ -50,6 +50,10 @@ func New(key, secret string) *Exchange {
 
 	client := maxapi.NewRestClient(baseURL)
 	client.Auth(key, secret)
+	if subAccount != "" {
+		client.SetSubAccount(subAccount)
+	}
+
 	return &Exchange{
 		client: client,
 		key:    key,

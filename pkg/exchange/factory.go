@@ -21,6 +21,7 @@ const (
 	OptionKeyAPISecret     = "API_SECRET"
 	OptionKeyAPIPassphrase = "API_PASSPHRASE"
 	OptionKeyAPIPrivateKey = "API_PRIVATE_KEy"
+	OptionKeyAPISubAccount = "API_SUB_ACCOUNT" // for exchanges like Coinbase Pro which support sub accounts
 )
 
 // Options is a map of exchange options used to initialize an exchange
@@ -48,7 +49,7 @@ var factories = map[types.ExchangeName]Factory{
 	types.ExchangeMax: {
 		EnvLoader: DefaultEnvVarLoader,
 		Constructor: func(options Options) (types.Exchange, error) {
-			return max.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret]), nil
+			return max.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret], options[OptionKeyAPISubAccount]), nil
 		},
 	},
 	types.ExchangeOKEx: {

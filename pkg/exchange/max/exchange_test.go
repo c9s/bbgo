@@ -20,7 +20,7 @@ func TestExchange_recoverOrder(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	ex := New(key, secret)
+	ex := New(key, secret, "")
 
 	_, err := ex.recoverOrder(ctx, types.SubmitOrder{
 		Symbol:        "BTCUSDT",
