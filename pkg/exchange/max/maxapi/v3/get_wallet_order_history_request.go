@@ -6,8 +6,8 @@ import "github.com/c9s/requestgen"
 //go:generate -command PostRequest requestgen -method POST
 //go:generate -command DeleteRequest requestgen -method DELETE
 
-func (s *Client) NewGetWalletOrderHistoryRequest(walletType WalletType) *GetWalletOrderHistoryRequest {
-	return &GetWalletOrderHistoryRequest{client: s.Client, walletType: walletType}
+func (c *Client) NewGetWalletOrderHistoryRequest(walletType WalletType) *GetWalletOrderHistoryRequest {
+	return &GetWalletOrderHistoryRequest{client: c.Client, walletType: walletType}
 }
 
 //go:generate GetRequest -url "/api/v3/wallet/:walletType/orders/history" -type GetWalletOrderHistoryRequest -responseType []Order

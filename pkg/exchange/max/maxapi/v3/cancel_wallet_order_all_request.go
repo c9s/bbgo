@@ -11,8 +11,8 @@ type OrderCancelResponse struct {
 	Error *string
 }
 
-func (s *Client) NewCancelWalletOrderAllRequest(walletType WalletType) *CancelWalletOrderAllRequest {
-	return &CancelWalletOrderAllRequest{client: s.Client, walletType: walletType}
+func (c *Client) NewCancelWalletOrderAllRequest(walletType WalletType) *CancelWalletOrderAllRequest {
+	return &CancelWalletOrderAllRequest{client: c.Client, walletType: walletType}
 }
 
 //go:generate DeleteRequest -url "/api/v3/wallet/:walletType/orders" -type CancelWalletOrderAllRequest -responseType []OrderCancelResponse

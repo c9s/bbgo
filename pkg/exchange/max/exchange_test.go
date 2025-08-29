@@ -66,7 +66,6 @@ func TestExchange_recoverOrder(t *testing.T) {
 
 func TestExchange_submitOrderAndCancel(t *testing.T) {
 	// httptesting.AlwaysRecord = true
-
 	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
 	if !ok {
 		t.SkipNow()
