@@ -113,6 +113,8 @@ type RestClient struct {
 
 	APIKey, APISecret string
 
+	subAccount string
+
 	AccountService    *AccountService
 	PublicService     *PublicService
 	TradeService      *TradeService
@@ -171,6 +173,12 @@ func (c *RestClient) Auth(key string, secret string) *RestClient {
 	c.APIKey = key
 	// pragma: allowlist nextline secret
 	c.APISecret = secret
+
+	return c
+}
+
+func (c *RestClient) SetSubAccount(subAccount string) *RestClient {
+	c.subAccount = subAccount
 	return c
 }
 
@@ -295,6 +303,9 @@ func (c *RestClient) newAuthenticatedRequest(
 	req.Header.Add("X-MAX-ACCESSKEY", apiKey)
 	req.Header.Add("X-MAX-PAYLOAD", encoded)
 	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, apiSecret))
+	if c.subAccount != "" {
+		req.Header.Add("X-Sub-Account", c.subAccount)
+	}
 
 	if disableUserAgentHeader {
 		req.Header.Set("USER-AGENT", "")
