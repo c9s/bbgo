@@ -16,4 +16,16 @@ type Account = maxapi.Account
 
 type Client struct {
 	Client requestgen.AuthenticatedAPIClient
+
+	MarginService     *MarginService
+	SubAccountService *SubAccountService
+}
+
+func NewClient(baseClient *maxapi.RestClient) *Client {
+	client := &Client{
+		Client:            baseClient,
+		MarginService:     &MarginService{Client: baseClient},
+		SubAccountService: &SubAccountService{Client: baseClient},
+	}
+	return client
 }

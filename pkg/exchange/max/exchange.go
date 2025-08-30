@@ -34,15 +34,15 @@ type Exchange struct {
 	types.MarginSettings
 
 	key, secret string
-	client      *maxapi.RestClient
+
+	client *maxapi.RestClient
 
 	v3client *v3.Client
-	v3margin *v3.MarginService
 
 	submitOrderLimiter, queryTradeLimiter, accountQueryLimiter, closedOrderQueryLimiter, marketDataLimiter *rate.Limiter
 }
 
-func New(key, secret string) *Exchange {
+func New(key, secret, subAccount string) *Exchange {
 	baseURL := maxapi.ProductionAPIURL
 	if override := os.Getenv("MAX_API_BASE_URL"); len(override) > 0 {
 		baseURL = override
@@ -50,13 +50,16 @@ func New(key, secret string) *Exchange {
 
 	client := maxapi.NewRestClient(baseURL)
 	client.Auth(key, secret)
+	if subAccount != "" {
+		client.SetSubAccount(subAccount)
+	}
+
 	return &Exchange{
 		client: client,
 		key:    key,
 		// pragma: allowlist nextline secret
 		secret:   secret,
-		v3client: &v3.Client{Client: client},
-		v3margin: &v3.MarginService{Client: client},
+		v3client: v3.NewClient(client),
 
 		queryTradeLimiter: rate.NewLimiter(rate.Every(250*time.Millisecond), 2),
 

@@ -6,8 +6,8 @@ package v3
 
 import "github.com/c9s/requestgen"
 
-func (s *Client) NewMarginLoanRequest() *MarginLoanRequest {
-	return &MarginLoanRequest{client: s.Client}
+func (c *Client) NewMarginLoanRequest() *MarginLoanRequest {
+	return &MarginLoanRequest{client: c.Client}
 }
 
 //go:generate PostRequest -url "/api/v3/wallet/m/loan" -type MarginLoanRequest -responseType .LoanRecord

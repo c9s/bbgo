@@ -11,6 +11,9 @@ import (
 	"regexp"
 )
 
+/*
+ * Market sets
+ */
 func (g *GetTickerRequest) Market(market string) *GetTickerRequest {
 	g.market = market
 	return g
@@ -22,7 +25,13 @@ func (g *GetTickerRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil

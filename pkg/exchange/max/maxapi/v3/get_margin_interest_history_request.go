@@ -30,6 +30,6 @@ type GetMarginInterestHistoryRequest struct {
 	limit     *int       `param:"limit"`
 }
 
-func (s *Client) NewGetMarginInterestHistoryRequest(currency string) *GetMarginInterestHistoryRequest {
-	return &GetMarginInterestHistoryRequest{client: s.Client, currency: currency}
+func (c *Client) NewGetMarginInterestHistoryRequest(currency string) *GetMarginInterestHistoryRequest {
+	return &GetMarginInterestHistoryRequest{client: c.Client, currency: currency}
 }

@@ -13,8 +13,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (s *Client) NewGetMarginLiquidationHistoryRequest() *GetMarginLiquidationHistoryRequest {
-	return &GetMarginLiquidationHistoryRequest{client: s.Client}
+func (c *Client) NewGetMarginLiquidationHistoryRequest() *GetMarginLiquidationHistoryRequest {
+	return &GetMarginLiquidationHistoryRequest{client: c.Client}
 }
 
 type LiquidationRecord struct {

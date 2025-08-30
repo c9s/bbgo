@@ -1,0 +1,337 @@
+[
+  {
+    "timestamp": "2025-08-30T11:29:57.305103+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://max-api.maicoin.com/api/v3/sub_accounts",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJub25jZSI6MTc1NjUyNDU5NzAwMSwicGF0aCI6Ii9hcGkvdjMvc3ViX2FjY291bnRzIn0="
+        ],
+        "X-Max-Signature": [
+          "1030569346339164a8c6ea5b6f1ae51be23a843272866dc117954d90e03e1d41"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "179"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Sat, 30 Aug 2025 03:29:57 GMT"
+        ],
+        "Etag": [
+          "W/\"c046318d46f900eec9d4b2b1d2a805c9\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Runtime": [
+          "0.037082"
+        ]
+      },
+      "body": "[{\"sn\":\"zzz123\",\"name\":\"50216ecd-07d6-4381-9978-095ac97f2f74\",\"created_at\":1756452707261},{\"sn\":\"jjj123\",\"name\":\"0d6794cb-ebbe-4ff5-8caa-9284cf577576\",\"created_at\":1756452843852}]"
+    }
+  },
+  {
+    "timestamp": "2025-08-30T11:29:57.314171+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://max-api.maicoin.com/api/v2/timestamp",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "10"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Sat, 30 Aug 2025 03:29:57 GMT"
+        ],
+        "Etag": [
+          "W/\"1175ed087d292a6f6e62926f27b056d2\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Runtime": [
+          "0.046487"
+        ]
+      },
+      "body": "1756524597"
+    }
+  },
+  {
+    "timestamp": "2025-08-30T11:29:57.520482+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://max-api.maicoin.com/api/v3/sub_accounts",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJuYW1lIjoiZDMzNTVmYzktMjMwYi00YTJhLWJhOTAtYjViMjQ2ZDU4NjI1Iiwibm9uY2UiOjE3NTY1MjQ1OTcwMDIsInBhdGgiOiIvYXBpL3YzL3N1Yl9hY2NvdW50cyJ9"
+        ],
+        "X-Max-Signature": [
+          "2e5dca740297ca4cba4253b86f3ca07c23551ffebd8c40b9f792021cfc0ce488"
+        ]
+      }
+    },
+    "response": {
+      "status": "201 Created",
+      "status_code": 201,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "88"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Sat, 30 Aug 2025 03:29:57 GMT"
+        ],
+        "Etag": [
+          "W/\"ef135022ee4424fe16d2683c79163c3f\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Runtime": [
+          "0.154271"
+        ]
+      },
+      "body": "{\"sn\":\"err123\",\"name\":\"d3355fc9-230b-4a2a-ba90-b5b246d58625\",\"created_at\":1756524597512}"
+    }
+  },
+  {
+    "timestamp": "2025-08-30T11:29:57.803219+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://max-api.maicoin.com/api/v3/sub_account/transfer",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJhbW91bnQiOiIxMCIsImNvbXBvc2l0ZV9jdXJyZW5jeSI6InVzZHQiLCJub25jZSI6MTc1NjUyNDU5NzAwMywicGF0aCI6Ii9hcGkvdjMvc3ViX2FjY291bnQvdHJhbnNmZXIiLCJ0b19zbiI6ImVyOGdlbiJ9"
+        ],
+        "X-Max-Signature": [
+          "63908f1946cdcef86b0c1491ce9bd243a6bf3cffcda400c44505ad8f25aea0cc"
+        ]
+      }
+    },
+    "response": {
+      "status": "201 Created",
+      "status_code": 201,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "177"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Sat, 30 Aug 2025 03:29:57 GMT"
+        ],
+        "Etag": [
+          "W/\"680c165c1a3ebec3076d3665533a106d\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Runtime": [
+          "0.223565"
+        ]
+      },
+      "body": "{\"sn\":\"250835566556655665566\",\"currency\":\"usdt\",\"amount\":\"10.0\",\"state\":\"processing\",\"created_at\":1756524597,\"from_sub_account\":{\"sn\":\"5b05ff\"},\"to_sub_account\":{\"sn\":\"err123\"}}"
+    }
+  },
+  {
+    "timestamp": "2025-08-30T11:29:57.978462+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://max-api.maicoin.com/api/v3/sub_account/transfer",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJhbW91bnQiOiIxMCIsImNvbXBvc2l0ZV9jdXJyZW5jeSI6InVzZHQiLCJub25jZSI6MTc1NjUyNDU5NzAwNCwicGF0aCI6Ii9hcGkvdjMvc3ViX2FjY291bnQvdHJhbnNmZXIiLCJ0b19zbiI6ImVyOGdlbiJ9"
+        ],
+        "X-Max-Signature": [
+          "15d63ce565710db1ea46f6b10de22329fa4e4fe06faf4fe502664fc35809776b"
+        ]
+      }
+    },
+    "response": {
+      "status": "201 Created",
+      "status_code": 201,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "177"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Sat, 30 Aug 2025 03:29:57 GMT"
+        ],
+        "Etag": [
+          "W/\"58607e0d6ef9a70fbbfae0e1f370d561\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Runtime": [
+          "0.116383"
+        ]
+      },
+      "body": "{\"sn\":\"250830032914805572727\",\"currency\":\"usdt\",\"amount\":\"10.0\",\"state\":\"processing\",\"created_at\":1756524597,\"from_sub_account\":{\"sn\":\"5b05ff\"},\"to_sub_account\":{\"sn\":\"err123\"}}"
+    }
+  },
+  {
+    "timestamp": "2025-08-30T11:29:58.121992+08:00",
+    "request": {
+      "method": "DELETE",
+      "url": "https://max-api.maicoin.com/api/v3/sub_account",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJub25jZSI6MTc1NjUyNDU5NzAwNSwicGF0aCI6Ii9hcGkvdjMvc3ViX2FjY291bnQiLCJzbiI6ImVyOGdlbiJ9"
+        ],
+        "X-Max-Signature": [
+          "11a3ab85b83f926ece5e61912e6ae2850464958ed074383d03587d2e32af0ec3"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "88"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Sat, 30 Aug 2025 03:29:58 GMT"
+        ],
+        "Etag": [
+          "W/\"ef135022ee4424fe16d2683c79163c3f\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Runtime": [
+          "0.084197"
+        ]
+      },
+      "body": "{\"sn\":\"err123\",\"name\":\"d3355fc9-230b-4a2a-ba90-b5b246d58625\",\"created_at\":1756524597512}"
+    }
+  }
+]

@@ -14,6 +14,6 @@ type GetWalletAccountsRequest struct {
 	currency   *string    `param:"currency,query"`
 }
 
-func (s *Client) NewGetWalletAccountsRequest(walletType WalletType) *GetWalletAccountsRequest {
-	return &GetWalletAccountsRequest{client: s.Client, walletType: walletType}
+func (c *Client) NewGetWalletAccountsRequest(walletType WalletType) *GetWalletAccountsRequest {
+	return &GetWalletAccountsRequest{client: c.Client, walletType: walletType}
 }

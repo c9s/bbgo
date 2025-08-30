@@ -10,8 +10,8 @@ import (
 	"github.com/c9s/requestgen"
 )
 
-func (s *Client) NewGetWalletTradesRequest(walletType WalletType) *GetWalletTradesRequest {
-	return &GetWalletTradesRequest{client: s.Client, walletType: walletType}
+func (c *Client) NewGetWalletTradesRequest(walletType WalletType) *GetWalletTradesRequest {
+	return &GetWalletTradesRequest{client: c.Client, walletType: walletType}
 }
 
 //go:generate GetRequest -url "/api/v3/wallet/:walletType/trades" -type GetWalletTradesRequest -responseType []Trade

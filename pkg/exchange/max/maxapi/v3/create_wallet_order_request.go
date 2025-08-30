@@ -22,6 +22,6 @@ type CreateWalletOrderRequest struct {
 	groupID       *string `param:"group_id"`
 }
 
-func (s *Client) NewCreateWalletOrderRequest(walletType WalletType) *CreateWalletOrderRequest {
-	return &CreateWalletOrderRequest{client: s.Client, walletType: walletType}
+func (c *Client) NewCreateWalletOrderRequest(walletType WalletType) *CreateWalletOrderRequest {
+	return &CreateWalletOrderRequest{client: c.Client, walletType: walletType}
 }
