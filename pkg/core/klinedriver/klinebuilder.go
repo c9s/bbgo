@@ -14,7 +14,7 @@ type KLineBuilder struct {
 
 	// accBucketMap is a map from interval to accumulated kline of that interval
 	lastBucketMap, accBucketMap map[types.Interval]*Bucket
-	// buffer the the klines that are not yet exposed
+	// buffer the klines that are not yet exposed
 	klinesBuffer map[types.Interval][]*types.KLine
 }
 
