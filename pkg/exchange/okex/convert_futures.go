@@ -1,6 +1,8 @@
 package okex
 
 import (
+	"fmt"
+
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -42,15 +44,17 @@ func toGlobalFuturesPositions(futuresPositions []okexapi.Position) types.Futures
 	for _, futuresPosition := range futuresPositions {
 		isolated := futuresPosition.MgnMode == okexapi.MarginModeIsolated
 		symbol := toGlobalSymbol(futuresPosition.InstId)
-		retFuturesPositions[symbol] = types.FuturesPosition{
-			Isolated:    isolated,
-			AverageCost: futuresPosition.AvgPx,
-			Base:        futuresPosition.Pos,
-			Quote:       futuresPosition.Pos.Mul(futuresPosition.MarkPx),
-			PositionRisk: &types.PositionRisk{
-				Leverage: futuresPosition.Lever,
-			},
-			Symbol: symbol,
+		positionSide := toGlobalPositionSide(okexapi.PosSide(futuresPosition.PosSide))
+
+		posKey := fmt.Sprintf("%s:%s", symbol, positionSide)
+		retFuturesPositions[posKey] = types.FuturesPosition{
+			Isolated:     isolated,
+			AverageCost:  futuresPosition.AvgPx,
+			Base:         futuresPosition.Pos,
+			Quote:        futuresPosition.Pos.Mul(futuresPosition.MarkPx),
+			PositionSide: positionSide,
+			PositionRisk: &toGlobalPositionRisk([]okexapi.Position{futuresPosition})[0],
+			Symbol:       symbol,
 		}
 	}
 
@@ -58,9 +62,10 @@ func toGlobalFuturesPositions(futuresPositions []okexapi.Position) types.Futures
 }
 
 func toGlobalPositionSide(positionSide okexapi.PosSide) types.PositionType {
-	if positionSide == okexapi.PosSideLong {
+	switch positionSide {
+	case okexapi.PosSideLong:
 		return types.PositionLong
-	} else if positionSide == okexapi.PosSideShort {
+	case okexapi.PosSideShort:
 		return types.PositionShort
 	}
 	return types.PositionType(positionSide)

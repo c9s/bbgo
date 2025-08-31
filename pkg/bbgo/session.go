@@ -455,7 +455,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		return err
 	}
 
-	if session.SymbolLeverage != nil && len(session.SymbolLeverage) > 0 && session.Futures {
+	if len(session.SymbolLeverage) > 0 && session.Futures {
 		if riskService, ok := session.Exchange.(types.ExchangeRiskService); ok {
 			for symbol, leverage := range session.SymbolLeverage {
 				if err := riskService.SetLeverage(ctx, symbol, leverage); err != nil {

@@ -322,6 +322,9 @@ type FuturesPosition struct {
 	// UpdateTime is the time when the position is updated
 	UpdateTime int64 `json:"updateTime"`
 
+	// PositionSide is the position side
+	PositionSide PositionType `json:"positionSide"`
+
 	// PositionRisk stores the position risk data
 	PositionRisk *PositionRisk
 }

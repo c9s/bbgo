@@ -80,6 +80,12 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 		return nil, err
 	}
 
+	reqRisks := e.futuresClient2.NewFuturesGetPositionRisksRequest()
+	risks, err := reqRisks.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// out, _ := json.MarshalIndent(accountBalances, "", "  ")
 	// fmt.Println(string(out))
 
@@ -99,10 +105,10 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 
 	a := &types.Account{
 		AccountType: types.AccountTypeFutures,
-		FuturesInfo: toGlobalFuturesAccountInfo(account), // In binance GO api, Account define account info which maintain []*AccountAsset and []*AccountPosition.
-		CanDeposit:  account.CanDeposit,                  // if can transfer in asset
-		CanTrade:    account.CanTrade,                    // if can trade
-		CanWithdraw: account.CanWithdraw,                 // if can transfer out asset
+		FuturesInfo: toGlobalFuturesAccountInfo(account, risks), // In binance GO api, Account define account info which maintain []*AccountAsset and []*AccountPosition.
+		CanDeposit:  account.CanDeposit,                         // if can transfer in asset
+		CanTrade:    account.CanTrade,                           // if can trade
+		CanWithdraw: account.CanWithdraw,                        // if can transfer out asset
 	}
 	a.UpdateBalances(balances)
 	return a, nil
