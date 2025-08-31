@@ -41,6 +41,7 @@ func Test_toGlobalFuturesAccountInfo(t *testing.T) {
 			MarkPx:      fixedpoint.NewFromFloat(51000.0),
 			Lever:       fixedpoint.NewFromFloat(10.0),
 			UpdatedTime: types.MillisecondTimestamp(testTime),
+			PosSide:     "long",
 		},
 	}
 
@@ -60,8 +61,8 @@ func Test_toGlobalFuturesAccountInfo(t *testing.T) {
 	assert.Equal(t, fixedpoint.NewFromFloat(500.0), btcAsset.MarginBalance)
 
 	// Verify position conversion
-	position, exists := info.Positions["BTCUSDT"]
-	assert.True(t, exists)
+	position := info.Positions["BTCUSDT:Long"]
+	assert.Equal(t, position.PositionSide, types.PositionLong)
 	assert.True(t, position.Isolated)
 	assert.Equal(t, fixedpoint.NewFromFloat(0.1), position.Base)
 	assert.Equal(t, fixedpoint.NewFromFloat(50000.0), position.AverageCost)
@@ -105,13 +106,14 @@ func Test_toGlobalFuturesPositions(t *testing.T) {
 			MarkPx:      fixedpoint.NewFromFloat(2100.0),
 			Lever:       fixedpoint.NewFromFloat(5.0),
 			UpdatedTime: types.MillisecondTimestamp(testTime),
+			PosSide:     "long",
 		},
 	}
 
 	globalPositions := toGlobalFuturesPositions(positions)
 
-	ethPosition, exists := globalPositions["ETHUSDT"]
-	assert.True(t, exists)
+	ethPosition := globalPositions["ETHUSDT:Long"]
+	assert.Equal(t, ethPosition.PositionSide, types.PositionLong)
 	assert.False(t, ethPosition.Isolated) // Cross margin
 	assert.Equal(t, fixedpoint.NewFromFloat(1.0), ethPosition.Base)
 	assert.Equal(t, fixedpoint.NewFromFloat(2000.0), ethPosition.AverageCost)

@@ -13,10 +13,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func toGlobalFuturesAccountInfo(account *binanceapi.FuturesAccount) *types.FuturesAccount {
+func toGlobalFuturesAccountInfo(account *binanceapi.FuturesAccount, risks []binanceapi.FuturesPositionRisk) *types.FuturesAccount {
 	return &types.FuturesAccount{
 		Assets:                      toGlobalFuturesUserAssets(account.Assets),
-		Positions:                   toGlobalFuturesPositions(account.Positions),
+		Positions:                   toGlobalFuturesPositions(account.Positions, risks),
 		TotalInitialMargin:          account.TotalInitialMargin,
 		TotalMaintMargin:            account.TotalMaintMargin,
 		TotalWalletBalance:          account.TotalWalletBalance,
@@ -29,23 +29,37 @@ func toGlobalFuturesAccountInfo(account *binanceapi.FuturesAccount) *types.Futur
 	}
 }
 
-func toGlobalFuturesPositions(futuresPositions []binanceapi.FuturesAccountPosition) types.FuturesPositionMap {
+func toGlobalFuturesPositions(futuresPositions []binanceapi.FuturesAccountPosition, risks []binanceapi.FuturesPositionRisk) types.FuturesPositionMap {
+	riskMap := make(map[string]types.PositionRisk)
+	if len(risks) > 0 {
+		for _, risk := range toGlobalPositionRisk(risks) {
+			key := fmt.Sprintf("%s:%s", risk.Symbol, risk.PositionSide)
+			riskMap[key] = risk
+		}
+	}
+
 	retFuturesPositions := make(types.FuturesPositionMap)
 	for _, futuresPosition := range futuresPositions {
-		retFuturesPositions[futuresPosition.Symbol] = types.FuturesPosition{ // TODO: types.FuturesPosition
-			Isolated:    futuresPosition.Isolated,
-			AverageCost: futuresPosition.EntryPrice,
-			Base:        futuresPosition.PositionAmt,
-			Quote:       futuresPosition.Notional,
-
-			// TODO: convert position risk
+		position := types.FuturesPosition{
+			Isolated:     futuresPosition.Isolated,
+			AverageCost:  futuresPosition.EntryPrice,
+			Base:         futuresPosition.PositionAmt,
+			Quote:        futuresPosition.Notional,
+			PositionSide: toGlobalPositionSide(futuresPosition.PositionSide),
+			Symbol:       futuresPosition.Symbol,
+			UpdateTime:   futuresPosition.UpdateTime,
 			PositionRisk: &types.PositionRisk{
 				Leverage: futuresPosition.Leverage,
 			},
-
-			Symbol:     futuresPosition.Symbol,
-			UpdateTime: futuresPosition.UpdateTime,
 		}
+
+		posKey := fmt.Sprintf("%s:%s", futuresPosition.Symbol, position.PositionSide)
+		if risk, exists := riskMap[posKey]; exists {
+			risk.Leverage = futuresPosition.Leverage
+			position.PositionRisk = &risk
+		}
+
+		retFuturesPositions[posKey] = position
 	}
 
 	return retFuturesPositions
