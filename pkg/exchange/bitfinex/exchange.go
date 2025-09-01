@@ -53,7 +53,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 	return ""
 }
 
-// NewStream creates a new data stream for Bitfinex.
+// NewStream ...
 func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e)
 }
@@ -76,23 +76,16 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		symbol := toGlobalSymbol(pair.Pair)
 		base, quote := splitLocalSymbol(pair.Pair)
 		markets[symbol] = types.Market{
-			Exchange:      ID,
-			Symbol:        symbol,
-			BaseCurrency:  toGlobalCurrency(base),
-			QuoteCurrency: toGlobalCurrency(quote),
-			MinQuantity:   pair.MinOrderSize,
-			MaxQuantity:   pair.MaxOrderSize,
-			MinNotional:   fixedpoint.NewFromFloat(10.0),
-
-			// The precision level of all trading prices is based on significant figures.
-			// All pairs on Bitfinex use up to 5 significant digits and up to 8 decimals
-			// (e.g. 1.2345, 123.45, 1234.5, 0.00012345). Prices submit with a precision larger than 5 will be cut by the API.
-			PricePrecision: 8,
-
-			// The amount field allows up to 8 decimals. Anything exceeding this will be rounded to the 8th decimal.
+			Exchange:        ID,
+			Symbol:          symbol,
+			BaseCurrency:    toGlobalCurrency(base),
+			QuoteCurrency:   toGlobalCurrency(quote),
+			MinQuantity:     pair.MinOrderSize,
+			MaxQuantity:     pair.MaxOrderSize,
+			MinNotional:     fixedpoint.NewFromFloat(10.0),
+			PricePrecision:  8,
 			VolumePrecision: 8,
 			StepSize:        fixedpoint.NewFromFloat(0.00001), // manually customized step size for bitfinex
-			TickSize:        fixedpoint.NewFromFloat(0.00001), // manually customized tick size for bitfinex
 		}
 	}
 	return markets, nil
@@ -244,7 +237,14 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 
 	switch order.Type {
 	case types.OrderTypeLimit:
-		req.OrderType(bfxapi.OrderTypeExchangeLimit)
+		switch order.TimeInForce {
+		case types.TimeInForceIOC:
+			req.OrderType(bfxapi.OrderTypeExchangeIOC)
+		case types.TimeInForceFOK:
+			req.OrderType(bfxapi.OrderTypeExchangeFOK)
+		default:
+			req.OrderType(bfxapi.OrderTypeExchangeLimit)
+		}
 	case types.OrderTypeMarket:
 		req.OrderType(bfxapi.OrderTypeExchangeMarket)
 	case types.OrderTypeStopLimit:
@@ -440,8 +440,7 @@ func (e *Exchange) QueryTrades(
 	ctx context.Context, symbol string, options *types.TradeQueryOptions,
 ) ([]types.Trade, error) {
 
-	req := e.client.NewGetTradeHistoryBySymbolRequest().
-		Symbol(toLocalSymbol(symbol))
+	req := e.client.NewGetTradeHistoryBySymbolRequest().Symbol(symbol)
 
 	if options != nil {
 		if options.StartTime != nil {

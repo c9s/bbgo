@@ -112,6 +112,17 @@ func toGlobalSide(amt fixedpoint.Value) types.SideType {
 
 // toGlobalOrder converts bfxapi.Order to types.Order
 func toGlobalOrder(o bfxapi.Order) *types.Order {
+	var tif types.TimeInForce
+
+	switch o.OrderType {
+	case bfxapi.OrderTypeExchangeLimit:
+		tif = types.TimeInForceGTC
+	case bfxapi.OrderTypeExchangeIOC:
+		tif = types.TimeInForceIOC
+	case bfxapi.OrderTypeExchangeFOK:
+		tif = types.TimeInForceFOK
+	}
+
 	// map bfxapi.Order to types.Order using struct literal
 	order := &types.Order{
 		SubmitOrder: types.SubmitOrder{
@@ -121,6 +132,7 @@ func toGlobalOrder(o bfxapi.Order) *types.Order {
 			Side:         toGlobalSide(o.AmountOrig),
 			Type:         toGlobalOrderType(o.OrderType),
 			AveragePrice: o.PriceAvg,
+			TimeInForce:  tif,
 		},
 		OrderID:          uint64(o.OrderID),
 		ExecutedQuantity: o.AmountOrig.Abs().Sub(o.Amount.Abs()),
