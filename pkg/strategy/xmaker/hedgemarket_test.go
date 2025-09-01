@@ -163,7 +163,8 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	hm.positionDeltaC <- testhelper.Number(1.0)
 	hm.positionDeltaC <- testhelper.Number(1.0)
 
-	time.Sleep(stepTime)
+	// wait for 2 ticks, so that 2 delta can be merged into one hedge
+	time.Sleep(stepTime * 2)
 
 	// emit trades
 	userDataStream.EmitTradeUpdate(types.Trade{
