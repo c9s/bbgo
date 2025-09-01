@@ -16,8 +16,8 @@ type TokenMeta struct {
 	Index       int    `json:"index"`
 	TokenId     string `json:"tokenId"`
 	IsCanonical bool   `json:"isCanonical"`
-	EvmContract string `json:"evmContract"`
-	FullName    string `json:"fullName"`
+	EvmContract any    `json:"evmContract"`
+	FullName    any    `json:"fullName"`
 }
 
 type UniverseMeta struct {
