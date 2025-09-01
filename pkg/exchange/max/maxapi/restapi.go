@@ -113,6 +113,8 @@ type RestClient struct {
 
 	APIKey, APISecret string
 
+	subAccount string
+
 	AccountService    *AccountService
 	PublicService     *PublicService
 	TradeService      *TradeService
@@ -121,6 +123,15 @@ type RestClient struct {
 	WithdrawalService *WithdrawalService
 
 	apiKeyRotator *apikey.RoundTripBalancer
+}
+
+func NewRestClientDefault() *RestClient {
+	baseURL := ProductionAPIURL
+	if override := os.Getenv("MAX_API_BASE_URL"); len(override) > 0 {
+		baseURL = override
+	}
+
+	return NewRestClient(baseURL)
 }
 
 func NewRestClient(baseURL string) *RestClient {
@@ -171,6 +182,12 @@ func (c *RestClient) Auth(key string, secret string) *RestClient {
 	c.APIKey = key
 	// pragma: allowlist nextline secret
 	c.APISecret = secret
+
+	return c
+}
+
+func (c *RestClient) SetSubAccount(subAccount string) *RestClient {
+	c.subAccount = subAccount
 	return c
 }
 
@@ -295,6 +312,9 @@ func (c *RestClient) newAuthenticatedRequest(
 	req.Header.Add("X-MAX-ACCESSKEY", apiKey)
 	req.Header.Add("X-MAX-PAYLOAD", encoded)
 	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, apiSecret))
+	if c.subAccount != "" {
+		req.Header.Add("X-Sub-Account", c.subAccount)
+	}
 
 	if disableUserAgentHeader {
 		req.Header.Set("USER-AGENT", "")

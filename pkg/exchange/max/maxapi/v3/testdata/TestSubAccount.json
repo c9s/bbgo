@@ -1,0 +1,358 @@
+[
+  {
+    "timestamp": "2025-09-01T20:39:18.178363+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://stag-max-api.maicoin.com/api/v3/sub_accounts",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJub25jZSI6MTc1NjczMDM1NzAwMSwicGF0aCI6Ii9hcGkvdjMvc3ViX2FjY291bnRzIn0="
+        ],
+        "X-Max-Signature": [
+          "b0a95cf9a81de401bf88d4c7cada26b6ab1777b9e72c82ad81a5038c468fa7a9"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "90"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Mon, 01 Sep 2025 12:39:18 GMT"
+        ],
+        "Etag": [
+          "W/\"53770a79399eaafe9f2a094d091a1d12\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b593f6-60f03cc640596b586e881ac9"
+        ],
+        "X-Runtime": [
+          "0.032626"
+        ]
+      },
+      "body": "[{\"sn\":\"6dikjo\",\"name\":\"40722169-1903-4d14-8479-f852998746b5\",\"created_at\":1756730007991}]"
+    }
+  },
+  {
+    "timestamp": "2025-09-01T20:39:18.199031+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://stag-max-api.maicoin.com/api/v2/timestamp",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "10"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Mon, 01 Sep 2025 12:39:18 GMT"
+        ],
+        "Etag": [
+          "W/\"82878221aa4ee3e1304c0eded9e8daab\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b593f6-3375d712718a9266665535f4"
+        ],
+        "X-Runtime": [
+          "0.053826"
+        ]
+      },
+      "body": "1756730358"
+    }
+  },
+  {
+    "timestamp": "2025-09-01T20:39:18.384185+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://stag-max-api.maicoin.com/api/v3/sub_accounts",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJuYW1lIjoiZjY3N2IzMDgtMDJiNy00MWYxLTkyYjItOTEwMjMxNzk2NWQzIiwibm9uY2UiOjE3NTY3MzAzNTgwMDIsInBhdGgiOiIvYXBpL3YzL3N1Yl9hY2NvdW50cyJ9"
+        ],
+        "X-Max-Signature": [
+          "c72af1b24de3e95e2236b2e51c58a5a0411a190f077129baa35a0e8310af72fa"
+        ]
+      }
+    },
+    "response": {
+      "status": "201 Created",
+      "status_code": 201,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "88"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Mon, 01 Sep 2025 12:39:18 GMT"
+        ],
+        "Etag": [
+          "W/\"1dacdfbb41e5a38e4787b95622f322a6\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b593f6-13ddbd1a70ae32ce44481b35"
+        ],
+        "X-Runtime": [
+          "0.091301"
+        ]
+      },
+      "body": "{\"sn\":\"iui1xt\",\"name\":\"f677b308-02b7-41f1-92b2-9102317965d3\",\"created_at\":1756730358318}"
+    }
+  },
+  {
+    "timestamp": "2025-09-01T20:39:18.751937+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://stag-max-api.maicoin.com/api/v3/sub_account/transfer",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJhbW91bnQiOiIxMCIsImN1cnJlbmN5IjoidXNkdCIsIm5vbmNlIjoxNzU2NzMwMzU4MDAzLCJwYXRoIjoiL2FwaS92My9zdWJfYWNjb3VudC90cmFuc2ZlciIsInRvX3NuIjoiaXVpMXh0In0="
+        ],
+        "X-Max-Signature": [
+          "e73f7b90f3a1ef82f9614800dc90182027739222491773efaa45dae788e1a381"
+        ]
+      }
+    },
+    "response": {
+      "status": "201 Created",
+      "status_code": 201,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "177"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Mon, 01 Sep 2025 12:39:18 GMT"
+        ],
+        "Etag": [
+          "W/\"3f5f2dceaacc813e1db3a3cc5a7eb61a\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b593f6-79cbad7550452b480ff10a5b"
+        ],
+        "X-Runtime": [
+          "0.292122"
+        ]
+      },
+      "body": "{\"sn\":\"250901123914870616917\",\"currency\":\"usdt\",\"amount\":\"10.0\",\"state\":\"processing\",\"created_at\":1756730358,\"from_sub_account\":{\"sn\":\"5b05ff\"},\"to_sub_account\":{\"sn\":\"iui1xt\"}}"
+    }
+  },
+  {
+    "timestamp": "2025-09-01T20:39:20.031217+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://stag-max-api.maicoin.com/api/v3/sub_account/transfer",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJhbW91bnQiOiIxMCIsImN1cnJlbmN5IjoidXNkdCIsIm5vbmNlIjoxNzU2NzMwMzU5MDA0LCJwYXRoIjoiL2FwaS92My9zdWJfYWNjb3VudC90cmFuc2ZlciIsInRvX21haW4iOnRydWV9"
+        ],
+        "X-Max-Signature": [
+          "973450b041f79e5c839e63ae63755de362ae35551a74f72e37e839df663af35d"
+        ],
+        "X-Sub-Account": [
+          "iui1xt"
+        ]
+      }
+    },
+    "response": {
+      "status": "201 Created",
+      "status_code": 201,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "177"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Mon, 01 Sep 2025 12:39:20 GMT"
+        ],
+        "Etag": [
+          "W/\"7ee49ad504e199a52877494ce384a6d1\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b593f7-551a14a74a049061588fe591"
+        ],
+        "X-Runtime": [
+          "0.205584"
+        ]
+      },
+      "body": "{\"sn\":\"250901123914870622753\",\"currency\":\"usdt\",\"amount\":\"10.0\",\"state\":\"processing\",\"created_at\":1756730359,\"from_sub_account\":{\"sn\":\"iui1xt\"},\"to_sub_account\":{\"sn\":\"5b05ff\"}}"
+    }
+  },
+  {
+    "timestamp": "2025-09-01T20:39:21.196663+08:00",
+    "request": {
+      "method": "DELETE",
+      "url": "https://stag-max-api.maicoin.com/api/v3/sub_account",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJub25jZSI6MTc1NjczMDM2MTAwNSwicGF0aCI6Ii9hcGkvdjMvc3ViX2FjY291bnQiLCJzbiI6Iml1aTF4dCJ9"
+        ],
+        "X-Max-Signature": [
+          "94f0061f97f303878c3b6e4b3d7b526963e75078ae65e683370511d3bb55ccee"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "88"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Mon, 01 Sep 2025 12:39:21 GMT"
+        ],
+        "Etag": [
+          "W/\"1dacdfbb41e5a38e4787b95622f322a6\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-68b593f9-7d97ca447176c51827caac42"
+        ],
+        "X-Runtime": [
+          "0.093164"
+        ]
+      },
+      "body": "{\"sn\":\"iui1xt\",\"name\":\"f677b308-02b7-41f1-92b2-9102317965d3\",\"created_at\":1756730358318}"
+    }
+  }
+]

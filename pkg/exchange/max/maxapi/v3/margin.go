@@ -15,8 +15,8 @@ type MarginService struct {
 	Client *maxapi.RestClient
 }
 
-func (s *Client) NewGetMarginBorrowingLimitsRequest() *GetMarginBorrowingLimitsRequest {
-	return &GetMarginBorrowingLimitsRequest{client: s.Client}
+func (c *Client) NewGetMarginBorrowingLimitsRequest() *GetMarginBorrowingLimitsRequest {
+	return &GetMarginBorrowingLimitsRequest{client: c.Client}
 }
 
 type MarginBorrowingLimitMap map[string]fixedpoint.Value

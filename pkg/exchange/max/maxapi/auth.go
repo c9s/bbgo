@@ -7,6 +7,9 @@ type AuthMessage struct {
 	Signature string   `json:"signature,omitempty"`
 	ID        string   `json:"id,omitempty"`
 	Filters   []string `json:"filters,omitempty"`
+
+	// SubAccount is the SN of the sub-account to access, this is only for master account.
+	SubAccount string `json:"subAccount,omitempty"`
 }
 
 type AuthEvent struct {

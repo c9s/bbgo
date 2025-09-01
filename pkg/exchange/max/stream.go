@@ -2,9 +2,6 @@ package max
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"os"
 	"strconv"
 	"time"
@@ -186,7 +183,7 @@ func (s *Stream) handleConnect() {
 			// pragma: allowlist nextline secret
 			APIKey:    s.key,
 			Nonce:     nonce,
-			Signature: signPayload(strconv.FormatInt(nonce, 10), s.secret),
+			Signature: maxapi.SignPayload(strconv.FormatInt(nonce, 10), s.secret),
 			ID:        uuid.New().String(),
 			Filters:   filters,
 		}
@@ -433,13 +430,4 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	default:
 		log.Warnf("unhandled %T event: %+v", e, e)
 	}
-}
-
-func signPayload(payload string, secret string) string {
-	var sig = hmac.New(sha256.New, []byte(secret))
-	_, err := sig.Write([]byte(payload))
-	if err != nil {
-		return ""
-	}
-	return hex.EncodeToString(sig.Sum(nil))
 }

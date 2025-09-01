@@ -14,6 +14,6 @@ type MarginRepayRequest struct {
 	amount   string `param:"amount"`
 }
 
-func (s *Client) NewMarginRepayRequest() *MarginRepayRequest {
-	return &MarginRepayRequest{client: s.Client}
+func (c *Client) NewMarginRepayRequest() *MarginRepayRequest {
+	return &MarginRepayRequest{client: c.Client}
 }

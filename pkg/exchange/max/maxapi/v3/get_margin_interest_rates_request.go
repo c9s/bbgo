@@ -22,6 +22,6 @@ type GetMarginInterestRatesRequest struct {
 	client requestgen.APIClient
 }
 
-func (s *Client) NewGetMarginInterestRatesRequest() *GetMarginInterestRatesRequest {
-	return &GetMarginInterestRatesRequest{client: s.Client}
+func (c *Client) NewGetMarginInterestRatesRequest() *GetMarginInterestRatesRequest {
+	return &GetMarginInterestRatesRequest{client: c.Client}
 }

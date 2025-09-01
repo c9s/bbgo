@@ -24,6 +24,6 @@ type GetDepthRequest struct {
 	sortByPrice *bool  `param:"sort_by_price"`
 }
 
-func (s *Client) NewGetDepthRequest() *GetDepthRequest {
-	return &GetDepthRequest{client: s.Client}
+func (c *Client) NewGetDepthRequest() *GetDepthRequest {
+	return &GetDepthRequest{client: c.Client}
 }
