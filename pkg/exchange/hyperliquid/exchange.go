@@ -18,7 +18,7 @@ const (
 )
 
 // REST requests share an aggregated weight limit of 1200 per minute.
-var restSharedLimiter = rate.NewLimiter(rate.Every(time.Duration(1200)*time.Minute), 1)
+var restSharedLimiter = rate.NewLimiter(rate.Every(50*time.Millisecond), 1)
 
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": ID,
@@ -66,10 +66,9 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	}
 
 	markets := types.MarketMap{}
-	for _, m := range meta.Universe {
-		markets[m.Name] = types.Market{
-			Exchange: types.ExchangeHyperliquid,
-		}
+	for _, s := range meta.Universe {
+		market := toGlobalSpotMarket(s, meta.Tokens)
+		markets.Add(market)
 	}
 
 	return markets, nil
