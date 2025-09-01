@@ -20,7 +20,7 @@ const (
 	OptionKeyAPIKey        = "API_KEY"
 	OptionKeyAPISecret     = "API_SECRET"
 	OptionKeyAPIPassphrase = "API_PASSPHRASE"
-	OptionKeyAPIPrivateKey = "API_PRIVATE_KEy"
+	OptionKeyAPIPrivateKey = "API_PRIVATE_KEY"
 	OptionKeyAPISubAccount = "API_SUB_ACCOUNT" // for exchanges like Coinbase Pro which support sub accounts
 )
 
