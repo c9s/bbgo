@@ -261,6 +261,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 
 	}
 
+	// TODO: support this time in force feature
+	// Time-In-Force: datetime for automatic order cancellation (e.g. 2020-01-15 10:45:23).
+	// req.Tif("")
+
 	var clientOrderID int64
 	if order.ClientOrderID != "" {
 		if i, err := strconv.ParseInt(order.ClientOrderID, 10, 64); err != nil {
