@@ -8,7 +8,6 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-
 	"gopkg.in/yaml.v3"
 
 	"github.com/c9s/bbgo/pkg/datatype/floats"
