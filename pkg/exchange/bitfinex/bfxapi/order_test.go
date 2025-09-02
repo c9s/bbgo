@@ -19,6 +19,8 @@ func TestOrderStatusUnmarshalJSON(t *testing.T) {
 		{"PARTIALLY EXECUTED @ 105.0(0.5)", OrderStatusPartiallyFilled},
 		{"CANCELED", OrderStatusCanceled},
 		{"CANCELLED", OrderStatusCanceled},
+		{"POSTONLY CANCELED", OrderStatusCanceled},
+		{"IOC CANCELED", OrderStatusCanceled},
 		{"CANCELED was: PARTIALLY FILLED @ 105.0(0.5)", OrderStatusCanceled},
 		{"REJECTED", OrderStatusRejected},
 		{"EXPIRED", OrderStatusExpired},
