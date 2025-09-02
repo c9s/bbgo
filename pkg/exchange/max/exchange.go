@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"os"
 	"sort"
 	"strconv"
 	"time"
@@ -43,15 +42,14 @@ type Exchange struct {
 }
 
 func New(key, secret, subAccount string) *Exchange {
-	baseURL := maxapi.ProductionAPIURL
-	if override := os.Getenv("MAX_API_BASE_URL"); len(override) > 0 {
-		baseURL = override
-	}
-
-	client := maxapi.NewRestClient(baseURL)
+	client := maxapi.NewRestClientDefault()
 	client.Auth(key, secret)
 	if subAccount != "" {
 		client.SetSubAccount(subAccount)
+	}
+
+	if err := client.Initialize(context.Background()); err != nil {
+		log.WithError(err).Fatal("failed to initialize max client")
 	}
 
 	return &Exchange{
