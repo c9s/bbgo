@@ -39,13 +39,11 @@ func (v *ExpirableValue) String() string {
 	return buf.String()
 }
 
-func (v *ExpirableValue) Set(value Value, expiresAt time.Time) error {
+func (v *ExpirableValue) Set(value Value, expiresAt time.Time) {
 	v.mu.Lock()
-	defer v.mu.Unlock()
-
 	v.value = value
 	v.expiresAt = expiresAt
-	return nil
+	v.mu.Unlock()
 }
 
 func (v *ExpirableValue) Get(now time.Time) (Value, bool) {
