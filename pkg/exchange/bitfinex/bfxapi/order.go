@@ -24,19 +24,17 @@ const (
 type OrderStatus string
 
 const (
-	OrderStatusActive            OrderStatus = "ACTIVE"             // order is active
-	OrderStatusExecuted          OrderStatus = "EXECUTED"           // order has been fully filled
-	OrderStatusPartiallyFilled   OrderStatus = "PARTIALLY FILLED"   // order has been partially filled
-	OrderStatusCanceled          OrderStatus = "CANCELED"           // order has been canceled
-	OrderStatusPostponed         OrderStatus = "POSTPONED"          // order has been postponed
-	OrderStatusInsufficientBal   OrderStatus = "INSUFFICIENT BAL"   // insufficient balance
-	OrderStatusNotEnoughBalance  OrderStatus = "NOT ENOUGH BALANCE" // not enough balance
-	OrderStatusNotFound          OrderStatus = "NOT FOUND"          // order not found
-	OrderStatusStopped           OrderStatus = "STOPPED"            // order stopped
-	OrderStatusRejected          OrderStatus = "REJECTED"           // order rejected
-	OrderStatusExpired           OrderStatus = "EXPIRED"            // order expired
-	OrderStatusPending           OrderStatus = "PENDING"            // order pending
-	OrderStatusPartiallyCanceled OrderStatus = "PARTIALLY CANCELED" // order partially canceled
+	OrderStatusActive            OrderStatus = "ACTIVE"               // order is active
+	OrderStatusExecuted          OrderStatus = "EXECUTED"             // order has been fully filled
+	OrderStatusPartiallyFilled   OrderStatus = "PARTIALLY FILLED"     // order has been partially filled
+	OrderStatusCanceled          OrderStatus = "CANCELED"             // order has been canceled
+	OrderStatusPostponed         OrderStatus = "POSTPONED"            // order has been postponed
+	OrderStatusInsufficientBal   OrderStatus = "INSUFFICIENT BALANCE" // insufficient balance
+	OrderStatusStopped           OrderStatus = "STOPPED"              // order stopped
+	OrderStatusRejected          OrderStatus = "REJECTED"             // order rejected
+	OrderStatusExpired           OrderStatus = "EXPIRED"              // order expired
+	OrderStatusPending           OrderStatus = "PENDING"              // order pending
+	OrderStatusPartiallyCanceled OrderStatus = "PARTIALLY CANCELED"   // order partially canceled
 )
 
 // UnmarshalJSON implements custom unmarshaling for OrderStatus.
@@ -53,17 +51,17 @@ func (s *OrderStatus) UnmarshalJSON(data []byte) error {
 	switch {
 	case strings.HasPrefix(raw, "ACTIVE"):
 		*s = OrderStatusActive
-	case strings.HasPrefix(raw, "EXECUTED") || strings.HasPrefix(raw, "FILLED"):
+	case strings.HasPrefix(raw, "EXECUTED") || strings.HasPrefix(raw, "FILLED") || strings.HasSuffix(raw, "EXECUTED"):
 		*s = OrderStatusExecuted
 	case strings.HasPrefix(raw, "PARTIALLY FILLED") || strings.HasPrefix(raw, "PARTIALLY EXECUTED"):
 		*s = OrderStatusPartiallyFilled
-	case strings.HasPrefix(raw, "CANCELED") || strings.HasPrefix(raw, "CANCELLED"):
+	case strings.HasPrefix(raw, "CANCELED") || strings.HasPrefix(raw, "CANCELLED") || strings.HasSuffix(raw, "CANCELED"):
 		*s = OrderStatusCanceled
 	case strings.HasPrefix(raw, "REJECTED"):
 		*s = OrderStatusRejected
 	case strings.HasPrefix(raw, "EXPIRED"):
 		*s = OrderStatusExpired
-	case strings.HasPrefix(raw, "INSUFFICIENT BAL") || strings.HasPrefix(raw, "NOT ENOUGH BALANCE") || strings.HasPrefix(raw, "INSUFFICIENT MARGIN"):
+	case strings.HasPrefix(raw, "INSUFFICIENT BALANCE") || strings.HasPrefix(raw, "NOT ENOUGH BALANCE") || strings.HasPrefix(raw, "INSUFFICIENT MARGIN"):
 		*s = OrderStatusInsufficientBal
 	case strings.HasPrefix(raw, "STOPPED"):
 		*s = OrderStatusStopped
@@ -73,11 +71,16 @@ func (s *OrderStatus) UnmarshalJSON(data []byte) error {
 		*s = OrderStatusPending
 	case strings.HasPrefix(raw, "PARTIALLY CANCELED"):
 		*s = OrderStatusPartiallyCanceled
-	case strings.HasPrefix(raw, "NOT FOUND"):
-		*s = OrderStatusNotFound
 	case strings.HasPrefix(raw, "RSN_DUST") || strings.HasPrefix(raw, "RSN_PAUSE"):
 		// treat as rejected
 		*s = OrderStatusRejected
+	case strings.HasPrefix(raw, "RSN_POS_REDUCE_INCR"),
+		strings.HasPrefix(raw, "RSN_POS_REDUCE_FLIP"),
+		strings.HasPrefix(raw, "RSN_POS_NOTFOUND"):
+
+		// status not used
+		*s = OrderStatus(raw)
+
 	default:
 		// fallback: use the raw string
 		*s = OrderStatus(raw)
