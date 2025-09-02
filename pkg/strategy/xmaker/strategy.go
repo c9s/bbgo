@@ -254,6 +254,8 @@ type Strategy struct {
 	positionStartedAtMutex sync.Mutex
 
 	sourceOrderExecutor *bbgo.GeneralOrderExecutor
+
+	debtQuotaCache *fixedpoint.ExpirableValue
 }
 
 func (s *Strategy) ID() string {
@@ -322,6 +324,9 @@ func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Valu
 func (s *Strategy) Initialize() error {
 	s.bidPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
 	s.askPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
+
+	s.debtQuotaCache = fixedpoint.NewExpirable(fixedpoint.Zero, time.Time{})
+
 	s.logger = logrus.WithFields(
 		logrus.Fields{
 			"symbol":      s.Symbol,
@@ -622,12 +627,21 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 	return q, nil
 }
 
+const debtQuotaCacheDuration = 30 * time.Second
+
 // margin level = totalValue / totalDebtValue * MMR (maintenance margin ratio)
 // on binance:
 // - MMR with 10x leverage = 5%
 // - MMR with 5x leverage = 9%
 // - MMR with 3x leverage = 10%
 func (s *Strategy) calculateDebtQuota(totalValue, debtValue, minMarginLevel, leverage fixedpoint.Value) fixedpoint.Value {
+	now := time.Now()
+	if s.debtQuotaCache != nil {
+		if v, ok := s.debtQuotaCache.Get(now); ok {
+			return v
+		}
+	}
+
 	if minMarginLevel.IsZero() || totalValue.IsZero() {
 		return fixedpoint.Zero
 	}
@@ -655,6 +669,12 @@ func (s *Strategy) calculateDebtQuota(totalValue, debtValue, minMarginLevel, lev
 	debtQuota := debtCap.Sub(debtValue)
 	if debtQuota.Sign() < 0 {
 		return fixedpoint.Zero
+	}
+
+	if s.debtQuotaCache == nil {
+		s.debtQuotaCache = fixedpoint.NewExpirable(debtQuota, now.Add(debtQuotaCacheDuration))
+	} else {
+		s.debtQuotaCache.Set(debtQuota, now.Add(debtQuotaCacheDuration))
 	}
 
 	return debtQuota

@@ -171,9 +171,15 @@ func NewRestClient(baseURL string) *RestClient {
 		client.apiKeyRotator = apikey.NewRoundTripBalancer(source)
 	}
 
-	// defaultHttpClient.MaxTokenService = &MaxTokenService{defaultHttpClient}
-	client.initNonce()
 	return client
+}
+
+func (c *RestClient) Initialize(ctx context.Context) error {
+	nonceOnce.Do(func() {
+		go c.queryAndUpdateServerTimestamp(ctx)
+	})
+
+	return nil
 }
 
 // Auth sets api key and secret for usage is requests that requires authentication.
