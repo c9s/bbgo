@@ -90,7 +90,7 @@ func (c *ConverterManager) ConvertTrade(trade types.Trade) types.Trade {
 	for _, converter := range c.converters {
 		convTrade, err := converter.ConvertTrade(trade)
 		if err != nil {
-			logrus.WithError(err).Errorf("converter %+v error, trade: %s", converter, trade.String())
+			logrus.WithError(err).WithFields(trade.LogFields()).Errorf("converter %+v error, trade: %s", converter, trade.String())
 			continue
 		}
 
@@ -102,7 +102,6 @@ func (c *ConverterManager) ConvertTrade(trade types.Trade) types.Trade {
 
 //go:generate callbackgen -type TradeCollector
 type TradeCollector struct {
-	Symbol   string
 	orderSig sigchan.Chan
 
 	tradeStore *TradeStore
@@ -120,6 +119,8 @@ type TradeCollector struct {
 	positionUpdateCallbacks []func(position *types.Position)
 	profitCallbacks         []func(trade types.Trade, profit *types.Profit)
 
+	boundStream map[types.Stream]struct{}
+
 	ConverterManager
 }
 
@@ -128,14 +129,14 @@ func NewTradeCollector(symbol string, position *types.Position, orderStore *Orde
 	tradeStore.pruneEnabled = true
 
 	return &TradeCollector{
-		Symbol:   symbol,
 		orderSig: sigchan.New(1),
 
-		tradeC:     make(chan types.Trade, 100),
-		tradeStore: tradeStore,
-		doneTrades: make(map[types.TradeKey]struct{}),
-		position:   position,
-		orderStore: orderStore,
+		tradeC:      make(chan types.Trade, 100),
+		tradeStore:  tradeStore,
+		doneTrades:  make(map[types.TradeKey]struct{}),
+		position:    position,
+		orderStore:  orderStore,
+		boundStream: make(map[types.Stream]struct{}),
 	}
 }
 
@@ -169,9 +170,16 @@ func (c *TradeCollector) BindStreamForBackground(stream types.Stream) {
 }
 
 func (c *TradeCollector) BindStream(stream types.Stream) {
+	// this prevents double binding
+	if _, ok := c.boundStream[stream]; ok {
+		return
+	}
+
 	stream.OnTradeUpdate(func(trade types.Trade) {
 		c.ProcessTrade(trade)
 	})
+
+	c.boundStream[stream] = struct{}{}
 }
 
 // Emit triggers the trade processing (position update)
