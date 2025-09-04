@@ -13,53 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type HedgeMethod string
-
-const (
-	// HedgeMethodMarket is the default hedge method that uses the market order to hedge
-	HedgeMethodMarket HedgeMethod = "market"
-
-	// HedgeMethodCounterparty is a hedge method that uses limit order at the specific counterparty price level to hedge
-	HedgeMethodCounterparty HedgeMethod = "counterparty"
-
-	// HedgeMethodQueue is a hedge method that uses limit order at the first price level in the queue to hedge
-	HedgeMethodQueue HedgeMethod = "queue"
-)
-
 const TradeTagMock = "mock"
-
-type HedgeMarketConfig struct {
-	SymbolSelector string         `json:"symbolSelector"`
-	HedgeMethod    HedgeMethod    `json:"hedgeMethod"`
-	HedgeInterval  types.Duration `json:"hedgeInterval"`
-
-	HedgeMethodMarket       *MarketOrderHedgeExecutorConfig  `json:"hedgeMethodMarket,omitempty"`       // for backward compatibility, this is the default hedge method
-	HedgeMethodCounterparty *CounterpartyHedgeExecutorConfig `json:"hedgeMethodCounterparty,omitempty"` // for backward compatibility, this is the default hedge method
-
-	HedgeMethodQueue *struct {
-		PriceLevel int `json:"priceLevel"`
-	} `json:"hedgeMethodQueue,omitempty"` // for backward compatibility, this is the default hedge method
-
-	QuotingDepth        fixedpoint.Value `json:"quotingDepth"`
-	QuotingDepthInQuote fixedpoint.Value `json:"quotingDepthInQuote"`
-}
-
-func initializeHedgeMarketFromConfig(
-	c *HedgeMarketConfig,
-	sessions map[string]*bbgo.ExchangeSession,
-) (*HedgeMarket, error) {
-	session, market, err := parseSymbolSelector(c.SymbolSelector, sessions)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.QuotingDepth.IsZero() && c.QuotingDepthInQuote.IsZero() {
-		return nil, fmt.Errorf("quotingDepth or quotingDepthInQuote must be set for hedge market %s", c.SymbolSelector)
-	}
-
-	hm := newHedgeMarket(c, session, market)
-	return hm, nil
-}
 
 // SyntheticHedge is a strategy that uses synthetic hedging to manage risk
 // SourceSymbol could be something like binance.BTCUSDT
