@@ -72,10 +72,20 @@ func (m *MarketOrderHedgeExecutor) canHedge(
 	bid, ask := m.getQuotePrice()
 	price := sideTakerPrice(bid, ask, side)
 	currency, required := determineRequiredCurrencyAndAmount(m.market, side, quantity, price)
-	available, ok := getAvailableBalance(m.session.GetAccount(), currency)
+	account := m.session.GetAccount()
+	available, ok := getAvailableBalance(account, currency)
 	if !ok {
 		log.Warnf("cannot find balance for currency: %s", currency)
 		return false, nil
+	}
+
+	// for margin account, we need to check if the margin level is sufficient
+	if m.session.Margin {
+		// a simple check to ensure the account is not in danger of liquidation
+		if account.MarginLevel.IsZero() || account.MarginLevel.Compare(fixedpoint.NewFromFloat(2.0)) < 0 {
+			log.Warnf("margin level too low to hedge: %s", account.MarginLevel.String())
+			return false, nil
+		}
 	}
 
 	if !isBalanceSufficient(available, required) {
