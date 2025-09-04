@@ -126,10 +126,12 @@ type Strategy struct {
 	// MinMargin is the minimum margin protection for signal margin
 	MinMargin *fixedpoint.Value `json:"minMargin"`
 
-	UseDepthPrice    bool             `json:"useDepthPrice"`
-	DepthQuantity    fixedpoint.Value `json:"depthQuantity"`
-	SourceDepthLevel types.Depth      `json:"sourceDepthLevel"`
-	MakerOnly        bool             `json:"makerOnly"`
+	UseDepthPrice bool             `json:"useDepthPrice"`
+	DepthQuantity fixedpoint.Value `json:"depthQuantity"`
+
+	// TODO: move SourceDepthLevel to HedgeMarket
+	SourceDepthLevel types.Depth `json:"sourceDepthLevel"`
+	MakerOnly        bool        `json:"makerOnly"`
 
 	// EnableDelayHedge enables the delay hedge feature
 	EnableDelayHedge bool `json:"enableDelayHedge"`
@@ -2532,15 +2534,16 @@ func (s *Strategy) CrossRun(
 	// bind two user data streams so that we can collect the trades together
 	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
 
-	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		s.logger.Infof("split hedge is enabled: %+v", s.SplitHedge)
+		if err := s.SplitHedge.InitializeAndBind(sessions, s); err != nil {
+			return err
+		}
+	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 		s.logger.Infof("syntheticHedge is enabled: %+v", s.SyntheticHedge)
 		if err := s.SyntheticHedge.InitializeAndBind(sessions, s); err != nil {
 			return err
 		}
-
-		// TODO: make this call clean ?
-		s.SyntheticHedge.sourceMarket.positionExposure.OnCover(s.positionExposure.Cover)
-		s.SyntheticHedge.sourceMarket.positionExposure.OnClose(s.positionExposure.Close)
 	} else {
 		s.orderStore.BindStream(s.sourceSession.UserDataStream)
 		s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
