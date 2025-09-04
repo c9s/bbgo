@@ -9,10 +9,34 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type HedgeExecutor interface {
+	// hedge executes a hedge order based on the uncovered position and the hedge delta
+	// uncoveredPosition: the current uncovered position that needs to be hedged
+	// hedgeDelta: the delta that needs to be hedged, which is the negative of uncoveredPosition
+	// quantity: the absolute value of hedgeDelta, which is the order quantity to be hedged
+	// side: the side of the hedge order, which is determined by the sign of hedgeDelta
+	hedge(
+		ctx context.Context,
+		uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
+		side types.SideType,
+	) error
+
+	canHedge(
+		ctx context.Context,
+		uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
+		side types.SideType,
+	) (bool, error)
+
+	// clear clears any pending orders or state related to hedging
+	clear(ctx context.Context) error
+}
+
 type BaseHedgeExecutorConfig struct {
 }
 
 type MarketOrderHedgeExecutorConfig struct {
+	HedgeExecutor
+
 	BaseHedgeExecutorConfig
 
 	MaxOrderQuantity fixedpoint.Value `json:"maxOrderQuantity,omitempty"` // max order quantity for market order hedge
@@ -37,6 +61,15 @@ func newMarketOrderHedgeExecutor(
 func (m *MarketOrderHedgeExecutor) clear(ctx context.Context) error {
 	// no-op for market order hedge executor
 	return nil
+}
+
+func (m *MarketOrderHedgeExecutor) canHedge(
+	ctx context.Context,
+	uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
+	side types.SideType,
+) (bool, error) {
+	// TODO: implement this
+	return true, nil
 }
 
 func (m *MarketOrderHedgeExecutor) hedge(
@@ -92,6 +125,8 @@ type CounterpartyHedgeExecutorConfig struct {
 }
 
 type CounterpartyHedgeExecutor struct {
+	HedgeExecutor
+
 	*HedgeMarket
 
 	config     *CounterpartyHedgeExecutorConfig
@@ -106,6 +141,15 @@ func newCounterpartyHedgeExecutor(
 		HedgeMarket: market,
 		config:      config,
 	}
+}
+
+func (m *CounterpartyHedgeExecutor) canHedge(
+	ctx context.Context,
+	uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
+	side types.SideType,
+) (bool, error) {
+	// TODO: implement this
+	return true, nil
 }
 
 func (m *CounterpartyHedgeExecutor) clear(ctx context.Context) error {

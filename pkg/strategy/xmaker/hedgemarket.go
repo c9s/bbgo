@@ -35,22 +35,6 @@ const (
 
 const defaultHedgeInterval = 200 * time.Millisecond
 
-type HedgeExecutor interface {
-	// hedge executes a hedge order based on the uncovered position and the hedge delta
-	// uncoveredPosition: the current uncovered position that needs to be hedged
-	// hedgeDelta: the delta that needs to be hedged, which is the negative of uncoveredPosition
-	// quantity: the absolute value of hedgeDelta, which is the order quantity to be hedged
-	// side: the side of the hedge order, which is determined by the sign of hedgeDelta
-	hedge(
-		ctx context.Context,
-		uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
-		side types.SideType,
-	) error
-
-	// clear clears any pending orders or state related to hedging
-	clear(ctx context.Context) error
-}
-
 type HedgeMarketConfig struct {
 	SymbolSelector string         `json:"symbolSelector"`
 	HedgeMethod    HedgeMethod    `json:"hedgeMethod"`
@@ -152,6 +136,7 @@ func newHedgeMarket(
 	activeMakerOrders.BindStream(session.UserDataStream)
 
 	logger := log.WithFields(logrus.Fields{
+		"session":      session.Name,
 		"exchange":     session.ExchangeName,
 		"hedge_market": market.Symbol,
 	})
