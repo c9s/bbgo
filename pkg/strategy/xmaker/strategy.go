@@ -111,6 +111,8 @@ type Strategy struct {
 
 	EnableSignalMargin bool `json:"enableSignalMargin"`
 
+	SignalSource string `json:"signalSource,omitempty"`
+
 	SignalConfigList *signal.DynamicConfig `json:"signals"`
 
 	SignalReverseSideMargin       *SignalMargin `json:"signalReverseSideMargin,omitempty"`
@@ -1896,6 +1898,10 @@ func (s *Strategy) Defaults() error {
 		s.CircuitBreaker = circuitbreaker.NewBasicCircuitBreaker(ID, s.InstanceID(), s.Symbol)
 	} else {
 		s.CircuitBreaker.SetMetricsInfo(ID, s.InstanceID(), s.Symbol)
+	}
+
+	if s.SignalSource == "" {
+		s.SignalSource = s.SourceExchange
 	}
 
 	if s.EnableSignalMargin {
