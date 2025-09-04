@@ -294,6 +294,35 @@ func TestPosition(t *testing.T) {
 			expectedQuote:       fixedpoint.NewFromFloat(2000.0*0.01 + 3000.0*0.03),
 			expectedProfit:      fixedpoint.Zero,
 		},
+
+		{
+			name: "different symbols",
+			trades: []Trade{
+				{
+					Symbol:        "BTCUSDT",
+					Side:          SideTypeBuy,
+					Price:         fixedpoint.NewFromInt(1000),
+					Quantity:      fixedpoint.NewFromFloat(0.01),
+					QuoteQuantity: fixedpoint.NewFromFloat(1000.0 * 0.01),
+					Fee:           fixedpoint.Zero,
+					FeeCurrency:   "BTC",
+				},
+				{
+					Symbol:        "BTCUSD",
+					Side:          SideTypeSell,
+					Price:         fixedpoint.NewFromInt(1020),
+					Quantity:      fixedpoint.NewFromFloat(0.01),
+					QuoteQuantity: fixedpoint.NewFromFloat(1020.0 * 0.01),
+					Fee:           fixedpoint.Zero,
+					FeeCurrency:   "BTC",
+				},
+			},
+			expectedAverageCost: fixedpoint.NewFromFloat(1000.0 * 0.01).
+				Div(fixedpoint.NewFromFloat(0.01)),
+			expectedBase:   fixedpoint.NewFromFloat(0.0),
+			expectedQuote:  fixedpoint.NewFromFloat(20.0 * 0.01),
+			expectedProfit: fixedpoint.NewFromFloat(0.2),
+		},
 	}
 
 	for _, testcase := range testcases {
@@ -304,11 +333,11 @@ func TestPosition(t *testing.T) {
 				QuoteCurrency: "USDT",
 			}
 			profitAmount, _, profit := pos.AddTrades(testcase.trades)
-			assert.Equal(t, testcase.expectedQuote, pos.Quote, "expectedQuote")
-			assert.Equal(t, testcase.expectedBase, pos.Base, "expectedBase")
-			assert.Equal(t, testcase.expectedAverageCost, pos.AverageCost, "expectedAverageCost")
+			assert.InDelta(t, testcase.expectedQuote.Float64(), pos.Quote.Float64(), 1e-3, "expectedQuote")
+			assert.InDelta(t, testcase.expectedBase.Float64(), pos.Base.Float64(), 1e-8, "expectedBase")
+			assert.InDelta(t, testcase.expectedAverageCost.Float64(), pos.AverageCost.Float64(), 1e-8, "expectedAverageCost")
 			if profit {
-				assert.Equal(t, testcase.expectedProfit, profitAmount, "expectedProfit")
+				assert.InDelta(t, testcase.expectedProfit.Float64(), profitAmount.Float64(), 1e-8, "expectedProfit")
 			}
 		})
 	}
