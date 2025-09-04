@@ -295,6 +295,46 @@ func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
 	return bid, ask
 }
 
+func (m *HedgeMarket) canHedge(
+	ctx context.Context, uncoveredPosition fixedpoint.Value,
+) (bool, error) {
+	hedgeDelta := uncoveredPosition.Neg()
+	quantity := hedgeDelta.Abs()
+	side := deltaToSide(hedgeDelta)
+
+	// get quote price
+	bid, ask := m.getQuotePrice()
+	price := sideTakerPrice(bid, ask, side)
+	currency, required := determineRequiredCurrencyAndAmount(m.market, side, quantity, price)
+	account := m.session.GetAccount()
+	available, ok := getAvailableBalance(account, currency)
+	if !ok {
+		log.Warnf("cannot find balance for currency: %s", currency)
+		return false, nil
+	}
+
+	// for margin account, we need to check if the margin level is sufficient
+	if m.session.Margin {
+		// a simple check to ensure the account is not in danger of liquidation
+		if account.MarginLevel.IsZero() || account.MarginLevel.Compare(fixedpoint.NewFromFloat(2.0)) < 0 {
+			log.Warnf("margin level too low to hedge: %s", account.MarginLevel.String())
+			return false, nil
+		}
+	}
+
+	if !isBalanceSufficient(available, required) {
+		log.Warnf("insufficient balance for hedge: need %s %s, available %s", required.String(), currency, available.String())
+		return false, nil
+	}
+
+	if m.market.IsDustQuantity(quantity, price) {
+		log.Warnf("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (m *HedgeMarket) hedge(
 	ctx context.Context, uncoveredPosition fixedpoint.Value,
 ) error {

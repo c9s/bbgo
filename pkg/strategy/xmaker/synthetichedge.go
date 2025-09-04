@@ -77,6 +77,9 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 	// BTC/USDT -> USDT/TWD = forward
 	// BTC/USDT -> USDC/USDT = reverse (!forward)
 	s.forward = s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency
+
+	s.sourceMarket.positionExposure.OnCover(strategy.positionExposure.Cover)
+	s.sourceMarket.positionExposure.OnClose(strategy.positionExposure.Close)
 	return s.initialize(strategy)
 }
 
