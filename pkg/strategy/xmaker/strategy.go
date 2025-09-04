@@ -139,6 +139,8 @@ type Strategy struct {
 
 	DelayedHedge *DelayedHedge `json:"delayedHedge,omitempty"`
 
+	SplitHedge *SplitHedge `json:"splitHedge,omitempty"`
+
 	SpreadMaker *SpreadMaker `json:"spreadMaker,omitempty"`
 
 	EnableBollBandMargin bool             `json:"enableBollBandMargin"`
