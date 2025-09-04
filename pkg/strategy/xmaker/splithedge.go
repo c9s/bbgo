@@ -1,7 +1,10 @@
 package xmaker
 
 import (
+	"context"
 	"encoding/json"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -35,6 +38,8 @@ type SplitHedge struct {
 	hedgeMarketInstances map[string]*HedgeMarket
 
 	strategy *Strategy
+
+	logger logrus.FieldLogger
 }
 
 func (h *SplitHedge) UnmarshalJSON(data []byte) error {
@@ -74,8 +79,43 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 		h.hedgeMarketInstances[name] = hedgeMarket
 
 		hedgeMarket.Position.StrategyInstanceID = strategy.InstanceID()
+
+		userDataStream := hedgeMarket.session.UserDataStream
+		strategy.orderStore.BindStream(userDataStream)
+		strategy.tradeCollector.BindStream(userDataStream)
 	}
 
 	h.strategy = strategy
+	h.logger = strategy.logger.WithField("component", "split_hedge")
+	return nil
+}
+
+func (h *SplitHedge) Start(ctx context.Context) error {
+	if !h.Enabled {
+		return nil
+	}
+
+	instanceID := ID
+	if h.strategy != nil {
+		instanceID = h.strategy.InstanceID()
+	}
+
+	for name, hedgeMarket := range h.hedgeMarketInstances {
+		if err := hedgeMarket.Restore(ctx, instanceID); err != nil {
+			h.logger.WithError(err).Errorf("[splitHedge] failed to restore hedge market %s persistence", name)
+			return err
+		}
+
+		if err := hedgeMarket.Start(ctx); err != nil {
+			h.logger.WithError(err).Errorf("[splitHedge] failed to start hedge market %s", name)
+			return err
+		}
+	}
+
+	for _, hedgeMarket := range h.hedgeMarketInstances {
+		hedgeMarket.WaitForReady(ctx)
+	}
+
+	h.logger.Infof("[splitHedge] source market and fiat market are ready")
 	return nil
 }

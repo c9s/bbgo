@@ -2561,6 +2561,11 @@ func (s *Strategy) CrossRun(
 	go func() {
 		s.logger.Infof("waiting for authentication connections to be ready...")
 
+		if s.SplitHedge != nil && s.SplitHedge.Enabled {
+			if err := s.SplitHedge.Start(ctx); err != nil {
+				s.logger.WithError(err).Errorf("failed to start split hedge")
+			}
+		}
 		if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 			if err := s.SyntheticHedge.Start(ctx); err != nil {
 				s.logger.WithError(err).Errorf("failed to start syntheticHedge")
