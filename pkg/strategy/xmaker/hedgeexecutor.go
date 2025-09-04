@@ -68,7 +68,26 @@ func (m *MarketOrderHedgeExecutor) canHedge(
 	uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
 	side types.SideType,
 ) (bool, error) {
-	// TODO: implement this
+	// get quote price
+	bid, ask := m.getQuotePrice()
+	price := sideTakerPrice(bid, ask, side)
+	currency, required := determineRequiredCurrencyAndAmount(m.market, side, quantity, price)
+	available, ok := getAvailableBalance(m.session.GetAccount(), currency)
+	if !ok {
+		log.Warnf("cannot find balance for currency: %s", currency)
+		return false, nil
+	}
+
+	if !isBalanceSufficient(available, required) {
+		log.Warnf("insufficient balance for hedge: need %s %s, available %s", required.String(), currency, available.String())
+		return false, nil
+	}
+
+	if m.market.IsDustQuantity(quantity, price) {
+		log.Warnf("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
+		return false, nil
+	}
+
 	return true, nil
 }
 
@@ -253,4 +272,28 @@ func toSign(v fixedpoint.Value) fixedpoint.Value {
 	}
 
 	return fixedpoint.One
+}
+
+// determineRequiredCurrencyAndAmount returns the required currency and amount for hedging
+func determineRequiredCurrencyAndAmount(
+	market types.Market, side types.SideType, quantity, price fixedpoint.Value,
+) (string, fixedpoint.Value) {
+	if side == types.SideTypeBuy {
+		return market.QuoteCurrency, quantity.Mul(price)
+	}
+	return market.BaseCurrency, quantity
+}
+
+// getAvailableBalance returns the available balance for the given currency
+func getAvailableBalance(account *types.Account, currency string) (fixedpoint.Value, bool) {
+	balance, ok := account.Balance(currency)
+	if !ok {
+		return fixedpoint.Zero, false
+	}
+	return balance.Available, true
+}
+
+// isBalanceSufficient checks if available balance is sufficient for required amount
+func isBalanceSufficient(available, required fixedpoint.Value) bool {
+	return available.Compare(required) >= 0
 }
