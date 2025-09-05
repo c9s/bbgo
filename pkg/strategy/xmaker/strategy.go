@@ -2113,6 +2113,10 @@ func (s *Strategy) tryToRepayDebts(ctx context.Context, session *bbgo.ExchangeSe
 			s.logger.WithError(err).Errorf("unable to repay %s asset", asset)
 		}
 	}
+
+	if _, err := session.UpdateAccount(ctx); err != nil {
+		s.logger.WithError(err).Errorf("unable to update account after repay")
+	}
 }
 
 func (s *Strategy) getCoveredPosition() fixedpoint.Value {
