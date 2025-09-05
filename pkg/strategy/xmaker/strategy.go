@@ -262,6 +262,15 @@ type Strategy struct {
 	sourceOrderExecutor *bbgo.GeneralOrderExecutor
 
 	debtQuotaCache *fixedpoint.ExpirableValue
+
+	// metricsCache
+	cancelOrderDurationMetrics         prometheus.Observer
+	aggregatedSignalMetrics            prometheus.Gauge
+	askMarginMetrics, bidMarginMetrics prometheus.Gauge
+
+	makerOrderPlacementDurationMetrics prometheus.Observer
+	openOrderBidExposureInUsdMetrics   prometheus.Gauge
+	openOrderAskExposureInUsdMetrics   prometheus.Gauge
 }
 
 func (s *Strategy) ID() string {
@@ -347,6 +356,15 @@ func (s *Strategy) Initialize() error {
 		"exchange":      s.MakerExchange,
 		"symbol":        s.Symbol,
 	}
+
+	s.cancelOrderDurationMetrics = cancelOrderDurationMetrics.With(s.metricsLabels)
+	s.aggregatedSignalMetrics = aggregatedSignalMetrics.With(s.metricsLabels)
+	s.askMarginMetrics = askMarginMetrics.With(s.metricsLabels)
+	s.bidMarginMetrics = bidMarginMetrics.With(s.metricsLabels)
+
+	s.makerOrderPlacementDurationMetrics = makerOrderPlacementDurationMetrics.With(s.metricsLabels)
+	s.openOrderBidExposureInUsdMetrics = openOrderBidExposureInUsdMetrics.With(s.metricsLabels)
+	s.openOrderAskExposureInUsdMetrics = openOrderAskExposureInUsdMetrics.With(s.metricsLabels)
 
 	if s.SignalReverseSideMargin != nil && s.SignalReverseSideMargin.Scale != nil {
 		scale, err := s.SignalReverseSideMargin.Scale.Scale()
@@ -813,7 +831,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		return nil
 	}
 
-	cancelOrderDurationMetrics.With(s.metricsLabels).Observe(float64(cancelMakerOrdersProfile.Stop().Milliseconds()))
+	s.cancelOrderDurationMetrics.Observe(float64(cancelMakerOrdersProfile.Stop().Milliseconds()))
 
 	if s.activeMakerOrders.NumOfOrders() > 0 {
 		s.logger.Warnf("unable to cancel all %s orders, skipping placing maker orders", s.Symbol)
@@ -836,7 +854,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	}
 
 	s.logger.Infof("aggregated signal: %f", sig)
-	aggregatedSignalMetrics.With(s.metricsLabels).Set(sig)
+	s.aggregatedSignalMetrics.Set(sig)
 
 	now := time.Now()
 	if s.CircuitBreaker != nil {
@@ -1110,8 +1128,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	bidExposureInUsd := fixedpoint.Zero
 	askExposureInUsd := fixedpoint.Zero
 
-	bidMarginMetrics.With(s.metricsLabels).Set(quote.BidMargin.Float64())
-	askMarginMetrics.With(s.metricsLabels).Set(quote.AskMargin.Float64())
+	s.bidMarginMetrics.Set(quote.BidMargin.Float64())
+	s.askMarginMetrics.Set(quote.AskMargin.Float64())
 
 	if s.EnableArbitrage {
 		done, err := s.tryArbitrage(ctx, quote, makerBalances, hedgeBalances, disableMakerBid, disableMakerAsk)
@@ -1315,10 +1333,9 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		return err
 	}
 
-	makerOrderPlacementDurationMetrics.With(s.metricsLabels).Observe(float64(makerOrderPlacementProfile.Stop().Milliseconds()))
-
-	openOrderBidExposureInUsdMetrics.With(s.metricsLabels).Set(bidExposureInUsd.Float64())
-	openOrderAskExposureInUsdMetrics.With(s.metricsLabels).Set(askExposureInUsd.Float64())
+	s.makerOrderPlacementDurationMetrics.Observe(float64(makerOrderPlacementProfile.Stop().Milliseconds()))
+	s.openOrderBidExposureInUsdMetrics.Set(bidExposureInUsd.Float64())
+	s.openOrderAskExposureInUsdMetrics.Set(askExposureInUsd.Float64())
 
 	_ = errIdx
 	_ = createdOrders
