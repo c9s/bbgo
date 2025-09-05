@@ -1651,11 +1651,13 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		return
 	}
 
+	// hedgeDelta is the reverse of the uncovered position
+	//
 	// if the uncovered position is a positive number, e.g., +10 BTC,
 	// then we need to sell 10 BTC, hence call .Neg() here
 	// if the uncovered position is a negative number, e.g., -10 BTC,
 	// then we need to buy 10 BTC, hence call .Neg() here
-	hedgeDelta := uncoveredPosition.Neg()
+	hedgeDelta := uncoveredToDelta(uncoveredPosition)
 	side := positionToSide(hedgeDelta)
 
 	sig := s.lastAggregatedSignal.Get()
@@ -1676,13 +1678,18 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		return
 	}
 
-	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		if err := s.SplitHedge.Hedge(ctx, uncoveredPosition); err != nil {
+			s.logger.WithError(err).Errorf("unable to hedge via split hedge")
+			return
+		}
+	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 		if err := s.SyntheticHedge.Hedge(ctx, uncoveredPosition); err != nil {
 			s.logger.WithError(err).Errorf("unable to place synthetic hedge order")
 			return
 		}
 	} else {
-		if _, err := s.directHedge(ctx, hedgeDelta); err != nil {
+		if _, err := s.directHedge(ctx, uncoveredPosition); err != nil {
 			s.logger.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
 			return
 		}
@@ -1692,8 +1699,9 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 }
 
 func (s *Strategy) directHedge(
-	ctx context.Context, hedgeDelta fixedpoint.Value,
+	ctx context.Context, uncoveredPosition fixedpoint.Value,
 ) (*types.Order, error) {
+	hedgeDelta := uncoveredToDelta(uncoveredPosition)
 	quantity := hedgeDelta.Abs()
 	side := positionToSide(hedgeDelta)
 
@@ -2565,8 +2573,7 @@ func (s *Strategy) CrossRun(
 			if err := s.SplitHedge.Start(ctx); err != nil {
 				s.logger.WithError(err).Errorf("failed to start split hedge")
 			}
-		}
-		if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 			if err := s.SyntheticHedge.Start(ctx); err != nil {
 				s.logger.WithError(err).Errorf("failed to start syntheticHedge")
 			}
@@ -2612,7 +2619,11 @@ func (s *Strategy) CrossRun(
 			// TODO: change this stopC to wait for the quoteWorker to stop
 			close(s.stopC)
 
-			if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+			if s.SplitHedge != nil && s.SplitHedge.Enabled {
+				if err := s.SplitHedge.Stop(ctx); err != nil {
+					s.logger.WithError(err).Errorf("failed to stop splitHedge")
+				}
+			} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 				if err := s.SyntheticHedge.Stop(ctx); err != nil {
 					s.logger.WithError(err).Errorf("failed to stop syntheticHedge")
 				}
@@ -2702,12 +2713,4 @@ func parseSymbolSelector(
 		return nil, types.Market{}, fmt.Errorf("market %s not found in session %s", symbol, sessionName)
 	}
 	return session, market, nil
-}
-
-func positionToSide(pos fixedpoint.Value) types.SideType {
-	side := types.SideTypeBuy
-	if pos.Sign() < 0 {
-		side = types.SideTypeSell
-	}
-	return side
 }
