@@ -31,9 +31,12 @@ type SplitHedgeProportionMarket struct {
 // CalculateQuantity calculates the order quantity for this market based on total quantity and price.
 // It applies ratio, maxQuantity, and maxQuoteQuantity constraints.
 func (m *SplitHedgeProportionMarket) CalculateQuantity(totalQuantity, price fixedpoint.Value) fixedpoint.Value {
-	allocated := totalQuantity.Mul(m.Ratio)
-	finalQuantity := allocated
+	allocated := totalQuantity
+	if m.Ratio.Sign() > 0 {
+		allocated = totalQuantity.Mul(m.Ratio)
+	}
 
+	finalQuantity := allocated
 	if m.MaxQuantity.Sign() > 0 {
 		if finalQuantity.Compare(m.MaxQuantity) > 0 {
 			finalQuantity = m.MaxQuantity
@@ -47,9 +50,9 @@ func (m *SplitHedgeProportionMarket) CalculateQuantity(totalQuantity, price fixe
 		}
 	}
 
-	log.Infof("calc quantity for market %s: ratio=%.4f, total=%s, allocated=%s, price=%s, finalQuantity=%s",
+	log.Infof("calculated split quantity for market %s: ratio=%s, total=%s, allocated=%s, price=%s, finalQuantity=%s",
 		m.Name,
-		m.Ratio,
+		m.Ratio.String(),
 		totalQuantity.String(), allocated.String(), price.String(), finalQuantity.String())
 
 	return finalQuantity
@@ -67,7 +70,7 @@ type SplitHedge struct {
 	ProportionAlgo *SplitHedgeProportionAlgo `json:"proportionAlgo"`
 
 	// HedgeMarkets stores session name to hedge market config mapping.
-	HedgeMarkets map[string]*HedgeMarketConfig `json:"hedgeMarketInstances"`
+	HedgeMarkets map[string]*HedgeMarketConfig `json:"hedgeMarkets"`
 
 	// hedgeMarketInstances stores session name to hedge market instance mapping.
 	hedgeMarketInstances map[string]*HedgeMarket
@@ -90,7 +93,7 @@ func (h *SplitHedge) UnmarshalJSON(data []byte) error {
 	}
 
 	if h.HedgeMarkets == nil {
-		h.HedgeMarkets = make(map[string]*HedgeMarketConfig)
+		return fmt.Errorf("hedgeMarkets must be provided")
 	}
 
 	if h.hedgeMarketInstances == nil {
@@ -108,6 +111,12 @@ func (h *SplitHedge) UnmarshalJSON(data []byte) error {
 				if m.Name == "" {
 					return fmt.Errorf("splithedge: market at index %d missing name", i)
 				}
+
+				// ensure the hedge market config exists
+				if _, exists := h.HedgeMarkets[m.Name]; !exists {
+					return fmt.Errorf("splithedge: market %s not found in hedgeMarkets", m.Name)
+				}
+
 				if i != len(h.ProportionAlgo.ProportionMarkets)-1 {
 					if m.Ratio.Sign() <= 0 {
 						return fmt.Errorf("splithedge: prior market %s ratio must be positive and can not be zero", m.Name)
@@ -146,7 +155,14 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 			trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value,
 		) {
 			strategy.positionExposure.Close(trade.PositionDelta())
+
+			if order, ok := hedgeMarket.orderStore.Get(trade.OrderID); ok {
+				strategy.orderStore.Add(order)
+			}
+
+			strategy.tradeCollector.ProcessTrade(trade) // this triggers position update and profit updates
 		})
+
 	}
 
 	h.strategy = strategy
@@ -173,6 +189,15 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 			continue
 		}
 
+		canHedge, err := hedgeMarket.canHedge(ctx, uncoveredPosition)
+		if err != nil {
+			h.logger.WithError(err).Errorf("[splitHedge] hedge market checking canHedge failed")
+			continue
+		} else if !canHedge {
+			h.logger.Infof("[splitHedge] hedge market %s cannot hedge now", proportionMarket.Name)
+			continue
+		}
+
 		bid, ask := hedgeMarket.getQuotePrice()
 		price := sideTakerPrice(bid, ask, side)
 		proportionQuantity := proportionMarket.CalculateQuantity(remainingQuantity, price)
@@ -181,13 +206,14 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 		)
 
 		proportionQuantity = hedgeMarket.market.TruncateQuantity(proportionQuantity)
-		if hedgeMarket.market.IsDustQuantity(proportionQuantity, price) {
-			h.logger.Infof("skip dust quantity: %s @ price %f", proportionQuantity.String(), price.Float64())
-			continue
-		}
 
 		if proportionQuantity.IsZero() {
 			h.logger.Infof("skip zero quantity")
+			continue
+		}
+
+		if hedgeMarket.market.IsDustQuantity(proportionQuantity, price) {
+			h.logger.Infof("skip dust quantity: %s @ price %f", proportionQuantity.String(), price.Float64())
 			continue
 		}
 
@@ -226,17 +252,7 @@ func (h *SplitHedge) Start(ctx context.Context) error {
 		return nil
 	}
 
-	instanceID := ID + "-splithedge"
-	if h.strategy != nil {
-		instanceID = h.strategy.InstanceID()
-	}
-
 	for name, hedgeMarket := range h.hedgeMarketInstances {
-		if err := hedgeMarket.Restore(ctx, instanceID); err != nil {
-			h.logger.WithError(err).Errorf("[splitHedge] failed to restore hedge market %s persistence", name)
-			return err
-		}
-
 		if err := hedgeMarket.Start(ctx); err != nil {
 			h.logger.WithError(err).Errorf("[splitHedge] failed to start hedge market %s", name)
 			return err
@@ -255,16 +271,6 @@ func (h *SplitHedge) Stop(shutdownCtx context.Context) error {
 	h.logger.Infof("[splitHedge] stopping synthetic hedge workers")
 	for _, hedgeMarket := range h.hedgeMarketInstances {
 		hedgeMarket.Stop(shutdownCtx)
-	}
-
-	instanceID := ID
-
-	if h.strategy != nil {
-		instanceID = h.strategy.InstanceID()
-	}
-
-	for _, hedgeMarket := range h.hedgeMarketInstances {
-		hedgeMarket.Sync(hedgeMarket.tradingCtx, instanceID)
 	}
 
 	h.logger.Infof("[splitHedge] synthetic hedge workers stopped")

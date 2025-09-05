@@ -40,6 +40,8 @@ type HedgeMarketConfig struct {
 	HedgeMethod    HedgeMethod    `json:"hedgeMethod"`
 	HedgeInterval  types.Duration `json:"hedgeInterval"`
 
+	MinMarginLevel fixedpoint.Value `json:"minMarginLevel"`
+
 	HedgeMethodMarket       *MarketOrderHedgeExecutorConfig  `json:"hedgeMethodMarket,omitempty"`       // for backward compatibility, this is the default hedge method
 	HedgeMethodCounterparty *CounterpartyHedgeExecutorConfig `json:"hedgeMethodCounterparty,omitempty"` // for backward compatibility, this is the default hedge method
 
@@ -307,27 +309,34 @@ func (m *HedgeMarket) canHedge(
 	price := sideTakerPrice(bid, ask, side)
 	currency, required := determineRequiredCurrencyAndAmount(m.market, side, quantity, price)
 	account := m.session.GetAccount()
-	available, ok := getAvailableBalance(account, currency)
-	if !ok {
-		log.Warnf("cannot find balance for currency: %s", currency)
-		return false, nil
-	} else if available.IsZero() {
-		log.Warnf("zero available balance for currency: %s", currency)
-		return false, nil
-	}
+	available, hasBalance := getAvailableBalance(account, currency)
 
 	// for margin account, we need to check if the margin level is sufficient
 	if m.session.Margin {
 		// a simple check to ensure the account is not in danger of liquidation
-		if account.MarginLevel.IsZero() || account.MarginLevel.Compare(fixedpoint.NewFromFloat(1.5)) < 0 {
-			log.Warnf("margin level too low to hedge: %s", account.MarginLevel.String())
+		minMarginLevel := m.MinMarginLevel
+		if minMarginLevel.IsZero() {
+			// default to 150% margin level
+			minMarginLevel = fixedpoint.NewFromFloat(1.5) // 150%
+		}
+
+		if account.MarginLevel.IsZero() || account.MarginLevel.Compare(minMarginLevel) < 0 {
+			log.Warnf("margin level too low to hedge: %s (less than %s)", account.MarginLevel.String(), minMarginLevel.String())
 			return false, nil
 		}
-	}
+	} else {
+		if !hasBalance {
+			log.Warnf("cannot find balance for currency: %s", currency)
+			return false, nil
+		} else if available.IsZero() {
+			log.Warnf("zero available balance for currency: %s", currency)
+			return false, nil
+		}
 
-	if !isBalanceSufficient(available, required) {
-		log.Warnf("insufficient balance for hedge: need %s %s, available %s", required.String(), currency, available.String())
-		return false, nil
+		if !isBalanceSufficient(available, required) {
+			log.Warnf("insufficient balance for hedge: need %s %s, available %s", required.String(), currency, available.String())
+			return false, nil
+		}
 	}
 
 	if m.market.IsDustQuantity(quantity, price) {
