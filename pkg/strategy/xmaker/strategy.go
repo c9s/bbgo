@@ -997,16 +997,20 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	hedgeBalances := hedgeAccount.Balances()
 	hedgeQuota := &bbgo.QuotaTransaction{}
 
+	s.logger.Infof("hedge balances: %+v", hedgeBalances.NotZero())
+
 	if s.sourceSession.Margin &&
 		!s.MinMarginLevel.IsZero() &&
 		!hedgeAccount.MarginLevel.IsZero() {
 
 		if hedgeAccount.MarginLevel.Compare(s.MinMarginLevel) < 0 {
 			s.logger.Warnf(
-				"hedge account margin level %s is less then the min margin level %s, calculating the borrowed positions",
+				"hedge account margin level %s is less then the min margin level %s, trying to repay the debts...",
 				hedgeAccount.MarginLevel.String(),
 				s.MinMarginLevel.String(),
 			)
+
+			s.tryToRepayDebts(ctx, s.sourceSession)
 		} else {
 			s.logger.Infof(
 				"hedge account margin level %s is greater than the min margin level %s, calculating the net value",
@@ -1029,6 +1033,10 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		} else {
 			s.logger.Warnf("margin hedge buy is disabled, disabling maker ask orders...")
 			disableMakerAsk = true
+		}
+
+		if disableMakerBid || disableMakerAsk {
+			s.tryToRepayDebts(ctx, s.sourceSession)
 		}
 	} else {
 		if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
@@ -2071,6 +2079,39 @@ func (s *Strategy) houseCleanWorker(ctx context.Context) {
 			s.orderStore.Prune(expiryDuration)
 		}
 
+	}
+}
+
+var repayRateLimiter = rate.NewLimiter(rate.Every(30*time.Second), 1)
+
+func (s *Strategy) tryToRepayDebts(ctx context.Context, session *bbgo.ExchangeSession) {
+	if !repayRateLimiter.Allow() {
+		return
+	}
+
+	hedgeBalances := session.GetAccount().Balances()
+	debts := hedgeBalances.Debts()
+
+	s.logger.Infof("trying to repay debts %+v on hedge exchange %s", debts, session.Exchange.Name())
+
+	repayables := make(map[string]fixedpoint.Value)
+	for asset, bal := range debts {
+		if bal.Borrowed.IsZero() || bal.Available.IsZero() {
+			continue
+		}
+
+		repayables[asset] = bal.Available
+	}
+
+	marginService, ok := session.Exchange.(types.MarginBorrowRepayService)
+	if !ok {
+		return
+	}
+
+	for asset, amount := range repayables {
+		if err := marginService.RepayMarginAsset(ctx, asset, amount); err != nil {
+			s.logger.WithError(err).Errorf("unable to repay %s asset", asset)
+		}
 	}
 }
 
