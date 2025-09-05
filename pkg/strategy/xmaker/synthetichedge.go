@@ -256,7 +256,7 @@ func (s *SyntheticHedge) Stop(shutdownCtx context.Context) error {
 	s.sourceMarket.Stop(shutdownCtx)
 	s.fiatMarket.Stop(shutdownCtx)
 
-	instanceID := ID
+	instanceID := ID + "-synthetichedge"
 	if s.strategy != nil {
 		instanceID = s.strategy.InstanceID()
 	}
