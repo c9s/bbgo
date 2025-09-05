@@ -105,7 +105,7 @@ func (b Balance) ValueString() (o string) {
 }
 
 func (b Balance) String() (o string) {
-	o = fmt.Sprintf("%s: %s", b.Currency, b.Net().String())
+	o = fmt.Sprintf("%s: %s", b.Currency, b.Available.String())
 
 	if b.Locked.Sign() > 0 {
 		o += fmt.Sprintf(" (locked %f)", b.Locked.Float64())
@@ -119,6 +119,7 @@ func (b Balance) String() (o string) {
 		o += fmt.Sprintf(" (interest: %f)", b.Interest.Float64())
 	}
 
+	o += fmt.Sprintf(" (net: %f)", b.Net().Float64())
 	return o
 }
 

@@ -9,6 +9,22 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type HedgeExecutor interface {
+	// hedge executes a hedge order based on the uncovered position and the hedge delta
+	// uncoveredPosition: the current uncovered position that needs to be hedged
+	// hedgeDelta: the delta that needs to be hedged, which is the negative of uncoveredPosition
+	// quantity: the absolute value of hedgeDelta, which is the order quantity to be hedged
+	// side: the side of the hedge order, which is determined by the sign of hedgeDelta
+	hedge(
+		ctx context.Context,
+		uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
+		side types.SideType,
+	) error
+
+	// clear clears any pending orders or state related to hedging
+	clear(ctx context.Context) error
+}
+
 type BaseHedgeExecutorConfig struct {
 }
 
@@ -92,6 +108,8 @@ type CounterpartyHedgeExecutorConfig struct {
 }
 
 type CounterpartyHedgeExecutor struct {
+	HedgeExecutor
+
 	*HedgeMarket
 
 	config     *CounterpartyHedgeExecutorConfig
@@ -106,6 +124,15 @@ func newCounterpartyHedgeExecutor(
 		HedgeMarket: market,
 		config:      config,
 	}
+}
+
+func (m *CounterpartyHedgeExecutor) canHedge(
+	ctx context.Context,
+	uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
+	side types.SideType,
+) (bool, error) {
+	// TODO: implement this
+	return true, nil
 }
 
 func (m *CounterpartyHedgeExecutor) clear(ctx context.Context) error {
@@ -209,4 +236,28 @@ func toSign(v fixedpoint.Value) fixedpoint.Value {
 	}
 
 	return fixedpoint.One
+}
+
+// determineRequiredCurrencyAndAmount returns the required currency and amount for hedging
+func determineRequiredCurrencyAndAmount(
+	market types.Market, side types.SideType, quantity, price fixedpoint.Value,
+) (string, fixedpoint.Value) {
+	if side == types.SideTypeBuy {
+		return market.QuoteCurrency, quantity.Mul(price)
+	}
+	return market.BaseCurrency, quantity
+}
+
+// getAvailableBalance returns the available balance for the given currency
+func getAvailableBalance(account *types.Account, currency string) (fixedpoint.Value, bool) {
+	balance, ok := account.Balance(currency)
+	if !ok {
+		return fixedpoint.Zero, false
+	}
+	return balance.Available, true
+}
+
+// isBalanceSufficient checks if available balance is sufficient for required amount
+func isBalanceSufficient(available, required fixedpoint.Value) bool {
+	return available.Compare(required) >= 0
 }

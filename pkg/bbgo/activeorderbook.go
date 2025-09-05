@@ -354,7 +354,9 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 		// if we can't detect which is newer, isNewerOrderUpdate returns false
 		// if you pass two same objects to isNewerOrderUpdate, it returns false
 		if !isNewerOrderUpdate(order, previousOrder) {
-			b.logger.Infof("[ActiveOrderBook] order #%d (update time %s) is out of date, skip it", order.OrderID, order.UpdateTime)
+			if !order.UpdateTime.Equal(time.Time(previousOrder.UpdateTime)) {
+				b.logger.Debugf("[ActiveOrderBook] order #%d (update time %s) is out of date, skip it", order.OrderID, order.UpdateTime)
+			}
 			b.mu.Unlock()
 			return
 		}
