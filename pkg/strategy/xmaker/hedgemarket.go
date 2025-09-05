@@ -311,12 +311,15 @@ func (m *HedgeMarket) canHedge(
 	if !ok {
 		log.Warnf("cannot find balance for currency: %s", currency)
 		return false, nil
+	} else if available.IsZero() {
+		log.Warnf("zero available balance for currency: %s", currency)
+		return false, nil
 	}
 
 	// for margin account, we need to check if the margin level is sufficient
 	if m.session.Margin {
 		// a simple check to ensure the account is not in danger of liquidation
-		if account.MarginLevel.IsZero() || account.MarginLevel.Compare(fixedpoint.NewFromFloat(2.0)) < 0 {
+		if account.MarginLevel.IsZero() || account.MarginLevel.Compare(fixedpoint.NewFromFloat(1.5)) < 0 {
 			log.Warnf("margin level too low to hedge: %s", account.MarginLevel.String())
 			return false, nil
 		}
