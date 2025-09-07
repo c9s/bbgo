@@ -205,7 +205,7 @@ func NewStreamBook(symbol string, exchangeName ExchangeName) *StreamOrderBook {
 	}
 }
 
-func (sb *StreamOrderBook) updateMetrics(t time.Time) {
+func (sb *StreamOrderBook) UpdateMetrics(t time.Time) {
 	bestBid, bestAsk, ok := sb.BestBidAndAsk()
 	if sb.bestAskPriceGauge == nil {
 		exchangeName := string(sb.Exchange)
@@ -238,7 +238,7 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 		sb.Load(book)
 		sb.EmitSnapshot(book)
 		sb.emitChange(BookSignalSnapshot, book.Time)
-		sb.updateMetrics(book.Time)
+		sb.UpdateMetrics(book.Time)
 	})
 
 	stream.OnBookUpdate(func(book SliceOrderBook) {
@@ -249,7 +249,7 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 		sb.Update(book)
 		sb.EmitUpdate(book)
 		sb.emitChange(BookSignalUpdate, book.Time)
-		sb.updateMetrics(book.Time)
+		sb.UpdateMetrics(book.Time)
 	})
 }
 
