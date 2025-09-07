@@ -188,12 +188,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	if s.SourceExchange != "" && s.SourceSymbol != "" {
 		s.sourceBook = types.NewStreamBook(s.SourceSymbol, sourceSession.ExchangeName)
 		s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
-		s.sourceBook.DebugBindStream(s.sourceSession.MarketDataStream, log)
 	}
 
 	s.tradingBook = types.NewStreamBook(s.Symbol, tradingSession.ExchangeName)
 	s.tradingBook.BindStream(s.tradingSession.MarketDataStream)
-	s.tradingBook.DebugBindStream(s.tradingSession.MarketDataStream, log)
 
 	s.tradingSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 		if trade.Symbol != s.Symbol {

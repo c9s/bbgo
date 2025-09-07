@@ -190,6 +190,12 @@ type StreamOrderBook struct {
 
 	updateCallbacks   []func(update SliceOrderBook)
 	snapshotCallbacks []func(snapshot SliceOrderBook)
+
+	bestAskPriceGauge  prometheus.Gauge
+	bestBidPriceGauge  prometheus.Gauge
+	bestAskVolumeGauge prometheus.Gauge
+	bestBidVolumeGauge prometheus.Gauge
+	updateTimeGauge    prometheus.Gauge
 }
 
 func NewStreamBook(symbol string, exchangeName ExchangeName) *StreamOrderBook {
@@ -199,16 +205,23 @@ func NewStreamBook(symbol string, exchangeName ExchangeName) *StreamOrderBook {
 	}
 }
 
-func (sb *StreamOrderBook) updateMetrics(t time.Time) {
+func (sb *StreamOrderBook) UpdateMetrics(t time.Time) {
 	bestBid, bestAsk, ok := sb.BestBidAndAsk()
-	if ok {
+	if sb.bestAskPriceGauge == nil {
 		exchangeName := string(sb.Exchange)
 		labels := prometheus.Labels{"symbol": sb.Symbol, "exchange": exchangeName}
-		streamOrderBookBestAskPriceMetrics.With(labels).Set(bestAsk.Price.Float64())
-		streamOrderBookBestBidPriceMetrics.With(labels).Set(bestBid.Price.Float64())
-		streamOrderBookBestAskVolumeMetrics.With(labels).Set(bestAsk.Volume.Float64())
-		streamOrderBookBestBidVolumeMetrics.With(labels).Set(bestBid.Volume.Float64())
-		streamOrderBookUpdateTimeMetrics.With(labels).Set(float64(t.UnixMilli()))
+		sb.bestAskPriceGauge = streamOrderBookBestAskPriceMetrics.With(labels)
+		sb.bestBidPriceGauge = streamOrderBookBestBidPriceMetrics.With(labels)
+		sb.bestAskVolumeGauge = streamOrderBookBestAskVolumeMetrics.With(labels)
+		sb.bestBidVolumeGauge = streamOrderBookBestBidVolumeMetrics.With(labels)
+		sb.updateTimeGauge = streamOrderBookUpdateTimeMetrics.With(labels)
+	}
+	if ok {
+		sb.bestAskPriceGauge.Set(bestAsk.Price.Float64())
+		sb.bestBidPriceGauge.Set(bestBid.Price.Float64())
+		sb.bestAskVolumeGauge.Set(bestAsk.Volume.Float64())
+		sb.bestBidVolumeGauge.Set(bestBid.Volume.Float64())
+		sb.updateTimeGauge.Set(float64(t.UnixMilli()))
 	}
 }
 
@@ -225,7 +238,7 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 		sb.Load(book)
 		sb.EmitSnapshot(book)
 		sb.emitChange(BookSignalSnapshot, book.Time)
-		sb.updateMetrics(book.Time)
+		sb.UpdateMetrics(book.Time)
 	})
 
 	stream.OnBookUpdate(func(book SliceOrderBook) {
@@ -236,7 +249,7 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 		sb.Update(book)
 		sb.EmitUpdate(book)
 		sb.emitChange(BookSignalUpdate, book.Time)
-		sb.updateMetrics(book.Time)
+		sb.UpdateMetrics(book.Time)
 	})
 }
 
