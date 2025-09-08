@@ -175,7 +175,7 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 	uncoveredPosition fixedpoint.Value,
 ) error {
 	if h.ProportionAlgo == nil || len(h.ProportionAlgo.ProportionMarkets) == 0 {
-		return fmt.Errorf("proportion algo requires proportion markets")
+		return fmt.Errorf("SplitHedge: proportion algo requires proportion markets")
 	}
 
 	delta := uncoveredToDelta(uncoveredPosition)
@@ -185,35 +185,34 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 	for _, proportionMarket := range h.ProportionAlgo.ProportionMarkets {
 		hedgeMarket, ok := h.hedgeMarketInstances[proportionMarket.Name]
 		if !ok {
-			h.logger.Warnf("[splitHedge] hedge market %s not found", proportionMarket.Name)
+			h.logger.Warnf("SplitHedge: hedge market %s not found", proportionMarket.Name)
 			continue
 		}
 
-		canHedge, err := hedgeMarket.canHedge(ctx, uncoveredPosition)
+		canHedge, maxQuantity, err := hedgeMarket.canHedge(ctx, uncoveredPosition)
 		if err != nil {
-			h.logger.WithError(err).Errorf("[splitHedge] hedge market checking canHedge failed")
+			h.logger.WithError(err).Errorf("SplitHedge: hedge market checking canHedge failed")
 			continue
 		} else if !canHedge {
-			h.logger.Infof("[splitHedge] hedge market %s cannot hedge now", proportionMarket.Name)
+			h.logger.Infof("SplitHedge: hedge market %s cannot hedge now", proportionMarket.Name)
 			continue
 		}
+
+		h.logger.Infof("SplitHedge: hedge market %s can hedge max quantity %s", proportionMarket.Name, maxQuantity.String())
 
 		bid, ask := hedgeMarket.getQuotePrice()
 		price := sideTakerPrice(bid, ask, side)
 		proportionQuantity := proportionMarket.CalculateQuantity(remainingQuantity, price)
-		proportionQuantity = AdjustHedgeQuantityWithAvailableBalance(
-			hedgeMarket.session.GetAccount(), hedgeMarket.market, side, proportionQuantity, price,
-		)
+		proportionQuantity = fixedpoint.Min(proportionQuantity, maxQuantity)
 
 		proportionQuantity = hedgeMarket.market.TruncateQuantity(proportionQuantity)
-
 		if proportionQuantity.IsZero() {
-			h.logger.Infof("skip zero quantity")
+			h.logger.Infof("SplitHedge: skip zero quantity")
 			continue
 		}
 
 		if hedgeMarket.market.IsDustQuantity(proportionQuantity, price) {
-			h.logger.Infof("skip dust quantity: %s @ price %f", proportionQuantity.String(), price.Float64())
+			h.logger.Infof("SplitHedge: skip dust quantity: %s @ price %f", proportionQuantity.String(), price.Float64())
 			continue
 		}
 
@@ -221,7 +220,7 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case hedgeMarket.positionDeltaC <- quantityToDelta(proportionQuantity, side):
+		case hedgeMarket.positionDeltaC <- quantityToDelta(proportionQuantity, side).Neg():
 		}
 	}
 

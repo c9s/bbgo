@@ -67,9 +67,11 @@ func (m *MarketOrderHedgeExecutor) hedge(
 	bid, ask := m.getQuotePrice()
 	price := sideTakerPrice(bid, ask, side)
 
-	quantity = AdjustHedgeQuantityWithAvailableBalance(
-		m.session.GetAccount(), m.market, side, quantity, price,
-	)
+	if !m.session.Margin {
+		quantity = AdjustHedgeQuantityWithAvailableBalance(
+			m.session.GetAccount(), m.market, side, quantity, price,
+		)
+	}
 
 	if m.config != nil {
 		if m.config.MaxOrderQuantity.Sign() > 0 {
@@ -78,19 +80,22 @@ func (m *MarketOrderHedgeExecutor) hedge(
 	}
 
 	if m.market.IsDustQuantity(quantity, price) {
-		m.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
+		m.logger.Infof("MarketOrderHedgeExecutor: skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
 		return nil
 	}
 
-	hedgeOrder, err := m.submitOrder(ctx, types.SubmitOrder{
+	orderForm := types.SubmitOrder{
+		Market:           m.market,
 		Symbol:           m.market.Symbol,
 		Side:             side,
 		Type:             types.OrderTypeMarket,
 		Quantity:         quantity,
-		Market:           m.market,
 		MarginSideEffect: types.SideEffectTypeMarginBuy,
-	})
+	}
 
+	m.logger.Infof("MarketOrderHedgeExecutor: submitting hedge order: %+v", orderForm)
+
+	hedgeOrder, err := m.submitOrder(ctx, orderForm)
 	if err != nil {
 		return err
 	}

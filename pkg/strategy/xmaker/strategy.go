@@ -1728,7 +1728,7 @@ func (s *Strategy) directHedge(
 ) (*types.Order, error) {
 	hedgeDelta := uncoveredToDelta(uncoveredPosition)
 	quantity := hedgeDelta.Abs()
-	side := positionToSide(hedgeDelta)
+	side := deltaToSide(hedgeDelta)
 
 	price := s.lastPrice.Get()
 
