@@ -2,6 +2,7 @@ package bfxapi
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 )
 
@@ -37,6 +38,8 @@ const (
 	OrderStatusPartiallyCanceled OrderStatus = "PARTIALLY CANCELED"   // order partially canceled
 )
 
+var orderStatusCleanupRegex = regexp.MustCompile(`\s*was:.*`)
+
 // UnmarshalJSON implements custom unmarshaling for OrderStatus.
 // It parses status strings like "EXECUTED @ 107.6(-0.2)", "CANCELED was: PARTIALLY FILLED @ ...", etc.
 func (s *OrderStatus) UnmarshalJSON(data []byte) error {
@@ -45,6 +48,7 @@ func (s *OrderStatus) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	raw = orderStatusCleanupRegex.ReplaceAllString(raw, "")
 	raw = strings.ToUpper(raw)
 
 	// direct match for known statuses
@@ -55,7 +59,7 @@ func (s *OrderStatus) UnmarshalJSON(data []byte) error {
 		*s = OrderStatusExecuted
 	case strings.HasPrefix(raw, "PARTIALLY FILLED") || strings.HasPrefix(raw, "PARTIALLY EXECUTED"):
 		*s = OrderStatusPartiallyFilled
-	case strings.HasPrefix(raw, "CANCELED") || strings.HasPrefix(raw, "CANCELLED") || strings.HasSuffix(raw, "CANCELED"):
+	case strings.HasPrefix(raw, "CANCELED") || strings.HasSuffix(raw, "CANCELED") || strings.Contains(raw, "CANCELED"):
 		*s = OrderStatusCanceled
 	case strings.HasPrefix(raw, "REJECTED"):
 		*s = OrderStatusRejected
