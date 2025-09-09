@@ -82,7 +82,8 @@ type HedgeMarket struct {
 	book      *types.StreamOrderBook
 	depthBook *types.DepthBook
 
-	quotingPrice *types.Ticker
+	quotingPrice         *types.Ticker
+	bidPricer, askPricer pricer.Pricer
 
 	positionExposure *PositionExposure
 
@@ -167,7 +168,20 @@ func newHedgeMarket(
 		logger: logger,
 	}
 
-	m.logger.Infof("%+v", m.HedgeMethodMarket)
+	takerFeeRate := fixedpoint.Zero
+	if m.session != nil {
+		takerFeeRate = m.session.TakerFeeRate
+	}
+
+	m.bidPricer = pricer.Compose(
+		pricer.FromBestPrice(types.SideTypeBuy, m.book),
+		pricer.ApplyFeeRate(types.SideTypeBuy, takerFeeRate),
+	)
+
+	m.askPricer = pricer.Compose(
+		pricer.FromBestPrice(types.SideTypeSell, m.book),
+		pricer.ApplyFeeRate(types.SideTypeSell, takerFeeRate),
+	)
 
 	switch m.HedgeMethod {
 	case HedgeMethodMarket:
@@ -258,28 +272,13 @@ func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitO
 }
 
 func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
+	now := time.Now()
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	now := time.Now()
-
-	takerFeeRate := fixedpoint.Zero
-	if m.session != nil {
-		takerFeeRate = m.session.TakerFeeRate
-	}
-
-	bidPricer := pricer.Compose(
-		pricer.FromBestPrice(types.SideTypeBuy, m.book),
-		pricer.ApplyFeeRate(types.SideTypeBuy, takerFeeRate),
-	)
-
-	askPricer := pricer.Compose(
-		pricer.FromBestPrice(types.SideTypeSell, m.book),
-		pricer.ApplyFeeRate(types.SideTypeSell, takerFeeRate),
-	)
-
-	bid = bidPricer(0, fixedpoint.Zero)
-	ask = askPricer(0, fixedpoint.Zero)
+	bid = m.bidPricer(0, fixedpoint.Zero)
+	ask = m.askPricer(0, fixedpoint.Zero)
 
 	if bid.IsZero() || ask.IsZero() {
 		bids := m.book.SideBook(types.SideTypeBuy)

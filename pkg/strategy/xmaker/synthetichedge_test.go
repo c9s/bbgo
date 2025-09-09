@@ -10,6 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/strategy/xmaker/pricer"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/tradeid"
 
@@ -61,6 +62,12 @@ func TestSyntheticHedge_GetQuotePrices_BaseQuote(t *testing.T) {
 		market:    sourceMarket,
 		book:      sourceBook,
 		depthBook: types.NewDepthBook(sourceBook),
+		bidPricer: pricer.Compose(
+			pricer.FromBestPrice(types.SideTypeBuy, sourceBook),
+		),
+		askPricer: pricer.Compose(
+			pricer.FromBestPrice(types.SideTypeSell, sourceBook),
+		),
 	}
 	fiat := &HedgeMarket{
 		HedgeMarketConfig: &HedgeMarketConfig{
@@ -69,6 +76,12 @@ func TestSyntheticHedge_GetQuotePrices_BaseQuote(t *testing.T) {
 		market:    fiatMarket,
 		book:      fiatBook,
 		depthBook: types.NewDepthBook(fiatBook),
+		bidPricer: pricer.Compose(
+			pricer.FromBestPrice(types.SideTypeBuy, fiatBook),
+		),
+		askPricer: pricer.Compose(
+			pricer.FromBestPrice(types.SideTypeSell, fiatBook),
+		),
 	}
 
 	hedge := &SyntheticHedge{
