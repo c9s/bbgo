@@ -704,18 +704,26 @@ func (s *Strategy) calculateDebtQuota(totalValue, debtValue, minMarginLevel, lev
 	return debtQuota
 }
 
-func (s *Strategy) allowMarginHedge(hedgeAccount *types.Account, makerSide types.SideType) (bool, fixedpoint.Value) {
+func (s *Strategy) allowMarginHedge(
+	session *bbgo.ExchangeSession,
+	minMarginLevel, maxHedgeAccountLeverage fixedpoint.Value,
+	makerSide types.SideType,
+) (bool, fixedpoint.Value) {
 	zero := fixedpoint.Zero
 
-	lastPrice := s.lastPrice.Get()
-	if hedgeAccount.MarginLevel.IsZero() || s.MinMarginLevel.IsZero() {
+	hedgeAccount := session.GetAccount()
+	if hedgeAccount.MarginLevel.IsZero() || minMarginLevel.IsZero() {
 		return false, zero
 	}
 
-	bufMinMarginLevel := s.MinMarginLevel.Mul(fixedpoint.NewFromFloat(1.005))
-	marketValue := s.accountValueCalculator.MarketValue()
-	debtValue := s.accountValueCalculator.DebtValue()
-	netValueInUsd := s.accountValueCalculator.NetValue()
+	lastPrice := s.lastPrice.Get()
+	bufMinMarginLevel := minMarginLevel.Mul(fixedpoint.NewFromFloat(1.005))
+
+	accountValueCalculator := session.GetAccountValueCalculator()
+	marketValue := accountValueCalculator.MarketValue()
+	debtValue := accountValueCalculator.DebtValue()
+	netValueInUsd := accountValueCalculator.NetValue()
+
 	s.logger.Infof(
 		"hedge account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
 		netValueInUsd.Float64(),
@@ -725,14 +733,14 @@ func (s *Strategy) allowMarginHedge(hedgeAccount *types.Account, makerSide types
 
 	// if the margin level is higher than the minimal margin level,
 	// we can hedge the position, but we need to check the debt quota
-	if hedgeAccount.MarginLevel.Compare(s.MinMarginLevel) > 0 {
+	if hedgeAccount.MarginLevel.Compare(minMarginLevel) > 0 {
 
 		// debtQuota is the quota with minimal margin level
-		debtQuota := s.calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel, s.MaxHedgeAccountLeverage)
+		debtQuota := s.calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel, maxHedgeAccountLeverage)
 
 		s.logger.Infof(
 			"hedge account margin level %f > %f, debt quota: %f",
-			hedgeAccount.MarginLevel.Float64(), s.MinMarginLevel.Float64(), debtQuota.Float64(),
+			hedgeAccount.MarginLevel.Float64(), minMarginLevel.Float64(), debtQuota.Float64(),
 		)
 
 		if debtQuota.Sign() <= 0 {
@@ -740,13 +748,13 @@ func (s *Strategy) allowMarginHedge(hedgeAccount *types.Account, makerSide types
 		}
 
 		// if MaxHedgeAccountLeverage is set, we need to calculate credit buffer
-		if s.MaxHedgeAccountLeverage.Sign() > 0 {
-			maximumValueInUsd := netValueInUsd.Mul(s.MaxHedgeAccountLeverage)
+		if maxHedgeAccountLeverage.Sign() > 0 {
+			maximumValueInUsd := netValueInUsd.Mul(maxHedgeAccountLeverage)
 			leverageQuotaInUsd := maximumValueInUsd.Sub(debtValue)
 			s.logger.Infof(
 				"hedge account maximum leveraged value in usd: %f (%f x), quota in usd: %f",
 				maximumValueInUsd.Float64(),
-				s.MaxHedgeAccountLeverage.Float64(),
+				maxHedgeAccountLeverage.Float64(),
 				leverageQuotaInUsd.Float64(),
 			)
 
@@ -1012,7 +1020,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			)
 		}
 
-		allowMarginSell, bidQuota := s.allowMarginHedge(s.sourceSession.GetAccount(), types.SideTypeBuy)
+		allowMarginSell, bidQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeBuy)
 		if allowMarginSell {
 			hedgeQuota.BaseAsset.Add(bidQuota.Div(bestBidPrice))
 		} else {
@@ -1020,7 +1028,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			disableMakerBid = true
 		}
 
-		allowMarginBuy, sellQuota := s.allowMarginHedge(s.sourceSession.GetAccount(), types.SideTypeSell)
+		allowMarginBuy, sellQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeSell)
 		if allowMarginBuy {
 			hedgeQuota.QuoteAsset.Add(sellQuota.Mul(bestAskPrice))
 		} else {
