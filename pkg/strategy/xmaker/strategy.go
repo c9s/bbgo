@@ -778,15 +778,8 @@ func (s *Strategy) allowMarginHedge(
 
 	// makerSide here is the makerSide of maker
 	// if the margin level is too low, check if we can hedge the position with repayments to reduce the position
-	quoteBal, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency)
-	if !ok {
-		quoteBal = types.NewZeroBalance(s.sourceMarket.QuoteCurrency)
-	}
-
-	baseBal, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency)
-	if !ok {
-		baseBal = types.NewZeroBalance(s.sourceMarket.BaseCurrency)
-	}
+	quoteBal, _ := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency)
+	baseBal, _ := hedgeAccount.Balance(s.sourceMarket.BaseCurrency)
 
 	switch makerSide {
 	case types.SideTypeBuy:
