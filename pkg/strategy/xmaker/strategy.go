@@ -704,17 +704,14 @@ func (s *Strategy) calculateDebtQuota(totalValue, debtValue, minMarginLevel, lev
 	return debtQuota
 }
 
-func (s *Strategy) allowMarginHedge(makerSide types.SideType) (bool, fixedpoint.Value) {
+func (s *Strategy) allowMarginHedge(hedgeAccount *types.Account, makerSide types.SideType) (bool, fixedpoint.Value) {
 	zero := fixedpoint.Zero
 
 	if !s.sourceSession.Margin {
 		return false, zero
 	}
 
-	// GetAccount() is a lightweight operation, it doesn't make any API request
-	hedgeAccount := s.sourceSession.GetAccount()
 	lastPrice := s.lastPrice.Get()
-
 	if hedgeAccount.MarginLevel.IsZero() || s.MinMarginLevel.IsZero() {
 		return false, zero
 	}
@@ -1019,7 +1016,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			)
 		}
 
-		allowMarginSell, bidQuota := s.allowMarginHedge(types.SideTypeBuy)
+		allowMarginSell, bidQuota := s.allowMarginHedge(s.sourceSession.GetAccount(), types.SideTypeBuy)
 		if allowMarginSell {
 			hedgeQuota.BaseAsset.Add(bidQuota.Div(bestBidPrice))
 		} else {
@@ -1027,7 +1024,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			disableMakerBid = true
 		}
 
-		allowMarginBuy, sellQuota := s.allowMarginHedge(types.SideTypeSell)
+		allowMarginBuy, sellQuota := s.allowMarginHedge(s.sourceSession.GetAccount(), types.SideTypeSell)
 		if allowMarginBuy {
 			hedgeQuota.QuoteAsset.Add(sellQuota.Mul(bestAskPrice))
 		} else {
