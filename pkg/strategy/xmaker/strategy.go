@@ -707,10 +707,6 @@ func (s *Strategy) calculateDebtQuota(totalValue, debtValue, minMarginLevel, lev
 func (s *Strategy) allowMarginHedge(hedgeAccount *types.Account, makerSide types.SideType) (bool, fixedpoint.Value) {
 	zero := fixedpoint.Zero
 
-	if !s.sourceSession.Margin {
-		return false, zero
-	}
-
 	lastPrice := s.lastPrice.Get()
 	if hedgeAccount.MarginLevel.IsZero() || s.MinMarginLevel.IsZero() {
 		return false, zero
