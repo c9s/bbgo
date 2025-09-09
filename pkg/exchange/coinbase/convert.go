@@ -70,6 +70,7 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 }
 
 func toGlobalTrade(cbTrade *api.Trade) types.Trade {
+	side := toGlobalSide(cbTrade.Side)
 	return types.Trade{
 		ID:            cbTrade.TradeID,
 		OrderID:       util.FNV64(cbTrade.OrderID),
@@ -79,8 +80,8 @@ func toGlobalTrade(cbTrade *api.Trade) types.Trade {
 		Quantity:      cbTrade.Size,
 		QuoteQuantity: cbTrade.Size.Mul(cbTrade.Price),
 		Symbol:        toGlobalSymbol(cbTrade.ProductID),
-		Side:          toGlobalSide(cbTrade.Side),
-		IsBuyer:       cbTrade.Liquidity == api.LiquidityTaker,
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
 		IsMaker:       cbTrade.Liquidity == api.LiquidityMaker,
 		Fee:           cbTrade.Fee,
 		FeeCurrency:   cbTrade.FundingCurrency,
