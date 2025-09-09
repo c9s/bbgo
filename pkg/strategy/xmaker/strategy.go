@@ -111,6 +111,8 @@ type Strategy struct {
 
 	EnableSignalMargin bool `json:"enableSignalMargin"`
 
+	SignalSource string `json:"signalSource,omitempty"`
+
 	SignalConfigList *signal.DynamicConfig `json:"signals"`
 
 	SignalReverseSideMargin       *SignalMargin `json:"signalReverseSideMargin,omitempty"`
@@ -124,10 +126,12 @@ type Strategy struct {
 	// MinMargin is the minimum margin protection for signal margin
 	MinMargin *fixedpoint.Value `json:"minMargin"`
 
-	UseDepthPrice    bool             `json:"useDepthPrice"`
-	DepthQuantity    fixedpoint.Value `json:"depthQuantity"`
-	SourceDepthLevel types.Depth      `json:"sourceDepthLevel"`
-	MakerOnly        bool             `json:"makerOnly"`
+	UseDepthPrice bool             `json:"useDepthPrice"`
+	DepthQuantity fixedpoint.Value `json:"depthQuantity"`
+
+	// TODO: move SourceDepthLevel to HedgeMarket
+	SourceDepthLevel types.Depth `json:"sourceDepthLevel"`
+	MakerOnly        bool        `json:"makerOnly"`
 
 	// EnableDelayHedge enables the delay hedge feature
 	EnableDelayHedge bool `json:"enableDelayHedge"`
@@ -136,6 +140,8 @@ type Strategy struct {
 	DelayHedgeSignalThreshold float64        `json:"delayHedgeSignalThreshold"`
 
 	DelayedHedge *DelayedHedge `json:"delayedHedge,omitempty"`
+
+	SplitHedge *SplitHedge `json:"splitHedge,omitempty"`
 
 	SpreadMaker *SpreadMaker `json:"spreadMaker,omitempty"`
 
@@ -256,6 +262,15 @@ type Strategy struct {
 	sourceOrderExecutor *bbgo.GeneralOrderExecutor
 
 	debtQuotaCache *fixedpoint.ExpirableValue
+
+	// metricsCache
+	cancelOrderDurationMetrics         prometheus.Observer
+	aggregatedSignalMetrics            prometheus.Gauge
+	askMarginMetrics, bidMarginMetrics prometheus.Gauge
+
+	makerOrderPlacementDurationMetrics prometheus.Observer
+	openOrderBidExposureInUsdMetrics   prometheus.Gauge
+	openOrderAskExposureInUsdMetrics   prometheus.Gauge
 }
 
 func (s *Strategy) ID() string {
@@ -341,6 +356,15 @@ func (s *Strategy) Initialize() error {
 		"exchange":      s.MakerExchange,
 		"symbol":        s.Symbol,
 	}
+
+	s.cancelOrderDurationMetrics = cancelOrderDurationMetrics.With(s.metricsLabels)
+	s.aggregatedSignalMetrics = aggregatedSignalMetrics.With(s.metricsLabels)
+	s.askMarginMetrics = askMarginMetrics.With(s.metricsLabels)
+	s.bidMarginMetrics = bidMarginMetrics.With(s.metricsLabels)
+
+	s.makerOrderPlacementDurationMetrics = makerOrderPlacementDurationMetrics.With(s.metricsLabels)
+	s.openOrderBidExposureInUsdMetrics = openOrderBidExposureInUsdMetrics.With(s.metricsLabels)
+	s.openOrderAskExposureInUsdMetrics = openOrderAskExposureInUsdMetrics.With(s.metricsLabels)
 
 	if s.SignalReverseSideMargin != nil && s.SignalReverseSideMargin.Scale != nil {
 		scale, err := s.SignalReverseSideMargin.Scale.Scale()
@@ -680,25 +704,26 @@ func (s *Strategy) calculateDebtQuota(totalValue, debtValue, minMarginLevel, lev
 	return debtQuota
 }
 
-func (s *Strategy) allowMarginHedge(makerSide types.SideType) (bool, fixedpoint.Value) {
+func (s *Strategy) allowMarginHedge(
+	session *bbgo.ExchangeSession,
+	minMarginLevel, maxHedgeAccountLeverage fixedpoint.Value,
+	makerSide types.SideType,
+) (bool, fixedpoint.Value) {
 	zero := fixedpoint.Zero
 
-	if !s.sourceSession.Margin {
+	hedgeAccount := session.GetAccount()
+	if hedgeAccount.MarginLevel.IsZero() || minMarginLevel.IsZero() {
 		return false, zero
 	}
 
-	// GetAccount() is a lightweight operation, it doesn't make any API request
-	hedgeAccount := s.sourceSession.GetAccount()
 	lastPrice := s.lastPrice.Get()
+	bufMinMarginLevel := minMarginLevel.Mul(fixedpoint.NewFromFloat(1.005))
 
-	if hedgeAccount.MarginLevel.IsZero() || s.MinMarginLevel.IsZero() {
-		return false, zero
-	}
+	accountValueCalculator := session.GetAccountValueCalculator()
+	marketValue := accountValueCalculator.MarketValue()
+	debtValue := accountValueCalculator.DebtValue()
+	netValueInUsd := accountValueCalculator.NetValue()
 
-	bufMinMarginLevel := s.MinMarginLevel.Mul(fixedpoint.NewFromFloat(1.005))
-	marketValue := s.accountValueCalculator.MarketValue()
-	debtValue := s.accountValueCalculator.DebtValue()
-	netValueInUsd := s.accountValueCalculator.NetValue()
 	s.logger.Infof(
 		"hedge account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
 		netValueInUsd.Float64(),
@@ -708,14 +733,14 @@ func (s *Strategy) allowMarginHedge(makerSide types.SideType) (bool, fixedpoint.
 
 	// if the margin level is higher than the minimal margin level,
 	// we can hedge the position, but we need to check the debt quota
-	if hedgeAccount.MarginLevel.Compare(s.MinMarginLevel) > 0 {
+	if hedgeAccount.MarginLevel.Compare(minMarginLevel) > 0 {
 
 		// debtQuota is the quota with minimal margin level
-		debtQuota := s.calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel, s.MaxHedgeAccountLeverage)
+		debtQuota := s.calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel, maxHedgeAccountLeverage)
 
 		s.logger.Infof(
 			"hedge account margin level %f > %f, debt quota: %f",
-			hedgeAccount.MarginLevel.Float64(), s.MinMarginLevel.Float64(), debtQuota.Float64(),
+			hedgeAccount.MarginLevel.Float64(), minMarginLevel.Float64(), debtQuota.Float64(),
 		)
 
 		if debtQuota.Sign() <= 0 {
@@ -723,13 +748,13 @@ func (s *Strategy) allowMarginHedge(makerSide types.SideType) (bool, fixedpoint.
 		}
 
 		// if MaxHedgeAccountLeverage is set, we need to calculate credit buffer
-		if s.MaxHedgeAccountLeverage.Sign() > 0 {
-			maximumValueInUsd := netValueInUsd.Mul(s.MaxHedgeAccountLeverage)
+		if maxHedgeAccountLeverage.Sign() > 0 {
+			maximumValueInUsd := netValueInUsd.Mul(maxHedgeAccountLeverage)
 			leverageQuotaInUsd := maximumValueInUsd.Sub(debtValue)
 			s.logger.Infof(
 				"hedge account maximum leveraged value in usd: %f (%f x), quota in usd: %f",
 				maximumValueInUsd.Float64(),
-				s.MaxHedgeAccountLeverage.Float64(),
+				maxHedgeAccountLeverage.Float64(),
 				leverageQuotaInUsd.Float64(),
 			)
 
@@ -753,15 +778,8 @@ func (s *Strategy) allowMarginHedge(makerSide types.SideType) (bool, fixedpoint.
 
 	// makerSide here is the makerSide of maker
 	// if the margin level is too low, check if we can hedge the position with repayments to reduce the position
-	quoteBal, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency)
-	if !ok {
-		quoteBal = types.NewZeroBalance(s.sourceMarket.QuoteCurrency)
-	}
-
-	baseBal, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency)
-	if !ok {
-		baseBal = types.NewZeroBalance(s.sourceMarket.BaseCurrency)
-	}
+	quoteBal, _ := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency)
+	baseBal, _ := hedgeAccount.Balance(s.sourceMarket.BaseCurrency)
 
 	switch makerSide {
 	case types.SideTypeBuy:
@@ -807,7 +825,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		return nil
 	}
 
-	cancelOrderDurationMetrics.With(s.metricsLabels).Observe(float64(cancelMakerOrdersProfile.Stop().Milliseconds()))
+	s.cancelOrderDurationMetrics.Observe(float64(cancelMakerOrdersProfile.Stop().Milliseconds()))
 
 	if s.activeMakerOrders.NumOfOrders() > 0 {
 		s.logger.Warnf("unable to cancel all %s orders, skipping placing maker orders", s.Symbol)
@@ -830,7 +848,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	}
 
 	s.logger.Infof("aggregated signal: %f", sig)
-	aggregatedSignalMetrics.With(s.metricsLabels).Set(sig)
+	s.aggregatedSignalMetrics.Set(sig)
 
 	now := time.Now()
 	if s.CircuitBreaker != nil {
@@ -973,16 +991,20 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	hedgeBalances := hedgeAccount.Balances()
 	hedgeQuota := &bbgo.QuotaTransaction{}
 
+	s.logger.Infof("hedge balances: %+v", hedgeBalances.NotZero())
+
 	if s.sourceSession.Margin &&
 		!s.MinMarginLevel.IsZero() &&
 		!hedgeAccount.MarginLevel.IsZero() {
 
 		if hedgeAccount.MarginLevel.Compare(s.MinMarginLevel) < 0 {
 			s.logger.Warnf(
-				"hedge account margin level %s is less then the min margin level %s, calculating the borrowed positions",
+				"hedge account margin level %s is less then the min margin level %s, trying to repay the debts...",
 				hedgeAccount.MarginLevel.String(),
 				s.MinMarginLevel.String(),
 			)
+
+			s.tryToRepayDebts(ctx, s.sourceSession)
 		} else {
 			s.logger.Infof(
 				"hedge account margin level %s is greater than the min margin level %s, calculating the net value",
@@ -991,7 +1013,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			)
 		}
 
-		allowMarginSell, bidQuota := s.allowMarginHedge(types.SideTypeBuy)
+		allowMarginSell, bidQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeBuy)
 		if allowMarginSell {
 			hedgeQuota.BaseAsset.Add(bidQuota.Div(bestBidPrice))
 		} else {
@@ -999,12 +1021,16 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			disableMakerBid = true
 		}
 
-		allowMarginBuy, sellQuota := s.allowMarginHedge(types.SideTypeSell)
+		allowMarginBuy, sellQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeSell)
 		if allowMarginBuy {
 			hedgeQuota.QuoteAsset.Add(sellQuota.Mul(bestAskPrice))
 		} else {
 			s.logger.Warnf("margin hedge buy is disabled, disabling maker ask orders...")
 			disableMakerAsk = true
+		}
+
+		if disableMakerBid || disableMakerAsk {
+			s.tryToRepayDebts(ctx, s.sourceSession)
 		}
 	} else {
 		if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
@@ -1104,8 +1130,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	bidExposureInUsd := fixedpoint.Zero
 	askExposureInUsd := fixedpoint.Zero
 
-	bidMarginMetrics.With(s.metricsLabels).Set(quote.BidMargin.Float64())
-	askMarginMetrics.With(s.metricsLabels).Set(quote.AskMargin.Float64())
+	s.bidMarginMetrics.Set(quote.BidMargin.Float64())
+	s.askMarginMetrics.Set(quote.AskMargin.Float64())
 
 	if s.EnableArbitrage {
 		done, err := s.tryArbitrage(ctx, quote, makerBalances, hedgeBalances, disableMakerBid, disableMakerAsk)
@@ -1309,10 +1335,9 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		return err
 	}
 
-	makerOrderPlacementDurationMetrics.With(s.metricsLabels).Observe(float64(makerOrderPlacementProfile.Stop().Milliseconds()))
-
-	openOrderBidExposureInUsdMetrics.With(s.metricsLabels).Set(bidExposureInUsd.Float64())
-	openOrderAskExposureInUsdMetrics.With(s.metricsLabels).Set(askExposureInUsd.Float64())
+	s.makerOrderPlacementDurationMetrics.Observe(float64(makerOrderPlacementProfile.Stop().Milliseconds()))
+	s.openOrderBidExposureInUsdMetrics.Set(bidExposureInUsd.Float64())
+	s.openOrderAskExposureInUsdMetrics.Set(askExposureInUsd.Float64())
 
 	_ = errIdx
 	_ = createdOrders
@@ -1645,11 +1670,13 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		return
 	}
 
+	// hedgeDelta is the reverse of the uncovered position
+	//
 	// if the uncovered position is a positive number, e.g., +10 BTC,
 	// then we need to sell 10 BTC, hence call .Neg() here
 	// if the uncovered position is a negative number, e.g., -10 BTC,
 	// then we need to buy 10 BTC, hence call .Neg() here
-	hedgeDelta := uncoveredPosition.Neg()
+	hedgeDelta := uncoveredToDelta(uncoveredPosition)
 	side := positionToSide(hedgeDelta)
 
 	sig := s.lastAggregatedSignal.Get()
@@ -1670,13 +1697,18 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		return
 	}
 
-	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		if err := s.SplitHedge.Hedge(ctx, uncoveredPosition); err != nil {
+			s.logger.WithError(err).Errorf("unable to hedge via split hedge")
+			return
+		}
+	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 		if err := s.SyntheticHedge.Hedge(ctx, uncoveredPosition); err != nil {
 			s.logger.WithError(err).Errorf("unable to place synthetic hedge order")
 			return
 		}
 	} else {
-		if _, err := s.directHedge(ctx, hedgeDelta); err != nil {
+		if _, err := s.directHedge(ctx, uncoveredPosition); err != nil {
 			s.logger.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
 			return
 		}
@@ -1686,10 +1718,11 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 }
 
 func (s *Strategy) directHedge(
-	ctx context.Context, hedgeDelta fixedpoint.Value,
+	ctx context.Context, uncoveredPosition fixedpoint.Value,
 ) (*types.Order, error) {
+	hedgeDelta := uncoveredToDelta(uncoveredPosition)
 	quantity := hedgeDelta.Abs()
-	side := positionToSide(hedgeDelta)
+	side := deltaToSide(hedgeDelta)
 
 	price := s.lastPrice.Get()
 
@@ -1898,6 +1931,10 @@ func (s *Strategy) Defaults() error {
 		s.CircuitBreaker.SetMetricsInfo(ID, s.InstanceID(), s.Symbol)
 	}
 
+	if s.SignalSource == "" {
+		s.SignalSource = s.SourceExchange
+	}
+
 	if s.EnableSignalMargin {
 		if s.SignalReverseSideMargin.Scale == nil {
 			s.SignalReverseSideMargin.Scale = &bbgo.SlideRule{
@@ -2036,6 +2073,43 @@ func (s *Strategy) houseCleanWorker(ctx context.Context) {
 			s.orderStore.Prune(expiryDuration)
 		}
 
+	}
+}
+
+var repayRateLimiter = rate.NewLimiter(rate.Every(30*time.Second), 1)
+
+func (s *Strategy) tryToRepayDebts(ctx context.Context, session *bbgo.ExchangeSession) {
+	if !repayRateLimiter.Allow() {
+		return
+	}
+
+	hedgeBalances := session.GetAccount().Balances()
+	debts := hedgeBalances.Debts()
+
+	s.logger.Infof("trying to repay debts %+v on hedge exchange %s", debts, session.Exchange.Name())
+
+	repayables := make(map[string]fixedpoint.Value)
+	for asset, bal := range debts {
+		if bal.Borrowed.IsZero() || bal.Available.IsZero() {
+			continue
+		}
+
+		repayables[asset] = bal.Available
+	}
+
+	marginService, ok := session.Exchange.(types.MarginBorrowRepayService)
+	if !ok {
+		return
+	}
+
+	for asset, amount := range repayables {
+		if err := marginService.RepayMarginAsset(ctx, asset, amount); err != nil {
+			s.logger.WithError(err).Errorf("unable to repay %s asset", asset)
+		}
+	}
+
+	if _, err := session.UpdateAccount(ctx); err != nil {
+		s.logger.WithError(err).Errorf("unable to update account after repay")
 	}
 }
 
@@ -2524,15 +2598,16 @@ func (s *Strategy) CrossRun(
 	// bind two user data streams so that we can collect the trades together
 	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
 
-	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		s.logger.Infof("split hedge is enabled: %+v", s.SplitHedge)
+		if err := s.SplitHedge.InitializeAndBind(sessions, s); err != nil {
+			return err
+		}
+	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 		s.logger.Infof("syntheticHedge is enabled: %+v", s.SyntheticHedge)
 		if err := s.SyntheticHedge.InitializeAndBind(sessions, s); err != nil {
 			return err
 		}
-
-		// TODO: make this call clean ?
-		s.SyntheticHedge.sourceMarket.positionExposure.OnCover(s.positionExposure.Cover)
-		s.SyntheticHedge.sourceMarket.positionExposure.OnClose(s.positionExposure.Close)
 	} else {
 		s.orderStore.BindStream(s.sourceSession.UserDataStream)
 		s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
@@ -2550,7 +2625,11 @@ func (s *Strategy) CrossRun(
 	go func() {
 		s.logger.Infof("waiting for authentication connections to be ready...")
 
-		if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		if s.SplitHedge != nil && s.SplitHedge.Enabled {
+			if err := s.SplitHedge.Start(ctx); err != nil {
+				s.logger.WithError(err).Errorf("failed to start split hedge")
+			}
+		} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 			if err := s.SyntheticHedge.Start(ctx); err != nil {
 				s.logger.WithError(err).Errorf("failed to start syntheticHedge")
 			}
@@ -2596,7 +2675,11 @@ func (s *Strategy) CrossRun(
 			// TODO: change this stopC to wait for the quoteWorker to stop
 			close(s.stopC)
 
-			if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+			if s.SplitHedge != nil && s.SplitHedge.Enabled {
+				if err := s.SplitHedge.Stop(ctx); err != nil {
+					s.logger.WithError(err).Errorf("failed to stop splitHedge")
+				}
+			} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 				if err := s.SyntheticHedge.Stop(ctx); err != nil {
 					s.logger.WithError(err).Errorf("failed to stop syntheticHedge")
 				}
@@ -2686,12 +2769,4 @@ func parseSymbolSelector(
 		return nil, types.Market{}, fmt.Errorf("market %s not found in session %s", symbol, sessionName)
 	}
 	return session, market, nil
-}
-
-func positionToSide(pos fixedpoint.Value) types.SideType {
-	side := types.SideTypeBuy
-	if pos.Sign() < 0 {
-		side = types.SideTypeSell
-	}
-	return side
 }

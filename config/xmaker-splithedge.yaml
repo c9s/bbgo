@@ -34,10 +34,12 @@ crossExchangeStrategies:
     makerExchange: max
     updateInterval: 1s
 
+    signalSource: binance
+
     # disableHedge disables the hedge orders on the source exchange
     # disableHedge: true
 
-    hedgeInterval: 10s
+    hedgeInterval: 1s
 
     margin: 0.004
     askMargin: 0.004

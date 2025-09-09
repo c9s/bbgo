@@ -239,6 +239,8 @@ type ExchangeSession struct {
 	logger log.FieldLogger
 
 	priceSolver *pricesolver.SimplePriceSolver
+
+	AccountValueCalculator *AccountValueCalculator `json:"-" yaml:"-"`
 }
 
 // NewExchangeSession creates a new exchange session instance
@@ -257,6 +259,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	marketDataConnectivity.Bind(marketDataStream)
 
 	connectivityGroup := types.NewConnectivityGroup(marketDataConnectivity, userDataConnectivity)
+	priceSolver := pricesolver.NewSimplePriceResolver(nil)
 
 	session := &ExchangeSession{
 		ExchangeSessionConfig: ExchangeSessionConfig{
@@ -288,8 +291,12 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		usedSymbols:           make(map[string]struct{}),
 		initializedSymbols:    make(map[string]struct{}),
 		logger:                log.WithField("session", name),
-		priceSolver:           pricesolver.NewSimplePriceResolver(nil),
+		priceSolver:           priceSolver,
 	}
+
+	session.AccountValueCalculator = NewAccountValueCalculator(
+		session, priceSolver, currency2.USDT,
+	)
 
 	session.OrderExecutor = &ExchangeOrderExecutor{
 		// copy the notification system so that we can route
@@ -305,6 +312,10 @@ func (session *ExchangeSession) GetPriceSolver() *pricesolver.SimplePriceSolver 
 	}
 
 	return session.priceSolver
+}
+
+func (session *ExchangeSession) GetAccountValueCalculator() *AccountValueCalculator {
+	return session.AccountValueCalculator
 }
 
 func (session *ExchangeSession) UnmarshalJSON(data []byte) error {
@@ -435,7 +446,12 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	logger.Infof("%d markets loaded", len(markets))
 	session.SetMarkets(markets)
 
+	// re-allocate the priceSolver
 	session.priceSolver = pricesolver.NewSimplePriceResolver(markets)
+	session.AccountValueCalculator = NewAccountValueCalculator(session, session.priceSolver, currency2.USDT)
+	if err := session.AccountValueCalculator.UpdatePrices(ctx); err != nil {
+		return err
+	}
 
 	if session.SymbolLeverage != nil && len(session.SymbolLeverage) > 0 && session.Futures {
 		if riskService, ok := session.Exchange.(types.ExchangeRiskService); ok {

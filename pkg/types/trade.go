@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -291,4 +292,22 @@ func (trade Trade) Validate() error {
 	}
 
 	return nil
+}
+
+// LogFields returns logrus.Fields for structured logging
+func (trade Trade) LogFields() logrus.Fields {
+	orderID := trade.OrderUUID
+	if orderID == "" {
+		orderID = strconv.FormatUint(trade.OrderID, 10)
+	}
+
+	return logrus.Fields{
+		"exchange":  trade.Exchange.String(),
+		"symbol":    trade.Symbol,
+		"side":      trade.Side,
+		"orderID":   orderID,
+		"tradeID":   trade.ID,
+		"time":      trade.Time.Time().Format(time.RFC3339Nano),
+		"liquidity": trade.Liquidity(),
+	}
 }

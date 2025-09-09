@@ -20,22 +20,54 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type HedgeMethod string
+
+const (
+	// HedgeMethodMarket is the default hedge method that uses the market order to hedge
+	HedgeMethodMarket HedgeMethod = "market"
+
+	// HedgeMethodCounterparty is a hedge method that uses limit order at the specific counterparty price level to hedge
+	HedgeMethodCounterparty HedgeMethod = "counterparty"
+
+	// HedgeMethodQueue is a hedge method that uses limit order at the first price level in the queue to hedge
+	HedgeMethodQueue HedgeMethod = "queue"
+)
+
 const defaultHedgeInterval = 200 * time.Millisecond
 
-type HedgeExecutor interface {
-	// hedge executes a hedge order based on the uncovered position and the hedge delta
-	// uncoveredPosition: the current uncovered position that needs to be hedged
-	// hedgeDelta: the delta that needs to be hedged, which is the negative of uncoveredPosition
-	// quantity: the absolute value of hedgeDelta, which is the order quantity to be hedged
-	// side: the side of the hedge order, which is determined by the sign of hedgeDelta
-	hedge(
-		ctx context.Context,
-		uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
-		side types.SideType,
-	) error
+type HedgeMarketConfig struct {
+	SymbolSelector string         `json:"symbolSelector"`
+	HedgeMethod    HedgeMethod    `json:"hedgeMethod"`
+	HedgeInterval  types.Duration `json:"hedgeInterval"`
 
-	// clear clears any pending orders or state related to hedging
-	clear(ctx context.Context) error
+	MinMarginLevel fixedpoint.Value `json:"minMarginLevel"`
+
+	HedgeMethodMarket       *MarketOrderHedgeExecutorConfig  `json:"hedgeMethodMarket,omitempty"`       // for backward compatibility, this is the default hedge method
+	HedgeMethodCounterparty *CounterpartyHedgeExecutorConfig `json:"hedgeMethodCounterparty,omitempty"` // for backward compatibility, this is the default hedge method
+
+	HedgeMethodQueue *struct {
+		PriceLevel int `json:"priceLevel"`
+	} `json:"hedgeMethodQueue,omitempty"` // for backward compatibility, this is the default hedge method
+
+	QuotingDepth        fixedpoint.Value `json:"quotingDepth"`
+	QuotingDepthInQuote fixedpoint.Value `json:"quotingDepthInQuote"`
+}
+
+func initializeHedgeMarketFromConfig(
+	c *HedgeMarketConfig,
+	sessions map[string]*bbgo.ExchangeSession,
+) (*HedgeMarket, error) {
+	session, market, err := parseSymbolSelector(c.SymbolSelector, sessions)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.QuotingDepth.IsZero() && c.QuotingDepthInQuote.IsZero() {
+		return nil, fmt.Errorf("quotingDepth or quotingDepthInQuote must be set for hedge market %s", c.SymbolSelector)
+	}
+
+	hm := newHedgeMarket(c, session, market)
+	return hm, nil
 }
 
 type HedgeMarket struct {
@@ -106,6 +138,7 @@ func newHedgeMarket(
 	activeMakerOrders.BindStream(session.UserDataStream)
 
 	logger := log.WithFields(logrus.Fields{
+		"session":      session.Name,
 		"exchange":     session.ExchangeName,
 		"hedge_market": market.Symbol,
 	})
@@ -262,6 +295,78 @@ func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
 	}
 
 	return bid, ask
+}
+
+func (m *HedgeMarket) canHedge(
+	ctx context.Context, uncoveredPosition fixedpoint.Value,
+) (bool, fixedpoint.Value, error) {
+	hedgeDelta := uncoveredPosition.Neg()
+	quantity := hedgeDelta.Abs()
+	side := deltaToSide(hedgeDelta)
+
+	// get quote price
+	bid, ask := m.getQuotePrice()
+	price := sideTakerPrice(bid, ask, side)
+	currency, required := determineRequiredCurrencyAndAmount(m.market, side, quantity, price)
+	// required = required amount of quote, or base currency depending on the side
+	_ = required
+
+	account := m.session.GetAccount()
+	available, hasBalance := getAvailableBalance(account, currency)
+	maxQuantity := quantity
+	amt := available
+	if amt.IsZero() || m.session.Margin {
+		amt = required
+	}
+
+	if !amt.IsZero() {
+		if side == types.SideTypeBuy {
+			// for buy, we need to check if we have enough quote currency
+			maxQuantity = fixedpoint.Min(maxQuantity, amt.Div(price))
+		} else {
+			// for sell, we need to check if we have enough base currency
+			maxQuantity = fixedpoint.Min(maxQuantity, amt)
+		}
+	}
+
+	quantity = fixedpoint.Min(quantity, maxQuantity)
+
+	if m.market.IsDustQuantity(quantity, price) {
+		log.Warnf("canHedge: skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
+		return false, fixedpoint.Zero, nil
+	}
+
+	// for margin account, we need to check if the margin level is sufficient
+	if m.session.Margin {
+		// a simple check to ensure the account is not in danger of liquidation
+		minMarginLevel := m.MinMarginLevel
+		if minMarginLevel.IsZero() {
+			// default to 150% margin level
+			minMarginLevel = fixedpoint.NewFromFloat(1.1) // 110%
+		}
+
+		if account.MarginLevel.IsZero() || account.MarginLevel.Compare(minMarginLevel) < 0 {
+			log.Warnf("canHedge: margin level too low to hedge: %s (less than %s)", account.MarginLevel.String(), minMarginLevel.String())
+			return false, fixedpoint.Zero, nil
+		}
+
+		// TODO: calculate debt quota here
+
+		return true, available, nil
+	}
+
+	// spot mode
+	if !hasBalance {
+		log.Warnf("canHedge: cannot find balance for currency: %s", currency)
+		return false, fixedpoint.Zero, nil
+	} else if available.IsZero() {
+		log.Warnf("canHedge: zero available balance for currency: %s", currency)
+		return false, fixedpoint.Zero, nil
+	} else if m.market.IsDustQuantity(available, price) {
+		return false, fixedpoint.Zero, nil
+	}
+
+	return true, quantity, nil
 }
 
 func (m *HedgeMarket) hedge(
@@ -452,5 +557,19 @@ func deltaToSide(delta fixedpoint.Value) types.SideType {
 	}
 
 	return side
+}
 
+func positionToSide(pos fixedpoint.Value) types.SideType {
+	side := types.SideTypeBuy
+	if pos.Sign() < 0 {
+		side = types.SideTypeSell
+	}
+	return side
+}
+
+// uncoveredToDelta converts uncovered position to delta by negating it.
+// delta is the amount needed to hedge the uncovered position.
+// For example, if uncovered position is +10 (long 10 units), the delta to hedge it is -10 (sell 10 units).
+func uncoveredToDelta(uncoveredPosition fixedpoint.Value) fixedpoint.Value {
+	return uncoveredPosition.Neg()
 }

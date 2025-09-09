@@ -56,23 +56,23 @@ func TestStrategy_allowMarginHedge(t *testing.T) {
 		accountValueCalc := bbgo.NewAccountValueCalculator(session, priceSolver, currency.USDT)
 		assert.Equal(t, "98000", accountValueCalc.DebtValue().String())
 		assert.Equal(t, "298000", accountValueCalc.NetValue().String())
+		session.AccountValueCalculator = accountValueCalc
 
 		s := &Strategy{
-			MinMarginLevel:         Number(1.7),
-			makerMarket:            market,
-			sourceMarket:           market,
-			sourceSession:          session,
-			accountValueCalculator: accountValueCalc,
-			logger:                 logger,
+			MinMarginLevel: Number(1.7),
+			makerMarket:    market,
+			sourceMarket:   market,
+			sourceSession:  session,
+			logger:         logger,
 		}
 		s.lastPrice.Set(Number(98000.0))
 
-		allowed, quota := s.allowMarginHedge(types.SideTypeBuy)
+		allowed, quota := s.allowMarginHedge(session, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeBuy)
 		if assert.True(t, allowed) {
 			assert.InDelta(t, 2.47735853175711e+06, quota.Float64(), 0.0001, "should be able to borrow %f USDT", quota.Float64())
 		}
 
-		allowed, quota = s.allowMarginHedge(types.SideTypeSell)
+		allowed, quota = s.allowMarginHedge(session, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeSell)
 		if assert.True(t, allowed) {
 			assert.InDelta(t, 25.27916869, quota.Float64(), 0.0001, "should be able to borrow %f BTC", quota.Float64())
 		}
@@ -106,6 +106,8 @@ func TestStrategy_allowMarginHedge(t *testing.T) {
 		assert.Equal(t, "392000", accountValueCalc.DebtValue().String())
 		assert.Equal(t, "4000", accountValueCalc.NetValue().String())
 
+		session.AccountValueCalculator = accountValueCalc
+
 		var err error
 		account.MarginLevel, err = accountValueCalc.MarginLevel()
 		if assert.NoError(t, err) {
@@ -122,10 +124,10 @@ func TestStrategy_allowMarginHedge(t *testing.T) {
 		}
 		s.lastPrice.Set(Number(98000.0))
 
-		allowed, quota := s.allowMarginHedge(types.SideTypeBuy)
+		allowed, quota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeBuy)
 		assert.False(t, allowed)
 
-		allowed, quota = s.allowMarginHedge(types.SideTypeSell)
+		allowed, quota = s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeSell)
 		if assert.True(t, allowed) {
 			assert.InDelta(t, 2.04, quota.Float64(), 0.001, "should be able to borrow %f BTC", quota.Float64())
 		}
