@@ -6,18 +6,17 @@ import (
 	"path"
 	"runtime/pprof"
 	"strings"
-	"time"
 	_ "time/tzdata"
 
 	"github.com/heroku/rollrus"
 	"github.com/joho/godotenv"
-	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rifflock/lfshook"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/util"
@@ -248,14 +247,12 @@ func init() {
 		if err := os.MkdirAll(logDir, 0777); err != nil {
 			log.Panic(err)
 		}
-		writer, err := rotatelogs.New(
-			path.Join(logDir, "access_log.%Y%m%d"),
-			rotatelogs.WithLinkName("access_log"),
-			// rotatelogs.WithMaxAge(24 * time.Hour),
-			rotatelogs.WithRotationTime(time.Duration(24)*time.Hour),
-		)
-		if err != nil {
-			log.Panic(err)
+
+		writer := &lumberjack.Logger{
+			Filename:   path.Join(logDir, "access.log"),
+			MaxBackups: 30,
+			MaxAge:     30,
+			Compress:   true,
 		}
 
 		log.AddHook(
