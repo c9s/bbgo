@@ -20,6 +20,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+var defaultMinMarginLevel = fixedpoint.NewFromFloat(1.3)
+
+var defaultMaxLeverage = fixedpoint.NewFromFloat(2.0) // 2x leverage
+
 type HedgeMethod string
 
 const (
@@ -41,6 +45,7 @@ type HedgeMarketConfig struct {
 	HedgeInterval  types.Duration `json:"hedgeInterval"`
 
 	MinMarginLevel fixedpoint.Value `json:"minMarginLevel"`
+	MaxLeverage    fixedpoint.Value `json:"maxLeverage"`
 
 	HedgeMethodMarket       *MarketOrderHedgeExecutorConfig  `json:"hedgeMethodMarket,omitempty"`       // for backward compatibility, this is the default hedge method
 	HedgeMethodCounterparty *CounterpartyHedgeExecutorConfig `json:"hedgeMethodCounterparty,omitempty"` // for backward compatibility, this is the default hedge method
@@ -51,6 +56,37 @@ type HedgeMarketConfig struct {
 
 	QuotingDepth        fixedpoint.Value `json:"quotingDepth"`
 	QuotingDepthInQuote fixedpoint.Value `json:"quotingDepthInQuote"`
+}
+
+func (c *HedgeMarketConfig) Defaults() error {
+	if c.HedgeMethod == "" {
+		c.HedgeMethod = HedgeMethodMarket
+	}
+
+	if c.HedgeInterval.Duration() == 0 {
+		c.HedgeInterval = types.Duration(defaultHedgeInterval)
+	}
+
+	if c.HedgeMethodMarket == nil {
+		c.HedgeMethodMarket = &MarketOrderHedgeExecutorConfig{
+			BaseHedgeExecutorConfig: BaseHedgeExecutorConfig{},
+			MaxOrderQuantity:        fixedpoint.Zero,
+		}
+	}
+
+	if c.MinMarginLevel.IsZero() {
+		c.MinMarginLevel = defaultMinMarginLevel
+	}
+
+	if c.MaxLeverage.IsZero() {
+		c.MaxLeverage = defaultMaxLeverage
+	}
+
+	if c.QuotingDepthInQuote.IsZero() {
+		c.QuotingDepthInQuote = fixedpoint.NewFromFloat(1000) // default to $1000
+	}
+
+	return nil
 }
 
 func initializeHedgeMarketFromConfig(
@@ -66,8 +102,11 @@ func initializeHedgeMarketFromConfig(
 		return nil, fmt.Errorf("quotingDepth or quotingDepthInQuote must be set for hedge market %s", c.SymbolSelector)
 	}
 
-	hm := newHedgeMarket(c, session, market)
-	return hm, nil
+	if err := c.Defaults(); err != nil {
+		return nil, fmt.Errorf("failed to set defaults for hedge market %s: %w", c.SymbolSelector, err)
+	}
+
+	return newHedgeMarket(c, session, market), nil
 }
 
 type HedgeMarket struct {
@@ -82,7 +121,8 @@ type HedgeMarket struct {
 	book      *types.StreamOrderBook
 	depthBook *types.DepthBook
 
-	quotingPrice *types.Ticker
+	quotingPrice         *types.Ticker
+	bidPricer, askPricer pricer.Pricer
 
 	positionExposure *PositionExposure
 
@@ -105,6 +145,8 @@ type HedgeMarket struct {
 
 	tradingCtx    context.Context
 	cancelTrading context.CancelFunc
+
+	debtQuotaCache *fixedpoint.ExpirableValue
 }
 
 func newHedgeMarket(
@@ -167,7 +209,20 @@ func newHedgeMarket(
 		logger: logger,
 	}
 
-	m.logger.Infof("%+v", m.HedgeMethodMarket)
+	takerFeeRate := fixedpoint.Zero
+	if m.session != nil {
+		takerFeeRate = m.session.TakerFeeRate
+	}
+
+	m.bidPricer = pricer.Compose(
+		pricer.FromBestPrice(types.SideTypeBuy, m.book),
+		pricer.ApplyFeeRate(types.SideTypeBuy, takerFeeRate),
+	)
+
+	m.askPricer = pricer.Compose(
+		pricer.FromBestPrice(types.SideTypeSell, m.book),
+		pricer.ApplyFeeRate(types.SideTypeSell, takerFeeRate),
+	)
 
 	switch m.HedgeMethod {
 	case HedgeMethodMarket:
@@ -258,28 +313,13 @@ func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitO
 }
 
 func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
+	now := time.Now()
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	now := time.Now()
-
-	takerFeeRate := fixedpoint.Zero
-	if m.session != nil {
-		takerFeeRate = m.session.TakerFeeRate
-	}
-
-	bidPricer := pricer.Compose(
-		pricer.FromBestPrice(types.SideTypeBuy, m.book),
-		pricer.ApplyFeeRate(types.SideTypeBuy, takerFeeRate),
-	)
-
-	askPricer := pricer.Compose(
-		pricer.FromBestPrice(types.SideTypeSell, m.book),
-		pricer.ApplyFeeRate(types.SideTypeSell, takerFeeRate),
-	)
-
-	bid = bidPricer(0, fixedpoint.Zero)
-	ask = askPricer(0, fixedpoint.Zero)
+	bid = m.bidPricer(0, fixedpoint.Zero)
+	ask = m.askPricer(0, fixedpoint.Zero)
 
 	if bid.IsZero() || ask.IsZero() {
 		bids := m.book.SideBook(types.SideTypeBuy)
@@ -345,28 +385,160 @@ func (m *HedgeMarket) canHedge(
 			minMarginLevel = fixedpoint.NewFromFloat(1.1) // 110%
 		}
 
-		if account.MarginLevel.IsZero() || account.MarginLevel.Compare(minMarginLevel) < 0 {
-			log.Warnf("canHedge: margin level too low to hedge: %s (less than %s)", account.MarginLevel.String(), minMarginLevel.String())
+		canHedge, quota := m.allowMarginHedge(m.session, minMarginLevel, m.MaxLeverage, side, price)
+		if !canHedge {
 			return false, fixedpoint.Zero, nil
 		}
 
-		// TODO: calculate debt quota here
-
-		return true, available, nil
+		return true, fixedpoint.Min(quota, quantity), nil
 	}
 
 	// spot mode
 	if !hasBalance {
-		log.Warnf("canHedge: cannot find balance for currency: %s", currency)
+		m.logger.Warnf("canHedge: cannot find balance for currency: %s", currency)
 		return false, fixedpoint.Zero, nil
 	} else if available.IsZero() {
-		log.Warnf("canHedge: zero available balance for currency: %s", currency)
+		m.logger.Warnf("canHedge: zero available balance for currency: %s", currency)
 		return false, fixedpoint.Zero, nil
 	} else if m.market.IsDustQuantity(available, price) {
 		return false, fixedpoint.Zero, nil
 	}
 
 	return true, quantity, nil
+}
+
+func (m *HedgeMarket) allowMarginHedge(
+	session *bbgo.ExchangeSession,
+	minMarginLevel, maxLeverage fixedpoint.Value,
+	side types.SideType,
+	price fixedpoint.Value,
+) (bool, fixedpoint.Value) {
+	zero := fixedpoint.Zero
+
+	account := session.GetAccount()
+	if account.MarginLevel.IsZero() || minMarginLevel.IsZero() {
+		return false, zero
+	}
+
+	bufMinMarginLevel := minMarginLevel.Mul(fixedpoint.NewFromFloat(1.005))
+
+	accountValueCalculator := session.GetAccountValueCalculator()
+	marketValue := accountValueCalculator.MarketValue()
+	debtValue := accountValueCalculator.DebtValue()
+	netValueInUsd := accountValueCalculator.NetValue()
+
+	m.logger.Infof(
+		"hedge account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
+		netValueInUsd.Float64(),
+		debtValue.Float64(),
+		marketValue.Float64(),
+	)
+
+	// if the margin level is lower than the minimal margin level,
+	// we need to repay the debt first
+	if account.MarginLevel.Compare(minMarginLevel) < 0 {
+		// check if we can repay the debt via available balance (the reverse side)
+		if tryToRepayDebts(context.Background(), session) {
+			return m.allowMarginHedge(session, minMarginLevel, maxLeverage, side, price)
+		}
+
+		swapQty, canSwap := canSwapDebtOnSide(m.market, account.Balances(), side, price)
+		if canSwap {
+			return true, swapQty
+		}
+	}
+
+	// if the margin level is higher than the minimal margin level,
+	// we can hedge the position, but we need to check the debt quota
+	// debtQuota is the quota with minimal margin level
+	debtQuota := m.calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel, maxLeverage)
+
+	m.logger.Infof(
+		"hedge account margin level %f > %f, debt quota: %f",
+		account.MarginLevel.Float64(), minMarginLevel.Float64(), debtQuota.Float64(),
+	)
+
+	if debtQuota.Sign() <= 0 {
+		return false, zero
+	}
+
+	// if MaxHedgeAccountLeverage is set, we need to calculate credit buffer
+	if maxLeverage.Sign() > 0 {
+		maximumValueInUsd := netValueInUsd.Mul(maxLeverage)
+		leverageQuotaInUsd := maximumValueInUsd.Sub(debtValue)
+		m.logger.Infof(
+			"hedge account maximum leveraged value in usd: %f (%f x), quota in usd: %f",
+			maximumValueInUsd.Float64(),
+			maxLeverage.Float64(),
+			leverageQuotaInUsd.Float64(),
+		)
+
+		debtQuota = fixedpoint.Min(debtQuota, leverageQuotaInUsd)
+	}
+
+	if price.IsZero() {
+		return false, zero
+	}
+
+	switch side {
+	case types.SideTypeBuy:
+		return true, debtQuota.Div(price)
+	case types.SideTypeSell:
+		return true, debtQuota.Div(price)
+	default:
+		return false, zero
+	}
+}
+
+// margin level = totalValue / totalDebtValue * MMR (maintenance margin ratio)
+// on binance:
+// - MMR with 10x leverage = 5%
+// - MMR with 5x leverage = 9%
+// - MMR with 3x leverage = 10%
+func (m *HedgeMarket) calculateDebtQuota(totalValue, debtValue, minMarginLevel, leverage fixedpoint.Value) fixedpoint.Value {
+	now := time.Now()
+	if m.debtQuotaCache != nil {
+		if v, ok := m.debtQuotaCache.Get(now); ok {
+			return v
+		}
+	}
+
+	if minMarginLevel.IsZero() || totalValue.IsZero() {
+		return fixedpoint.Zero
+	}
+
+	defaultMmr := fixedpoint.NewFromFloat(9.0 * 0.01)
+	if leverage.Compare(fixedpoint.NewFromFloat(10.0)) >= 0 {
+		defaultMmr = fixedpoint.NewFromFloat(5.0 * 0.01) // 5%
+	} else if leverage.Compare(fixedpoint.NewFromFloat(5.0)) >= 0 {
+		defaultMmr = fixedpoint.NewFromFloat(9.0 * 0.01) // 9%
+	} else if leverage.Compare(fixedpoint.NewFromFloat(3.0)) >= 0 {
+		defaultMmr = fixedpoint.NewFromFloat(10.0 * 0.01) // 10%
+	}
+
+	debtCap := totalValue.Div(minMarginLevel).Div(defaultMmr)
+	marginLevel := totalValue.Div(debtValue).Div(defaultMmr)
+
+	m.logger.Infof(
+		"calculateDebtQuota: debtCap=%f, debtValue=%f currentMarginLevel=%f mmr=%f",
+		debtCap.Float64(),
+		debtValue.Float64(),
+		marginLevel.Float64(),
+		defaultMmr.Float64(),
+	)
+
+	debtQuota := debtCap.Sub(debtValue)
+	if debtQuota.Sign() < 0 {
+		return fixedpoint.Zero
+	}
+
+	if m.debtQuotaCache == nil {
+		m.debtQuotaCache = fixedpoint.NewExpirable(debtQuota, now.Add(debtQuotaCacheDuration))
+	} else {
+		m.debtQuotaCache.Set(debtQuota, now.Add(debtQuotaCacheDuration))
+	}
+
+	return debtQuota
 }
 
 func (m *HedgeMarket) hedge(
@@ -557,6 +729,42 @@ func deltaToSide(delta fixedpoint.Value) types.SideType {
 	}
 
 	return side
+}
+
+func canSwapDebtOnSide(
+	market types.Market, balances types.BalanceMap, side types.SideType, price fixedpoint.Value,
+) (fixedpoint.Value, bool) {
+	var debtCurrency string
+	var qty fixedpoint.Value
+	switch side {
+	case types.SideTypeSell:
+		// check if we have debt in quote, and we have available base to sell
+		debtCurrency = market.QuoteCurrency
+		if baseBal, ok := balances[market.BaseCurrency]; ok {
+			qty = baseBal.Available
+		}
+
+	case types.SideTypeBuy:
+		// check if we have debt in base, and we have available quote to buy
+		debtCurrency = market.BaseCurrency
+		if quoteBal, ok := balances[market.QuoteCurrency]; ok {
+			qty = quoteBal.Available.Div(price)
+		}
+
+	default:
+		return fixedpoint.Zero, false
+	}
+
+	if market.IsDustQuantity(qty, price) {
+		return fixedpoint.Zero, false
+	}
+
+	debtBal, ok := balances[debtCurrency]
+	if !ok || debtBal.Debt().IsZero() {
+		return fixedpoint.Zero, false
+	}
+
+	return qty, true
 }
 
 func positionToSide(pos fixedpoint.Value) types.SideType {

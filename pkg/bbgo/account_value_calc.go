@@ -40,7 +40,8 @@ func NewAccountValueCalculator(
 
 // UpdatePrices updates the price index from the existing balances
 func (c *AccountValueCalculator) UpdatePrices(ctx context.Context) error {
-	balances := c.session.Account.Balances().NotZero()
+	account := c.session.GetAccount()
+	balances := account.Balances().NotZero()
 	currencies := balances.Currencies()
 	markets := c.session.Markets()
 
@@ -63,7 +64,7 @@ func (c *AccountValueCalculator) UpdatePrices(ctx context.Context) error {
 }
 
 func (c *AccountValueCalculator) DebtValue() fixedpoint.Value {
-	balances := c.session.Account.Balances().Debts()
+	balances := c.session.GetAccount().Balances().Debts()
 	return totalValueInQuote(balances, c.priceSolver, c.quoteCurrency, func(
 		prev fixedpoint.Value, b types.Balance, price fixedpoint.Value,
 	) fixedpoint.Value {
@@ -72,17 +73,16 @@ func (c *AccountValueCalculator) DebtValue() fixedpoint.Value {
 }
 
 func (c *AccountValueCalculator) MarketValue() fixedpoint.Value {
-	balances := c.session.Account.Balances().NotZero()
+	balances := c.session.GetAccount().Balances().NotZero()
 	return totalValueInQuote(balances, c.priceSolver, c.quoteCurrency, func(
 		prev fixedpoint.Value, b types.Balance, price fixedpoint.Value,
 	) fixedpoint.Value {
 		return prev.Add(b.Total().Mul(price))
 	})
-
 }
 
 func (c *AccountValueCalculator) NetValue() fixedpoint.Value {
-	balances := c.session.Account.Balances().NotZero()
+	balances := c.session.GetAccount().Balances().NotZero()
 	return totalValueInQuote(balances, c.priceSolver, c.quoteCurrency, func(
 		prev fixedpoint.Value, b types.Balance, price fixedpoint.Value,
 	) fixedpoint.Value {

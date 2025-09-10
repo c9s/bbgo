@@ -121,6 +121,8 @@ type ExchangeSessionConfig struct {
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate" yaml:"makerFeeRate"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate" yaml:"takerFeeRate"`
 
+	MaxLeverage fixedpoint.Value `json:"maxLeverage,omitempty" yaml:"maxLeverage,omitempty"`
+
 	// PublicOnly is used for setting the session to public only (without authentication, no private user data)
 	PublicOnly bool `json:"publicOnly,omitempty" yaml:"publicOnly"`
 
@@ -652,7 +654,9 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		return fmt.Errorf("market %s is not defined", symbol)
 	}
 
-	session.logger.Infof("environment config: %+v", environ.environmentConfig)
+	if environ.environmentConfig != nil {
+		session.logger.Infof("environment config: %+v", environ.environmentConfig)
+	}
 
 	disableMarketDataStore := environ.environmentConfig != nil && environ.environmentConfig.DisableMarketDataStore
 	disableSessionTradeBuffer := environ.environmentConfig != nil && environ.environmentConfig.DisableSessionTradeBuffer

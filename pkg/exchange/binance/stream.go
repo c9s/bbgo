@@ -2,7 +2,6 @@ package binance
 
 import (
 	"context"
-	"encoding/json"
 	"net"
 	"net/url"
 	"strconv"
@@ -46,8 +45,8 @@ type LogonParams struct {
 
 //go:generate callbackgen -type Stream -interface
 type Stream struct {
-	types.MarginSettings
-	types.FuturesSettings
+	exchange *Exchange
+
 	types.StandardStream
 
 	client        *binance.Client
@@ -90,14 +89,12 @@ type Stream struct {
 
 func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Client) *Stream {
 	stream := &Stream{
-		StandardStream: types.NewStandardStream(),
-		client:         client,
-		futuresClient:  futuresClient,
-
+		StandardStream:        types.NewStandardStream(),
+		client:                client,
+		futuresClient:         futuresClient,
 		ed25519authentication: ex.ed25519authentication,
-		MarginSettings:        ex.MarginSettings,
-		FuturesSettings:       ex.FuturesSettings,
 
+		exchange:     ex,
 		depthBuffers: make(map[string]*depth.Buffer),
 	}
 
@@ -195,7 +192,7 @@ func (s *Stream) handleConnect() {
 		time.Sleep(1 * time.Second)
 
 		// futures does
-		if !s.IsFutures {
+		if !s.exchange.IsFutures {
 			if err := s.sendSubscribeUserDataStreamCommand(); err != nil {
 				log.WithError(err).Error("subscribe user data stream error")
 			}
@@ -282,7 +279,7 @@ func (s *Stream) handleExecutionReportEvent(e *ExecutionReportEvent) {
 	case "NEW", "CANCELED", "REJECTED", "EXPIRED", "REPLACED":
 		order, err := e.Order()
 		if err != nil {
-			log.WithError(err).Error("order convert error")
+			log.WithError(err).Errorf("order convert error: %+v", e)
 			return
 		}
 
@@ -291,7 +288,7 @@ func (s *Stream) handleExecutionReportEvent(e *ExecutionReportEvent) {
 	case "TRADE":
 		trade, err := e.Trade()
 		if err != nil {
-			log.WithError(err).Error("trade convert error")
+			log.WithError(err).Errorf("trade convert error: %+v", e)
 			return
 		}
 
@@ -299,7 +296,7 @@ func (s *Stream) handleExecutionReportEvent(e *ExecutionReportEvent) {
 
 		order, err := e.Order()
 		if err != nil {
-			log.WithError(err).Error("order convert error")
+			log.WithError(err).Errorf("order convert error: %+v", e)
 			return
 		}
 
@@ -351,6 +348,9 @@ func (s *Stream) handleOutboundAccountPositionEvent(e *OutboundAccountPositionEv
 func (s *Stream) handleOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
 	switch e.OrderTrade.CurrentExecutionType {
 
+	case "TRADE_PREVENTION", "REJECTED":
+		log.Warnf("ExecutionReport %s: %+v", e.OrderTrade.CurrentExecutionType, e)
+
 	case "NEW", "CANCELED", "EXPIRED":
 		order, err := e.OrderFutures()
 		if err != nil {
@@ -386,7 +386,7 @@ func (s *Stream) handleOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
 }
 
 func (s *Stream) getPublicEndpointUrl() string {
-	if s.IsFutures {
+	if s.exchange.IsFutures {
 		if testNet {
 			return TestNetFuturesBaseURL + "/ws"
 		}
@@ -415,7 +415,7 @@ func (s *Stream) getUserDataStreamEndpointUrl(listenKey string) string {
 // only the new spot trading websocket endpoint supports ed25519 authentication
 func (s *Stream) canUseWsApiEndpoint() bool {
 	// margin and futures don't support ed25519 authentication
-	if s.MarginSettings.IsMargin || s.FuturesSettings.IsFutures {
+	if s.exchange.MarginSettings.IsMargin || s.exchange.FuturesSettings.IsFutures {
 		return false
 	}
 
@@ -507,18 +507,18 @@ func (s *Stream) dispatchEvent(e interface{}) {
 }
 
 func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
-	if s.IsMargin {
-		if s.IsIsolatedMargin {
-			debug("isolated margin %s is enabled, requesting margin user stream listen key...", s.IsolatedMarginSymbol)
+	if s.exchange.IsMargin {
+		if s.exchange.IsIsolatedMargin {
+			debug("isolated margin %s is enabled, requesting margin user stream listen key...", s.exchange.IsolatedMarginSymbol)
 			req := s.client.NewStartIsolatedMarginUserStreamService()
-			req.Symbol(s.IsolatedMarginSymbol)
+			req.Symbol(s.exchange.IsolatedMarginSymbol)
 			return req.Do(ctx)
 		}
 
 		debug("margin mode is enabled, requesting margin user stream listen key...")
 		req := s.client.NewStartMarginUserStreamService()
 		return req.Do(ctx)
-	} else if s.IsFutures {
+	} else if s.exchange.IsFutures {
 		debug("futures mode is enabled, requesting futures user stream listen key...")
 		req := s.futuresClient.NewStartUserStreamService()
 		return req.Do(ctx)
@@ -530,15 +530,15 @@ func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 
 func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error {
 	debug("keepalive listen key: %s", util.MaskKey(listenKey))
-	if s.IsMargin {
-		if s.IsIsolatedMargin {
+	if s.exchange.IsMargin {
+		if s.exchange.IsIsolatedMargin {
 			req := s.client.NewKeepaliveIsolatedMarginUserStreamService().ListenKey(listenKey)
-			req.Symbol(s.IsolatedMarginSymbol)
+			req.Symbol(s.exchange.IsolatedMarginSymbol)
 			return req.Do(ctx)
 		}
 		req := s.client.NewKeepaliveMarginUserStreamService().ListenKey(listenKey)
 		return req.Do(ctx)
-	} else if s.IsFutures {
+	} else if s.exchange.IsFutures {
 		req := s.futuresClient.NewKeepaliveUserStreamService().ListenKey(listenKey)
 		return req.Do(ctx)
 	}
@@ -550,17 +550,17 @@ func (s *Stream) closeListenKey(ctx context.Context, listenKey string) (err erro
 	// should use background context to invalidate the user stream
 	debug("closing listen key: %s", util.MaskKey(listenKey))
 
-	if s.IsMargin {
-		if s.IsIsolatedMargin {
+	if s.exchange.IsMargin {
+		if s.exchange.IsIsolatedMargin {
 			req := s.client.NewCloseIsolatedMarginUserStreamService().ListenKey(listenKey)
-			req.Symbol(s.IsolatedMarginSymbol)
+			req.Symbol(s.exchange.IsolatedMarginSymbol)
 			err = req.Do(ctx)
 		} else {
 			req := s.client.NewCloseMarginUserStreamService().ListenKey(listenKey)
 			err = req.Do(ctx)
 		}
 
-	} else if s.IsFutures {
+	} else if s.exchange.IsFutures {
 		req := s.futuresClient.NewCloseUserStreamService().ListenKey(listenKey)
 		err = req.Do(ctx)
 	} else {
@@ -579,9 +579,9 @@ func (s *Stream) String() string {
 		ss += " (user data)"
 	}
 
-	if s.MarginSettings.IsMargin {
+	if s.exchange.MarginSettings.IsMargin {
 		ss += " (margin)"
-	} else if s.FuturesSettings.IsFutures {
+	} else if s.exchange.FuturesSettings.IsFutures {
 		ss += " (futures)"
 	}
 
@@ -638,9 +638,4 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 
 		}
 	}
-}
-
-func toJson(a any) string {
-	o, _ := json.MarshalIndent(a, "", " ")
-	return string(o)
 }

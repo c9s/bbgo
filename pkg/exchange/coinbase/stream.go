@@ -134,8 +134,9 @@ func (s *Stream) logSubscriptions(m *SubscriptionsMessage) {
 	if m == nil {
 		return
 	}
+
 	for _, channel := range m.Channels {
-		s.logger.Infof("Confirmed subscription to channel: %s (product ids: %s)", channel.Name, channel.ProductIDs)
+		s.logger.Infof("confirmed subscription: channel=%s productIds=%v", channel.Name, channel.ProductIDs)
 	}
 }
 
@@ -143,7 +144,8 @@ func (s *Stream) logErrorMessage(m *ErrorMessage) {
 	if m == nil {
 		return
 	}
-	s.logger.Errorf("Get error message: %s", m.Reason)
+
+	s.logger.Errorf("get error message: %s", m.Reason)
 }
 
 func (s *Stream) dispatchEvent(e interface{}) {

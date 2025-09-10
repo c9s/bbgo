@@ -202,11 +202,12 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	}
 
 	cmdutil.WaitForSignal(tradingCtx, syscall.SIGINT, syscall.SIGTERM)
-	cancelTrading()
 
 	gracefulShutdownPeriod := 30 * time.Second
 	shtCtx, cancelShutdown := context.WithTimeout(bbgo.NewTodoContextWithExistingIsolation(tradingCtx), gracefulShutdownPeriod)
 	bbgo.Shutdown(shtCtx)
+	cancelShutdown()
+	cancelTrading()
 
 	if environ.ProfilingService != nil {
 		if err = environ.ProfilingService.Stop(); err != nil {
@@ -217,8 +218,6 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	if err := trader.SaveState(shtCtx); err != nil {
 		log.WithError(err).Errorf("can not save strategy persistence states")
 	}
-
-	cancelShutdown()
 
 	for _, session := range environ.Sessions() {
 		if err := session.MarketDataStream.Close(); err != nil {

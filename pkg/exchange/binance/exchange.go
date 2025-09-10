@@ -38,6 +38,10 @@ const BinanceTestBaseURL = "https://testnet.binance.vision"
 const BinanceUSWebSocketURL = "wss://stream.binance.us:9443"
 
 const WebSocketURL = "wss://stream.binance.com:9443"
+
+// MarginWebSocketURL is Risk Data stream, which is defined in https://developers.binance.com/docs/margin_trading/risk-data-stream
+const MarginWebSocketURL = "wss://margin-stream.binance.com"
+
 const FuturesWebSocketURL = "wss://fstream.binance.com"
 const TestNetFuturesWebSocketURL = "wss://stream.binancefuture.com"
 

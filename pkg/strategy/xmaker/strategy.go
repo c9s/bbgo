@@ -92,6 +92,7 @@ type SignalMargin struct {
 type Strategy struct {
 	Environment *bbgo.Environment
 
+	// Symbol is the maker Symbol
 	Symbol string `json:"symbol"`
 
 	// SourceSymbol allows subscribing to a different symbol for price/book
@@ -240,7 +241,10 @@ type Strategy struct {
 	lastPrice fixedpoint.MutexValue
 	groupID   uint32
 
-	stopC chan struct{}
+	stopQuoteWorkerC chan struct{}
+	quoteWorkerDoneC chan struct{}
+
+	wg sync.WaitGroup
 
 	reportProfitStatsRateLimiter *rate.Limiter
 	circuitBreakerAlertLimiter   *rate.Limiter
@@ -337,6 +341,9 @@ func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Valu
 }
 
 func (s *Strategy) Initialize() error {
+	s.stopQuoteWorkerC = make(chan struct{})
+	s.quoteWorkerDoneC = make(chan struct{})
+
 	s.bidPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
 	s.askPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
 
@@ -1004,7 +1011,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				s.MinMarginLevel.String(),
 			)
 
-			s.tryToRepayDebts(ctx, s.sourceSession)
+			tryToRepayDebts(ctx, s.sourceSession)
 		} else {
 			s.logger.Infof(
 				"hedge account margin level %s is greater than the min margin level %s, calculating the net value",
@@ -1030,7 +1037,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		}
 
 		if disableMakerBid || disableMakerAsk {
-			s.tryToRepayDebts(ctx, s.sourceSession)
+			tryToRepayDebts(ctx, s.sourceSession)
 		}
 	} else {
 		if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
@@ -1826,6 +1833,9 @@ func (s *Strategy) directHedge(
 }
 
 func (s *Strategy) tradeRecover(ctx context.Context) {
+	s.wg.Add(1)
+	defer s.wg.Done()
+
 	tradeScanInterval := s.RecoverTradeScanPeriod.Duration()
 	if tradeScanInterval == 0 {
 		tradeScanInterval = 30 * time.Minute
@@ -2005,10 +2015,16 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) quoteWorker(ctx context.Context) {
+	s.wg.Add(1)
+	defer s.wg.Done()
+
+	defer close(s.quoteWorkerDoneC)
+
 	ticker := time.NewTicker(timejitter.Milliseconds(s.UpdateInterval.Duration(), 200))
 	defer ticker.Stop()
 
 	defer func() {
+		// use background context to ensure the cancellation
 		if err := s.activeMakerOrders.GracefulCancel(context.Background(), s.makerSession.Exchange); err != nil {
 			s.logger.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
 		}
@@ -2017,18 +2033,19 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 	for {
 		select {
 
-		case <-s.stopC:
-			s.logger.Warnf("%s maker goroutine stopped, due to the stop signal", s.Symbol)
+		case <-s.stopQuoteWorkerC:
+			s.logger.Warnf("%s quote worker is exiting due to the stop signal", s.Symbol)
 			return
 
 		case <-ctx.Done():
-			s.logger.Warnf("%s maker goroutine stopped, due to the cancelled context", s.Symbol)
+			s.logger.Warnf("%s quote worker is exiting due to the cancelled context", s.Symbol)
 			return
 
 		case <-ticker.C:
-
 			if err := s.updateQuote(ctx); err != nil {
-				s.logger.WithError(err).Errorf("unable to place maker orders")
+				if !errors.Is(err, context.Canceled) {
+					s.logger.WithError(err).Errorf("unable to place maker orders")
+				}
 			}
 
 		}
@@ -2036,6 +2053,9 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 }
 
 func (s *Strategy) accountUpdater(ctx context.Context) {
+	s.wg.Add(1)
+	defer s.wg.Done()
+
 	ticker := time.NewTicker(3 * time.Minute)
 	defer ticker.Stop()
 	for {
@@ -2060,6 +2080,9 @@ func (s *Strategy) accountUpdater(ctx context.Context) {
 }
 
 func (s *Strategy) houseCleanWorker(ctx context.Context) {
+	s.wg.Add(1)
+	defer s.wg.Done()
+
 	expiryDuration := 3 * time.Hour
 	ticker := time.NewTicker(15 * time.Minute)
 
@@ -2076,43 +2099,6 @@ func (s *Strategy) houseCleanWorker(ctx context.Context) {
 	}
 }
 
-var repayRateLimiter = rate.NewLimiter(rate.Every(30*time.Second), 1)
-
-func (s *Strategy) tryToRepayDebts(ctx context.Context, session *bbgo.ExchangeSession) {
-	if !repayRateLimiter.Allow() {
-		return
-	}
-
-	hedgeBalances := session.GetAccount().Balances()
-	debts := hedgeBalances.Debts()
-
-	s.logger.Infof("trying to repay debts %+v on hedge exchange %s", debts, session.Exchange.Name())
-
-	repayables := make(map[string]fixedpoint.Value)
-	for asset, bal := range debts {
-		if bal.Borrowed.IsZero() || bal.Available.IsZero() {
-			continue
-		}
-
-		repayables[asset] = bal.Available
-	}
-
-	marginService, ok := session.Exchange.(types.MarginBorrowRepayService)
-	if !ok {
-		return
-	}
-
-	for asset, amount := range repayables {
-		if err := marginService.RepayMarginAsset(ctx, asset, amount); err != nil {
-			s.logger.WithError(err).Errorf("unable to repay %s asset", asset)
-		}
-	}
-
-	if _, err := session.UpdateAccount(ctx); err != nil {
-		s.logger.WithError(err).Errorf("unable to update account after repay")
-	}
-}
-
 func (s *Strategy) getCoveredPosition() fixedpoint.Value {
 	coveredPosition := s.positionExposure.pending.Get()
 	coveredPositionMetrics.With(s.metricsLabels).Set(coveredPosition.Float64())
@@ -2124,6 +2110,9 @@ func (s *Strategy) getUncoveredPosition() fixedpoint.Value {
 }
 
 func (s *Strategy) hedgeWorker(ctx context.Context) {
+	s.wg.Add(1)
+	defer s.wg.Done()
+
 	ticker := time.NewTicker(timejitter.Milliseconds(s.HedgeInterval.Duration(), 200))
 	defer ticker.Stop()
 
@@ -2613,8 +2602,6 @@ func (s *Strategy) CrossRun(
 		s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
 	}
 
-	s.stopC = make(chan struct{})
-
 	s.sourceUserDataConnectivity = s.sourceSession.UserDataConnectivity
 	s.sourceMarketDataConnectivity = s.sourceSession.MarketDataConnectivity
 
@@ -2647,10 +2634,10 @@ func (s *Strategy) CrossRun(
 
 		s.logger.Infof("all user data streams are connected, starting workers...")
 
-		go s.accountUpdater(ctx)
-		go s.hedgeWorker(ctx)
+		go s.accountUpdater(s.tradingCtx)
+		go s.hedgeWorker(s.tradingCtx)
 		go s.quoteWorker(s.tradingCtx)
-		go s.houseCleanWorker(ctx)
+		go s.houseCleanWorker(s.tradingCtx)
 
 		if s.RecoverTrade {
 			go s.tradeRecover(ctx)
@@ -2664,16 +2651,18 @@ func (s *Strategy) CrossRun(
 
 	bbgo.OnShutdown(
 		ctx, func(ctx context.Context, wg *sync.WaitGroup) {
-			s.cancelTrading()
-
 			// the ctx here is the shutdown context (not the strategy context)
+			bbgo.Notify("Shutting down %s %s", ID, s.Symbol, s.Position)
 
 			// defer work group done to mark the strategy as stopped
 			defer wg.Done()
 
 			// send stop signal to the quoteWorker
-			// TODO: change this stopC to wait for the quoteWorker to stop
-			close(s.stopC)
+			close(s.stopQuoteWorkerC)
+
+			<-s.quoteWorkerDoneC
+
+			s.cancelTrading()
 
 			if s.SplitHedge != nil && s.SplitHedge.Enabled {
 				if err := s.SplitHedge.Stop(ctx); err != nil {
@@ -2685,15 +2674,15 @@ func (s *Strategy) CrossRun(
 				}
 			}
 
-			// wait for the quoter to stop
-			time.Sleep(s.UpdateInterval.Duration())
+			s.logger.Infof("waiting for workers to stop...")
+			s.wg.Wait()
 
-			if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
+			// make sure all orders are cancelled
+			if err := tradingutil.UniversalCancelAllOrders(ctx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
 				s.logger.WithError(err).Errorf("graceful cancel error")
 			}
 
 			bbgo.Sync(ctx, s)
-			bbgo.Notify("Shutting down %s %s", ID, s.Symbol, s.Position)
 		},
 	)
 

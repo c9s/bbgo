@@ -84,13 +84,19 @@ func (m *MarketOrderHedgeExecutor) hedge(
 		return nil
 	}
 
+	marginSideEffect := types.SideEffectTypeMarginBuy
+	account := m.session.GetAccount()
+	if !account.MarginLevel.IsZero() && !m.MinMarginLevel.IsZero() && account.MarginLevel.Compare(m.MinMarginLevel) < 0 {
+		marginSideEffect = types.SideEffectTypeAutoRepay
+	}
+
 	orderForm := types.SubmitOrder{
 		Market:           m.market,
 		Symbol:           m.market.Symbol,
 		Side:             side,
 		Type:             types.OrderTypeMarket,
 		Quantity:         quantity,
-		MarginSideEffect: types.SideEffectTypeMarginBuy,
+		MarginSideEffect: marginSideEffect,
 	}
 
 	m.logger.Infof("MarketOrderHedgeExecutor: submitting hedge order: %+v", orderForm)
