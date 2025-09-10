@@ -92,6 +92,7 @@ type SignalMargin struct {
 type Strategy struct {
 	Environment *bbgo.Environment
 
+	// Symbol is the maker Symbol
 	Symbol string `json:"symbol"`
 
 	// SourceSymbol allows subscribing to a different symbol for price/book
