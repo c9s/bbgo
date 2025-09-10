@@ -279,7 +279,7 @@ func (s *Stream) handleExecutionReportEvent(e *ExecutionReportEvent) {
 	case "NEW", "CANCELED", "REJECTED", "EXPIRED", "REPLACED":
 		order, err := e.Order()
 		if err != nil {
-			log.WithError(err).Error("order convert error")
+			log.WithError(err).Errorf("order convert error: %+v", e)
 			return
 		}
 
@@ -288,7 +288,7 @@ func (s *Stream) handleExecutionReportEvent(e *ExecutionReportEvent) {
 	case "TRADE":
 		trade, err := e.Trade()
 		if err != nil {
-			log.WithError(err).Error("trade convert error")
+			log.WithError(err).Errorf("trade convert error: %+v", e)
 			return
 		}
 
@@ -296,7 +296,7 @@ func (s *Stream) handleExecutionReportEvent(e *ExecutionReportEvent) {
 
 		order, err := e.Order()
 		if err != nil {
-			log.WithError(err).Error("order convert error")
+			log.WithError(err).Errorf("order convert error: %+v", e)
 			return
 		}
 
@@ -347,6 +347,9 @@ func (s *Stream) handleOutboundAccountPositionEvent(e *OutboundAccountPositionEv
 
 func (s *Stream) handleOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
 	switch e.OrderTrade.CurrentExecutionType {
+
+	case "TRADE_PREVENTION", "REJECTED":
+		log.Warnf("ExecutionReport %s: %+v", e.OrderTrade.CurrentExecutionType, e)
 
 	case "NEW", "CANCELED", "EXPIRED":
 		order, err := e.OrderFutures()

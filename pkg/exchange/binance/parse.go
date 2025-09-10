@@ -32,11 +32,19 @@ const (
 	EventTypeAggTrade                EventType = "aggTrade"
 	EventTypeForceOrder              EventType = "forceOrder"
 
+	// EventTypeListStatus is for OCO order update
+	// see https://developers.binance.com/docs/margin_trading/trade-data-stream/Event-Order-Update
+	EventTypeListStatus EventType = "listStatus"
+
 	// Our side defines the following event types since binance doesn't
 	// define the event name from the server messages.
 	//
 	EventTypeBookTicker   EventType = "bookTicker"
 	EventTypePartialDepth EventType = "partialDepth"
+
+	// @group RiskDataStream
+	EventTypeMarginLevelStatusChange EventType = "MARGIN_LEVEL_STATUS_CHANGE"
+	EventTypeUserLiabilityChange     EventType = "USER_LIABILITY_CHANGE"
 )
 
 type EventBase struct {
@@ -91,8 +99,8 @@ type ExecutionReportEvent struct {
 	ClientOrderID         string `json:"c"`
 	OriginalClientOrderID string `json:"C"`
 
-	OrderType         string `json:"o"`
-	OrderCreationTime int64  `json:"O"`
+	OrderType         string                     `json:"o"`
+	OrderCreationTime types.MillisecondTimestamp `json:"O"`
 
 	TimeInForce     string           `json:"f"`
 	IcebergQuantity fixedpoint.Value `json:"F"`
@@ -119,8 +127,8 @@ type ExecutionReportEvent struct {
 	OrderID int64 `json:"i"`
 	Ignored int64 `json:"I"`
 
-	TradeID         int64 `json:"t"`
-	TransactionTime int64 `json:"T"`
+	TradeID         int64                      `json:"t"`
+	TransactionTime types.MillisecondTimestamp `json:"T"`
 
 	LastExecutedQuantity fixedpoint.Value `json:"l"`
 	LastExecutedPrice    fixedpoint.Value `json:"L"`
@@ -129,6 +137,8 @@ type ExecutionReportEvent struct {
 	CumulativeQuoteAssetTransactedQuantity fixedpoint.Value `json:"Z"`
 
 	LastQuoteAssetTransactedQuantity fixedpoint.Value `json:"Y"`
+
+	SelfTradePreventionMode *string `json:"V"`
 }
 
 func (e *ExecutionReportEvent) Order() (*types.Order, error) {
@@ -140,7 +150,7 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 		return nil, errors.New("execution report type is not for order")
 	}
 
-	orderCreationTime := time.Unix(0, e.OrderCreationTime*int64(time.Millisecond))
+	orderCreationTime := e.OrderCreationTime.Time()
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: e.ClientOrderID,
@@ -169,7 +179,7 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 		return nil, errors.New("execution report is not a trade")
 	}
 
-	tt := time.Unix(0, e.TransactionTime*int64(time.Millisecond))
+	tt := e.TransactionTime.Time()
 	return &types.Trade{
 		ID:            uint64(e.TradeID),
 		Exchange:      types.ExchangeBinance,
@@ -393,6 +403,9 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 
 	case EventTypeDepthUpdate:
 		return parseDepthEvent(val)
+
+	case EventTypeListStatus:
+		// TODO: handle OCO update
 
 	case EventTypeTrade:
 		var event MarketTradeEvent
