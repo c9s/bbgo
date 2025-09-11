@@ -1951,10 +1951,6 @@ func (s *Strategy) Defaults() error {
 		s.CircuitBreaker.SetMetricsInfo(ID, s.InstanceID(), s.Symbol)
 	}
 
-	if s.SignalSource == "" {
-		s.SignalSource = s.SourceExchange
-	}
-
 	if s.EnableSignalMargin {
 		if s.SignalReverseSideMargin.Scale == nil {
 			s.SignalReverseSideMargin.Scale = &bbgo.SlideRule{
@@ -2015,6 +2011,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.MakerSession == "" {
 		s.MakerSession = s.MakerExchange
+	}
+
+	if s.SignalSource == "" {
+		s.SignalSource = s.HedgeSession
 	}
 
 	return nil
