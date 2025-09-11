@@ -102,8 +102,9 @@ func (c *ConverterManager) ConvertTrade(trade types.Trade) types.Trade {
 
 //go:generate callbackgen -type TradeCollector
 type TradeCollector struct {
-	orderSig sigchan.Chan
+	symbol string
 
+	orderSig   sigchan.Chan
 	tradeStore *TradeStore
 	tradeC     chan types.Trade
 	position   *types.Position
@@ -129,6 +130,7 @@ func NewTradeCollector(symbol string, position *types.Position, orderStore *Orde
 	tradeStore.pruneEnabled = true
 
 	return &TradeCollector{
+		symbol:   symbol,
 		orderSig: sigchan.New(1),
 
 		tradeC:      make(chan types.Trade, 100),
@@ -176,6 +178,7 @@ func (c *TradeCollector) BindStream(stream types.Stream) {
 	}
 
 	stream.OnTradeUpdate(func(trade types.Trade) {
+
 		c.ProcessTrade(trade)
 	})
 
@@ -337,6 +340,10 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 // return true when the given trade is added
 // return false when the given trade is not added
 func (c *TradeCollector) ProcessTrade(trade types.Trade) bool {
+	if c.symbol != "" && trade.Symbol != c.symbol {
+		return false
+	}
+
 	return c.processTrade(c.ConvertTrade(trade))
 }
 
@@ -356,7 +363,7 @@ func (c *TradeCollector) Run(ctx context.Context) {
 			c.Process()
 
 		case trade := <-c.tradeC:
-			c.processTrade(c.ConvertTrade(trade))
+			c.ProcessTrade(trade)
 
 		}
 	}
