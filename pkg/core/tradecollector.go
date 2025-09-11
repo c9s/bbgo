@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
@@ -193,10 +194,13 @@ func (c *TradeCollector) Recover(
 	ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, from time.Time,
 ) error {
 	logrus.Debugf("recovering %s trades...", symbol)
-
-	trades, err := ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
-		StartTime: &from,
-	})
+	trades, err := retry.QueryTradesUntilSuccessfulLite(
+		ctx,
+		ex,
+		symbol,
+		&types.TradeQueryOptions{
+			StartTime: &from,
+		})
 
 	if err != nil {
 		return err

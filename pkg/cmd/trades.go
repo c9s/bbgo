@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"syscall"
 	"time"
@@ -70,6 +71,12 @@ var tradesCmd = &cobra.Command{
 			Limit:       limit,
 			LastTradeID: 0,
 		})
+
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Warnf("context deadline exceeded when querying trades from %s: %s", session.Exchange.Name(), symbol)
+			return nil
+		}
+
 		if err != nil {
 			return err
 		}
