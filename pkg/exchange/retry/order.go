@@ -116,24 +116,42 @@ func QueryOpenOrdersUntilSuccessfulLite(
 func QueryClosedOrdersUntilSuccessful(
 	ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, since, until time.Time, lastOrderID uint64,
 ) (closedOrders []types.Order, err error) {
+	errMsg := ""
 	var op = func() (err2 error) {
 		closedOrders, err2 = ex.QueryClosedOrders(ctx, symbol, since, until, lastOrderID)
+		// return nil to stop retry if context deadline exceeded
+		if errors.Is(err2, context.DeadlineExceeded) {
+			errMsg = fmt.Sprintf("context deadline exceeded when querying closed orders: %s", symbol)
+			return nil
+		}
 		return err2
 	}
 
 	err = GeneralBackoff(ctx, op)
+	if errMsg != "" {
+		err = errors.New(errMsg)
+	}
 	return closedOrders, err
 }
 
 func QueryClosedOrdersUntilSuccessfulLite(
 	ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, since, until time.Time, lastOrderID uint64,
 ) (closedOrders []types.Order, err error) {
+	errMsg := ""
 	var op = func() (err2 error) {
 		closedOrders, err2 = ex.QueryClosedOrders(ctx, symbol, since, until, lastOrderID)
+		// return nil to stop retry if context deadline exceeded
+		if errors.Is(err2, context.DeadlineExceeded) {
+			errMsg = fmt.Sprintf("context deadline exceeded when querying closed orders: %s", symbol)
+			return nil
+		}
 		return err2
 	}
 
 	err = GeneralLiteBackoff(ctx, op)
+	if errMsg != "" {
+		err = errors.New(errMsg)
+	}
 	return closedOrders, err
 }
 
