@@ -263,8 +263,6 @@ type Strategy struct {
 	positionStartedAt      *time.Time
 	positionStartedAtMutex sync.Mutex
 
-	sourceOrderExecutor *bbgo.GeneralOrderExecutor
-
 	debtQuotaCache *fixedpoint.ExpirableValue
 
 	// metricsCache
@@ -275,6 +273,8 @@ type Strategy struct {
 	makerOrderPlacementDurationMetrics prometheus.Observer
 	openOrderBidExposureInUsdMetrics   prometheus.Gauge
 	openOrderAskExposureInUsdMetrics   prometheus.Gauge
+
+	simpleHedgeMode bool
 }
 
 func (s *Strategy) ID() string {
@@ -1857,16 +1857,22 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 			if s.RecoverTrade {
 				startTime := time.Now().Add(-tradeScanInterval).Add(-tradeScanOverlapBufferPeriod)
 
-				if err := s.tradeCollector.Recover(
-					ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.SourceSymbol, startTime,
-				); err != nil {
-					s.logger.WithError(err).Errorf("query trades error")
+				// if source symbol is set, and no split hedge or synthetic hedge is configured,
+				// recover trades only when in simple hedge mode
+				if s.simpleHedgeMode {
+					if err := s.tradeCollector.Recover(
+						ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.SourceSymbol, startTime,
+					); err != nil {
+						s.logger.WithError(err).Errorf("query trades error")
+					}
 				}
 
-				if err := s.tradeCollector.Recover(
-					ctx, s.makerSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime,
-				); err != nil {
-					s.logger.WithError(err).Errorf("query trades error")
+				if s.Symbol != "" {
+					if err := s.tradeCollector.Recover(
+						ctx, s.makerSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime,
+					); err != nil {
+						s.logger.WithError(err).Errorf("query trades error")
+					}
 				}
 			}
 		}
@@ -2172,6 +2178,10 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 	}
 }
 
+func (s *Strategy) isSimpleHedgeMode() bool {
+	return s.SourceSymbol != "" && s.SplitHedge == nil && s.SyntheticHedge == nil
+}
+
 func (s *Strategy) CrossRun(
 	ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
 ) error {
@@ -2211,6 +2221,8 @@ func (s *Strategy) CrossRun(
 	if !ok {
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
+
+	s.simpleHedgeMode = s.isSimpleHedgeMode()
 
 	if s.UseSandbox {
 		balances := types.BalanceMap{
@@ -2339,10 +2351,6 @@ func (s *Strategy) CrossRun(
 			},
 		),
 	)
-
-	// for direct hedge, we can share the position with different order executor
-	s.sourceOrderExecutor = bbgo.NewGeneralOrderExecutor(s.sourceSession, s.SourceSymbol, ID, instanceID, s.Position)
-	s.sourceOrderExecutor.Bind()
 
 	if s.ProfitFixerConfig != nil {
 		bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)
@@ -2512,7 +2520,7 @@ func (s *Strategy) CrossRun(
 			delta := trade.PositionDelta()
 
 			// for direct hedge: trades from source session are always hedge trades
-			if trade.Exchange == s.sourceSession.ExchangeName {
+			if s.simpleHedgeMode && trade.Exchange == s.sourceSession.ExchangeName {
 				s.positionExposure.Close(delta)
 			} else if trade.Exchange == s.makerSession.ExchangeName {
 				// spread maker: trades from maker session can be hedge trades only when spread maker is enabled and it's a spread maker order
@@ -2534,6 +2542,7 @@ func (s *Strategy) CrossRun(
 			s.Environment.RecordPosition(s.Position, trade, nil)
 		}
 	})
+
 	s.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
 		if profit == nil {
 			return

@@ -53,9 +53,15 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 		return fmt.Errorf("source and fiat must be set")
 	}
 
-	s.logger = log.WithFields(logrus.Fields{
-		"component": "synthetic_hedge",
-	})
+	if strategy != nil && strategy.logger != nil {
+		s.logger = strategy.logger.WithFields(logrus.Fields{
+			"feature": "synthetic_hedge",
+		})
+	} else {
+		s.logger = log.WithFields(logrus.Fields{
+			"feature": "synthetic_hedge",
+		})
+	}
 
 	var err error
 
@@ -64,10 +70,14 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 		return err
 	}
 
+	s.sourceMarket.SetLogger(s.logger)
+
 	s.fiatMarket, err = initializeHedgeMarketFromConfig(s.Fiat, sessions)
 	if err != nil {
 		return err
 	}
+
+	s.fiatMarket.SetLogger(s.logger)
 
 	// update strategy instance ID for the source and fiat markets
 	s.sourceMarket.Position.StrategyInstanceID = strategy.InstanceID()
