@@ -179,11 +179,13 @@ func newHedgeMarket(
 	activeMakerOrders := bbgo.NewActiveOrderBook(symbol)
 	activeMakerOrders.BindStream(session.UserDataStream)
 
-	logger := log.WithFields(logrus.Fields{
+	// default logger
+	logFields := logrus.Fields{
 		"session":      session.Name,
 		"exchange":     session.ExchangeName,
 		"hedge_market": market.Symbol,
-	})
+	}
+	logger := log.WithFields(logFields)
 
 	m := &HedgeMarket{
 		HedgeMarketConfig: config,
@@ -249,6 +251,14 @@ func newHedgeMarket(
 	})
 
 	return m
+}
+
+func (m *HedgeMarket) SetLogger(logger logrus.FieldLogger) {
+	m.logger = logger.WithFields(logrus.Fields{
+		"session":      m.session.Name,
+		"exchange":     m.session.ExchangeName,
+		"hedge_market": m.market.Symbol,
+	})
 }
 
 func (m *HedgeMarket) newMockTrade(
