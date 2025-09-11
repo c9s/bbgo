@@ -598,9 +598,8 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 
 	// if we exit, we should invalidate the existing listen key
 	defer func() {
-		log.Debugf("keepalive worker stopped")
 		if err := s.closeListenKey(context.Background(), listenKey); err != nil {
-			log.WithError(err).Errorf("close listen key error: %v key: %s", err, util.MaskKey(listenKey))
+			log.WithError(err).Warnf("close listen key error: %v key: %s", err, util.MaskKey(listenKey))
 		}
 	}()
 
