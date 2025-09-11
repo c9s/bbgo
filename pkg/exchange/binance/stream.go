@@ -5,11 +5,13 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/depth"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/util"
 
 	"github.com/adshao/go-binance/v2"
@@ -41,6 +43,12 @@ type LogonParams struct {
 	APIKey    string `json:"apiKey"`
 	Signature string `json:"signature"`
 	Timestamp int64  `json:"timestamp"`
+}
+
+type RiskBalance struct {
+	Currency string
+	Borrowed fixedpoint.Value
+	Interest fixedpoint.Value
 }
 
 //go:generate callbackgen -type Stream -interface
@@ -85,6 +93,9 @@ type Stream struct {
 
 	// depthBuffers is used for storing the depth info
 	depthBuffers map[string]*depth.Buffer
+
+	riskBalances map[string]*RiskBalance
+	mu           sync.RWMutex
 }
 
 func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Client) *Stream {
@@ -96,6 +107,8 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 
 		exchange:     ex,
 		depthBuffers: make(map[string]*depth.Buffer),
+
+		riskBalances: make(map[string]*RiskBalance),
 	}
 
 	stream.SetParser(parseWebSocketEvent)
@@ -164,6 +177,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 
 	stream.OnDisconnect(stream.handleDisconnect)
 	stream.OnConnect(stream.handleConnect)
+	stream.SetBeforeConnect(stream.handleBeforeConnect)
 	stream.OnListenKeyExpired(func(e *ListenKeyExpired) {
 		log.Warnf("listen key expired, triggering reconnect: %+v", e)
 		stream.Reconnect()
@@ -176,6 +190,41 @@ func (s *Stream) handleDisconnect() {
 	for _, f := range s.depthBuffers {
 		f.Reset()
 	}
+}
+
+func (s *Stream) updateRiskBalance(ctx context.Context) error {
+	if !s.exchange.IsMargin {
+		return nil
+	}
+
+	account, err := s.exchange.QueryCrossMarginAccount(ctx)
+	if err != nil {
+		return err
+	}
+
+	marginBalances := account.Balances()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, b := range marginBalances {
+		s.riskBalances[b.Currency] = &RiskBalance{
+			Currency: b.Currency,
+			Borrowed: b.Borrowed,
+			Interest: b.Interest,
+		}
+	}
+
+	return nil
+}
+
+func (s *Stream) handleBeforeConnect(ctx context.Context) error {
+	if s.exchange.IsMargin {
+		if err := s.updateRiskBalance(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *Stream) handleConnect() {
@@ -333,14 +382,30 @@ func (s *Stream) handleKLineEvent(e *KLineEvent) {
 	}
 }
 
+func (s *Stream) addRiskBalance(balance types.Balance) types.Balance {
+	s.mu.RLock()
+	rb, hasRb := s.riskBalances[balance.Currency]
+	s.mu.RUnlock()
+
+	if hasRb {
+		return balance
+	}
+
+	balance.Borrowed = rb.Borrowed
+	balance.Interest = rb.Interest
+	return balance
+}
+
 func (s *Stream) handleOutboundAccountPositionEvent(e *OutboundAccountPositionEvent) {
-	snapshot := types.BalanceMap{}
+	snapshot := make(types.BalanceMap, len(e.Balances))
 	for _, balance := range e.Balances {
-		snapshot[balance.Asset] = types.Balance{
+		snapshot[balance.Asset] = s.addRiskBalance(types.Balance{
 			Currency:  balance.Asset,
 			Available: balance.Free,
 			Locked:    balance.Locked,
-		}
+			Borrowed:  fixedpoint.Zero,
+			Interest:  fixedpoint.Zero,
+		})
 	}
 	s.EmitBalanceSnapshot(snapshot)
 }
