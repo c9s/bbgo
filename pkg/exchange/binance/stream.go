@@ -94,8 +94,9 @@ type Stream struct {
 	// depthBuffers is used for storing the depth info
 	depthBuffers map[string]*depth.Buffer
 
-	riskBalances map[string]*RiskBalance
-	mu           sync.RWMutex
+	riskBalances          map[string]*RiskBalance
+	riskBalancesUpdatedAt time.Time
+	mu                    sync.RWMutex
 }
 
 func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Client) *Stream {
@@ -213,6 +214,7 @@ func (s *Stream) updateRiskBalance(ctx context.Context) error {
 			Interest: b.Interest,
 		}
 	}
+	s.riskBalancesUpdatedAt = time.Now()
 
 	return nil
 }
@@ -397,6 +399,12 @@ func (s *Stream) addRiskBalance(balance types.Balance) types.Balance {
 }
 
 func (s *Stream) handleOutboundAccountPositionEvent(e *OutboundAccountPositionEvent) {
+	if time.Since(s.riskBalancesUpdatedAt) > 1*time.Minute {
+		if err := s.updateRiskBalance(context.Background()); err != nil {
+			log.WithError(err).Error("update risk balance error")
+		}
+	}
+
 	snapshot := make(types.BalanceMap, len(e.Balances))
 	for _, balance := range e.Balances {
 		snapshot[balance.Asset] = s.addRiskBalance(types.Balance{
