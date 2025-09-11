@@ -93,16 +93,19 @@ type Strategy struct {
 	Environment *bbgo.Environment
 
 	// Symbol is the maker Symbol
-	Symbol string `json:"symbol"`
+	Symbol      string `json:"symbol"`
+	MakerSymbol string `json:"makerSymbol"`
+
+	// MakerExchange session name
+	MakerExchange string `json:"makerExchange"`
+	MakerSession  string `json:"makerSession"`
 
 	// SourceSymbol allows subscribing to a different symbol for price/book
 	SourceSymbol string `json:"sourceSymbol,omitempty"`
 
 	// SourceExchange session name
 	SourceExchange string `json:"sourceExchange"`
-
-	// MakerExchange session name
-	MakerExchange string `json:"makerExchange"`
+	HedgeSession   string `json:"hedgeSession"`
 
 	UpdateInterval      types.Duration `json:"updateInterval"`
 	HedgeInterval       types.Duration `json:"hedgeInterval"`
@@ -1867,6 +1870,7 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 					}
 				}
 
+				// always recover trades for the maker session if symbol is set
 				if s.Symbol != "" {
 					if err := s.tradeCollector.Recover(
 						ctx, s.makerSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime,
@@ -1999,6 +2003,18 @@ func (s *Strategy) Defaults() error {
 	// Set SourceSymbol to Symbol if not set
 	if s.SourceSymbol == "" {
 		s.SourceSymbol = s.Symbol
+	}
+
+	if s.MakerSymbol == "" {
+		s.MakerSymbol = s.Symbol
+	}
+
+	if s.HedgeSession == "" {
+		s.HedgeSession = s.SourceExchange
+	}
+
+	if s.MakerSession == "" {
+		s.MakerSession = s.MakerExchange
 	}
 
 	return nil
