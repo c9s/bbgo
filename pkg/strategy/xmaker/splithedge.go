@@ -138,10 +138,21 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 		return nil
 	}
 
+	h.strategy = strategy
+	h.logger = strategy.logger.WithField("feature", "split_hedge")
+
 	for name, config := range h.HedgeMarkets {
 		hedgeMarket, err := initializeHedgeMarketFromConfig(config, sessions)
 		if err != nil {
 			return err
+		}
+
+		hedgeMarket.SetLogger(h.logger)
+
+		// ensure the hedge market base currency matches the maker market base currency
+		if h.strategy.makerMarket.BaseCurrency != hedgeMarket.market.BaseCurrency {
+			return fmt.Errorf("splithedge: hedge market %q base currency %s does not match maker market base currency %s",
+				name, hedgeMarket.market.BaseCurrency, h.strategy.makerMarket.BaseCurrency)
 		}
 
 		h.hedgeMarketInstances[name] = hedgeMarket
@@ -165,8 +176,6 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 
 	}
 
-	h.strategy = strategy
-	h.logger = strategy.logger.WithField("component", "split_hedge")
 	return nil
 }
 
@@ -175,7 +184,7 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 	uncoveredPosition fixedpoint.Value,
 ) error {
 	if h.ProportionAlgo == nil || len(h.ProportionAlgo.ProportionMarkets) == 0 {
-		return fmt.Errorf("SplitHedge: proportion algo requires proportion markets")
+		return fmt.Errorf("splitHedge: proportion algo requires proportion markets")
 	}
 
 	delta := uncoveredToDelta(uncoveredPosition)
@@ -185,20 +194,20 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 	for _, proportionMarket := range h.ProportionAlgo.ProportionMarkets {
 		hedgeMarket, ok := h.hedgeMarketInstances[proportionMarket.Name]
 		if !ok {
-			h.logger.Warnf("SplitHedge: hedge market %s not found", proportionMarket.Name)
+			h.logger.Warnf("splitHedge: hedge market %s not found", proportionMarket.Name)
 			continue
 		}
 
 		canHedge, maxQuantity, err := hedgeMarket.canHedge(ctx, uncoveredPosition)
 		if err != nil {
-			h.logger.WithError(err).Errorf("SplitHedge: hedge market checking canHedge failed")
+			h.logger.WithError(err).Errorf("splitHedge: hedge market checking canHedge failed")
 			continue
 		} else if !canHedge {
-			h.logger.Infof("SplitHedge: hedge market %s cannot hedge now", proportionMarket.Name)
+			h.logger.Infof("splitHedge: hedge market %s cannot hedge now", proportionMarket.Name)
 			continue
 		}
 
-		h.logger.Infof("SplitHedge: hedge market %s can hedge max quantity %s", proportionMarket.Name, maxQuantity.String())
+		h.logger.Infof("splitHedge: hedge market %s can hedge max quantity %s", proportionMarket.Name, maxQuantity.String())
 
 		bid, ask := hedgeMarket.getQuotePrice()
 		price := sideTakerPrice(bid, ask, side)
@@ -207,12 +216,12 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 
 		proportionQuantity = hedgeMarket.market.TruncateQuantity(proportionQuantity)
 		if proportionQuantity.IsZero() {
-			h.logger.Infof("SplitHedge: skip zero quantity")
+			h.logger.Infof("splitHedge: skip zero quantity")
 			continue
 		}
 
 		if hedgeMarket.market.IsDustQuantity(proportionQuantity, price) {
-			h.logger.Infof("SplitHedge: skip dust quantity: %s @ price %f", proportionQuantity.String(), price.Float64())
+			h.logger.Infof("splitHedge: skip dust quantity: %s @ price %f", proportionQuantity.String(), price.Float64())
 			continue
 		}
 
@@ -235,7 +244,7 @@ func (h *SplitHedge) Hedge(
 		return nil
 	}
 
-	h.logger.Infof("[splitHedge] split hedging with delta: %f", uncoveredPosition.Float64())
+	h.logger.Infof("splitHedge: split hedging with delta: %f", uncoveredPosition.Float64())
 
 	switch h.Algo {
 	case SplitHedgeAlgoProportion:
@@ -253,7 +262,7 @@ func (h *SplitHedge) Start(ctx context.Context) error {
 
 	for name, hedgeMarket := range h.hedgeMarketInstances {
 		if err := hedgeMarket.Start(ctx); err != nil {
-			h.logger.WithError(err).Errorf("[splitHedge] failed to start hedge market %s", name)
+			h.logger.WithError(err).Errorf("splitHedge: failed to start hedge market %s", name)
 			return err
 		}
 	}
@@ -262,12 +271,12 @@ func (h *SplitHedge) Start(ctx context.Context) error {
 		hedgeMarket.WaitForReady(ctx)
 	}
 
-	h.logger.Infof("[splitHedge] source market and fiat market are ready")
+	h.logger.Infof("splitHedge: source market and fiat market are ready")
 	return nil
 }
 
 func (h *SplitHedge) Stop(shutdownCtx context.Context) error {
-	h.logger.Infof("[splitHedge] stopping synthetic hedge workers")
+	h.logger.Infof("splitHedge: stopping synthetic hedge workers")
 	for _, hedgeMarket := range h.hedgeMarketInstances {
 		hedgeMarket.Stop(shutdownCtx)
 	}
