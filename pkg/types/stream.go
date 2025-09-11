@@ -110,6 +110,8 @@ type StandardStream struct {
 	// When changing these field values, be sure to call subLock
 	subLock sync.Mutex
 
+	// startCallbacks are called when the stream is started
+	// only called once
 	startCallbacks []func()
 
 	connectCallbacks []func()

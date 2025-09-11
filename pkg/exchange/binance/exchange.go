@@ -774,7 +774,6 @@ func (e *Exchange) QueryDepositHistory(
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-
 	account, err := e.QueryAccount(ctx)
 	if err != nil {
 		return nil, err
