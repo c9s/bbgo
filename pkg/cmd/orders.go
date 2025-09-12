@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -123,8 +124,14 @@ var listOrdersCmd = &cobra.Command{
 				log.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing closed orders (listOrdersCmd)", session.Exchange.Name())
 				return nil
 			}
-
-			os, err = tradeHistoryService.QueryClosedOrders(ctx, symbol, time.Now().Add(-3*24*time.Hour), time.Now(), 0)
+			os, err = retry.QueryClosedOrdersUntilSuccessfulLite(
+				ctx,
+				tradeHistoryService,
+				symbol,
+				time.Now().Add(-3*24*time.Hour),
+				time.Now(),
+				0,
+			)
 			if err != nil {
 				return err
 			}

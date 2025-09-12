@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -30,12 +31,16 @@ func (e TradeBatchQuery) Query(
 	query := &AsyncTimeRangedBatchQuery{
 		Type: types.Trade{},
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
-			return e.ExchangeTradeHistoryService.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
-				StartTime:   &startTime,
-				EndTime:     &endTime,
-				Limit:       options.Limit,
-				LastTradeID: options.LastTradeID,
-			})
+			return retry.QueryTradesUntilSuccessfulLite(
+				ctx,
+				e.ExchangeTradeHistoryService,
+				symbol,
+				&types.TradeQueryOptions{
+					StartTime:   &startTime,
+					EndTime:     &endTime,
+					Limit:       options.Limit,
+					LastTradeID: options.LastTradeID,
+				})
 		},
 		T: func(obj interface{}) time.Time {
 			return time.Time(obj.(types.Trade).Time)

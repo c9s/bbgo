@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -16,8 +17,14 @@ func (q *ClosedOrderBatchQuery) Query(ctx context.Context, symbol string, startT
 	query := &AsyncTimeRangedBatchQuery{
 		Type: types.Order{},
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
-			orders, err := q.ExchangeTradeHistoryService.QueryClosedOrders(ctx, symbol, startTime, endTime, lastOrderID)
-			return orders, err
+			return retry.QueryClosedOrdersUntilSuccessfulLite(
+				ctx,
+				q.ExchangeTradeHistoryService,
+				symbol,
+				startTime,
+				endTime,
+				lastOrderID,
+			)
 		},
 		T: func(obj interface{}) time.Time {
 			return time.Time(obj.(types.Order).CreationTime)

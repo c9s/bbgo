@@ -11,6 +11,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -65,11 +66,17 @@ var tradesCmd = &cobra.Command{
 			return nil
 		}
 
-		trades, err := tradeHistoryService.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
-			StartTime:   &since,
-			Limit:       limit,
-			LastTradeID: 0,
-		})
+		trades, err := retry.QueryTradesUntilSuccessfulLite(
+			ctx,
+			tradeHistoryService,
+			symbol,
+			&types.TradeQueryOptions{
+				StartTime:   &since,
+				Limit:       limit,
+				LastTradeID: 0,
+			},
+		)
+
 		if err != nil {
 			return err
 		}
