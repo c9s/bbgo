@@ -551,26 +551,26 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 		if environ.loggingConfig.Trade {
 			session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-				logger.Info(trade.String())
+				logger.WithFields(trade.LogFields()).Info(trade.String())
 			})
 		}
 
 		if environ.loggingConfig.FilledOrderOnly {
 			session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 				if order.Status == types.OrderStatusFilled {
-					logger.Info(order.String())
+					logger.WithFields(order.LogFields()).Info(order.String())
 				}
 			})
 		} else if environ.loggingConfig.Order {
 			session.UserDataStream.OnOrderUpdate(func(order types.Order) {
-				logger.Info(order.String())
+				logger.WithFields(order.LogFields()).Info(order.String())
 			})
 		}
 	} else {
 		// if logging config is nil, then apply default logging setup
 		// add trade logger
 		session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-			logger.Info(trade.String())
+			logger.WithFields(trade.LogFields()).Info(trade.String())
 		})
 	}
 
