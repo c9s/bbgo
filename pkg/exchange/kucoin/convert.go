@@ -115,10 +115,10 @@ func convertSubscriptions(ss []types.Subscription) ([]WebSocketCommand, error) {
 		switch s.Channel {
 		case types.BookChannel:
 			// see https://docs.kucoin.com/#level-2-market-data
-			subscribeTopic = "/market/level2" + ":" + toLocalSymbol(s.Symbol)
+			subscribeTopic = "/market/level2" + ":" + ToLocalSymbol(s.Symbol)
 
 		case types.KLineChannel:
-			subscribeTopic = "/market/candles" + ":" + toLocalSymbol(s.Symbol) + "_" + toLocalInterval(types.Interval(s.Options.Interval))
+			subscribeTopic = "/market/candles" + ":" + ToLocalSymbol(s.Symbol) + "_" + toLocalInterval(types.Interval(s.Options.Interval))
 
 		default:
 			return nil, fmt.Errorf("websocket channel %s is not supported by kucoin", s.Channel)
