@@ -11,7 +11,7 @@ import (
 func QueryTradesUntilSuccessful(
 	ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, q *types.TradeQueryOptions,
 ) (trades []types.Trade, err error) {
-	errMsg := ""
+	var stopOnErr error
 	var op = func() (err2 error) {
 		trades, err2 = ex.QueryTrades(ctx, symbol, q)
 		for _, trade := range trades {
@@ -22,15 +22,15 @@ func QueryTradesUntilSuccessful(
 
 		if errors.Is(err2, context.DeadlineExceeded) {
 			// return nil to stop retrying
-			errMsg = fmt.Sprintf("context deadline exceeded when querying trades: %s", symbol)
+			stopOnErr = fmt.Errorf("retry query trades stopped on %w", err2)
 			return nil
 		}
 		return err2
 	}
 
 	err = GeneralBackoff(ctx, op)
-	if errMsg != "" {
-		err = errors.New(errMsg)
+	if stopOnErr != nil {
+		err = stopOnErr
 	}
 	return trades, err
 }
@@ -38,7 +38,7 @@ func QueryTradesUntilSuccessful(
 func QueryTradesUntilSuccessfulLite(
 	ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, q *types.TradeQueryOptions,
 ) (trades []types.Trade, err error) {
-	errMsg := ""
+	var stopOnErr error
 	var op = func() (err2 error) {
 		trades, err2 = ex.QueryTrades(ctx, symbol, q)
 		for _, trade := range trades {
@@ -48,15 +48,15 @@ func QueryTradesUntilSuccessfulLite(
 		}
 		if errors.Is(err2, context.DeadlineExceeded) {
 			// return nil to stop retrying
-			errMsg = fmt.Sprintf("context deadline exceeded when querying trades: %s", symbol)
+			stopOnErr = fmt.Errorf("retry query trades lite stopped on %w", err2)
 			return nil
 		}
 		return err2
 	}
 
 	err = GeneralLiteBackoff(ctx, op)
-	if errMsg != "" {
-		err = errors.New(errMsg)
+	if stopOnErr != nil {
+		err = stopOnErr
 	}
 	return trades, err
 }

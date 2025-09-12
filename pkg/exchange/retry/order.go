@@ -22,8 +22,14 @@ type advancedOrderCancelService interface {
 func QueryOrderUntilCanceled(
 	ctx context.Context, queryOrderService types.ExchangeOrderQueryService, query types.OrderQuery,
 ) (o *types.Order, err error) {
+	var stopOnErr error
 	var op = func() (err2 error) {
 		o, err2 = queryOrderService.QueryOrder(ctx, query)
+		// return nil to stop retry if context deadline exceeded
+		if errors.Is(err2, context.DeadlineExceeded) {
+			stopOnErr = fmt.Errorf("retry query order until canceled stopped on %w", err2)
+			return nil
+		}
 
 		if err2 != nil {
 			return err2
@@ -41,14 +47,23 @@ func QueryOrderUntilCanceled(
 	}
 
 	err = GeneralBackoff(ctx, op)
+	if stopOnErr != nil {
+		err = stopOnErr
+	}
 	return o, err
 }
 
 func QueryOrderUntilFilled(
 	ctx context.Context, queryOrderService types.ExchangeOrderQueryService, query types.OrderQuery,
 ) (o *types.Order, err error) {
+	var stopOnErr error
 	var op = func() (err2 error) {
 		o, err2 = queryOrderService.QueryOrder(ctx, query)
+		// return nil to stop retry if context deadline exceeded
+		if errors.Is(err2, context.DeadlineExceeded) {
+			stopOnErr = fmt.Errorf("retry query order until filled stopped on %w", err2)
+			return nil
+		}
 
 		if err2 != nil {
 			return err2
@@ -68,6 +83,9 @@ func QueryOrderUntilFilled(
 	}
 
 	err = GeneralBackoff(ctx, op)
+	if stopOnErr != nil {
+		err = stopOnErr
+	}
 	return o, err
 }
 
@@ -92,44 +110,62 @@ func GeneralLiteBackoff(ctx context.Context, op backoff.Operation) (err error) {
 func QueryOpenOrdersUntilSuccessful(
 	ctx context.Context, ex types.Exchange, symbol string,
 ) (openOrders []types.Order, err error) {
+	var stopOnErr error
 	var op = func() (err2 error) {
 		openOrders, err2 = ex.QueryOpenOrders(ctx, symbol)
-		return err2
-	}
-
-	err = GeneralBackoff(ctx, op)
-	return openOrders, err
-}
-
-func QueryOpenOrdersUntilSuccessfulLite(
-	ctx context.Context, ex types.Exchange, symbol string,
-) (openOrders []types.Order, err error) {
-	var op = func() (err2 error) {
-		openOrders, err2 = ex.QueryOpenOrders(ctx, symbol)
-		return err2
-	}
-
-	err = GeneralLiteBackoff(ctx, op)
-	return openOrders, err
-}
-
-func QueryClosedOrdersUntilSuccessful(
-	ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, since, until time.Time, lastOrderID uint64,
-) (closedOrders []types.Order, err error) {
-	errMsg := ""
-	var op = func() (err2 error) {
-		closedOrders, err2 = ex.QueryClosedOrders(ctx, symbol, since, until, lastOrderID)
 		// return nil to stop retry if context deadline exceeded
 		if errors.Is(err2, context.DeadlineExceeded) {
-			errMsg = fmt.Sprintf("context deadline exceeded when querying closed orders: %s", symbol)
+			stopOnErr = fmt.Errorf("retry query open orders stopped on %w", err2)
 			return nil
 		}
 		return err2
 	}
 
 	err = GeneralBackoff(ctx, op)
-	if errMsg != "" {
-		err = errors.New(errMsg)
+	if stopOnErr != nil {
+		err = stopOnErr
+	}
+	return openOrders, err
+}
+
+func QueryOpenOrdersUntilSuccessfulLite(
+	ctx context.Context, ex types.Exchange, symbol string,
+) (openOrders []types.Order, err error) {
+	var stopOnErr error
+	var op = func() (err2 error) {
+		openOrders, err2 = ex.QueryOpenOrders(ctx, symbol)
+		// return nil to stop retry if context deadline exceeded
+		if errors.Is(err2, context.DeadlineExceeded) {
+			stopOnErr = fmt.Errorf("retry query open orders lite stopped on %w", err2)
+			return nil
+		}
+		return err2
+	}
+
+	err = GeneralLiteBackoff(ctx, op)
+	if stopOnErr != nil {
+		err = stopOnErr
+	}
+	return openOrders, err
+}
+
+func QueryClosedOrdersUntilSuccessful(
+	ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, since, until time.Time, lastOrderID uint64,
+) (closedOrders []types.Order, err error) {
+	var stopOnErr error
+	var op = func() (err2 error) {
+		closedOrders, err2 = ex.QueryClosedOrders(ctx, symbol, since, until, lastOrderID)
+		// return nil to stop retry if context deadline exceeded
+		if errors.Is(err2, context.DeadlineExceeded) {
+			stopOnErr = fmt.Errorf("retry query closed orders stopped on %w", err2)
+			return nil
+		}
+		return err2
+	}
+
+	err = GeneralBackoff(ctx, op)
+	if stopOnErr != nil {
+		err = stopOnErr
 	}
 	return closedOrders, err
 }
@@ -137,20 +173,20 @@ func QueryClosedOrdersUntilSuccessful(
 func QueryClosedOrdersUntilSuccessfulLite(
 	ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, since, until time.Time, lastOrderID uint64,
 ) (closedOrders []types.Order, err error) {
-	errMsg := ""
+	var stopOnErr error
 	var op = func() (err2 error) {
 		closedOrders, err2 = ex.QueryClosedOrders(ctx, symbol, since, until, lastOrderID)
 		// return nil to stop retry if context deadline exceeded
 		if errors.Is(err2, context.DeadlineExceeded) {
-			errMsg = fmt.Sprintf("context deadline exceeded when querying closed orders: %s", symbol)
+			stopOnErr = fmt.Errorf("retry query closed orders lite stopped on %w", err2)
 			return nil
 		}
 		return err2
 	}
 
 	err = GeneralLiteBackoff(ctx, op)
-	if errMsg != "" {
-		err = errors.New(errMsg)
+	if stopOnErr != nil {
+		err = stopOnErr
 	}
 	return closedOrders, err
 }
@@ -165,8 +201,15 @@ func QueryOrderTradesUntilSuccessful(
 	// sometimes the api might return empty trades without an error when we query the order too soon,
 	// so in the initial attempts, we should check the len(trades) and retry the query
 	var initialAttempts = 5
+	var stopOnErr error
 	var op = func() (err2 error) {
 		trades, err2 = ex.QueryOrderTrades(ctx, q)
+		// return nil to stop retry if context deadline exceeded
+		if errors.Is(err2, context.DeadlineExceeded) {
+			stopOnErr = fmt.Errorf("retry query order trades stopped on %w", err2)
+			return nil
+		}
+
 		if err2 != nil {
 			return err2
 		}
@@ -187,6 +230,9 @@ func QueryOrderTradesUntilSuccessful(
 	}
 
 	err = GeneralBackoff(ctx, op)
+	if stopOnErr != nil {
+		err = stopOnErr
+	}
 	return trades, err
 }
 
@@ -194,8 +240,15 @@ func QueryOrderTradesUntilSuccessful(
 func QueryOrderTradesUntilSuccessfulLite(
 	ctx context.Context, ex types.ExchangeOrderQueryService, q types.OrderQuery,
 ) (trades []types.Trade, err error) {
+	var stopOnErr error
 	var op = func() (err2 error) {
 		trades, err2 = ex.QueryOrderTrades(ctx, q)
+		// return nil to stop retry if context deadline exceeded
+		if errors.Is(err2, context.DeadlineExceeded) {
+			stopOnErr = fmt.Errorf("retry query order trades lite stopped on %w", err2)
+			return nil
+		}
+
 		if err2 != nil {
 			return err2
 		}
@@ -214,35 +267,67 @@ func QueryOrderTradesUntilSuccessfulLite(
 	}
 
 	err = GeneralLiteBackoff(ctx, op)
+	if stopOnErr != nil {
+		err = stopOnErr
+	}
 	return trades, err
 }
 
 func QueryOrderUntilSuccessful(
 	ctx context.Context, query types.ExchangeOrderQueryService, opts types.OrderQuery,
 ) (order *types.Order, err error) {
+	var stopOnErr error
 	var op = func() (err2 error) {
 		order, err2 = query.QueryOrder(ctx, opts)
+		if errors.Is(err2, context.DeadlineExceeded) {
+			// return nil to stop retrying
+			stopOnErr = fmt.Errorf("retry query order stopped on %w", err2)
+			return nil
+		}
 		return err2
 	}
 
 	err = GeneralBackoff(ctx, op)
+	if stopOnErr != nil {
+		err = stopOnErr
+	}
 	return order, err
 }
 
 func CancelAllOrdersUntilSuccessful(ctx context.Context, service advancedOrderCancelService) error {
+	var stopOnErr error
 	var op = func() (err2 error) {
 		_, err2 = service.CancelAllOrders(ctx)
+		// return nil to stop retry if context deadline exceeded
+		if errors.Is(err2, context.DeadlineExceeded) {
+			stopOnErr = fmt.Errorf("retry cancel all orders stopped on %w", err2)
+			return nil
+		}
 		return err2
 	}
 
-	return GeneralBackoff(ctx, op)
+	err := GeneralBackoff(ctx, op)
+	if stopOnErr != nil {
+		err = stopOnErr
+	}
+	return err
 }
 
 func CancelOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, orders ...types.Order) error {
+	var stopOnErr error
 	var op = func() (err2 error) {
 		err2 = ex.CancelOrders(ctx, orders...)
+		// return nil to stop retry if context deadline exceeded
+		if errors.Is(err2, context.DeadlineExceeded) {
+			stopOnErr = fmt.Errorf("retry cancel orders stopped on %w", err2)
+			return nil
+		}
 		return err2
 	}
 
-	return GeneralBackoff(ctx, op)
+	err := GeneralBackoff(ctx, op)
+	if stopOnErr != nil {
+		err = stopOnErr
+	}
+	return err
 }
