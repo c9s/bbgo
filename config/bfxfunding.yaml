@@ -1,0 +1,20 @@
+---
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sessions:
+  bitfinex:
+    exchange: bitfinex
+    envVarPrefix: BITFINEX
+
+exchangeStrategies:
+
+- on: bitfinex
+  bfxfunding:
+    currency: fUSD
+
+    # interval is how long do you want to update your order price and quantity
+    interval: 1m
