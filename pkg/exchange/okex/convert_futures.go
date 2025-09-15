@@ -1,8 +1,6 @@
 package okex
 
 import (
-	"fmt"
-
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -46,7 +44,7 @@ func toGlobalFuturesPositions(futuresPositions []okexapi.Position) types.Futures
 		symbol := toGlobalSymbol(futuresPosition.InstId)
 		positionSide := toGlobalPositionSide(okexapi.PosSide(futuresPosition.PosSide))
 
-		posKey := fmt.Sprintf("%s:%s", symbol, positionSide)
+		posKey := types.NewPositionKey(symbol, positionSide)
 		retFuturesPositions[posKey] = types.FuturesPosition{
 			Isolated:     isolated,
 			AverageCost:  futuresPosition.AvgPx,

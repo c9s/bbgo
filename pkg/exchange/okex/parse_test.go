@@ -1190,3 +1190,204 @@ func TestOrderTradeEvent_toGlobalTrade1(t *testing.T) {
 	})
 
 }
+
+func Test_parseWebSocketEvent_positions(t *testing.T) {
+	in := `
+{
+    "arg": {
+        "channel": "positions",
+        "uid": "77982378738415879",
+        "instType": "ANY"
+    },
+    "eventType": "snapshot",
+    "curPage": 1,
+    "lastPage": true,
+    "data": [{
+        "adl": "1",
+        "availPos": "1",
+        "avgPx": "2566.31",
+        "cTime": "1619507758793",
+        "ccy": "ETH",
+        "deltaBS": "",
+        "deltaPA": "",
+        "gammaBS": "",
+        "gammaPA": "",
+        "imr": "",
+        "instId": "ETH-USD-210430",
+        "instType": "FUTURES",
+        "interest": "0",
+        "idxPx": "2566.13",
+        "last": "2566.22",
+        "usdPx": "",
+        "bePx": "2353.949",
+        "lever": "10",
+        "liab": "",
+        "liabCcy": "",
+        "liqPx": "2352.8496681818233",
+        "markPx": "2353.849",
+        "margin": "0.0003896645377994",
+        "mgnMode": "isolated",
+        "mgnRatio": "11.731726509588816",
+        "mmr": "0.0000311811092368",
+        "notionalUsd": "2276.2546609009605",
+        "optVal": "",
+        "pendingCloseOrdLiabVal": "0.1",
+        "pTime": "1619507761462",
+        "pos": "1",
+        "baseBorrowed": "",
+        "baseInterest": "",
+        "quoteBorrowed": "",
+        "quoteInterest": "",
+        "posCcy": "",
+        "posId": "307173036051017730",
+        "posSide": "long",
+        "spotInUseAmt": "",
+        "clSpotInUseAmt": "",
+        "maxSpotInUseAmt": "",
+        "spotInUseCcy": "",
+        "bizRefId": "",
+        "bizRefType": "",
+        "thetaBS": "",
+        "thetaPA": "",
+        "tradeId": "109844",
+        "uTime": "1619507761462",
+        "upl": "-0.0000009932766034",
+        "uplLastPx": "-0.0000009932766034",
+        "uplRatio": "-0.0025490556801078",
+        "uplRatioLastPx": "-0.0025490556801078",
+        "vegaBS": "",
+        "vegaPA": "",
+        "realizedPnl": "0.001",
+        "pnl": "0.0011",
+        "fee": "-0.0001",
+        "fundingFee": "0",
+        "liqPenalty": "0",
+        "nonSettleAvgPx": "",
+        "settledPnl": "",
+        "closeOrderAlgo": [{
+                "algoId": "123",
+                "slTriggerPx": "123",
+                "slTriggerPxType": "mark",
+                "tpTriggerPx": "123",
+                "tpTriggerPxType": "mark",
+                "closeFraction": "0.6"
+            },
+            {
+                "algoId": "123",
+                "slTriggerPx": "123",
+                "slTriggerPxType": "mark",
+                "tpTriggerPx": "123",
+                "tpTriggerPxType": "mark",
+                "closeFraction": "0.4"
+            }
+        ]
+    }, {
+        "adl": "1",
+        "availPos": "1",
+        "avgPx": "2566.31",
+        "cTime": "1619507758793",
+        "ccy": "ETH",
+        "deltaBS": "",
+        "deltaPA": "",
+        "gammaBS": "",
+        "gammaPA": "",
+        "imr": "",
+        "instId": "ETH-USD-SWAP",
+        "instType": "SWAP",
+        "interest": "0",
+        "idxPx": "2566.13",
+        "last": "2566.22",
+        "usdPx": "",
+        "bePx": "2353.949",
+        "lever": "10",
+        "liab": "",
+        "liabCcy": "",
+        "liqPx": "2352.8496681818233",
+        "markPx": "2353.849",
+        "margin": "0.0003896645377994",
+        "mgnMode": "isolated",
+        "mgnRatio": "11.731726509588816",
+        "mmr": "0.0000311811092368",
+        "notionalUsd": "2276.2546609009605",
+        "optVal": "",
+        "pendingCloseOrdLiabVal": "0.1",
+        "pTime": "1619507761462",
+        "pos": "1",
+        "baseBorrowed": "",
+        "baseInterest": "",
+        "quoteBorrowed": "",
+        "quoteInterest": "",
+        "posCcy": "",
+        "posId": "307173036051017730",
+        "posSide": "long",
+        "spotInUseAmt": "",
+        "clSpotInUseAmt": "",
+        "maxSpotInUseAmt": "",
+        "spotInUseCcy": "",
+        "bizRefId": "",
+        "bizRefType": "",
+        "thetaBS": "",
+        "thetaPA": "",
+        "tradeId": "109844",
+        "uTime": "1619507761462",
+        "upl": "-0.0000009932766034",
+        "uplLastPx": "-0.0000009932766034",
+        "uplRatio": "-0.0025490556801078",
+        "uplRatioLastPx": "-0.0025490556801078",
+        "vegaBS": "",
+        "vegaPA": "",
+        "realizedPnl": "0.001",
+        "pnl": "0.0011",
+        "fee": "-0.0001",
+        "fundingFee": "0",
+        "liqPenalty": "0",
+        "nonSettleAvgPx": "",
+        "settledPnl": "",
+        "closeOrderAlgo": [{
+                "algoId": "123",
+                "slTriggerPx": "123",
+                "slTriggerPxType": "mark",
+                "tpTriggerPx": "123",
+                "tpTriggerPxType": "mark",
+                "closeFraction": "0.6"
+            },
+            {
+                "algoId": "123",
+                "slTriggerPx": "123",
+                "slTriggerPxType": "mark",
+                "tpTriggerPx": "123",
+                "tpTriggerPxType": "mark",
+                "closeFraction": "0.4"
+            }
+        ]
+    }]
+}
+`
+
+	res, err := parseWebSocketEvent([]byte(in))
+	assert.NoError(t, err)
+
+	positions, ok := res.([]okexapi.Position)
+	assert.True(t, ok)
+	assert.Len(t, positions, 2)
+
+	p0 := positions[0]
+	assert.Equal(t, "ETH-USD-210430", p0.InstId)
+	assert.Equal(t, "FUTURES", p0.InstType)
+	assert.Equal(t, "isolated", p0.MgnMode)
+	assert.Equal(t, "long", p0.PosSide)
+	assert.Equal(t, fixedpoint.NewFromInt(1), p0.AvailPos)
+	assert.Equal(t, fixedpoint.NewFromFloat(10), p0.Lever)
+	assert.Equal(t, fixedpoint.NewFromFloat(2566.31), p0.AvgPx)
+	assert.Equal(t, types.NewMillisecondTimestampFromInt(1619507758793), p0.CreationTime)
+	assert.Equal(t, types.NewMillisecondTimestampFromInt(1619507761462), p0.UpdatedTime)
+
+	p1 := positions[1]
+	assert.Equal(t, "ETH-USD-SWAP", p1.InstId)
+	assert.Equal(t, "SWAP", p1.InstType)
+	assert.Equal(t, "isolated", p1.MgnMode)
+	assert.Equal(t, "long", p1.PosSide)
+	assert.Equal(t, fixedpoint.NewFromInt(1), p1.AvailPos)
+	assert.Equal(t, fixedpoint.NewFromFloat(10), p1.Lever)
+	assert.Equal(t, fixedpoint.NewFromFloat(2566.31), p1.AvgPx)
+}

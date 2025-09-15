@@ -39,6 +39,7 @@ const (
 	ChannelAccount      Channel = "account"
 	ChannelMarketTrades Channel = "trades"
 	ChannelOrderTrades  Channel = "orders"
+	ChannelPositions    Channel = "positions"
 )
 
 type ActionType string
@@ -92,7 +93,14 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 		}
 
 		return orderTrade, nil
+	case ChannelPositions:
+		var positions []okexapi.Position
+		err := json.Unmarshal(event.Data, &positions)
+		if err != nil {
+			return nil, err
+		}
 
+		return positions, nil
 	default:
 		if strings.HasPrefix(string(event.Arg.Channel), string(ChannelCandlePrefix)) {
 			// TODO: Support kline subscription. The kline requires another URL to subscribe, which is why we cannot

@@ -61,7 +61,9 @@ func Test_toGlobalFuturesAccountInfo(t *testing.T) {
 	assert.Equal(t, fixedpoint.NewFromFloat(500.0), btcAsset.MarginBalance)
 
 	// Verify position conversion
-	position := info.Positions["BTCUSDT:Long"]
+	posKey := types.NewPositionKey("BTCUSDT", types.PositionLong)
+	position, exists := info.Positions[posKey]
+	assert.True(t, exists)
 	assert.Equal(t, position.PositionSide, types.PositionLong)
 	assert.True(t, position.Isolated)
 	assert.Equal(t, fixedpoint.NewFromFloat(0.1), position.Base)
@@ -112,7 +114,9 @@ func Test_toGlobalFuturesPositions(t *testing.T) {
 
 	globalPositions := toGlobalFuturesPositions(positions)
 
-	ethPosition := globalPositions["ETHUSDT:Long"]
+	posKey := types.NewPositionKey("ETHUSDT", types.PositionLong)
+	ethPosition, exists := globalPositions[posKey]
+	assert.True(t, exists)
 	assert.Equal(t, ethPosition.PositionSide, types.PositionLong)
 	assert.False(t, ethPosition.Isolated) // Cross margin
 	assert.Equal(t, fixedpoint.NewFromFloat(1.0), ethPosition.Base)

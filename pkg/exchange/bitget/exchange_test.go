@@ -404,8 +404,11 @@ func TestExchange_QueryAccount(t *testing.T) {
 		ex         = New("key", "secret", "passphrase")
 		url        = "/api/v2/spot/account/assets"
 		expAccount = &types.Account{
-			AccountType:        "spot",
-			FuturesInfo:        nil,
+			AccountType: "spot",
+			FuturesInfo: &types.FuturesAccount{
+				Assets:    types.FuturesAssetMap{},
+				Positions: types.FuturesPositionMap{},
+			},
 			MarginInfo:         nil,
 			IsolatedMarginInfo: nil,
 			MarginLevel:        fixedpoint.Zero,
