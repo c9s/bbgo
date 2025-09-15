@@ -10,6 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/bitfinex"
 	"github.com/c9s/bbgo/pkg/exchange/bitfinex/bfxapi"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -20,7 +21,11 @@ func init() {
 }
 
 type Strategy struct {
-	Currency string `json:"currency"`
+	Currency string           `json:"currency"`
+	Amount   fixedpoint.Value `json:"amount"`
+	Period   int              `json:"period"`
+
+	MinRate fixedpoint.Value `json:"minRate"`
 
 	exchange *bitfinex.Exchange
 	stream   *bitfinex.Stream
@@ -39,6 +44,28 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Defaults() error {
+	s.Currency = "fUSD"
+	s.MinRate = fixedpoint.NewFromFloat(0.01 * 0.01)
+	return nil
+}
+
+func (s *Strategy) Validate() error {
+	if s.Currency == "" {
+		return fmt.Errorf("currency is required")
+	}
+
+	if s.Amount.IsZero() {
+		return fmt.Errorf("amount must be greater than 0")
+	}
+
+	if s.Period <= 0 {
+		return fmt.Errorf("period must be greater than 0")
+	}
+
+	if s.MinRate.IsZero() {
+		return fmt.Errorf("minRate must be greater than 0")
+	}
+
 	return nil
 }
 
@@ -57,6 +84,17 @@ func (s *Strategy) handleFundingOfferSnapshot(e *bfxapi.FundingOfferSnapshotEven
 
 func (s *Strategy) handleFundingOfferUpdate(e *bfxapi.FundingOfferUpdateEvent) {
 	s.logger.Infof("funding offer update event: %+v", e)
+}
+
+func (s *Strategy) bookFunding(rate fixedpoint.Value) {
+	req := s.client.Funding().NewSubmitFundingOfferRequest()
+	req.Symbol(s.Currency).
+		Amount(s.Amount.String()).
+		OfferType(bfxapi.FundingOfferTypeLimit).
+		Rate(rate.String()).
+		Period(s.Period).Notify(true).
+		Hidden(false).
+		AutoRenew(true)
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
