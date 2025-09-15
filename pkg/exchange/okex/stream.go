@@ -329,5 +329,7 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	case []MarketTradeEvent:
 		s.EmitMarketTradeEvent(et)
 
+	case []okexapi.Position:
+		s.EmitFuturesPositionSnapshot(toGlobalFuturesPositions(et))
 	}
 }

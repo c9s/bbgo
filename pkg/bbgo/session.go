@@ -531,6 +531,18 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 			session.accountMutex.Unlock()
 		})
 
+		session.UserDataStream.OnFuturesPositionSnapshot(func(positions types.FuturesPositionMap) {
+			session.accountMutex.Lock()
+			session.Account.UpdateFuturesPositions(positions)
+			session.accountMutex.Unlock()
+		})
+
+		session.UserDataStream.OnFuturesPositionUpdate(func(positions types.FuturesPositionMap) {
+			session.accountMutex.Lock()
+			session.Account.UpdateFuturesPositions(positions)
+			session.accountMutex.Unlock()
+		})
+
 		session.bindConnectionStatusNotification(session.UserDataStream, "user data")
 
 		// if metrics mode is enabled, we bind the callbacks to update metrics

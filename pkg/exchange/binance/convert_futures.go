@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
-
 	"github.com/adshao/go-binance/v2/futures"
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -30,11 +29,10 @@ func toGlobalFuturesAccountInfo(account *binanceapi.FuturesAccount, risks []bina
 }
 
 func toGlobalFuturesPositions(futuresPositions []binanceapi.FuturesAccountPosition, risks []binanceapi.FuturesPositionRisk) types.FuturesPositionMap {
-	riskMap := make(map[string]types.PositionRisk)
+	riskMap := make(map[types.PositionKey]types.PositionRisk)
 	if len(risks) > 0 {
 		for _, risk := range toGlobalPositionRisk(risks) {
-			key := fmt.Sprintf("%s:%s", risk.Symbol, risk.PositionSide)
-			riskMap[key] = risk
+			riskMap[types.NewPositionKey(risk.Symbol, risk.PositionSide)] = risk
 		}
 	}
 
@@ -53,7 +51,7 @@ func toGlobalFuturesPositions(futuresPositions []binanceapi.FuturesAccountPositi
 			},
 		}
 
-		posKey := fmt.Sprintf("%s:%s", futuresPosition.Symbol, position.PositionSide)
+		posKey := types.NewPositionKey(futuresPosition.Symbol, position.PositionSide)
 		if risk, exists := riskMap[posKey]; exists {
 			risk.Leverage = futuresPosition.Leverage
 			position.PositionRisk = &risk

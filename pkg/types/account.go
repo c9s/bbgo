@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"maps"
 	"sync"
 
 	"github.com/spf13/viper"
@@ -19,7 +20,7 @@ type PositionMap map[string]Position
 type IsolatedMarginAssetMap map[string]IsolatedMarginAsset
 type MarginAssetMap map[string]MarginUserAsset
 type FuturesAssetMap map[string]FuturesUserAsset
-type FuturesPositionMap map[string]FuturesPosition
+type FuturesPositionMap map[PositionKey]FuturesPosition
 
 type AccountType string
 
@@ -142,9 +143,14 @@ type IsolatedMarginAccountInfo struct {
 }
 
 func NewAccount() *Account {
+	futuresAccount := &FuturesAccount{
+		Assets:    make(FuturesAssetMap),
+		Positions: make(FuturesPositionMap),
+	}
+
 	return &Account{
 		AccountType:        "spot",
-		FuturesInfo:        nil,
+		FuturesInfo:        futuresAccount,
 		MarginInfo:         nil,
 		IsolatedMarginInfo: nil,
 		MarginLevel:        fixedpoint.Zero,
@@ -286,6 +292,13 @@ func (a *Account) UpdateBalances(balances BalanceMap) {
 	for _, balance := range balances {
 		a.balances[balance.Currency] = balance
 	}
+}
+
+func (a *Account) UpdateFuturesPositions(positions FuturesPositionMap) {
+	a.Lock()
+	defer a.Unlock()
+
+	maps.Copy(a.FuturesInfo.Positions, positions)
 }
 
 func (a *Account) Print(log LogFunc) {

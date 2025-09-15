@@ -90,6 +90,18 @@ type Position struct {
 	ttl time.Duration
 }
 
+type PositionKey struct {
+	Symbol string
+	Side   PositionType
+}
+
+func NewPositionKey(symbol string, side PositionType) PositionKey {
+	return PositionKey{
+		Symbol: symbol,
+		Side:   side,
+	}
+}
+
 func (s *Position) SetTTL(ttl time.Duration) {
 	if ttl.Nanoseconds() <= 0 {
 		return
