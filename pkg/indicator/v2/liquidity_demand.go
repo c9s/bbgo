@@ -5,6 +5,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const MaxNumOfLiquidityDemand = 3000
+
 type LiquidityDemandStream struct {
 	*types.Float64Series
 
@@ -23,6 +25,7 @@ func (s *LiquidityDemandStream) BackFill(kLines []types.KLine) {
 func (s *LiquidityDemandStream) handleKLine(k types.KLine) {
 	netDemand := s.calculateKLine(k)
 	s.PushAndEmit(netDemand)
+	s.Slice.Truncate(MaxNumOfLiquidityDemand)
 }
 
 /*

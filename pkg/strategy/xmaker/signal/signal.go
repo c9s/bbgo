@@ -40,6 +40,7 @@ func init() {
 	Register(&BollingerBandTrendSignal{})
 	Register(&OrderBookBestPriceVolumeSignal{})
 	Register(&TradeVolumeWindowSignal{})
+	Register(&LiquidityDemandSignal{})
 	// Register(&KLineShapeSignal{})
 }
 
