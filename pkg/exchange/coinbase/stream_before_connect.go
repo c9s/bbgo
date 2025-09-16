@@ -22,7 +22,7 @@ func (s *Stream) beforeConnect(ctx context.Context) error {
 		return err
 	}
 	// check channel authorization
-	for channel := range s.channel2LocalSymbolsMap {
+	for channel := range s.channel2LocalIdsMap {
 		switch channel {
 		case userChannel, level2Channel, balanceChannel:
 			if !s.authEnabled {
@@ -52,14 +52,14 @@ func (s *Stream) buildMapForUserDataStream(ctx context.Context) error {
 	// Once subscribe to the user channel, it will receive events for the following types:
 	// - order life cycle events: receive, open, done, change, activate(for stop orders)
 	// - order match
-	s.channel2LocalSymbolsMap[userChannel] = privateChannelLocalSymbols
+	s.channel2LocalIdsMap[userChannel] = privateChannelLocalSymbols
 
 	// query account id for the symbols
 	balanceAccountIDs, err := s.exchange.queryAccountIDsBySymbols(ctx, s.privateChannelSymbols)
 	if err != nil {
 		return err
 	}
-	s.channel2LocalSymbolsMap[balanceChannel] = balanceAccountIDs
+	s.channel2LocalIdsMap[balanceChannel] = balanceAccountIDs
 	return nil
 }
 
@@ -99,14 +99,14 @@ func (s *Stream) buildMapForMarketStream() error {
 		case types.BookChannel:
 			// bridge to level2 channel, which provides order book snapshot and book updates
 			s.logger.Infof("bridge %s to level2_batch channel", channel)
-			s.channel2LocalSymbolsMap[level2BatchChannel] = keys(dedupLocalSymbols)
+			s.channel2LocalIdsMap[level2BatchChannel] = keys(dedupLocalSymbols)
 		case types.MarketTradeChannel:
 			// matches: all trades
-			s.channel2LocalSymbolsMap[matchesChannel] = keys(dedupLocalSymbols)
+			s.channel2LocalIdsMap[matchesChannel] = keys(dedupLocalSymbols)
 			s.logger.Infof("bridge %s to %s", channel, matchesChannel)
 		case types.BookTickerChannel:
 			// ticker channel provides feeds on best bid/ask prices
-			s.channel2LocalSymbolsMap[tickerChannel] = keys(dedupLocalSymbols)
+			s.channel2LocalIdsMap[tickerChannel] = keys(dedupLocalSymbols)
 			s.logger.Infof("bridge %s to %s", channel, tickerChannel)
 		case types.KLineChannel:
 			// kline stream is available on Advanced Trade API only: https://docs.cdp.coinbase.com/advanced-trade/docs/ws-channels#candles-channel
@@ -121,7 +121,7 @@ func (s *Stream) buildMapForMarketStream() error {
 					s.logger.Warnf("do not support subscription to %s without symbol, skipped", channel)
 					continue
 				}
-				s.channel2LocalSymbolsMap[channel] = append(s.channel2LocalSymbolsMap[channel], localSymbol)
+				s.channel2LocalIdsMap[channel] = append(s.channel2LocalIdsMap[channel], localSymbol)
 			}
 		}
 	}
@@ -135,7 +135,7 @@ func (s *Stream) buildMapForMarketStream() error {
 		}
 		for symbol := range klineOptionsMap {
 			if _, ok := seenMatchSymbols[symbol]; !ok {
-				s.channel2LocalSymbolsMap[matchesChannel] = append(s.channel2LocalSymbolsMap[matchesChannel], toLocalSymbol(symbol))
+				s.channel2LocalIdsMap[matchesChannel] = append(s.channel2LocalIdsMap[matchesChannel], toLocalSymbol(symbol))
 			}
 		}
 

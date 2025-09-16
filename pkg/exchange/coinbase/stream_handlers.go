@@ -29,9 +29,13 @@ const (
 type channelType struct {
 	Name       types.Channel `json:"name"`
 	ProductIDs []string      `json:"product_ids,omitempty"`
+	AccountIDs []string      `json:"account_ids,omitempty"` // for balance channel
 }
 
 func (c channelType) String() string {
+	if c.Name == balanceChannel {
+		return fmt.Sprintf("(channelType Name:%s, AccountIDs: %s)", c.Name, c.AccountIDs)
+	}
 	return fmt.Sprintf("(channelType Name:%s, ProductIDs: %s)", c.Name, c.ProductIDs)
 }
 
@@ -85,7 +89,7 @@ func (s *Stream) handleConnect() {
 	}
 
 	// write subscribe json
-	s.writeSubscribeJson(s.channel2LocalSymbolsMap)
+	s.writeSubscribeJson(s.channel2LocalIdsMap)
 
 	s.clearSequenceNumber()
 	s.clearWorkingOrders()
