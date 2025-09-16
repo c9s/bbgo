@@ -35,8 +35,8 @@ type Stream struct {
 
 	logger logrus.FieldLogger
 
-	// channel2LocalSymbolsMap is a map from channel to local symbols
-	channel2LocalSymbolsMap map[types.Channel][]string
+	// channel2LocalIdsMap is a map from channel to local ids, including symbols and other ids
+	channel2LocalIdsMap map[types.Channel][]string
 
 	// callbacks
 	errorMessageCallbacks             []func(m *ErrorMessage)
@@ -87,10 +87,10 @@ func NewStream(
 			"exchange": ID,
 			"module":   "stream",
 		}),
-		authEnabled:             len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
-		lastSequenceMsgMap:      make(map[string]SequenceNumberType),
-		workingOrdersMap:        make(map[string]types.Order),
-		channel2LocalSymbolsMap: make(map[types.Channel][]string),
+		authEnabled:         len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
+		lastSequenceMsgMap:  make(map[string]SequenceNumberType),
+		workingOrdersMap:    make(map[string]types.Order),
+		channel2LocalIdsMap: make(map[types.Channel][]string),
 	}
 	s.SetParser(parseMessage)
 	s.SetDispatcher(s.dispatchEvent)
@@ -136,7 +136,7 @@ func (s *Stream) logSubscriptions(m *SubscriptionsMessage) {
 	}
 
 	for _, channel := range m.Channels {
-		s.logger.Infof("confirmed subscription: channel=%s productIds=%v", channel.Name, channel.ProductIDs)
+		s.logger.Infof("confirmed subscription: %s", channel)
 	}
 }
 
