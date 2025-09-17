@@ -2,7 +2,6 @@ package signal
 
 import (
 	"context"
-	"errors"
 	"math"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -12,6 +11,12 @@ import (
 
 var _ bbgo.SignalProvider = (*LiquidityDemandSignal)(nil)
 
+const (
+	warmUpInterval       = 100
+	statsUpdateInterval  = 300
+	statsUpdateIntervalF = float64(statsUpdateInterval)
+)
+
 type LiquidityDemandSignal struct {
 	BaseProvider
 	Logger
@@ -19,6 +24,7 @@ type LiquidityDemandSignal struct {
 	types.IntervalWindow
 	Threshold float64 `json:"threshold"`
 	indicator *indicatorv2.LiquidityDemandStream
+	mean, std float64
 }
 
 // bbgo.SignalProvider
@@ -40,13 +46,30 @@ func (s *LiquidityDemandSignal) Bind(_ context.Context, session *bbgo.ExchangeSe
 }
 
 func (s *LiquidityDemandSignal) CalculateSignal(_ context.Context) (float64, error) {
-	if s.indicator.Length() == 0 {
-		return 0.0, errors.New("not enough data")
+	// still warming up
+	if s.indicator.Length() <= warmUpInterval {
+		return 0.0, nil
 	}
+	// threshold check
+	// if the last liquidity demand is less than the threshold, we consider it as a noise and return 0 (no signal)
 	last := s.indicator.Last(0)
 	if math.Abs(last) < s.Threshold {
 		return 0.0, nil
 	}
-	sig := math.Tanh(last) * 2 // scale to [-2, 2]
+	// update mean and std by incremental calculation (Welford's online algorithm)
+	if s.indicator.Length() <= statsUpdateInterval {
+		s.mean = s.indicator.Slice.Mean()
+		s.std = s.indicator.Slice.Std()
+	} else {
+		s.mean = (s.mean*statsUpdateIntervalF + s.indicator.Last(0)) / (statsUpdateIntervalF + 1)
+		d := last - s.mean
+		s.std = math.Sqrt((s.std*s.std*statsUpdateIntervalF + d*d) / (statsUpdateIntervalF + 1))
+	}
+	// avoid division by zero
+	if s.std == 0 {
+		return 0.0, nil
+	}
+	score := (last - s.mean) / s.std
+	sig := math.Tanh(score) * 2 // scale to [-2, 2]
 	return sig, nil
 }
