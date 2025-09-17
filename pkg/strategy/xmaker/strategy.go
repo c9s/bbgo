@@ -408,6 +408,9 @@ func (s *Strategy) Initialize() error {
 
 	s.positionExposure = newPositionExposure(s.Symbol)
 	s.positionExposure.SetMetricsLabels(ID, s.InstanceID(), s.MakerExchange, s.Symbol)
+	for _, sig := range s.SignalConfigList.Signals {
+		s.logger.Infof("using signal provider: %s", sig)
+	}
 	return nil
 }
 

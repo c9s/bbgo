@@ -51,6 +51,10 @@ type ProviderWrapper struct {
 	Signal bbgo.SignalProvider `json:"-"`
 }
 
+func (p ProviderWrapper) String() string {
+	return fmt.Sprintf("%s(weight=%.2f)", p.Signal.ID(), p.Weight)
+}
+
 type DynamicConfig struct {
 	// SessionName is the name of the session to use for this signal provider
 	SessionName string `json:"session,omitempty"` // optional session name, if not set, it will use the default session
