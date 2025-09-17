@@ -6,7 +6,6 @@ import (
 	"math"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -18,7 +17,7 @@ type LiquidityDemandSignal struct {
 	Logger
 
 	types.IntervalWindow
-	Threshold fixedpoint.Value `json:"threshold"`
+	Threshold float64 `json:"threshold"`
 	indicator *indicatorv2.LiquidityDemandStream
 }
 
@@ -29,8 +28,8 @@ func (s *LiquidityDemandSignal) ID() string {
 
 func (s *LiquidityDemandSignal) Subscribe(session *bbgo.ExchangeSession, symbol string) {
 	s.Symbol = symbol
-	if s.Threshold.IsZero() {
-		s.Threshold = fixedpoint.NewFromFloat(1000000)
+	if s.Threshold == 0 {
+		s.Threshold = 1000000.0
 	}
 	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.IntervalWindow.Interval})
 }
@@ -45,8 +44,7 @@ func (s *LiquidityDemandSignal) CalculateSignal(_ context.Context) (float64, err
 		return 0.0, errors.New("not enough data")
 	}
 	last := s.indicator.Last(0)
-	lastF := fixedpoint.NewFromFloat(last)
-	if fixedpoint.Abs(lastF) < s.Threshold {
+	if math.Abs(last) < s.Threshold {
 		return 0.0, nil
 	}
 	sig := math.Tanh(last) * 2 // scale to [-2, 2]
