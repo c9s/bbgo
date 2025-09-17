@@ -2688,15 +2688,30 @@ func (s *Strategy) gracefulShutDown(shutdownCtx context.Context) {
 
 	// send stop signal to the quoteWorker
 	close(s.stopQuoteWorkerC)
-
 	<-s.quoteWorkerDoneC
 
 	s.logger.Infof("quote worker is done, ensure that we have canceled all maker orders...")
+
+	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
+		makerOrder, err := s.SpreadMaker.cancelAndQueryOrder(shutdownCtx)
+		if err != nil {
+			s.logger.WithError(err).Errorf("unable to cancel spread maker orders")
+		} else if makerOrder != nil {
+			s.logger.Infof("spread maker orders are cancelled, current position: %s", s.Position)
+		}
+	}
 
 	// make sure all orders are cancelled
 	if err := tradingutil.UniversalCancelAllOrders(shutdownCtx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
 		s.logger.WithError(err).Errorf("graceful cancel order error")
 	}
+
+	if s.tradeCollector.Process() {
+		s.logger.Infof("trade collector process found trades to process after quote worker is done")
+	}
+
+	// wait for a while to let the hedge worker to process the last position
+	time.Sleep(s.HedgeInterval.Duration() * 5)
 
 	// stop the hedge workers
 	if s.SplitHedge != nil && s.SplitHedge.Enabled {
