@@ -628,7 +628,7 @@ func (s *Strategy) aggregateSignal(ctx context.Context) (float64, error) {
 		}
 	}
 
-	if sum == 0.0 {
+	if sum == 0.0 || voters == 0.0 {
 		return 0.0, nil
 	}
 
