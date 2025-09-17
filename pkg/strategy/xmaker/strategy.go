@@ -2046,8 +2046,7 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 	defer ticker.Stop()
 
 	defer func() {
-		// use background context to ensure the cancellation
-		if err := s.activeMakerOrders.GracefulCancel(context.Background(), s.makerSession.Exchange); err != nil {
+		if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 			s.logger.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
 		}
 	}()
@@ -2416,7 +2415,7 @@ func (s *Strategy) CrossRun(
 	}
 
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
-		if err := s.SpreadMaker.Bind(ctx, s.makerSession, s.Symbol); err != nil {
+		if err := s.SpreadMaker.Bind(s.tradingCtx, s.makerSession, s.Symbol); err != nil {
 			return err
 		}
 	}
@@ -2434,16 +2433,15 @@ func (s *Strategy) CrossRun(
 		s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
 		s.makerBook.BindStream(makerMarketStream)
 
-		if err := makerMarketStream.Connect(ctx); err != nil {
+		if err := makerMarketStream.Connect(s.tradingCtx); err != nil {
 			return err
 		}
 	}
 
 	s.CircuitBreaker.OnPanic(
 		func() {
-			s.cancelTrading()
-
-			bbgo.Sync(ctx, s)
+			s.gracefulShutDown(context.Background())
+			panic(fmt.Errorf("panic triggered the circuit breaker on %s %s", s.MakerExchange, s.Symbol))
 		},
 	)
 
@@ -2461,7 +2459,7 @@ func (s *Strategy) CrossRun(
 	s.sourceBook.BindStream(sourceMarketStream)
 	s.depthSourceBook = types.NewDepthBook(s.sourceBook)
 
-	if err := sourceMarketStream.Connect(ctx); err != nil {
+	if err := sourceMarketStream.Connect(s.tradingCtx); err != nil {
 		return err
 	}
 
@@ -2508,7 +2506,7 @@ func (s *Strategy) CrossRun(
 
 		if binder, ok := sigProvider.(SessionBinder); ok {
 			s.logger.Infof("binding session on signal %T", sigProvider)
-			if err := binder.Bind(ctx, s.sourceSession, s.SourceSymbol); err != nil {
+			if err := binder.Bind(s.tradingCtx, s.sourceSession, s.SourceSymbol); err != nil {
 				return err
 			}
 		}
@@ -2637,16 +2635,6 @@ func (s *Strategy) CrossRun(
 	go func() {
 		s.logger.Infof("waiting for authentication connections to be ready...")
 
-		if s.SplitHedge != nil && s.SplitHedge.Enabled {
-			if err := s.SplitHedge.Start(ctx); err != nil {
-				s.logger.WithError(err).Errorf("failed to start split hedge")
-			}
-		} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-			if err := s.SyntheticHedge.Start(ctx); err != nil {
-				s.logger.WithError(err).Errorf("failed to start syntheticHedge")
-			}
-		}
-
 		select {
 		case <-ctx.Done():
 
@@ -2659,13 +2647,23 @@ func (s *Strategy) CrossRun(
 
 		s.logger.Infof("all user data streams are connected, starting workers...")
 
+		if s.SplitHedge != nil && s.SplitHedge.Enabled {
+			if err := s.SplitHedge.Start(s.tradingCtx); err != nil {
+				s.logger.WithError(err).Errorf("failed to start split hedge")
+			}
+		} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+			if err := s.SyntheticHedge.Start(s.tradingCtx); err != nil {
+				s.logger.WithError(err).Errorf("failed to start syntheticHedge")
+			}
+		}
+
 		go s.accountUpdater(s.tradingCtx)
 		go s.hedgeWorker(s.tradingCtx)
 		go s.quoteWorker(s.tradingCtx)
 		go s.houseCleanWorker(s.tradingCtx)
 
 		if s.RecoverTrade {
-			go s.tradeRecover(ctx)
+			go s.tradeRecover(s.tradingCtx)
 		}
 
 		if !s.Position.IsDust() {
@@ -2675,43 +2673,47 @@ func (s *Strategy) CrossRun(
 	}()
 
 	bbgo.OnShutdown(
-		ctx, func(ctx context.Context, wg *sync.WaitGroup) {
-			// the ctx here is the shutdown context (not the strategy context)
-			bbgo.Notify("Shutting down %s %s", ID, s.Symbol, s.Position)
-
+		ctx, func(shutdownCtx context.Context, wg *sync.WaitGroup) {
 			// defer work group done to mark the strategy as stopped
 			defer wg.Done()
-
-			// send stop signal to the quoteWorker
-			close(s.stopQuoteWorkerC)
-
-			<-s.quoteWorkerDoneC
-
-			s.cancelTrading()
-
-			if s.SplitHedge != nil && s.SplitHedge.Enabled {
-				if err := s.SplitHedge.Stop(ctx); err != nil {
-					s.logger.WithError(err).Errorf("failed to stop splitHedge")
-				}
-			} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-				if err := s.SyntheticHedge.Stop(ctx); err != nil {
-					s.logger.WithError(err).Errorf("failed to stop syntheticHedge")
-				}
-			}
-
-			s.logger.Infof("waiting for workers to stop...")
-			s.wg.Wait()
-
-			// make sure all orders are cancelled
-			if err := tradingutil.UniversalCancelAllOrders(ctx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
-				s.logger.WithError(err).Errorf("graceful cancel error")
-			}
-
-			bbgo.Sync(ctx, s)
+			s.gracefulShutDown(shutdownCtx)
 		},
 	)
 
 	return nil
+}
+
+func (s *Strategy) gracefulShutDown(shutdownCtx context.Context) {
+	bbgo.Notify("Shutting down %s %s", ID, s.Symbol, s.Position)
+
+	// send stop signal to the quoteWorker
+	close(s.stopQuoteWorkerC)
+
+	<-s.quoteWorkerDoneC
+
+	s.logger.Infof("quote worker is done, ensure that we have canceled all maker orders...")
+
+	// make sure all orders are cancelled
+	if err := tradingutil.UniversalCancelAllOrders(shutdownCtx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
+		s.logger.WithError(err).Errorf("graceful cancel order error")
+	}
+
+	// stop the hedge workers
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		if err := s.SplitHedge.Stop(shutdownCtx); err != nil {
+			s.logger.WithError(err).Errorf("failed to stop splitHedge")
+		}
+	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		if err := s.SyntheticHedge.Stop(shutdownCtx); err != nil {
+			s.logger.WithError(err).Errorf("failed to stop syntheticHedge")
+		}
+	}
+
+	s.cancelTrading()
+	s.logger.Infof("canceling trading context and waiting for workers to stop...")
+	s.wg.Wait()
+
+	bbgo.Sync(shutdownCtx, s)
 }
 
 func isSignalSidePosition(signal float64, side types.SideType) bool {
