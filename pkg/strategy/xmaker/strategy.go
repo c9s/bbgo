@@ -408,6 +408,9 @@ func (s *Strategy) Initialize() error {
 
 	s.positionExposure = newPositionExposure(s.Symbol)
 	s.positionExposure.SetMetricsLabels(ID, s.InstanceID(), s.MakerExchange, s.Symbol)
+	for _, sig := range s.SignalConfigList.Signals {
+		s.logger.Infof("using signal provider: %s", sig)
+	}
 	return nil
 }
 
@@ -625,7 +628,7 @@ func (s *Strategy) aggregateSignal(ctx context.Context) (float64, error) {
 		}
 	}
 
-	if sum == 0.0 {
+	if sum == 0.0 || voters == 0.0 {
 		return 0.0, nil
 	}
 

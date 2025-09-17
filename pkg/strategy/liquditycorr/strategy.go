@@ -1,4 +1,4 @@
-package correlation_liquidity_demand
+package liquditycorr
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const ID = "correlation-liquidity-demand"
+const ID = "liquditycorr"
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})

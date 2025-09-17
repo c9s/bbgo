@@ -40,6 +40,7 @@ func init() {
 	Register(&BollingerBandTrendSignal{})
 	Register(&OrderBookBestPriceVolumeSignal{})
 	Register(&TradeVolumeWindowSignal{})
+	Register(&LiquidityDemandSignal{})
 	// Register(&KLineShapeSignal{})
 }
 
@@ -48,6 +49,10 @@ type ProviderWrapper struct {
 	Weight float64 `json:"weight"`
 
 	Signal bbgo.SignalProvider `json:"-"`
+}
+
+func (p ProviderWrapper) String() string {
+	return fmt.Sprintf("%s(weight=%.2f)", p.Signal.ID(), p.Weight)
 }
 
 type DynamicConfig struct {

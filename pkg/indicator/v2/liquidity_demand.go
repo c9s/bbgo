@@ -5,32 +5,20 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type MASource interface {
-	types.Float64Calculator
-	types.Series
-}
-
-var (
-	_ MASource = &SMAStream{}
-	_ MASource = &EWMAStream{}
-)
+const MaxNumOfLiquidityDemand = 3000
 
 type LiquidityDemandStream struct {
 	*types.Float64Series
 
-	sellDemandMA, buyDemandMA MASource
-	kLineStream               *KLineStream
+	sellDemandMA, buyDemandMA *SMAStream
+	kLineStream               KLineSubscription
 	epsilon                   fixedpoint.Value
-}
-
-// BackFill fills historical values
-func (s *LiquidityDemandStream) BackFill(kLines []types.KLine) {
-	s.kLineStream.BackFill(kLines)
 }
 
 func (s *LiquidityDemandStream) handleKLine(k types.KLine) {
 	netDemand := s.calculateKLine(k)
 	s.PushAndEmit(netDemand)
+	s.Slice.Truncate(MaxNumOfLiquidityDemand)
 }
 
 /*
@@ -61,8 +49,8 @@ func (s *LiquidityDemandStream) calculateKLine(k types.KLine) float64 {
 }
 
 func LiquidityDemand(
-	klineStream *KLineStream,
-	sellDemandMA, buyDemandMA MASource,
+	klineStream KLineSubscription,
+	sellDemandMA, buyDemandMA *SMAStream,
 ) *LiquidityDemandStream {
 	s := &LiquidityDemandStream{
 		Float64Series: types.NewFloat64Series(),
@@ -71,6 +59,6 @@ func LiquidityDemand(
 		kLineStream:   klineStream,
 		epsilon:       fixedpoint.NewFromFloat(1e-6),
 	}
-	klineStream.OnUpdate(s.handleKLine)
+	klineStream.AddSubscriber(s.handleKLine)
 	return s
 }
