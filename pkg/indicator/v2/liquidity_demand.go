@@ -15,13 +15,6 @@ type LiquidityDemandStream struct {
 	epsilon                   fixedpoint.Value
 }
 
-// BackFill fills historical values
-func (s *LiquidityDemandStream) BackFill(kLines []types.KLine) {
-	for _, kline := range kLines {
-		s.handleKLine(kline)
-	}
-}
-
 func (s *LiquidityDemandStream) handleKLine(k types.KLine) {
 	netDemand := s.calculateKLine(k)
 	s.PushAndEmit(netDemand)
