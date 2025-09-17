@@ -2200,6 +2200,10 @@ func (s *Strategy) isSimpleHedgeMode() bool {
 func (s *Strategy) CrossRun(
 	ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
 ) error {
+	if bbgo.IsBackTesting {
+		panic("xmaker strategy does not support backtesting")
+	}
+
 	s.tradingCtx, s.cancelTrading = context.WithCancel(ctx)
 
 	instanceID := s.InstanceID()
