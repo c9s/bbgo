@@ -2350,13 +2350,13 @@ func (s *Strategy) CrossRun(
 	}
 	allMarkets := makerMarkets.Merge(sourceMarkets)
 
+	// TODO: we can share this priceSolver across different instances
 	s.priceSolver = pricesolver.NewSimplePriceResolver(allMarkets)
 	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
+
 	s.sourceSession.UserDataStream.OnTradeUpdate(s.priceSolver.UpdateFromTrade)
 
-	s.accountValueCalculator = bbgo.NewAccountValueCalculator(
-		s.sourceSession, s.priceSolver, s.sourceMarket.QuoteCurrency,
-	)
+	s.accountValueCalculator = s.sourceSession.GetAccountValueCalculator()
 	if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
 		return err
 	}
