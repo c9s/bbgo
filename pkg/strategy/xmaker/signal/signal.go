@@ -78,6 +78,18 @@ func (c *DynamicConfig) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("failed to get provider ID from item: %v", item)
 		}
 
+		// default weight
+		weight := 1.0
+		if weightJson, ok := item["weight"]; ok {
+			num := json.Number(weightJson)
+			w, parseErr := num.Float64()
+			if parseErr != nil {
+				return fmt.Errorf("failed to parse weight: %v", parseErr)
+			}
+
+			weight = w
+		}
+
 		providerConfigJson, ok := item[providerId]
 		if !ok {
 			return fmt.Errorf("provider config %s not found in item: %+v", providerId, item)
@@ -102,6 +114,11 @@ func (c *DynamicConfig) UnmarshalJSON(data []byte) error {
 		}
 
 		configEntry.Signal = providerInstanceRef.Interface().(bbgo.SignalProvider)
+
+		// if the weight is not set in the config, use the loaded weight or default weight
+		if configEntry.Weight == 0. {
+			configEntry.Weight = weight
+		}
 
 		c.Signals = append(c.Signals, configEntry)
 	}
