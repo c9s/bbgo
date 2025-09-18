@@ -66,6 +66,8 @@ func (m *MutexFloat64) Get() float64 {
 	return v
 }
 
+// Quote stores the source prices and margins for quoting
+// for both bid and ask sides
 type Quote struct {
 	BestBidPrice, BestAskPrice fixedpoint.Value
 
@@ -423,22 +425,6 @@ func (s *Strategy) PrintConfig(f io.Writer, pretty bool, withColor ...bool) {
 	dynamic.PrintConfig(s, f, tableStyle, len(withColor) > 0 && withColor[0], dynamic.DefaultWhiteList()...)
 }
 
-// getBollingerTrend returns -1 when the price is in the downtrend, 1 when the price is in the uptrend, 0 when the price is in the band
-func (s *Strategy) getBollingerTrend(quote *Quote) int {
-	// when bid price is lower than the down band, then it's in the downtrend
-	// when ask price is higher than the up band, then it's in the uptrend
-	lastDownBand := fixedpoint.NewFromFloat(s.boll.DownBand.Last(0))
-	lastUpBand := fixedpoint.NewFromFloat(s.boll.UpBand.Last(0))
-
-	if quote.BestAskPrice.Compare(lastDownBand) < 0 {
-		return -1
-	} else if quote.BestBidPrice.Compare(lastUpBand) > 0 {
-		return 1
-	} else {
-		return 0
-	}
-}
-
 // setPositionStartTime sets the position start time only if it's not set
 func (s *Strategy) setPositionStartTime(now time.Time) {
 	s.positionStartedAtMutex.Lock()
@@ -543,66 +529,6 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		quote.AskMargin,
 		quote.BidMargin,
 	)
-
-	return nil
-}
-
-// applyBollingerMargin applies the bollinger band margin to the quote
-func (s *Strategy) applyBollingerMargin(
-	quote *Quote,
-) error {
-	lastDownBand := fixedpoint.NewFromFloat(s.boll.DownBand.Last(0))
-	lastUpBand := fixedpoint.NewFromFloat(s.boll.UpBand.Last(0))
-
-	if lastUpBand.IsZero() || lastDownBand.IsZero() {
-		s.logger.Warnf("bollinger band value is zero, skipping")
-		return nil
-	}
-
-	factor := fixedpoint.Min(s.BollBandMarginFactor, fixedpoint.One)
-	switch s.getBollingerTrend(quote) {
-	case -1:
-		// for the downtrend, increase the bid margin
-		//  ratio here should be greater than 1.00
-		ratio := fixedpoint.Min(lastDownBand.Div(quote.BestAskPrice), fixedpoint.One)
-
-		// so that 1.x can multiply the original bid margin
-		bollMargin := s.BollBandMargin.Mul(ratio).Mul(factor)
-
-		s.logger.Infof(
-			"%s bollband downtrend: increasing bid margin %f (bidMargin) + %f (bollMargin) = %f (finalBidMargin)",
-			s.Symbol,
-			quote.BidMargin.Float64(),
-			bollMargin.Float64(),
-			quote.BidMargin.Add(bollMargin).Float64(),
-		)
-
-		quote.BidMargin = quote.BidMargin.Add(bollMargin)
-		quote.BidLayerPips = quote.BidLayerPips.Mul(ratio)
-
-	case 1:
-		// for the uptrend, increase the ask margin
-		// ratio here should be greater than 1.00
-		ratio := fixedpoint.Min(quote.BestAskPrice.Div(lastUpBand), fixedpoint.One)
-
-		// so that the original bid margin can be multiplied by 1.x
-		bollMargin := s.BollBandMargin.Mul(ratio).Mul(factor)
-
-		s.logger.Infof(
-			"%s bollband uptrend adjusting ask margin %f (askMargin) + %f (bollMargin) = %f (finalAskMargin)",
-			s.Symbol,
-			quote.AskMargin.Float64(),
-			bollMargin.Float64(),
-			quote.AskMargin.Add(bollMargin).Float64(),
-		)
-
-		quote.AskMargin = quote.AskMargin.Add(bollMargin)
-		quote.AskLayerPips = quote.AskLayerPips.Mul(ratio)
-
-	default:
-		// default, in the band
-
-	}
 
 	return nil
 }
@@ -1134,10 +1060,6 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			s.logger.WithError(err).Errorf("unable to apply signal margin")
 		}
 
-	} else if s.EnableBollBandMargin {
-		if err := s.applyBollingerMargin(quote); err != nil {
-			s.logger.WithError(err).Errorf("unable to apply bollinger margin")
-		}
 	}
 
 	bidExposureInUsd := fixedpoint.Zero
