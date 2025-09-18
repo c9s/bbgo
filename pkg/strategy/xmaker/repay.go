@@ -18,8 +18,14 @@ func tryToRepayDebts(ctx context.Context, session *bbgo.ExchangeSession) bool {
 		return false
 	}
 
-	hedgeBalances := session.GetAccount().Balances()
-	debts := hedgeBalances.Debts()
+	account, err := session.UpdateAccount(ctx)
+	if err != nil {
+		log.WithError(err).Errorf("unable to update account for repay")
+		return false
+	}
+
+	balances := account.Balances()
+	debts := balances.Debts()
 
 	log.Infof("trying to repay debts %+v on hedge exchange %s", debts, session.Exchange.Name())
 
@@ -51,6 +57,9 @@ func tryToRepayDebts(ctx context.Context, session *bbgo.ExchangeSession) bool {
 		repaid = true
 	}
 
+	// if we have repaid something, update the account again.
+	// this is to make sure the account info is up-to-date.
+	// we don't want to wait until the next periodic update.
 	if repaid {
 		if _, err := session.UpdateAccount(ctx); err != nil {
 			log.WithError(err).Errorf("unable to update account after repay")
