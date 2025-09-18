@@ -38,9 +38,9 @@ import (
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
 var two = fixedpoint.NewFromInt(2)
 
-const feeTokenQuote = "USDT"
+const feeTokenQuoteCurrency = "USDT"
 
-const priceUpdateTimeout = 30 * time.Second
+const priceUpdateTimeout = 60 * time.Second
 
 const ID = "xmaker"
 
@@ -311,13 +311,13 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		subscribeOpts := types.SubscribeOptions{Interval: "1m"}
 		if cu := sourceSession.Exchange.PlatformFeeCurrency(); cu != "" {
 			sourceSession.Subscribe(
-				types.KLineChannel, sourceSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts,
+				types.KLineChannel, sourceSession.Exchange.PlatformFeeCurrency()+feeTokenQuoteCurrency, subscribeOpts,
 			)
 		}
 
 		if cu := makerSession.Exchange.PlatformFeeCurrency(); cu != "" {
 			makerSession.Subscribe(
-				types.KLineChannel, makerSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts,
+				types.KLineChannel, makerSession.Exchange.PlatformFeeCurrency()+feeTokenQuoteCurrency, subscribeOpts,
 			)
 		}
 	}
@@ -2365,7 +2365,7 @@ func (s *Strategy) CrossRun(
 		types.KLineWith(
 			s.SourceSymbol, types.Interval1m, func(k types.KLine) {
 				feeToken := s.sourceSession.Exchange.PlatformFeeCurrency()
-				if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuote); ok {
+				if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuoteCurrency); ok {
 					s.Position.SetFeeAverageCost(feeToken, feePrice)
 				}
 			},
@@ -2376,7 +2376,7 @@ func (s *Strategy) CrossRun(
 		types.KLineWith(
 			s.Symbol, types.Interval1m, func(k types.KLine) {
 				feeToken := s.makerSession.Exchange.PlatformFeeCurrency()
-				if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuote); ok {
+				if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuoteCurrency); ok {
 					s.Position.SetFeeAverageCost(feeToken, feePrice)
 				}
 			},
