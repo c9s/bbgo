@@ -143,7 +143,7 @@ func (s *Strategy) Initialize() error {
 		s.deviationDetectors[currency].SetLogger(log)
 	}
 
-	s.deltaGaugesMap = make(map[string]prometheus.Gauge)
+	s.deltaGaugesMap = make(map[deltaGaugeKey]prometheus.Gauge)
 
 	return nil
 }
