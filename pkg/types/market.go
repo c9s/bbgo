@@ -303,10 +303,14 @@ func (m MarketMap) Add(markets ...Market) {
 	}
 }
 
-func (m MarketMap) Merge(marketMap MarketMap) {
+func (m MarketMap) Merge(marketMap MarketMap) MarketMap {
+	var result = make(MarketMap, len(m))
+
 	for symbol, market := range marketMap {
-		m[symbol] = market
+		result[symbol] = market
 	}
+
+	return result
 }
 
 func (m MarketMap) Has(symbol string) bool {
