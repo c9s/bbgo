@@ -2036,6 +2036,14 @@ func (s *Strategy) Validate() error {
 		return errors.New("symbol is required")
 	}
 
+	if s.MakerSession == "" {
+		return errors.New("maker session is required")
+	}
+
+	if s.HedgeSession == "" {
+		return errors.New("hedge session is required")
+	}
+
 	return nil
 }
 
