@@ -80,7 +80,7 @@ type Strategy struct {
 
 	activeTransferNotificationLimiter *rate.Limiter
 
-	gaugeMetrics map[string]prometheus.Gauge
+	deltaGaugesMap map[deltaGaugeKey]prometheus.Gauge
 }
 
 func (s *Strategy) ID() string {
@@ -143,7 +143,7 @@ func (s *Strategy) Initialize() error {
 		s.deviationDetectors[currency].SetLogger(log)
 	}
 
-	s.gaugeMetrics = make(map[string]prometheus.Gauge)
+	s.deltaGaugesMap = make(map[string]prometheus.Gauge)
 
 	return nil
 }

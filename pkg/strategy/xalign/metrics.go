@@ -5,6 +5,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+type deltaGaugeKey struct {
+	currency string
+	side     string
+	typ      string
+}
+
 var quantityDeltaMetrics = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "xalign_balance_quantity_delta",
@@ -23,10 +29,17 @@ var amountDeltaMetrics = promauto.NewGaugeVec(
 
 func (s *Strategy) updateMetrics(currency string, side string, quantityDelta float64, amountDelta float64) {
 	var quantityGauge, amountGauge prometheus.Gauge
-	key := currency + "_" + side
-	qKey := key + "_quantity"
-	aKey := key + "_amount"
-	if g, ok := s.gaugeMetrics[qKey]; ok {
+	qKey := deltaGaugeKey{
+		currency: currency,
+		side:     side,
+		typ:      "quantity",
+	}
+	aKey := deltaGaugeKey{
+		currency: currency,
+		side:     side,
+		typ:      "amount",
+	}
+	if g, ok := s.deltaGaugesMap[qKey]; ok {
 		quantityGauge = g
 	} else {
 		quantityGauge = quantityDeltaMetrics.With(
@@ -35,9 +48,9 @@ func (s *Strategy) updateMetrics(currency string, side string, quantityDelta flo
 				"side":  side,
 			},
 		)
-		s.gaugeMetrics[qKey] = quantityGauge
+		s.deltaGaugesMap[qKey] = quantityGauge
 	}
-	if g, ok := s.gaugeMetrics[aKey]; ok {
+	if g, ok := s.deltaGaugesMap[aKey]; ok {
 		amountGauge = g
 	} else {
 		amountGauge = amountDeltaMetrics.With(
@@ -46,7 +59,7 @@ func (s *Strategy) updateMetrics(currency string, side string, quantityDelta flo
 				"side":  side,
 			},
 		)
-		s.gaugeMetrics[aKey] = amountGauge
+		s.deltaGaugesMap[aKey] = amountGauge
 	}
 
 	quantityGauge.Set(quantityDelta)
