@@ -799,7 +799,7 @@ func (s *Strategy) detectActiveDeposit(
 	sessions map[string]*bbgo.ExchangeSession,
 ) ([]types.Deposit, error) {
 	var err2 error
-	var activeDeposit []types.Deposit
+	var activeDeposits []types.Deposit
 	until := time.Now()
 	since := until.Add(-time.Hour * 24)
 	for _, session := range sessions {
@@ -819,10 +819,10 @@ func (s *Strategy) detectActiveDeposit(
 			log.Infof("checking deposit status: %s", deposit.String())
 			switch deposit.Status {
 			case types.DepositPending:
-				activeDeposit = append(activeDeposit, deposit)
+				activeDeposits = append(activeDeposits, deposit)
 			}
 		}
 	}
 
-	return activeDeposit, err2
+	return activeDeposits, err2
 }
