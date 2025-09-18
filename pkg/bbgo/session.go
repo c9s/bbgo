@@ -71,7 +71,9 @@ func (sessions ExchangeSessionMap) CollectMarkets(preferredSessions []string) ty
 	sort.Sort(sort.Reverse(sort.StringSlice(preferredSessions)))
 	for _, sessionName := range preferredSessions {
 		if session, ok := sessions[sessionName]; ok {
-			allMarkets.Merge(session.Markets())
+			for symbol, market := range session.Markets() {
+				allMarkets[symbol] = market
+			}
 		}
 	}
 
