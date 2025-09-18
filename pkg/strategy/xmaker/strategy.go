@@ -2343,12 +2343,13 @@ func (s *Strategy) CrossRun(
 	}
 
 	// initialize the price resolver
-	allMarkets := s.makerSession.Markets()
+	makerMarkets := s.makerSession.Markets()
 	sourceMarkets := s.sourceSession.Markets()
 	if len(sourceMarkets) == 0 {
 		return fmt.Errorf("source exchange %s has no markets", s.SourceExchange)
 	}
-	allMarkets.Merge(sourceMarkets)
+	allMarkets := makerMarkets.Merge(sourceMarkets)
+
 	s.priceSolver = pricesolver.NewSimplePriceResolver(allMarkets)
 	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
 	s.sourceSession.UserDataStream.OnTradeUpdate(s.priceSolver.UpdateFromTrade)
