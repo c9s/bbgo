@@ -124,7 +124,7 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Initialize() error {
-	s.activeTransferNotificationLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
+	s.activeTransferNotificationLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 5)
 
 	s.sessions = make(map[string]*bbgo.ExchangeSession)
 	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
@@ -584,6 +584,9 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 	}
 	if s.SkipAlignOnAnyActiveTransfer && activeTransferExists {
 		log.Info("balance alignment will be skipped due to active transfer")
+		bbgo.Notify(
+			"Balance alignment will be skipped due to active transfer",
+		)
 	}
 
 	totalBalances, _, err := sessions.AggregateBalances(ctx, false)
@@ -630,6 +633,10 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 		if activeTransferExists {
 			if isActive, ok := activeTransferMap[currency]; ok && isActive {
 				log.Infof("skip balance alignment due to active transfer: %s", currency)
+				bbgo.Notify(
+					"Skip balance alignment for %s due to active transfer",
+					currency,
+				)
 				continue
 			}
 		}
