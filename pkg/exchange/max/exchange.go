@@ -256,10 +256,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.Order, error) {
 	market := toLocalSymbol(symbol)
-	walletType := maxapi.WalletTypeSpot
-	if e.MarginSettings.IsMargin {
-		walletType = maxapi.WalletTypeMargin
-	}
+	walletType := e.getWalletType()
 
 	// timestamp can't be negative, so we need to use time which epochtime is > 0
 	since, err := e.getLaunchDate()
@@ -345,10 +342,7 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(
 	}
 
 	market := toLocalSymbol(symbol)
-	walletType := maxapi.WalletTypeSpot
-	if e.MarginSettings.IsMargin {
-		walletType = maxapi.WalletTypeMargin
-	}
+	walletType := e.getWalletType()
 
 	if lastOrderID == 0 {
 		lastOrderID = 1
@@ -401,10 +395,8 @@ func (e *Exchange) queryClosedOrdersByTime(
 	}
 
 	market := toLocalSymbol(symbol)
-	walletType := maxapi.WalletTypeSpot
-	if e.MarginSettings.IsMargin {
-		walletType = maxapi.WalletTypeMargin
-	}
+
+	walletType := e.getWalletType()
 
 	req := e.v3client.NewGetWalletClosedOrdersRequest(walletType).
 		Market(market).
@@ -453,82 +445,43 @@ func (e *Exchange) queryClosedOrdersByTime(
 }
 
 func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
-	walletType := maxapi.WalletTypeSpot
-	if e.MarginSettings.IsMargin {
-		walletType = maxapi.WalletTypeMargin
-	}
-
+	walletType := e.getWalletType()
 	req := e.v3client.NewCancelWalletOrderAllRequest(walletType)
-	var orderResponses, err = req.Do(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var maxOrders []maxapi.Order
-	for _, resp := range orderResponses {
-		if resp.Error == nil {
-			maxOrders = append(maxOrders, resp.Order)
-		}
-	}
-
-	return toGlobalOrders(maxOrders)
+	orderResponses, err := req.Do(ctx)
+	return convertCancelOrderResponses(orderResponses, err)
 }
 
 func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error) {
-	market := toLocalSymbol(symbol)
-	walletType := maxapi.WalletTypeSpot
-	if e.MarginSettings.IsMargin {
-		walletType = maxapi.WalletTypeMargin
-	}
-
+	walletType := e.getWalletType()
 	req := e.v3client.NewCancelWalletOrderAllRequest(walletType)
-	req.Market(market)
+	req.Market(toLocalSymbol(symbol))
+	orderResponses, err := req.Do(ctx)
+	return convertCancelOrderResponses(orderResponses, err)
+}
 
-	var orderResponses, err = req.Do(ctx)
-	if err != nil {
-		return nil, err
-	}
+func (e *Exchange) CancelOrdersBySymbolSide(
+	ctx context.Context, symbol string, side types.SideType,
+) ([]types.Order, error) {
+	walletType := e.getWalletType()
+	req := e.v3client.NewCancelWalletOrderAllRequest(walletType)
+	req.Market(toLocalSymbol(symbol)).
+		Side(toLocalSideType(side))
 
-	var maxOrders []maxapi.Order
-	for _, resp := range orderResponses {
-		if resp.Error == nil {
-			maxOrders = append(maxOrders, resp.Order)
-		}
-	}
-
-	return toGlobalOrders(maxOrders)
+	orderResponses, err := req.Do(ctx)
+	return convertCancelOrderResponses(orderResponses, err)
 }
 
 func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([]types.Order, error) {
-	walletType := maxapi.WalletTypeSpot
-	if e.MarginSettings.IsMargin {
-		walletType = maxapi.WalletTypeMargin
-	}
-
+	walletType := e.getWalletType()
 	req := e.v3client.NewCancelWalletOrderAllRequest(walletType)
 	req.GroupID(groupID)
 
-	var orderResponses, err = req.Do(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var maxOrders []maxapi.Order
-	for _, resp := range orderResponses {
-		if resp.Error == nil {
-			maxOrders = append(maxOrders, resp.Order)
-		}
-	}
-
-	return toGlobalOrders(maxOrders)
+	orderResponses, err := req.Do(ctx)
+	return convertCancelOrderResponses(orderResponses, err)
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
-	walletType := maxapi.WalletTypeSpot
-	if e.MarginSettings.IsMargin {
-		walletType = maxapi.WalletTypeMargin
-	}
-
+	var walletType = e.getWalletType()
 	var groupIDs = make(map[uint32]struct{})
 	var orphanOrders []types.Order
 	for _, o := range orders {
@@ -1306,6 +1259,14 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(
 	return amount, fmt.Errorf("borrowing limit of %s not found", asset)
 }
 
+func (e *Exchange) getWalletType() maxapi.WalletType {
+	if e.MarginSettings.IsMargin {
+		return maxapi.WalletTypeMargin
+	}
+
+	return maxapi.WalletTypeSpot
+}
+
 // DefaultFeeRates returns the MAX VIP 0 fee schedule
 // See also https://max-vip-zh.maicoin.com/
 func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
@@ -1346,4 +1307,21 @@ func logResponse(resp interface{}, err error, req interface{}) error {
 
 	log.Infof("%T: response: %+v", req, resp)
 	return nil
+}
+
+func convertCancelOrderResponses(resps []v3.OrderCancelResponse, err error) ([]types.Order, error) {
+	if err != nil {
+		return nil, fmt.Errorf("cancel orders error: %w", err)
+	}
+
+	var maxOrders []maxapi.Order
+	for _, resp := range resps {
+		if resp.Error != nil {
+			log.Warnf("cancel order error: %s", *resp.Error)
+		} else {
+			maxOrders = append(maxOrders, resp.Order)
+		}
+	}
+
+	return toGlobalOrders(maxOrders)
 }
