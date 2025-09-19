@@ -6,45 +6,45 @@ import (
 )
 
 type deltaGaugeKey struct {
-	currency string
-	side     string
-	typ      string
+	asset string
+	side  string
+	typ   string
 }
 
 var quantityDeltaMetrics = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "xalign_balance_quantity_delta",
-		Help: "The balance delta of the currency",
+		Help: "The balance delta of the asset",
 	},
-	[]string{"currency", "side"},
+	[]string{"asset", "side"},
 )
 
 var amountDeltaMetrics = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "xalign_balance_amount_delta",
-		Help: "The balance delta of the quote amount of the currency",
+		Help: "The balance delta of the quote amount of the asset",
 	},
-	[]string{"currency", "side"},
+	[]string{"asset", "side"},
 )
 
-func (s *Strategy) updateMetrics(currency string, side string, quantityDelta float64, amountDelta float64) {
+func (s *Strategy) updateMetrics(asset string, side string, quantityDelta float64, amountDelta float64) {
 	var quantityGauge, amountGauge prometheus.Gauge
 	qKey := deltaGaugeKey{
-		currency: currency,
-		side:     side,
-		typ:      "quantity",
+		asset: asset,
+		side:  side,
+		typ:   "quantity",
 	}
 	aKey := deltaGaugeKey{
-		currency: currency,
-		side:     side,
-		typ:      "amount",
+		asset: asset,
+		side:  side,
+		typ:   "amount",
 	}
 	if g, ok := s.deltaGaugesMap[qKey]; ok {
 		quantityGauge = g
 	} else {
 		quantityGauge = quantityDeltaMetrics.With(
 			prometheus.Labels{
-				"asset": currency,
+				"asset": asset,
 				"side":  side,
 			},
 		)
@@ -55,7 +55,7 @@ func (s *Strategy) updateMetrics(currency string, side string, quantityDelta flo
 	} else {
 		amountGauge = amountDeltaMetrics.With(
 			prometheus.Labels{
-				"asset": currency,
+				"asset": asset,
 				"side":  side,
 			},
 		)
