@@ -583,8 +583,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 		}
 	}
 	if s.SkipAlignOnAnyActiveTransfer && activeTransferExists {
-		log.Info("skip balance align check due to active transfer")
-		return
+		log.Info("balance alignment will be skipped due to active transfer")
 	}
 
 	totalBalances, _, err := sessions.AggregateBalances(ctx, false)
@@ -623,10 +622,14 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 			quantity.Float64(),
 			amount.Float64(),
 		)
+		if s.SkipAlignOnAnyActiveTransfer && activeTransferExists {
+			// if there is any active transfer and SkipAlignOnAnyActiveTransfer is true, skip all alignment
+			continue
+		}
 
 		if activeTransferExists {
 			if isActive, ok := activeTransferMap[currency]; ok && isActive {
-				log.Infof("skip balance align check due to active transfer: %s", currency)
+				log.Infof("skip balance alignment due to active transfer: %s", currency)
 				continue
 			}
 		}
