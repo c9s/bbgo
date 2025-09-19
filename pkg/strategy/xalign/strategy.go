@@ -10,6 +10,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -124,7 +125,7 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Initialize() error {
-	s.activeTransferNotificationLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 5)
+	s.activeTransferNotificationLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
 
 	s.sessions = make(map[string]*bbgo.ExchangeSession)
 	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
@@ -501,14 +502,52 @@ func (s *Strategy) recordBalances(totalBalances types.BalanceMap, now time.Time)
 	}
 }
 
+type AssetTransfer struct {
+	Withdraws []types.Withdraw
+	Deposits  []types.Deposit
+}
+
+func (at *AssetTransfer) SlackAttachment() slack.Attachment {
+	var fields []slack.AttachmentField
+	var depositStrs, withdrawStrs []string
+
+	for _, withdraw := range at.Withdraws {
+		withdrawStrs = append(withdrawStrs, withdraw.String())
+	}
+	if len(withdrawStrs) > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Withdrawals",
+			Value: strings.Join(withdrawStrs, "\n"),
+		})
+	}
+
+	for _, deposit := range at.Deposits {
+		depositStrs = append(depositStrs, deposit.String())
+	}
+
+	if len(depositStrs) > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Deposits",
+			Value: strings.Join(depositStrs, "\n"),
+		})
+	}
+
+	return slack.Attachment{
+		Title:  "Active Asset Transfer",
+		Text:   fmt.Sprintf("Found %d active transfers", len(at.Withdraws)+len(at.Deposits)),
+		Fields: fields,
+	}
+}
+
 // canAlign checks if the strategy can align the balances by checking for active transfers.
-// It returns a map of currencies as keys and a boolean indicating if there are active transfers for that currency.
-func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) (map[string]struct{}, error) {
+// It returns a map of currencies as keys and their corresponding active transfers.
+// If the asset is not involved in any active transfer, it will not be included in the map.
+func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) (map[string]*AssetTransfer, error) {
 	if s.SkipTransferCheck {
 		return nil, nil
 	}
 
-	activeTransferMap := make(map[string]struct{})
+	activeTransfers := make(map[string]*AssetTransfer)
 	pendingWithdraws, err := s.detectActiveWithdraw(ctx, sessions)
 	if err != nil {
 		return nil, fmt.Errorf("unable to check active transfers (withdraw): %w", err)
@@ -519,14 +558,12 @@ func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.Excha
 			pendingWithdraw.Amount.Float64(),
 			pendingWithdraw.Asset)
 		s.resetFaultBalanceRecords(pendingWithdraw.Asset)
-		activeTransferMap[pendingWithdraw.Asset] = struct{}{}
-	}
-
-	if s.activeTransferNotificationLimiter.Allow() {
-		for _, pendingWithdraw := range pendingWithdraws {
-			bbgo.Notify("Found active %s withdraw",
-				pendingWithdraw,
-				pendingWithdraw)
+		if at, ok := activeTransfers[pendingWithdraw.Asset]; ok {
+			at.Withdraws = append(at.Withdraws, pendingWithdraw)
+		} else {
+			activeTransfers[pendingWithdraw.Asset] = &AssetTransfer{
+				Withdraws: []types.Withdraw{pendingWithdraw},
+			}
 		}
 	}
 
@@ -541,18 +578,16 @@ func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.Excha
 			pendingDeposit.Asset)
 
 		s.resetFaultBalanceRecords(pendingDeposit.Asset)
-		activeTransferMap[pendingDeposit.Asset] = struct{}{}
-	}
-
-	if s.activeTransferNotificationLimiter.Allow() {
-		for _, pendingDeposit := range pendingDeposits {
-			bbgo.Notify("Found active %s deposit",
-				pendingDeposit.Asset,
-				pendingDeposit)
+		if at, ok := activeTransfers[pendingDeposit.Asset]; ok {
+			at.Deposits = append(at.Deposits, pendingDeposit)
+		} else {
+			activeTransfers[pendingDeposit.Asset] = &AssetTransfer{
+				Deposits: []types.Deposit{pendingDeposit},
+			}
 		}
 	}
 
-	return activeTransferMap, nil
+	return activeTransfers, nil
 }
 
 func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) {
@@ -569,18 +604,25 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 	}
 
 	// detect if there is any active transfer for this currency. Skip aligning if there is any.
-	activeTransferMap, err := s.canAlign(ctx, sessions)
+	activeTransfers, err := s.canAlign(ctx, sessions)
 	if err != nil {
 		log.WithError(err).Errorf("unable to transfer activities")
 		return
 	}
 
-	var activeTransferExists bool = len(activeTransferMap) > 0
+	activeTransferExists := len(activeTransfers) > 0
 	if s.SkipAlignOnAnyActiveTransfer && activeTransferExists {
 		log.Info("balance alignment will be skipped due to active transfer")
-		bbgo.Notify(
-			"Balance alignment will be skipped due to active transfer",
-		)
+		if s.activeTransferNotificationLimiter.Allow() {
+			assetNames := ""
+			for asset := range activeTransfers {
+				assetNames += asset + " "
+			}
+			bbgo.Notify(
+				"Balance alignment will be skipped due to active transfer on assets: %s",
+				assetNames,
+			)
+		}
 	}
 
 	totalBalances, _, err := sessions.AggregateBalances(ctx, false)
@@ -625,12 +667,15 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 		}
 
 		if activeTransferExists {
-			if _, ok := activeTransferMap[currency]; ok {
+			if transfer, ok := activeTransfers[currency]; ok {
 				log.Infof("skip balance alignment due to active transfer: %s", currency)
-				bbgo.Notify(
-					"Skip balance alignment for %s due to active transfer",
-					currency,
-				)
+				if s.activeTransferNotificationLimiter.Allow() {
+					bbgo.Notify(
+						"Skip balance alignment for %s due to active transfer",
+						currency,
+						transfer,
+					)
+				}
 				continue
 			}
 		}

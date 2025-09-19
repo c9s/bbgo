@@ -6,62 +6,62 @@ import (
 )
 
 type deltaGaugeKey struct {
-	asset string
-	side  string
-	typ   string
+	currency string
+	side     string
+	typ      string
 }
 
 var quantityDeltaMetrics = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "xalign_balance_quantity_delta",
-		Help: "The balance delta of the asset",
+		Help: "The balance delta of the currency in quantity",
 	},
-	[]string{"asset", "side"},
+	[]string{"currency", "side"},
 )
 
 var amountDeltaMetrics = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "xalign_balance_amount_delta",
-		Help: "The balance delta of the quote amount of the asset",
+		Name: "xalign_balance_value_delta",
+		Help: "The balance delta of the currency in quote value",
 	},
-	[]string{"asset", "side"},
+	[]string{"currency", "side"},
 )
 
-func (s *Strategy) updateMetrics(asset string, side string, quantityDelta float64, amountDelta float64) {
-	var quantityGauge, amountGauge prometheus.Gauge
+func (s *Strategy) updateMetrics(currency string, side string, quantityDelta float64, valueDelta float64) {
+	var quantityGauge, valueGauge prometheus.Gauge
 	qKey := deltaGaugeKey{
-		asset: asset,
-		side:  side,
-		typ:   "quantity",
+		currency: currency,
+		side:     side,
+		typ:      "quantity",
 	}
-	aKey := deltaGaugeKey{
-		asset: asset,
-		side:  side,
-		typ:   "amount",
+	vKey := deltaGaugeKey{
+		currency: currency,
+		side:     side,
+		typ:      "value",
 	}
 	if g, ok := s.deltaGaugesMap[qKey]; ok {
 		quantityGauge = g
 	} else {
 		quantityGauge = quantityDeltaMetrics.With(
 			prometheus.Labels{
-				"asset": asset,
-				"side":  side,
+				"currency": currency,
+				"side":     side,
 			},
 		)
 		s.deltaGaugesMap[qKey] = quantityGauge
 	}
-	if g, ok := s.deltaGaugesMap[aKey]; ok {
-		amountGauge = g
+	if g, ok := s.deltaGaugesMap[vKey]; ok {
+		valueGauge = g
 	} else {
-		amountGauge = amountDeltaMetrics.With(
+		valueGauge = amountDeltaMetrics.With(
 			prometheus.Labels{
-				"asset": asset,
-				"side":  side,
+				"currency": currency,
+				"side":     side,
 			},
 		)
-		s.deltaGaugesMap[aKey] = amountGauge
+		s.deltaGaugesMap[vKey] = valueGauge
 	}
 
 	quantityGauge.Set(quantityDelta)
-	amountGauge.Set(amountDelta)
+	valueGauge.Set(valueDelta)
 }
