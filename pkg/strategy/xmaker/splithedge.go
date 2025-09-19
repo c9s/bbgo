@@ -271,7 +271,7 @@ func (h *SplitHedge) Start(ctx context.Context) error {
 		hedgeMarket.WaitForReady(ctx)
 	}
 
-	h.logger.Infof("splitHedge: source market and fiat market are ready")
+	h.logger.Infof("splitHedge: hedge markets are ready")
 	return nil
 }
 

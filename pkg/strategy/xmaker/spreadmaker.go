@@ -26,7 +26,7 @@ type SpreadMaker struct {
 
 	MakerOnly bool `json:"makerOnly"`
 
-	// order is the current spread maker order on the maker exchange
+	// order is the current spread maker order on the maker makerExchange
 	order *types.Order
 
 	// orderStore stores the history maker orders
