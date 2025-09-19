@@ -503,12 +503,12 @@ func (s *Strategy) recordBalances(totalBalances types.BalanceMap, now time.Time)
 
 // canAlign checks if the strategy can align the balances by checking for active transfers.
 // It returns a map of currencies as keys and a boolean indicating if there are active transfers for that currency.
-func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) (map[string]bool, error) {
+func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) (map[string]struct{}, error) {
 	if s.SkipTransferCheck {
 		return nil, nil
 	}
 
-	activeTransferMap := make(map[string]bool)
+	activeTransferMap := make(map[string]struct{})
 	pendingWithdraws, err := s.detectActiveWithdraw(ctx, sessions)
 	if err != nil {
 		return nil, fmt.Errorf("unable to check active transfers (withdraw): %w", err)
@@ -519,7 +519,7 @@ func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.Excha
 			pendingWithdraw.Amount.Float64(),
 			pendingWithdraw.Asset)
 		s.resetFaultBalanceRecords(pendingWithdraw.Asset)
-		activeTransferMap[pendingWithdraw.Asset] = true
+		activeTransferMap[pendingWithdraw.Asset] = struct{}{}
 	}
 
 	if s.activeTransferNotificationLimiter.Allow() {
@@ -541,7 +541,7 @@ func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.Excha
 			pendingDeposit.Asset)
 
 		s.resetFaultBalanceRecords(pendingDeposit.Asset)
-		activeTransferMap[pendingDeposit.Asset] = true
+		activeTransferMap[pendingDeposit.Asset] = struct{}{}
 	}
 
 	if s.activeTransferNotificationLimiter.Allow() {
@@ -575,13 +575,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 		return
 	}
 
-	var activeTransferExists bool = false
-	for _, isActive := range activeTransferMap {
-		if isActive {
-			activeTransferExists = true
-			break
-		}
-	}
+	var activeTransferExists bool = len(activeTransferMap) > 0
 	if s.SkipAlignOnAnyActiveTransfer && activeTransferExists {
 		log.Info("balance alignment will be skipped due to active transfer")
 		bbgo.Notify(
@@ -631,7 +625,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 		}
 
 		if activeTransferExists {
-			if isActive, ok := activeTransferMap[currency]; ok && isActive {
+			if _, ok := activeTransferMap[currency]; ok {
 				log.Infof("skip balance alignment due to active transfer: %s", currency)
 				bbgo.Notify(
 					"Skip balance alignment for %s due to active transfer",
