@@ -25,6 +25,10 @@ type StreamBookSetter interface {
 	SetStreamBook(book *types.StreamOrderBook)
 }
 
+type MarketTradeStreamSetter interface {
+	SetMarketTradeStream(stream types.Stream)
+}
+
 type OrderBookBestPriceVolumeSignal struct {
 	BaseProvider
 	Logger

@@ -181,9 +181,9 @@ func newHedgeMarket(
 
 	// default logger
 	logFields := logrus.Fields{
-		"session":      session.Name,
-		"exchange":     session.ExchangeName,
-		"hedge_market": market.Symbol,
+		"session":       session.Name,
+		"makerExchange": session.ExchangeName,
+		"hedge_market":  market.Symbol,
 	}
 	logger := log.WithFields(logFields)
 
@@ -255,9 +255,9 @@ func newHedgeMarket(
 
 func (m *HedgeMarket) SetLogger(logger logrus.FieldLogger) {
 	m.logger = logger.WithFields(logrus.Fields{
-		"session":      m.session.Name,
-		"exchange":     m.session.ExchangeName,
-		"hedge_market": m.market.Symbol,
+		"session":       m.session.Name,
+		"makerExchange": m.session.ExchangeName,
+		"hedge_market":  m.market.Symbol,
 	})
 }
 

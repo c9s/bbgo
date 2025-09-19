@@ -159,7 +159,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 			baseQuantity = trade.Quantity.Div(avgCost)
 		} else {
 			// To handle the case where the source market's quote currency is not the fiat market's base currency:
-			// Assume it's TWD/USDT, the exchange rate is 0.03125 when USDT/TWD is at 32.0,
+			// Assume it's TWD/USDT, the makerExchange rate is 0.03125 when USDT/TWD is at 32.0,
 			// and trade quantity is in TWD,
 			// so we need to convert Quantity from TWD to USDT unit by div
 			baseQuantity = avgCost.Div(trade.Quantity.Div(trade.Price))
@@ -214,7 +214,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 
 // Hedge is the main function to perform the synthetic hedging:
 // 1) use the snapshot price as the source average cost
-// 2) submit the hedge order to the source exchange
+// 2) submit the hedge order to the source makerExchange
 // 3) query trades from of the hedge order.
 // 4) build up the source hedge position for the average cost.
 // 5) submit fiat hedge order to the fiat market to convert the quote.

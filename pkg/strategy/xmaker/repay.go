@@ -27,7 +27,7 @@ func tryToRepayDebts(ctx context.Context, session *bbgo.ExchangeSession) bool {
 	balances := account.Balances()
 	debts := balances.Debts()
 
-	log.Infof("trying to repay debts %+v on hedge exchange %s", debts, session.Exchange.Name())
+	log.Infof("trying to repay debts %+v on hedge makerExchange %s", debts, session.Exchange.Name())
 
 	repayables := make(map[string]fixedpoint.Value)
 	for asset, bal := range debts {
