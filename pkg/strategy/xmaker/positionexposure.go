@@ -11,21 +11,21 @@ var positionExposurePendingMetrics = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_position_exposure_pending",
 		Help: "the pending position exposure",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"},
+	}, []string{"strategy_type", "strategy_id", "makerExchange", "symbol"},
 )
 
 var positionExposureNetMetrics = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_position_exposure_net",
 		Help: "the net position exposure",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"},
+	}, []string{"strategy_type", "strategy_id", "makerExchange", "symbol"},
 )
 
 var positionExposureUncoveredMetrics = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_position_exposure_uncovered",
 		Help: "the uncovered position exposure",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"},
+	}, []string{"strategy_type", "strategy_id", "makerExchange", "symbol"},
 )
 
 var positionExposureSizeMetrics = promauto.NewHistogramVec(
@@ -33,7 +33,7 @@ var positionExposureSizeMetrics = promauto.NewHistogramVec(
 		Name:    "bbgo_position_exposure_size",
 		Help:    "the size of position exposure",
 		Buckets: prometheus.LinearBuckets(0, 10, 10),
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"},
+	}, []string{"strategy_type", "strategy_id", "makerExchange", "symbol"},
 )
 
 //go:generate callbackgen -type PositionExposure
@@ -115,7 +115,7 @@ func (m *PositionExposure) SetMetricsLabels(strategyType, strategyID, exchange, 
 	m.labels = prometheus.Labels{
 		"strategy_type": strategyType,
 		"strategy_id":   strategyID,
-		"exchange":      exchange,
+		"makerExchange": exchange,
 		"symbol":        symbol,
 	}
 

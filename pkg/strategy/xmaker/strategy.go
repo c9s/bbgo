@@ -48,6 +48,16 @@ var log = logrus.WithField("strategy", ID)
 
 func nopCover(v fixedpoint.Value) {}
 
+type connector interface {
+	Connect(ctx context.Context) error
+}
+
+type cancelOrdersBySymbolSide interface {
+	CancelOrdersBySymbolSide(
+		ctx context.Context, symbol string, side types.SideType,
+	) ([]types.Order, error)
+}
+
 type MutexFloat64 struct {
 	value float64
 	mu    sync.Mutex
@@ -139,8 +149,6 @@ type Strategy struct {
 	SourceDepthLevel types.Depth `json:"sourceDepthLevel"`
 	MakerOnly        bool        `json:"makerOnly"`
 
-	// EnableDelayHedge enables the delay hedge feature
-	EnableDelayHedge bool `json:"enableDelayHedge"`
 	// MaxHedgeDelayDuration is the maximum delay duration to hedge the position
 	MaxDelayHedgeDuration     types.Duration `json:"maxHedgeDelayDuration"`
 	DelayHedgeSignalThreshold float64        `json:"delayHedgeSignalThreshold"`
@@ -150,6 +158,8 @@ type Strategy struct {
 	SplitHedge *SplitHedge `json:"splitHedge,omitempty"`
 
 	SpreadMaker *SpreadMaker `json:"spreadMaker,omitempty"`
+
+	FastCancel *FastCancel `json:"fastCancel,omitempty"`
 
 	EnableBollBandMargin bool             `json:"enableBollBandMargin"`
 	BollBandInterval     types.Interval   `json:"bollBandInterval"`
@@ -244,7 +254,11 @@ type Strategy struct {
 	accountValueCalculator *bbgo.AccountValueCalculator
 
 	lastPrice fixedpoint.MutexValue
-	groupID   uint32
+
+	lastQuote  *Quote
+	quoteMutex sync.Mutex
+
+	groupID uint32
 
 	stopQuoteWorkerC chan struct{}
 	quoteWorkerDoneC chan struct{}
@@ -260,6 +274,11 @@ type Strategy struct {
 
 	sourceMarketDataConnectivity, sourceUserDataConnectivity *types.Connectivity
 	connectivityGroup                                        *types.ConnectivityGroup
+
+	// marketTradeStream is the trade stream of the source market (hedge market)
+	marketTradeStream types.Stream
+
+	makerBookStream, sourceBookStream types.Stream
 
 	// lastAggregatedSignal stores the last aggregated signal with mutex
 	// TODO: use float64 series instead, so that we can store history signal values
@@ -280,6 +299,8 @@ type Strategy struct {
 	openOrderAskExposureInUsdMetrics   prometheus.Gauge
 
 	simpleHedgeMode bool
+
+	connectors []connector
 }
 
 func (s *Strategy) ID() string {
@@ -365,7 +386,7 @@ func (s *Strategy) Initialize() error {
 	s.metricsLabels = prometheus.Labels{
 		"strategy_type": ID,
 		"strategy_id":   s.InstanceID(),
-		"exchange":      s.MakerExchange,
+		"makerExchange": s.MakerExchange,
 		"symbol":        s.Symbol,
 	}
 
@@ -439,6 +460,19 @@ func (s *Strategy) resetPositionStartTime() {
 	s.positionStartedAtMutex.Lock()
 	s.positionStartedAt = nil
 	s.positionStartedAtMutex.Unlock()
+}
+
+func (s *Strategy) setLastQuote(quote *Quote) {
+	s.quoteMutex.Lock()
+	s.lastQuote = quote
+	s.quoteMutex.Unlock()
+}
+
+func (s *Strategy) getLastQuote() (quote *Quote) {
+	s.quoteMutex.Lock()
+	quote = s.lastQuote
+	s.quoteMutex.Unlock()
+	return quote
 }
 
 func (s *Strategy) getPositionHoldingPeriod(now time.Time) (time.Duration, bool) {
@@ -973,7 +1007,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		}
 	} else {
 		if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
-			// to make bid orders, we need enough base asset in the foreign exchange,
+			// to make bid orders, we need enough base asset in the foreign makerExchange,
 			// if the base asset balance is not enough for selling
 			if s.StopHedgeBaseBalance.Sign() > 0 {
 				minAvailable := s.StopHedgeBaseBalance.Add(s.sourceMarket.MinQuantity)
@@ -992,7 +1026,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		}
 
 		if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
-			// to make ask orders, we need enough quote asset in the foreign exchange,
+			// to make ask orders, we need enough quote asset in the foreign makerExchange,
 			// if the quote asset balance is not enough for buying
 			if s.StopHedgeQuoteBalance.Sign() > 0 {
 				minAvailable := s.StopHedgeQuoteBalance.Add(s.sourceMarket.MinNotional)
@@ -1044,9 +1078,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		orderType = types.OrderTypeLimitMaker
 	}
 
-	var submitOrders []types.SubmitOrder
-
-	var quote = &Quote{
+	quote := &Quote{
 		BestBidPrice: bestBidPrice,
 		BestAskPrice: bestAskPrice,
 		BidMargin:    s.BidMargin,
@@ -1059,8 +1091,9 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		if err := s.applySignalMargin(ctx, quote); err != nil {
 			s.logger.WithError(err).Errorf("unable to apply signal margin")
 		}
-
 	}
+
+	s.setLastQuote(quote)
 
 	bidExposureInUsd := fixedpoint.Zero
 	askExposureInUsd := fixedpoint.Zero
@@ -1077,7 +1110,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		}
 	}
 
-	var bidSourcePricer = pricer.FromBestPrice(types.SideTypeBuy, s.sourceBook)
+	bidSourcePricer := pricer.FromBestPrice(types.SideTypeBuy, s.sourceBook)
 	coverBidDepth := nopCover
 	if s.UseDepthPrice {
 		bidCoveredDepth := pricer.NewCoveredDepth(s.depthSourceBook, types.SideTypeBuy, s.DepthQuantity)
@@ -1091,7 +1124,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		pricer.AdjustByTick(types.SideTypeBuy, quote.BidLayerPips, s.makerMarket.TickSize),
 	))...)
 
-	var askSourcePricer = pricer.FromBestPrice(types.SideTypeSell, s.sourceBook)
+	askSourcePricer := pricer.FromBestPrice(types.SideTypeSell, s.sourceBook)
 	coverAskDepth := nopCover
 	if s.UseDepthPrice {
 		askCoveredDepth := pricer.NewCoveredDepth(s.depthSourceBook, types.SideTypeSell, s.DepthQuantity)
@@ -1105,6 +1138,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		pricer.AdjustByTick(types.SideTypeSell, quote.BidLayerPips, s.makerMarket.TickSize),
 	))...)
 
+	// build up maker orders
+	var submitOrders []types.SubmitOrder
 	if !disableMakerBid {
 		for i := 0; i < s.NumLayers; i++ {
 			bidQuantity, err := s.getInitialLayerQuantity(i)
@@ -1284,7 +1319,7 @@ func (s *Strategy) makerOrderCreateCallback(createdOrder types.Order) {
 	s.activeMakerOrders.Add(createdOrder)
 }
 
-// tryArbitrage tries to arbitrage between the source and maker exchange
+// tryArbitrage tries to arbitrage between the source and maker makerExchange
 func (s *Strategy) tryArbitrage(
 	ctx context.Context, quote *Quote, makerBalances, hedgeBalances types.BalanceMap, disableBid, disableAsk bool,
 ) (bool, error) {
@@ -1975,6 +2010,13 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 
 	defer close(s.quoteWorkerDoneC)
 
+	marketTradeC := make(chan types.Trade)
+	fastCancelFn := func(_ context.Context, _ types.Trade) {}
+	if s.FastCancel != nil && s.FastCancel.Enabled && s.FastCancel.MarketTradeC != nil {
+		marketTradeC = s.FastCancel.MarketTradeC
+		fastCancelFn = s.FastCancel.fastCancel
+	}
+
 	ticker := time.NewTicker(timejitter.Milliseconds(s.UpdateInterval.Duration(), 200))
 	defer ticker.Stop()
 
@@ -1986,6 +2028,10 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 
 	for {
 		select {
+
+		case marketTrade := <-marketTradeC:
+			s.logger.Info(marketTrade)
+			fastCancelFn(ctx, marketTrade)
 
 		case <-s.stopQuoteWorkerC:
 			s.logger.Warnf("%s quote worker is exiting due to the stop signal", s.Symbol)
@@ -2061,6 +2107,12 @@ func (s *Strategy) getCoveredPosition() fixedpoint.Value {
 
 func (s *Strategy) getUncoveredPosition() fixedpoint.Value {
 	return s.positionExposure.GetUncovered()
+}
+
+func (s *Strategy) cancelSideOrders(side types.SideType) error {
+	// s.makerSession.Exchange
+
+	return nil
 }
 
 func (s *Strategy) hedgeWorker(ctx context.Context) {
@@ -2152,14 +2204,14 @@ func (s *Strategy) CrossRun(
 	// configure sessions
 	sourceSession, ok := sessions[s.SourceExchange]
 	if !ok {
-		return fmt.Errorf("source exchange session %s is not defined", s.SourceExchange)
+		return fmt.Errorf("source makerExchange session %s is not defined", s.SourceExchange)
 	}
 
 	s.sourceSession = sourceSession
 
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
-		return fmt.Errorf("maker exchange session %s is not defined", s.MakerExchange)
+		return fmt.Errorf("maker makerExchange session %s is not defined", s.MakerExchange)
 	}
 
 	s.makerSession = makerSession
@@ -2190,7 +2242,7 @@ func (s *Strategy) CrossRun(
 			}
 		}
 
-		s.logger.Warnf("using sandbox exchange to simulate hedge with balances: %+v", balances)
+		s.logger.Warnf("using sandbox makerExchange to simulate hedge with balances: %+v", balances)
 
 		sandboxEx := sandbox.New(s.sourceSession.Exchange, s.sourceSession.MarketDataStream, s.SourceSymbol, balances)
 
@@ -2198,7 +2250,7 @@ func (s *Strategy) CrossRun(
 			return err
 		}
 
-		// replace the user data stream created in the exchange session
+		// replace the user data stream created in the makerExchange session
 		userDataStream := sandboxEx.GetUserDataStream()
 		s.sourceSession.Exchange = sandboxEx
 		s.sourceSession.UserDataStream = userDataStream
@@ -2268,7 +2320,7 @@ func (s *Strategy) CrossRun(
 	makerMarkets := s.makerSession.Markets()
 	sourceMarkets := s.sourceSession.Markets()
 	if len(sourceMarkets) == 0 {
-		return fmt.Errorf("source exchange %s has no markets", s.SourceExchange)
+		return fmt.Errorf("source makerExchange %s has no markets", s.SourceExchange)
 	}
 	allMarkets := makerMarkets.Merge(sourceMarkets)
 
@@ -2358,23 +2410,36 @@ func (s *Strategy) CrossRun(
 		}
 	}
 
-	if s.EnableArbitrage {
-		makerMarketStream := s.makerSession.Exchange.NewStream()
-		makerMarketStream.SetPublicOnly()
-		makerMarketStream.Subscribe(
-			types.BookChannel, s.Symbol, types.SubscribeOptions{
-				Depth: types.DepthLevelFull,
-				Speed: types.SpeedLow,
-			},
-		)
+	// allocate required isolated streams to the connectors
+	if (s.FastCancel != nil && s.FastCancel.Enabled) || (s.EnableSignalMargin && s.SignalConfigList != nil && len(s.SignalConfigList.Signals) > 0) {
+		s.marketTradeStream = bbgo.NewMarketTradeStream(s.sourceSession, s.SourceSymbol)
+		s.addConnector(s.marketTradeStream)
 
-		s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
-		s.makerBook.BindStream(makerMarketStream)
+	}
 
-		if err := makerMarketStream.Connect(s.tradingCtx); err != nil {
-			return err
+	if s.FastCancel != nil && s.FastCancel.Enabled {
+		if err := s.FastCancel.InitializeAndBind(sessions, s); err != nil {
+			return fmt.Errorf("fastCancel setup error: %w", err)
 		}
 	}
+
+	if s.EnableArbitrage {
+		s.makerBookStream = bbgo.NewBookStream(s.sourceSession, s.SourceSymbol)
+		s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
+		s.makerBook.BindStream(s.makerBookStream)
+		s.addConnector(s.makerBookStream)
+	}
+
+	// TODO: replace the following stream book with HedgeMarket integration
+	s.sourceBookStream = bbgo.NewBookStream(s.sourceSession, s.SourceSymbol, types.SubscribeOptions{
+		Depth: types.DepthLevelFull,
+		Speed: types.SpeedLow,
+	})
+	s.addConnector(s.sourceBookStream)
+
+	s.sourceBook = types.NewStreamBook(s.SourceSymbol, s.sourceSession.ExchangeName)
+	s.sourceBook.BindStream(s.sourceBookStream)
+	s.depthSourceBook = types.NewDepthBook(s.sourceBook)
 
 	s.CircuitBreaker.OnPanic(
 		func() {
@@ -2382,24 +2447,6 @@ func (s *Strategy) CrossRun(
 			panic(fmt.Errorf("panic triggered the circuit breaker on %s %s", s.MakerExchange, s.Symbol))
 		},
 	)
-
-	// TODO: replace this with HedgeMarket
-	sourceMarketStream := s.sourceSession.Exchange.NewStream()
-	sourceMarketStream.SetPublicOnly()
-	sourceMarketStream.Subscribe(
-		types.BookChannel, s.SourceSymbol, types.SubscribeOptions{
-			Depth: types.DepthLevelFull,
-			Speed: types.SpeedLow,
-		},
-	)
-
-	s.sourceBook = types.NewStreamBook(s.SourceSymbol, s.sourceSession.ExchangeName)
-	s.sourceBook.BindStream(sourceMarketStream)
-	s.depthSourceBook = types.NewDepthBook(s.sourceBook)
-
-	if err := sourceMarketStream.Connect(s.tradingCtx); err != nil {
-		return err
-	}
 
 	if s.EnableSignalMargin {
 		s.logger.Infof("signal margin is enabled")
@@ -2433,6 +2480,11 @@ func (s *Strategy) CrossRun(
 		if setter, ok := sigProvider.(signal.StreamBookSetter); ok {
 			s.logger.Infof("setting stream book on signal %T", sigProvider)
 			setter.SetStreamBook(s.sourceBook)
+		}
+
+		if setter, ok := sigProvider.(signal.MarketTradeStreamSetter); ok {
+			s.logger.Infof("setting market trade stream on signal %T", sigProvider)
+			setter.SetMarketTradeStream(s.marketTradeStream)
 		}
 
 		// pass logger to the signal provider
@@ -2569,6 +2621,13 @@ func (s *Strategy) CrossRun(
 	s.connectivityGroup = types.NewConnectivityGroup(
 		s.sourceSession.UserDataConnectivity, s.makerSession.UserDataConnectivity,
 	)
+
+	// TODO: use connectivity group to ensure all connections are ready
+	for _, ctr := range s.connectors {
+		if err := ctr.Connect(s.tradingCtx); err != nil {
+			return err
+		}
+	}
 
 	go func() {
 		s.logger.Infof("waiting for authentication connections to be ready...")
@@ -2738,4 +2797,8 @@ func parseSymbolSelector(
 		return nil, types.Market{}, fmt.Errorf("market %s not found in session %s", symbol, sessionName)
 	}
 	return session, market, nil
+}
+
+func (s *Strategy) addConnector(ctr connector) {
+	s.connectors = append(s.connectors, ctr)
 }

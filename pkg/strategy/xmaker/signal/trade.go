@@ -2,6 +2,7 @@ package signal
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -55,6 +56,8 @@ type TradeVolumeWindowSignal struct {
 
 	symbol string
 
+	stream types.Stream
+
 	mu sync.Mutex
 }
 
@@ -63,7 +66,11 @@ func (s *TradeVolumeWindowSignal) ID() string {
 }
 
 func (s *TradeVolumeWindowSignal) Subscribe(session *bbgo.ExchangeSession, symbol string) {
-	session.Subscribe(types.MarketTradeChannel, symbol, types.SubscribeOptions{})
+	// session.Subscribe(types.MarketTradeChannel, symbol, types.SubscribeOptions{})
+}
+
+func (s *TradeVolumeWindowSignal) SetStream(stream types.Stream) {
+	s.stream = stream
 }
 
 // handleTrade adds a trade into the ring buffer.
@@ -108,7 +115,16 @@ func (s *TradeVolumeWindowSignal) Bind(ctx context.Context, session *bbgo.Exchan
 	s.start = 0
 	s.count = 0
 
-	session.MarketDataStream.OnMarketTrade(s.handleTrade)
+	if s.stream != nil {
+		s.stream.OnMarketTrade(s.handleTrade)
+		return nil
+	}
+
+	s.stream = bbgo.NewMarketTradeStream(session, symbol)
+	s.stream.OnMarketTrade(s.handleTrade)
+	if err := s.stream.Connect(ctx); err != nil {
+		return fmt.Errorf("unable to connect to the market trade stream: %w", err)
+	}
 	return nil
 }
 
