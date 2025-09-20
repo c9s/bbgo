@@ -55,7 +55,7 @@ var ErrEmptyOrderType = errors.New("order type can not be empty string")
 type Exchange struct {
 	sourceName     types.ExchangeName
 	publicExchange types.Exchange
-	srv            *service.BacktestService
+	srv            service.BackTestable
 	currentTime    time.Time
 
 	account *types.Account
@@ -78,7 +78,7 @@ type Exchange struct {
 }
 
 func NewExchange(
-	sourceName types.ExchangeName, sourceExchange types.Exchange, srv *service.BacktestService, config *bbgo.Backtest,
+	sourceName types.ExchangeName, sourceExchange types.Exchange, srv service.BackTestable, config *bbgo.Backtest,
 ) (*Exchange, error) {
 	ex := sourceExchange
 
@@ -250,11 +250,11 @@ func (e *Exchange) QueryKLines(
 	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
 ) ([]types.KLine, error) {
 	if options.EndTime != nil {
-		return e.srv.QueryKLinesBackward(e, symbol, interval, *options.EndTime, 1000)
+		return e.srv.QueryKLinesBackward(e.Name(), symbol, interval, *options.EndTime, 1000)
 	}
 
 	if options.StartTime != nil {
-		return e.srv.QueryKLinesForward(e, symbol, interval, *options.StartTime, 1000)
+		return e.srv.QueryKLinesForward(e.Name(), symbol, interval, *options.StartTime, 1000)
 	}
 
 	return nil, errors.New("endTime or startTime can not be nil")
@@ -363,6 +363,7 @@ func (e *Exchange) SubscribeMarketData(
 			loadedIntervals[sub.Options.Interval] = struct{}{}
 
 		default:
+			// todo support stream back test with csv tick source
 			// Since Environment is not yet been injected at this point, no hard error
 			log.Errorf("stream channel %s is not supported in backtest", sub.Channel)
 		}
