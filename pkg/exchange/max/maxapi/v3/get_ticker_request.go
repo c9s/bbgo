@@ -16,5 +16,5 @@ type GetTickerRequest struct {
 }
 
 func (c *Client) NewGetTickerRequest() *GetTickerRequest {
-	return &GetTickerRequest{client: c.Client}
+	return &GetTickerRequest{client: c.RestClient}
 }

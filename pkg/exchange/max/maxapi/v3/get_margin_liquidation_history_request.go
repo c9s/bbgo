@@ -14,7 +14,7 @@ import (
 )
 
 func (c *Client) NewGetMarginLiquidationHistoryRequest() *GetMarginLiquidationHistoryRequest {
-	return &GetMarginLiquidationHistoryRequest{client: c.Client}
+	return &GetMarginLiquidationHistoryRequest{client: c.RestClient}
 }
 
 type LiquidationRecord struct {

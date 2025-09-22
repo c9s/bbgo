@@ -15,5 +15,5 @@ type MarginRepayRequest struct {
 }
 
 func (c *Client) NewMarginRepayRequest() *MarginRepayRequest {
-	return &MarginRepayRequest{client: c.Client}
+	return &MarginRepayRequest{client: c.RestClient}
 }
