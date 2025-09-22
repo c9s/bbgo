@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"gopkg.in/yaml.v3"
 
 	"github.com/c9s/bbgo/pkg/datatype/floats"
@@ -55,10 +53,7 @@ type ProfitReport struct {
 }
 
 func (s ProfitReport) String() string {
-	b, err := json.MarshalIndent(s, "", "\t")
-	if err != nil {
-		log.Fatal(err)
-	}
+	b, _ := json.MarshalIndent(s, "", "\t")
 	return string(b)
 }
 
