@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/c9s/requestgen"
+
+	"github.com/c9s/bbgo/pkg/nonce"
 )
 
 const productionBaseURL = "https://api.bitfinex.com/v2"
@@ -23,7 +25,7 @@ type Client struct {
 	apiKey    string
 	apiSecret string
 
-	nonce *Nonce
+	nonce *nonce.MillisecondNonce
 }
 
 // mock me in tests
@@ -38,7 +40,7 @@ func NewClient() *Client {
 			BaseURL:    u,
 			HttpClient: http.DefaultClient,
 		},
-		nonce: NewNonce(time.Now()),
+		nonce: nonce.NewMillisecondNonce(time.Now()),
 	}
 }
 
@@ -92,9 +94,9 @@ func (c *Client) newAuthenticatedRequest(
 
 	pathURL := c.BaseURL.ResolveReference(rel)
 
-	nonce := c.nonce.GetString()
+	n := c.nonce.GetString()
 	// sign("/api" + apiPath + nonce + data in JSON format)
-	msg := "/api" + pathURL.Path + nonce + string(data)
+	msg := "/api" + pathURL.Path + n + string(data)
 	sig, err := c.sign(msg)
 	if err != nil {
 		return nil, err
@@ -111,7 +113,7 @@ func (c *Client) newAuthenticatedRequest(
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("bfx-nonce", nonce)
+	req.Header.Set("bfx-nonce", n)
 	req.Header.Set("bfx-apikey", c.apiKey)
 	req.Header.Set("bfx-signature", sig)
 	return req, nil
