@@ -140,21 +140,35 @@ func (c *FastCancel) fastCancel(ctx context.Context, marketTrade types.Trade) {
 	}
 }
 
-func (c *FastCancel) executeFastCancel(ctx context.Context, symbol string, side types.SideType) error {
+func (c *FastCancel) executeFastCancel(ctx context.Context, symbol string, side types.SideType) (err error) {
 	c.logger.Infof("FastCancel: cancelling %s %s", c.makerSymbol, side.String())
+
 	if service, ok := c.makerExchange.(cancelOrdersBySymbolSide); ok {
-		if _, err := service.CancelOrdersBySymbolSide(ctx, symbol, side); err != nil {
-			return err
-		}
+		_, err = service.CancelOrdersBySymbolSide(ctx, symbol, side)
 	} else {
 		buyOrders, sellOrders := c.activeMakerOrders.Orders().SeparateBySide()
 		switch side {
 		case types.SideTypeBuy:
-			return c.activeMakerOrders.GracefulCancel(ctx, c.makerExchange, buyOrders...)
+			if len(buyOrders) == 0 {
+				return nil
+			}
+
+			err = c.activeMakerOrders.GracefulCancel(ctx, c.makerExchange, buyOrders...)
 		case types.SideTypeSell:
-			return c.activeMakerOrders.GracefulCancel(ctx, c.makerExchange, sellOrders...)
+			if len(sellOrders) == 0 {
+				return nil
+			}
+
+			err = c.activeMakerOrders.GracefulCancel(ctx, c.makerExchange, sellOrders...)
 		}
 	}
 
+	if err != nil {
+		return err
+	}
+
+	// FIXME: we might cancelled only one side of the orders, but we clear for both sides here.
+	// This is not accurate if we want to handle both sides.
+	c.strategy.setLastQuote(nil)
 	return nil
 }
