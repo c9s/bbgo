@@ -14,7 +14,6 @@ import (
 	"github.com/c9s/requestgen"
 )
 
-const code = "xr20Jbz8a"
 const productionBaseURL = "https://api.bitfinex.com/v2"
 
 type Client struct {
