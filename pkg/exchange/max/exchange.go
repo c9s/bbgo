@@ -49,7 +49,7 @@ func New(key, secret, subAccount string) *Exchange {
 	}
 
 	if err := client.Initialize(context.Background()); err != nil {
-		log.WithError(err).Fatal("failed to initialize max client")
+		log.WithError(err).Panic("failed to initialize max client")
 	}
 
 	return &Exchange{

@@ -245,6 +245,8 @@ func (c *RestClient) getNonce() int64 {
 	var seconds = time.Now().Unix()
 	var rc = atomic.AddUint64(&reqCount, 1)
 	var offset = atomic.LoadInt64(&globalTimeOffset)
+
+	// (seconds+offset)*1000 -> convert seconds to milliseconds
 	return (seconds+offset)*1000 - 1 + int64(math.Mod(float64(rc), 1000.0))
 }
 
