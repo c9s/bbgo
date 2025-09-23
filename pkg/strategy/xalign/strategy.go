@@ -196,6 +196,12 @@ func (s *Strategy) selectSessionForCurrency(
 			continue
 		}
 
+		account, err := session.UpdateAccount(ctx)
+		if err != nil {
+			log.WithError(err).Errorf("unable to update account for session %s", sessionName)
+			continue
+		}
+
 		for _, fromQuoteCurrency := range quoteCurrencies {
 			// skip the same currency, because there is no such USDT/USDT market
 			if currency == fromQuoteCurrency {
@@ -262,7 +268,7 @@ func (s *Strategy) selectSessionForCurrency(
 					price = ticker.Buy
 				}
 
-				quoteBalance, ok := session.Account.Balance(quoteCurrency)
+				quoteBalance, ok := account.Balance(quoteCurrency)
 				if !ok {
 					continue
 				}
@@ -330,7 +336,7 @@ func (s *Strategy) selectSessionForCurrency(
 					q = q.Div(price)
 				}
 
-				baseBalance, ok := session.Account.Balance(baseCurrency)
+				baseBalance, ok := account.Balance(baseCurrency)
 				if !ok {
 					continue
 				}
@@ -707,14 +713,13 @@ func (s *Strategy) aggregateBalances(
 	// iterate the sessions and record them
 	for sessionName, session := range sessions {
 		// update the account balances and the margin information
-		if _, err := session.UpdateAccount(ctx); err != nil {
+		account, err := session.UpdateAccount(ctx)
+		if err != nil {
 			log.WithError(err).Errorf("unable to update account")
 			return nil, nil, err
 		}
 
-		account := session.GetAccount()
 		balances := account.Balances()
-
 		sessionBalances[sessionName] = balances
 		totalBalances = totalBalances.Add(balances)
 	}
