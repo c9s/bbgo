@@ -44,7 +44,13 @@ const (
 
 var httpTransportMaxIdleConnsPerHost = http.DefaultMaxIdleConnsPerHost
 var httpTransportMaxIdleConns = 100
-var httpTransportIdleConnTimeout = 85 * time.Second
+
+// httpTransportIdleConnTimeout is the maximum amount of time an idle (keep-alive) connection will remain idle before closing itself.
+// The default Idle Timeout values vary based on the type of Elastic Load Balancer:
+// Classic Load Balancer (CLB): The default Idle Timeout is 60 seconds.
+// Application Load Balancer (ALB): The default Idle Timeout is 60 seconds.
+// Network Load Balancer (NLB): The default Idle Timeout is 350 seconds
+var httpTransportIdleConnTimeout = 60 * time.Second
 var disableUserAgentHeader = false
 
 var logger = log.WithField("exchange", "max")
