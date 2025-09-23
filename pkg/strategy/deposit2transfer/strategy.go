@@ -191,7 +191,6 @@ func (s *Strategy) checkDeposits(ctx context.Context, firstTime bool) {
 		succeededDeposits, err := s.scanDepositHistory(
 			ctx,
 			asset,
-			s.ScanTimeWindow.Duration(),
 			firstTime,
 		)
 		if err != nil {
@@ -369,12 +368,12 @@ func (s *Strategy) addWatchingDeposit(deposit types.Deposit) {
 	}
 }
 
-func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duration time.Duration, firstTime bool) ([]types.Deposit, error) {
+func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, firstTime bool) ([]types.Deposit, error) {
 	logger := s.logger.WithField("asset", asset)
 	logger.Debugf("scanning %s deposit history...", asset)
 
 	now := time.Now()
-	since := now.Add(-duration)
+	since := now.Add(-s.ScanTimeWindow.Duration())
 
 	var deposits []types.Deposit
 	err := retry.GeneralBackoff(ctx, func() (err error) {
@@ -390,9 +389,15 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 	sort.Slice(deposits, func(i, j int) bool {
 		return deposits[i].Time.Time().Before(deposits[j].Time.Time())
 	})
-	bal, ok := s.session.Account.Balance(asset)
+
+	// get the latest account balance
+	account, err := s.session.UpdateAccount(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update account: %w", err)
+	}
+	bal, ok := account.Balance(asset)
 	if !ok {
-		return nil, fmt.Errorf("unable to find %s balance in the account", asset)
+		return nil, fmt.Errorf("unable to find %s balance in account", asset)
 	}
 	// update the watching deposits
 	for _, deposit := range deposits {
@@ -418,10 +423,13 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 				// add the deposit to the watching list if
 				// 1. it's the first time scanning the deposits
 				// 2. the available balance is greater than the deposit amount
-				if firstTime && bal.Available.Compare(deposit.Amount) > 0 {
-					logger.Infof("adding initial succeedded deposit: %s", deposit.TransactionID)
-					s.addWatchingDeposit(deposit)
-					continue
+				if firstTime {
+					startTime := s.Environment.StartTime()
+					if bal.Available.Compare(deposit.Amount) > 0 && deposit.Time.After(startTime) {
+						logger.Infof("adding initial succeedded deposit: %s", deposit.TransactionID)
+						s.addWatchingDeposit(deposit)
+						continue
+					}
 				}
 				// if the deposit is in success status, we need to check if it's newer than the latest deposit time
 				// this usually happens when the deposit is credited to the account very quickly
