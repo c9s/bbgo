@@ -31,5 +31,5 @@ type GetMarginInterestHistoryRequest struct {
 }
 
 func (c *Client) NewGetMarginInterestHistoryRequest(currency string) *GetMarginInterestHistoryRequest {
-	return &GetMarginInterestHistoryRequest{client: c.Client, currency: currency}
+	return &GetMarginInterestHistoryRequest{client: c.RestClient, currency: currency}
 }

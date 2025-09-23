@@ -26,7 +26,6 @@ var log = logrus.WithField("exchange", "max")
 
 func init() {
 	_ = types.ExchangeTradeHistoryService(&Exchange{})
-
 }
 
 type Exchange struct {
@@ -46,10 +45,6 @@ func New(key, secret, subAccount string) *Exchange {
 	client.Auth(key, secret)
 	if subAccount != "" {
 		client.SetSubAccount(subAccount)
-	}
-
-	if err := client.Initialize(context.Background()); err != nil {
-		log.WithError(err).Panic("failed to initialize max client")
 	}
 
 	return &Exchange{

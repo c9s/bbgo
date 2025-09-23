@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -26,7 +25,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/util/apikey"
-	"github.com/c9s/bbgo/pkg/util/backoff"
 	"github.com/c9s/bbgo/pkg/version"
 )
 
@@ -46,44 +44,31 @@ const (
 
 var httpTransportMaxIdleConnsPerHost = http.DefaultMaxIdleConnsPerHost
 var httpTransportMaxIdleConns = 100
-var httpTransportIdleConnTimeout = 85 * time.Second
+
+// httpTransportIdleConnTimeout is the maximum amount of time an idle (keep-alive) connection will remain idle before closing itself.
+// The default Idle Timeout values vary based on the type of Elastic Load Balancer:
+// Classic Load Balancer (CLB): The default Idle Timeout is 60 seconds.
+// Application Load Balancer (ALB): The default Idle Timeout is 60 seconds.
+// Network Load Balancer (NLB): The default Idle Timeout is 350 seconds
+var httpTransportIdleConnTimeout = 60 * time.Second
 var disableUserAgentHeader = false
-
-func init() {
-
-	if val, ok := envvar.Int("HTTP_TRANSPORT_MAX_IDLE_CONNS_PER_HOST"); ok {
-		httpTransportMaxIdleConnsPerHost = val
-	}
-
-	if val, ok := envvar.Int("HTTP_TRANSPORT_MAX_IDLE_CONNS"); ok {
-		httpTransportMaxIdleConns = val
-	}
-
-	if val, ok := envvar.Duration("HTTP_TRANSPORT_IDLE_CONN_TIMEOUT"); ok {
-		httpTransportIdleConnTimeout = val
-	}
-
-	if val, ok := envvar.Bool("DISABLE_MAX_USER_AGENT_HEADER"); ok {
-		disableUserAgentHeader = val
-	}
-}
 
 var logger = log.WithField("exchange", "max")
 
 var htmlTagPattern = regexp.MustCompile("<[/]?[a-zA-Z-]+.*?>")
 
-// The following variables are used for nonce.
-
 // globalTimeOffset is used for nonce
 var globalTimeOffset int64 = 0
+
+// The following variables are used for nonce.
 
 // globalServerTimestamp is used for storing the server timestamp, default to Now
 var globalServerTimestamp = time.Now().Unix()
 
-// reqCount is used for nonce, this variable counts the API request count.
-var reqCount uint64 = 1
-
-var nonceOnce sync.Once
+var defaultHttpClient = &http.Client{
+	Timeout:   defaultHTTPTimeout,
+	Transport: httpTransport,
+}
 
 // create an isolated http httpTransport rather than the default one
 var httpTransport = &http.Transport{
@@ -103,9 +88,57 @@ var httpTransport = &http.Transport{
 	ExpectContinueTimeout: 1 * time.Second,
 }
 
-var defaultHttpClient = &http.Client{
-	Timeout:   defaultHTTPTimeout,
-	Transport: httpTransport,
+func init() {
+	if val, ok := envvar.Int("HTTP_TRANSPORT_MAX_IDLE_CONNS_PER_HOST"); ok {
+		httpTransportMaxIdleConnsPerHost = val
+	}
+
+	if val, ok := envvar.Int("HTTP_TRANSPORT_MAX_IDLE_CONNS"); ok {
+		httpTransportMaxIdleConns = val
+	}
+
+	if val, ok := envvar.Duration("HTTP_TRANSPORT_IDLE_CONN_TIMEOUT"); ok {
+		httpTransportIdleConnTimeout = val
+	}
+
+	if val, ok := envvar.Bool("DISABLE_MAX_USER_AGENT_HEADER"); ok {
+		disableUserAgentHeader = val
+	}
+
+	client := NewRestClientDefault()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Error("unable to update server time offset due to timeout")
+			return
+		default:
+
+		}
+		serverTime, err := client.NewGetTimestampRequest().Do(context.Background())
+		if err != nil {
+			logger.WithError(err).Error("unable to get max exchange server timestamp")
+			continue
+		} else if serverTime == nil {
+			logger.Error("unable to get max exchange server timestamp: empty response")
+			continue
+		}
+
+		globalServerTimestamp = int64(*serverTime)
+		clientTime := time.Now()
+		offset := globalServerTimestamp - clientTime.Unix()
+		if offset < 0 {
+			// avoid updating a negative offset: server time is before our local time
+			if offset > maxAllowedNegativeTimeOffset {
+				return
+			}
+			logger.Warnf("server time is behind local time, offset: %d", offset)
+		}
+
+		globalTimeOffset = offset
+		logger.Infof("updated server time offset: %d", offset)
+	}
 }
 
 type RestClient struct {
@@ -113,16 +146,17 @@ type RestClient struct {
 
 	APIKey, APISecret string
 
-	subAccount string
+	SubAccount string
 
-	AccountService    *AccountService
 	PublicService     *PublicService
-	TradeService      *TradeService
-	OrderService      *OrderService
 	RewardService     *RewardService
 	WithdrawalService *WithdrawalService
 
-	apiKeyRotator *apikey.RoundTripBalancer
+	ApiKeyRotator *apikey.RoundTripBalancer
+
+	apiKeyNonce map[string]int64
+
+	mu sync.Mutex
 }
 
 func NewRestClientDefault() *RestClient {
@@ -140,17 +174,16 @@ func NewRestClient(baseURL string) *RestClient {
 		panic(err)
 	}
 
-	var client = &RestClient{
+	client := &RestClient{
 		BaseAPIClient: requestgen.BaseAPIClient{
 			HttpClient: defaultHttpClient,
 			BaseURL:    u,
 		},
+
+		apiKeyNonce: make(map[string]int64),
 	}
 
-	client.AccountService = &AccountService{client}
-	client.TradeService = &TradeService{client}
 	client.PublicService = &PublicService{client}
-	client.OrderService = &OrderService{client}
 	client.RewardService = &RewardService{client}
 	client.WithdrawalService = &WithdrawalService{client}
 
@@ -160,7 +193,7 @@ func NewRestClient(baseURL string) *RestClient {
 		// this loads MAX_API_KEY_1, MAX_API_KEY_2, MAX_API_KEY_3, ...
 		source, err := loader.Load(os.Environ())
 		if err != nil {
-			panic(err)
+			logger.Panic(err)
 		}
 
 		// load the original one as index 0
@@ -168,18 +201,10 @@ func NewRestClient(baseURL string) *RestClient {
 			source.Add(apikey.Entry{Index: 0, Key: client.APIKey, Secret: client.APISecret})
 		}
 
-		client.apiKeyRotator = apikey.NewRoundTripBalancer(source)
+		client.ApiKeyRotator = apikey.NewRoundTripBalancer(source)
 	}
 
 	return client
-}
-
-func (c *RestClient) Initialize(ctx context.Context) error {
-	nonceOnce.Do(func() {
-		go c.queryAndUpdateServerTimestamp(ctx)
-	})
-
-	return nil
 }
 
 // Auth sets api key and secret for usage is requests that requires authentication.
@@ -193,72 +218,34 @@ func (c *RestClient) Auth(key string, secret string) *RestClient {
 }
 
 func (c *RestClient) SetSubAccount(subAccount string) *RestClient {
-	c.subAccount = subAccount
+	c.SubAccount = subAccount
 	return c
 }
 
-func (c *RestClient) queryAndUpdateServerTimestamp(ctx context.Context) {
-	op := func() error {
-		serverTs, err := c.PublicService.Timestamp(ctx)
-		if err != nil {
-			return err
-		}
-
-		if serverTs == 0 {
-			return errors.New("unexpected zero server timestamp")
-		}
-
-		clientTime := time.Now()
-		offset := serverTs - clientTime.Unix()
-
-		if offset < 0 {
-			// avoid updating a negative offset: server time is before the local time
-			if offset > maxAllowedNegativeTimeOffset {
-				return nil
-			}
-
-			// if the offset is greater than 15 seconds, we should restart
-			logger.Panicf("max exchange server timestamp offset %d is less than the negative offset %d", offset, maxAllowedNegativeTimeOffset)
-		}
-
-		atomic.StoreInt64(&globalServerTimestamp, serverTs)
-		atomic.StoreInt64(&globalTimeOffset, offset)
-
-		logger.Debugf("loaded max server timestamp: %d offset=%d", globalServerTimestamp, offset)
-		return nil
-	}
-
-	if err := backoff.RetryGeneral(ctx, op); err != nil {
-		logger.WithError(err).Error("unable to sync timestamp with max")
-	}
-}
-
-func (c *RestClient) initNonce() {
-	nonceOnce.Do(func() {
-		go c.queryAndUpdateServerTimestamp(context.Background())
-	})
-}
-
-func (c *RestClient) getNonce() int64 {
+func (c *RestClient) GetNonce(apiKey string) int64 {
 	// nonce 是以正整數表示的時間戳記，代表了從 Unix epoch 到當前時間所經過的毫秒數(ms)。
 	// nonce 與伺服器的時間差不得超過正負30秒，每個 nonce 只能使用一次。
-	var seconds = time.Now().Unix()
-	var rc = atomic.AddUint64(&reqCount, 1)
-	var offset = atomic.LoadInt64(&globalTimeOffset)
+	c.mu.Lock()
+	now := time.Now()
+	seconds := now.Unix()
+	offset := atomic.LoadInt64(&globalTimeOffset)
+	next := (seconds + offset) * 1000
+	if last, ok := c.apiKeyNonce[apiKey]; ok {
+		if next <= last {
+			next = last + 1
+		}
+	}
+
+	c.apiKeyNonce[apiKey] = next
+	c.mu.Unlock()
 
 	// (seconds+offset)*1000 -> convert seconds to milliseconds
-	return (seconds+offset)*1000 - 1 + int64(math.Mod(float64(rc), 1000.0))
+	return next
 }
 
+// NewAuthenticatedRequest creates new http request for authenticated routes.
 func (c *RestClient) NewAuthenticatedRequest(
-	ctx context.Context, m string, refURL string, params url.Values, payload interface{},
-) (*http.Request, error) {
-	return c.newAuthenticatedRequest(ctx, m, refURL, params, payload, nil)
-}
-
-// newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) newAuthenticatedRequest(
-	ctx context.Context, m string, refURL string, params url.Values, data interface{}, rel *url.URL,
+	ctx context.Context, m string, refURL string, params url.Values, data interface{},
 ) (*http.Request, error) {
 	if len(c.APIKey) == 0 {
 		return nil, errors.New("empty api key")
@@ -268,17 +255,20 @@ func (c *RestClient) newAuthenticatedRequest(
 		return nil, errors.New("empty api secret")
 	}
 
-	var err error
-	if rel == nil {
-		rel, err = url.Parse(refURL)
-		if err != nil {
-			return nil, err
-		}
+	apiKey := c.APIKey
+	apiSecret := c.APISecret
+	if c.ApiKeyRotator != nil {
+		apiKey, apiSecret = c.ApiKeyRotator.Next().GetKeySecret()
 	}
 
-	var p []byte
-	var payload = map[string]interface{}{
-		"nonce": c.getNonce(),
+	rel, err := url.Parse(refURL)
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := c.GetNonce(apiKey)
+	payload := map[string]interface{}{
+		"nonce": nonce,
 		"path":  c.BaseURL.ResolveReference(rel).Path,
 	}
 
@@ -287,6 +277,8 @@ func (c *RestClient) newAuthenticatedRequest(
 		for k, v := range d {
 			payload[k] = v
 		}
+	default:
+		logger.Warnf("unsupported payload type: %T", d)
 	}
 
 	for k, vs := range params {
@@ -298,7 +290,7 @@ func (c *RestClient) newAuthenticatedRequest(
 		}
 	}
 
-	p, err = castPayload(payload)
+	p, err := castPayload(payload)
 	if err != nil {
 		return nil, err
 	}
@@ -310,22 +302,17 @@ func (c *RestClient) newAuthenticatedRequest(
 
 	encoded := base64.StdEncoding.EncodeToString(p)
 
-	apiKey := c.APIKey
-	apiSecret := c.APISecret
-	if c.apiKeyRotator != nil {
-		apiKey, apiSecret = c.apiKeyRotator.Next().GetKeySecret()
-	}
-
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-MAX-ACCESSKEY", apiKey)
 	req.Header.Add("X-MAX-PAYLOAD", encoded)
 	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, apiSecret))
-	if c.subAccount != "" {
-		req.Header.Add("X-Sub-Account", c.subAccount)
+	if c.SubAccount != "" {
+		req.Header.Add("X-Sub-Account", c.SubAccount)
 	}
 
 	if disableUserAgentHeader {
 		req.Header.Set("USER-AGENT", "")
+		req.Header.Del("User-Agent")
 	} else {
 		req.Header.Set("USER-AGENT", UserAgent)
 	}

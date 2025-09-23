@@ -16,7 +16,7 @@ type MarginService struct {
 }
 
 func (c *Client) NewGetMarginBorrowingLimitsRequest() *GetMarginBorrowingLimitsRequest {
-	return &GetMarginBorrowingLimitsRequest{client: c.Client}
+	return &GetMarginBorrowingLimitsRequest{client: c.RestClient}
 }
 
 type MarginBorrowingLimitMap map[string]fixedpoint.Value

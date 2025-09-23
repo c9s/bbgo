@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testing/httptesting"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
@@ -80,7 +79,7 @@ func TestExchange_submitOrderAndCancel(t *testing.T) {
 	defer saveRecord()
 
 	// patch client
-	restClient := ex.v3client.Client.(*maxapi.RestClient)
+	restClient := ex.v3client.RestClient
 	restClient.HttpClient = ex.client.HttpClient
 
 	if isRecording && !ok {

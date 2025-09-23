@@ -1,4 +1,4 @@
-package bfxapi
+package nonce
 
 import (
 	"strconv"
@@ -6,18 +6,22 @@ import (
 	"time"
 )
 
-type Nonce struct {
+// MillisecondNonce generates nonce values based on the current time in milliseconds with microsecond precision.
+type MillisecondNonce struct {
 	current int64
 }
 
 // GetString generates a unique nonce based on the current time in milliseconds * 1000.
 // If multiple calls occur within the same millisecond, atomic increment ensures uniqueness.
-func (ng *Nonce) GetString() string {
+func (ng *MillisecondNonce) GetString() string {
 	nonce := ng.GetInt64()
 	return strconv.FormatInt(nonce, 10)
 }
 
-func (ng *Nonce) GetInt64() int64 {
+// GetInt64 generates a unique nonce based on the current time in milliseconds * 1000.
+// If multiple calls occur within the same millisecond, atomic increment ensures uniqueness.
+// The unit is microsecond (1 second = 1,000,000 microseconds).
+func (ng *MillisecondNonce) GetInt64() int64 {
 	current := atomic.LoadInt64(&ng.current)
 	newNonce := time.Now().UnixMilli() * 1000
 
@@ -30,8 +34,8 @@ func (ng *Nonce) GetInt64() int64 {
 	return atomic.AddInt64(&ng.current, 1)
 }
 
-func NewNonce(now time.Time) *Nonce {
-	return &Nonce{
+func NewMillisecondNonce(now time.Time) *MillisecondNonce {
+	return &MillisecondNonce{
 		current: now.UnixMilli() * 1000,
 	}
 }

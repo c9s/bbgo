@@ -1,4 +1,4 @@
-package bfxapi
+package nonce
 
 import (
 	"strconv"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestNonce_GetString(t *testing.T) {
-	ng := NewNonce(time.Now())
+	ng := NewMillisecondNonce(time.Now())
 
 	// Generate a nonce string
 	nonceStr := ng.GetString()
@@ -24,7 +24,7 @@ func TestNonce_GetString(t *testing.T) {
 }
 
 func TestNonce_GetInt64(t *testing.T) {
-	ng := NewNonce(time.Now())
+	ng := NewMillisecondNonce(time.Now())
 
 	// Generate a nonce int64
 	nonce := ng.GetInt64()
@@ -34,7 +34,7 @@ func TestNonce_GetInt64(t *testing.T) {
 }
 
 func TestNonce_Concurrency(t *testing.T) {
-	ng := NewNonce(time.Now())
+	ng := NewMillisecondNonce(time.Now())
 	var wg sync.WaitGroup
 	nonces := sync.Map{}
 
@@ -64,7 +64,7 @@ func TestNonce_Concurrency(t *testing.T) {
 
 func TestNonce_NewNonce(t *testing.T) {
 	now := time.Now()
-	ng := NewNonce(now)
+	ng := NewMillisecondNonce(now)
 	if ng.current <= 0 {
 		t.Errorf("expected positive initial nonce, got %d", ng.current)
 	}

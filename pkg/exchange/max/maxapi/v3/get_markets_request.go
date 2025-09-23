@@ -14,5 +14,5 @@ type GetMarketsRequest struct {
 }
 
 func (c *Client) NewGetMarketsRequest() *GetMarketsRequest {
-	return &GetMarketsRequest{client: c.Client}
+	return &GetMarketsRequest{client: c.RestClient}
 }

@@ -34,5 +34,5 @@ type GetMarginLoanHistoryRequest struct {
 }
 
 func (c *Client) NewGetMarginLoanHistoryRequest() *GetMarginLoanHistoryRequest {
-	return &GetMarginLoanHistoryRequest{client: c.Client}
+	return &GetMarginLoanHistoryRequest{client: c.RestClient}
 }

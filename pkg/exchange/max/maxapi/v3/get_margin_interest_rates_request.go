@@ -23,5 +23,5 @@ type GetMarginInterestRatesRequest struct {
 }
 
 func (c *Client) NewGetMarginInterestRatesRequest() *GetMarginInterestRatesRequest {
-	return &GetMarginInterestRatesRequest{client: c.Client}
+	return &GetMarginInterestRatesRequest{client: c.RestClient}
 }
