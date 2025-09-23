@@ -57,7 +57,7 @@ type Strategy struct {
 
 	SlackAlert *slackalert.SlackAlert `json:"slackAlert"`
 
-	ScanTimeWindow types.Duration `json:"scanTimeWindow"`
+	ScanWindow types.Duration `json:"scanWindow"`
 
 	marginTransferService    marginTransferService
 	marginBorrowRepayService types.MarginBorrowRepayService
@@ -98,8 +98,8 @@ func (s *Strategy) Defaults() error {
 		}
 	}
 
-	if s.ScanTimeWindow == 0 {
-		s.ScanTimeWindow = types.Duration(4 * time.Hour)
+	if s.ScanWindow == 0 {
+		s.ScanWindow = types.Duration(4 * time.Hour)
 	}
 
 	return nil
@@ -191,6 +191,7 @@ func (s *Strategy) checkDeposits(ctx context.Context, firstTime bool) {
 		succeededDeposits, err := s.scanDepositHistory(
 			ctx,
 			asset,
+			s.ScanWindow.Duration(),
 			firstTime,
 		)
 		if err != nil {
@@ -368,12 +369,12 @@ func (s *Strategy) addWatchingDeposit(deposit types.Deposit) {
 	}
 }
 
-func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, firstTime bool) ([]types.Deposit, error) {
+func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, scanWindow time.Duration, firstTime bool) ([]types.Deposit, error) {
 	logger := s.logger.WithField("asset", asset)
 	logger.Debugf("scanning %s deposit history...", asset)
 
 	now := time.Now()
-	since := now.Add(-s.ScanTimeWindow.Duration())
+	since := now.Add(-scanWindow)
 
 	var deposits []types.Deposit
 	err := retry.GeneralBackoff(ctx, func() (err error) {
@@ -394,10 +395,6 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, firstTi
 	account, err := s.session.UpdateAccount(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update account: %w", err)
-	}
-	bal, ok := account.Balance(asset)
-	if !ok {
-		return nil, fmt.Errorf("unable to find %s balance in account", asset)
 	}
 	// update the watching deposits
 	for _, deposit := range deposits {
@@ -424,12 +421,16 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, firstTi
 				// 1. it's the first time scanning the deposits
 				// 2. the available balance is greater than the deposit amount
 				if firstTime {
-					startTime := s.Environment.StartTime()
-					if bal.Available.Compare(deposit.Amount) > 0 && deposit.Time.After(startTime) {
-						logger.Infof("adding initial succeedded deposit: %s", deposit.TransactionID)
-						s.addWatchingDeposit(deposit)
+					bal, ok := account.Balance(deposit.Asset)
+					if !ok {
+						logger.Warnf("balance not found, skipping %+v", deposit)
 						continue
 					}
+					if bal.Available.Compare(deposit.Amount) > 0 {
+						logger.Infof("adding initial succeedded deposit: %s", deposit.TransactionID)
+						s.addWatchingDeposit(deposit)
+					}
+					continue
 				}
 				// if the deposit is in success status, we need to check if it's newer than the latest deposit time
 				// this usually happens when the deposit is credited to the account very quickly
@@ -443,13 +444,7 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, firstTi
 						logger.Infof("ignored expired succeedded deposit: %s %+v", deposit.TransactionID, deposit)
 					}
 				} else {
-					// if the latest deposit time is not found, check if the deposit is older than 5 minutes
-					expiryTime := 5 * time.Minute
-					if deposit.Time.Before(time.Now().Add(-expiryTime)) {
-						logger.Infof("ignored expired (%s) succeedded deposit: %s %+v", expiryTime, deposit.TransactionID, deposit)
-					} else {
-						s.addWatchingDeposit(deposit)
-					}
+					s.addWatchingDeposit(deposit)
 				}
 
 			case types.DepositCredited, types.DepositPending:
