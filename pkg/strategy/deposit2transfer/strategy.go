@@ -57,6 +57,8 @@ type Strategy struct {
 
 	SlackAlert *slackalert.SlackAlert `json:"slackAlert"`
 
+	ScanTimeWindow types.Duration `json:"scanTimeWindow"`
+
 	marginTransferService    marginTransferService
 	marginBorrowRepayService types.MarginBorrowRepayService
 
@@ -94,6 +96,10 @@ func (s *Strategy) Defaults() error {
 			"BTC":  fixedpoint.NewFromFloat(0.00001),
 			"ETH":  fixedpoint.NewFromFloat(0.00001),
 		}
+	}
+
+	if s.ScanTimeWindow == 0 {
+		s.ScanTimeWindow = types.Duration(4 * time.Hour)
 	}
 
 	return nil
@@ -156,7 +162,7 @@ func (s *Strategy) tickWatcher(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	s.checkDeposits(ctx)
+	s.checkDeposits(ctx, true)
 
 	for {
 		select {
@@ -164,12 +170,17 @@ func (s *Strategy) tickWatcher(ctx context.Context, interval time.Duration) {
 			return
 
 		case <-ticker.C:
-			s.checkDeposits(ctx)
+			s.checkDeposits(ctx, false)
 		}
 	}
 }
 
-func (s *Strategy) checkDeposits(ctx context.Context) {
+func (s *Strategy) checkDeposits(ctx context.Context, firstTime bool) {
+	// we will add or remove deposits from the watching list during the checking process
+	// so we need to lock the mutex here
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	accountLimiter := rate.NewLimiter(rate.Every(5*time.Second), 1)
 
 	for _, asset := range s.Assets {
@@ -177,7 +188,12 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 
 		logger.Debugf("checking %s deposits...", asset)
 
-		succeededDeposits, err := s.scanDepositHistory(ctx, asset, 4*time.Hour)
+		succeededDeposits, err := s.scanDepositHistory(
+			ctx,
+			asset,
+			s.ScanTimeWindow.Duration(),
+			firstTime,
+		)
 		if err != nil {
 			logger.WithError(err).Errorf("unable to scan deposit history")
 			return
@@ -251,8 +267,9 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 				s.postLiveNoteError(d, "❌ Unable to transfer deposit asset into the margin account, error: %+v", err2)
 			} else {
 				s.logger.Infof("%s %s has been transferred successfully", amount.String(), d.Asset)
-
 				s.postLiveNoteMessage(d, "✅ %s %s has been transferred successfully", amount.String(), d.Asset)
+				// remove the transferred deposit from the watching list
+				delete(s.watchingDeposits, d.TransactionID)
 
 				if s.AutoRepay && s.marginBorrowRepayService != nil {
 					s.logger.Infof("autoRepay is enabled, repaying %s %s...", amount.String(), d.Asset)
@@ -331,6 +348,8 @@ func (s *Strategy) postLiveNoteMessage(d types.Deposit, msgf string, args ...any
 	}
 }
 
+// methods that modify the internal state of the strategy starts here
+// make sure to lock the mutex before calling any of them
 func (s *Strategy) addWatchingDeposit(deposit types.Deposit) {
 	s.watchingDeposits[deposit.TransactionID] = deposit
 
@@ -350,7 +369,7 @@ func (s *Strategy) addWatchingDeposit(deposit types.Deposit) {
 	}
 }
 
-func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duration time.Duration) ([]types.Deposit, error) {
+func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duration time.Duration, firstTime bool) ([]types.Deposit, error) {
 	logger := s.logger.WithField("asset", asset)
 	logger.Debugf("scanning %s deposit history...", asset)
 
@@ -371,10 +390,10 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 	sort.Slice(deposits, func(i, j int) bool {
 		return deposits[i].Time.Time().Before(deposits[j].Time.Time())
 	})
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	bal, ok := s.session.Account.Balance(asset)
+	if !ok {
+		return nil, fmt.Errorf("unable to find %s balance in the account", asset)
+	}
 	// update the watching deposits
 	for _, deposit := range deposits {
 		logger.Debugf("checking deposit: %+v", deposit)
@@ -396,6 +415,14 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 			switch deposit.Status {
 
 			case types.DepositSuccess:
+				// add the deposit to the watching list if
+				// 1. it's the first time scanning the deposits
+				// 2. the available balance is greater than the deposit amount
+				if firstTime && bal.Available.Compare(deposit.Amount) > 0 {
+					logger.Infof("adding initial succeedded deposit: %s", deposit.TransactionID)
+					s.addWatchingDeposit(deposit)
+					continue
+				}
 				// if the deposit is in success status, we need to check if it's newer than the latest deposit time
 				// this usually happens when the deposit is credited to the account very quickly
 				if depositTime, ok := s.lastAssetDepositTimes[asset]; ok {
@@ -441,9 +468,7 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 				logger.Infof("deposit %s confirm %d/%d is not reached", deposit.TransactionID, current, required)
 				continue
 			}
-
 			succeededDeposits = append(succeededDeposits, deposit)
-			delete(s.watchingDeposits, deposit.TransactionID)
 		}
 	}
 
