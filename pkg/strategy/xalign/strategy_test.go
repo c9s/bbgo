@@ -136,6 +136,7 @@ func TestStrategy(t *testing.T) {
 		account := types.NewAccount()
 		account.AddBalance("TWD", Number(20_000))
 		account.AddBalance("USDT", Number(80_000))
+		mockEx.EXPECT().QueryAccount(ctx).Return(account, nil)
 
 		session := &bbgo.ExchangeSession{
 			Exchange: mockEx,
@@ -162,6 +163,7 @@ func TestStrategy(t *testing.T) {
 		account := types.NewAccount()
 		account.AddBalance("TWD", Number(20_000))
 		account.AddBalance("USDT", Number(80_000))
+		mockEx.EXPECT().QueryAccount(ctx).Return(account, nil)
 
 		session := &bbgo.ExchangeSession{
 			Exchange: mockEx,
@@ -195,6 +197,7 @@ func TestStrategy(t *testing.T) {
 		account.AddBalance("BTC", Number(0.955))
 		account.AddBalance("TWD", Number(60_000))
 		account.AddBalance("USDT", Number(80_000))
+		mockEx.EXPECT().QueryAccount(ctx).Return(account, nil)
 
 		// 36000.0 * 32 * 0.045
 
