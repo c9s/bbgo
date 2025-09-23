@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -23,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/util/apikey"
 	"github.com/c9s/bbgo/pkg/version"
@@ -34,73 +34,27 @@ const (
 
 	UserAgent = "bbgo/" + version.Version
 
-	defaultHTTPTimeout = time.Second * 60
-
 	// 2018-09-01 08:00:00 +0800 CST
 	TimestampSince = 1535760000
 
 	maxAllowedNegativeTimeOffset = -20
 )
 
-var httpTransportMaxIdleConnsPerHost = http.DefaultMaxIdleConnsPerHost
-var httpTransportMaxIdleConns = 100
-
-// httpTransportIdleConnTimeout is the maximum amount of time an idle (keep-alive) connection will remain idle before closing itself.
-// The default Idle Timeout values vary based on the type of Elastic Load Balancer:
-// Classic Load Balancer (CLB): The default Idle Timeout is 60 seconds.
-// Application Load Balancer (ALB): The default Idle Timeout is 60 seconds.
-// Network Load Balancer (NLB): The default Idle Timeout is 350 seconds
-var httpTransportIdleConnTimeout = 60 * time.Second
 var disableUserAgentHeader = false
 
 var logger = log.WithField("exchange", "max")
 
 var htmlTagPattern = regexp.MustCompile("<[/]?[a-zA-Z-]+.*?>")
 
+// The following variables are used for nonce:
+
 // globalTimeOffset is used for nonce
 var globalTimeOffset int64 = 0
-
-// The following variables are used for nonce.
 
 // globalServerTimestamp is used for storing the server timestamp, default to Now
 var globalServerTimestamp = time.Now().Unix()
 
-var defaultHttpClient = &http.Client{
-	Timeout:   defaultHTTPTimeout,
-	Transport: httpTransport,
-}
-
-// create an isolated http httpTransport rather than the default one
-var httpTransport = &http.Transport{
-	Proxy: http.ProxyFromEnvironment,
-	DialContext: (&net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}).DialContext,
-
-	// ForceAttemptHTTP2:     true,
-	// DisableCompression:    false,
-
-	MaxIdleConns:          httpTransportMaxIdleConns,
-	MaxIdleConnsPerHost:   httpTransportMaxIdleConnsPerHost,
-	IdleConnTimeout:       httpTransportIdleConnTimeout,
-	TLSHandshakeTimeout:   10 * time.Second,
-	ExpectContinueTimeout: 1 * time.Second,
-}
-
 func init() {
-	if val, ok := envvar.Int("HTTP_TRANSPORT_MAX_IDLE_CONNS_PER_HOST"); ok {
-		httpTransportMaxIdleConnsPerHost = val
-	}
-
-	if val, ok := envvar.Int("HTTP_TRANSPORT_MAX_IDLE_CONNS"); ok {
-		httpTransportMaxIdleConns = val
-	}
-
-	if val, ok := envvar.Duration("HTTP_TRANSPORT_IDLE_CONN_TIMEOUT"); ok {
-		httpTransportIdleConnTimeout = val
-	}
-
 	if val, ok := envvar.Bool("DISABLE_MAX_USER_AGENT_HEADER"); ok {
 		disableUserAgentHeader = val
 	}
@@ -176,7 +130,7 @@ func NewRestClient(baseURL string) *RestClient {
 
 	client := &RestClient{
 		BaseAPIClient: requestgen.BaseAPIClient{
-			HttpClient: defaultHttpClient,
+			HttpClient: core.HttpClient,
 			BaseURL:    u,
 		},
 
