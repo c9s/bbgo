@@ -67,7 +67,9 @@ type Strategy struct {
 	session *bbgo.ExchangeSession
 
 	watchingDeposits map[string]types.Deposit
-	mu               sync.Mutex
+	// muTransaction is the mutex to enclose a transaction of checking and updating the watching deposits
+	// lock it to make sure only one checkDeposits is running at the same time
+	muTransaction sync.Mutex
 
 	logger logrus.FieldLogger
 
@@ -176,10 +178,9 @@ func (s *Strategy) tickWatcher(ctx context.Context, interval time.Duration) {
 }
 
 func (s *Strategy) checkDeposits(ctx context.Context, firstTime bool) {
-	// we will add or remove deposits from the watching list during the checking process
-	// so we need to lock the mutex here
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// lock the mutex to start a transaction
+	s.muTransaction.Lock()
+	defer s.muTransaction.Unlock()
 
 	accountLimiter := rate.NewLimiter(rate.Every(5*time.Second), 1)
 
@@ -260,6 +261,10 @@ func (s *Strategy) checkDeposits(ctx context.Context, firstTime bool) {
 			err2 := retry.GeneralBackoff(ctx, func() error {
 				return s.marginTransferService.TransferMarginAccountAsset(ctx, d.Asset, amount, types.TransferIn)
 			})
+			// remove the deposit right after the transfer attempt
+			// since `retry.GeneralBackoff` already did several retries
+			// we don't want to retry the same deposit again later
+			s.removeWatchingDeposit(d)
 
 			if err2 != nil {
 				logger.WithError(err2).Errorf("unable to transfer deposit asset into the margin account")
@@ -269,7 +274,6 @@ func (s *Strategy) checkDeposits(ctx context.Context, firstTime bool) {
 				s.logger.Infof("%s %s has been transferred successfully", amount.String(), d.Asset)
 				s.postLiveNoteMessage(d, "✅ %s %s has been transferred successfully", amount.String(), d.Asset)
 				// remove the transferred deposit from the watching list
-				delete(s.watchingDeposits, d.TransactionID)
 
 				if s.AutoRepay && s.marginBorrowRepayService != nil {
 					s.logger.Infof("autoRepay is enabled, repaying %s %s...", amount.String(), d.Asset)
@@ -348,7 +352,7 @@ func (s *Strategy) postLiveNoteMessage(d types.Deposit, msgf string, args ...any
 	}
 }
 
-// methods that modify the internal state of the strategy starts here
+// methods that modify the internal state of the strategy starts from here
 // make sure to lock the mutex before calling any of them
 func (s *Strategy) addWatchingDeposit(deposit types.Deposit) {
 	s.watchingDeposits[deposit.TransactionID] = deposit
@@ -367,6 +371,10 @@ func (s *Strategy) addWatchingDeposit(deposit types.Deposit) {
 			livenote.OneTimeMention(s.SlackAlert.Mentions...),
 		)
 	}
+}
+
+func (s *Strategy) removeWatchingDeposit(deposit types.Deposit) {
+	delete(s.watchingDeposits, deposit.TransactionID)
 }
 
 func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, scanWindow time.Duration, firstTime bool) ([]types.Deposit, error) {
