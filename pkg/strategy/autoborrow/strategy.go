@@ -383,7 +383,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 
 			maxBorrowable, err2 := s.marginBorrowRepay.QueryMarginAssetMaxBorrowable(ctx, marginAsset.Asset)
 			if err2 != nil {
-				s.logger.WithError(err2).Errorf("max borrowable query error")
+				s.logger.WithError(err2).Warnf("max borrowable query error")
 				continue
 			}
 
