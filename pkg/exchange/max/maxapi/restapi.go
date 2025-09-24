@@ -85,13 +85,14 @@ func init() {
 		if offset < 0 {
 			// avoid updating a negative offset: server time is before our local time
 			if offset > maxAllowedNegativeTimeOffset {
-				return
+				break
 			}
 			logger.Warnf("server time is behind local time, offset: %d", offset)
 		}
 
 		globalTimeOffset = offset
 		logger.Infof("updated server time offset: %d", offset)
+		break
 	}
 }
 
