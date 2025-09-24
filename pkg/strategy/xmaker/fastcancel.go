@@ -15,7 +15,9 @@ type FastCancel struct {
 	Enabled bool `json:"enabled"`
 
 	SourceSession string `json:"session"`
-	Symbol        string `json:"symbol"`
+
+	// Symbol is the source symbol
+	Symbol string `json:"symbol"`
 
 	TriggerSpread fixedpoint.Value `json:"triggerSpread"`
 
@@ -73,6 +75,10 @@ func (c *FastCancel) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 	c.logger = strategy.logger.WithFields(logrus.Fields{
 		"feature": "fastcancel",
 	})
+
+	if c.Symbol == "" {
+		c.Symbol = strategy.SourceSymbol
+	}
 
 	c.makerExchange = strategy.makerSession.Exchange
 	c.makerSymbol = strategy.MakerSymbol
