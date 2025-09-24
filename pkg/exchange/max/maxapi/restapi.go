@@ -233,7 +233,6 @@ func (c *RestClient) NewAuthenticatedRequest(
 			payload[k] = v
 		}
 	default:
-		logger.Warnf("unsupported payload type: %T", d)
 	}
 
 	for k, vs := range params {
