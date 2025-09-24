@@ -48,16 +48,22 @@ type Stream struct {
 	depthBuffers map[string]*depth.Buffer
 
 	debts map[string]maxapi.Debt
+
+	exchange *Exchange
 }
 
 func NewStream(ex *Exchange, key, secret string) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
-		key:            key,
+
+		key: key,
+
 		// pragma: allowlist nextline secret
-		secret:       secret,
+		secret: secret,
+	
 		depthBuffers: make(map[string]*depth.Buffer),
 		debts:        make(map[string]maxapi.Debt, 20),
+		exchange:     ex,
 	}
 	stream.SetEndpointCreator(stream.getEndpoint)
 	stream.SetParser(maxapi.ParseMessage)
@@ -179,14 +185,15 @@ func (s *Stream) handleConnect() {
 
 		log.Debugf("user data websocket channels: %v", filters)
 
-		nonce := time.Now().UnixNano() / int64(time.Millisecond)
+		apiKey, apiSecret := s.exchange.client.SelectApiKey()
+		nonce := s.exchange.client.GetNonce(apiKey)
 		auth := &maxapi.AuthMessage{
 			// pragma: allowlist nextline secret
 			Action: "auth",
 			// pragma: allowlist nextline secret
-			APIKey:    s.key,
+			APIKey:    apiKey,
 			Nonce:     nonce,
-			Signature: maxapi.SignPayload(strconv.FormatInt(nonce, 10), s.secret),
+			Signature: maxapi.SignPayload(strconv.FormatInt(nonce, 10), apiSecret),
 			ID:        uuid.New().String(),
 			Filters:   filters,
 		}
