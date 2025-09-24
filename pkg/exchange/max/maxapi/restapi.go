@@ -198,6 +198,16 @@ func (c *RestClient) GetNonce(apiKey string) int64 {
 	return next
 }
 
+func (c *RestClient) SelectApiKey() (string, string) {
+	apiKey := c.APIKey
+	apiSecret := c.APISecret
+	if c.ApiKeyRotator != nil {
+		apiKey, apiSecret = c.ApiKeyRotator.Next().GetKeySecret()
+	}
+
+	return apiKey, apiSecret
+}
+
 // NewAuthenticatedRequest creates new http request for authenticated routes.
 func (c *RestClient) NewAuthenticatedRequest(
 	ctx context.Context, m string, refURL string, params url.Values, data interface{},
@@ -210,11 +220,7 @@ func (c *RestClient) NewAuthenticatedRequest(
 		return nil, errors.New("empty api secret")
 	}
 
-	apiKey := c.APIKey
-	apiSecret := c.APISecret
-	if c.ApiKeyRotator != nil {
-		apiKey, apiSecret = c.ApiKeyRotator.Next().GetKeySecret()
-	}
+	apiKey, apiSecret := c.SelectApiKey()
 
 	rel, err := url.Parse(refURL)
 	if err != nil {
