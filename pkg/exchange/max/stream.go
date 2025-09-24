@@ -66,7 +66,7 @@ func NewStream(ex *Exchange, key, secret string) *Stream {
 	stream.OnDisconnect(stream.handleDisconnect)
 	stream.OnDebtEvent(stream.handleDebtEvent)
 	stream.OnErrorEvent(func(e maxapi.ErrorEvent) {
-		log.Errorf("max websocket error: %+v", e)
+		log.Warnf("max websocket responds an error event: %+v", e)
 	})
 	stream.OnAuthEvent(func(e maxapi.AuthEvent) {
 		log.Infof("max websocket connection authenticated: %+v", e)
