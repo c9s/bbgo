@@ -658,7 +658,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 				if recoverErr != nil {
 					return nil, fmt.Errorf("unable to recover order, error: %w", recoverErr)
 				} else if recoveredOrder == nil {
-					return nil, fmt.Errorf("unable to recover order, error: %w", err)
+					return nil, fmt.Errorf("unable to recover order, order not found, error: %w", err)
 				}
 
 				// note, recoveredOrder could be nil if the order is not found
