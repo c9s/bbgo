@@ -92,7 +92,6 @@ func (c *FastCancel) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 		return err
 	}
 
-	c.marketTradeStream = c.strategy.marketTradeStream
 	if c.marketTradeStream == nil {
 		c.logger.Warnf("market trade stream is not set on strategy, creating a new one for %s", c.Symbol)
 		sourceSymbol := c.Symbol
