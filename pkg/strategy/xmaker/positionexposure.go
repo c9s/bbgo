@@ -49,6 +49,11 @@ type PositionExposure struct {
 	closeCallbacks []func(d fixedpoint.Value)
 
 	labels prometheus.Labels
+
+	positionExposurePendingMetrics,
+	positionExposureNetMetrics,
+	positionExposureUncoveredMetrics prometheus.Gauge
+	positionExposureSizeMetrics prometheus.Observer
 }
 
 func newPositionExposure(symbol string) *PositionExposure {
@@ -119,8 +124,13 @@ func (m *PositionExposure) SetMetricsLabels(strategyType, strategyID, exchange, 
 		"symbol":        symbol,
 	}
 
-	updater := func(_ fixedpoint.Value) {
-		m.UpdateMetricsWith(m.labels)
+	m.positionExposurePendingMetrics = positionExposurePendingMetrics.With(m.labels)
+	m.positionExposureNetMetrics = positionExposureNetMetrics.With(m.labels)
+	m.positionExposureUncoveredMetrics = positionExposureUncoveredMetrics.With(m.labels)
+	m.positionExposureSizeMetrics = positionExposureSizeMetrics.With(m.labels)
+
+	updater := func(delta fixedpoint.Value) {
+		m.updateMetrics()
 	}
 
 	m.OnOpen(updater)
@@ -128,9 +138,9 @@ func (m *PositionExposure) SetMetricsLabels(strategyType, strategyID, exchange, 
 	m.OnClose(updater)
 }
 
-func (m *PositionExposure) UpdateMetricsWith(labels prometheus.Labels) {
-	positionExposurePendingMetrics.With(labels).Set(m.pending.Get().Float64())
-	positionExposureNetMetrics.With(labels).Set(m.net.Get().Float64())
-	positionExposureUncoveredMetrics.With(labels).Set(m.GetUncovered().Float64())
-	positionExposureSizeMetrics.With(labels).Observe(m.net.Get().Float64())
+func (m *PositionExposure) updateMetrics() {
+	m.positionExposurePendingMetrics.Set(m.pending.Get().Float64())
+	m.positionExposureNetMetrics.Set(m.net.Get().Float64())
+	m.positionExposureUncoveredMetrics.Set(m.GetUncovered().Float64())
+	m.positionExposureSizeMetrics.Observe(m.net.Get().Float64())
 }
