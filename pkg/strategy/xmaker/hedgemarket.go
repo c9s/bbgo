@@ -777,14 +777,6 @@ func canSwapDebtOnSide(
 	return qty, true
 }
 
-func positionToSide(pos fixedpoint.Value) types.SideType {
-	side := types.SideTypeBuy
-	if pos.Sign() < 0 {
-		side = types.SideTypeSell
-	}
-	return side
-}
-
 // uncoveredToDelta converts uncovered position to delta by negating it.
 // delta is the amount needed to hedge the uncovered position.
 // For example, if uncovered position is +10 (long 10 units), the delta to hedge it is -10 (sell 10 units).
