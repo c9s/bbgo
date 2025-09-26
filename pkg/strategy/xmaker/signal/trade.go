@@ -56,7 +56,7 @@ type TradeVolumeWindowSignal struct {
 
 	symbol string
 
-	stream types.Stream
+	marketTradeStream types.Stream
 
 	mu sync.Mutex
 }
@@ -65,12 +65,10 @@ func (s *TradeVolumeWindowSignal) ID() string {
 	return "tradeVolumeWindow"
 }
 
-func (s *TradeVolumeWindowSignal) Subscribe(session *bbgo.ExchangeSession, symbol string) {
-	// session.Subscribe(types.MarketTradeChannel, symbol, types.SubscribeOptions{})
-}
+func (s *TradeVolumeWindowSignal) Subscribe(session *bbgo.ExchangeSession, symbol string) {}
 
-func (s *TradeVolumeWindowSignal) SetStream(stream types.Stream) {
-	s.stream = stream
+func (s *TradeVolumeWindowSignal) SetMarketTradeStream(stream types.Stream) {
+	s.marketTradeStream = stream
 }
 
 // handleTrade adds a trade into the ring buffer.
@@ -115,16 +113,17 @@ func (s *TradeVolumeWindowSignal) Bind(ctx context.Context, session *bbgo.Exchan
 	s.start = 0
 	s.count = 0
 
-	if s.stream != nil {
-		s.stream.OnMarketTrade(s.handleTrade)
+	if s.marketTradeStream == nil {
+		s.marketTradeStream = bbgo.NewMarketTradeStream(session, symbol)
+		s.marketTradeStream.OnMarketTrade(s.handleTrade)
+		if err := s.marketTradeStream.Connect(ctx); err != nil {
+			return fmt.Errorf("unable to connect to the market trade stream: %w", err)
+		}
+
 		return nil
 	}
 
-	s.stream = bbgo.NewMarketTradeStream(session, symbol)
-	s.stream.OnMarketTrade(s.handleTrade)
-	if err := s.stream.Connect(ctx); err != nil {
-		return fmt.Errorf("unable to connect to the market trade stream: %w", err)
-	}
+	s.marketTradeStream.OnMarketTrade(s.handleTrade)
 	return nil
 }
 
