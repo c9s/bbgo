@@ -1649,7 +1649,7 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	hedgeDelta := uncoveredToDelta(uncoveredPosition)
 
 	// side is the order side
-	side := positionToSide(hedgeDelta)
+	side := deltaToSide(hedgeDelta)
 
 	sig := s.lastAggregatedSignal.Get()
 
