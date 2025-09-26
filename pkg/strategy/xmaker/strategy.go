@@ -1544,22 +1544,22 @@ func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(
 }
 
 func (s *Strategy) spreadMakerHedge(
-	ctx context.Context, sig float64, uncoveredPosition, pos fixedpoint.Value,
+	ctx context.Context, sig float64, uncoveredPosition, hedgeDelta fixedpoint.Value,
 ) (fixedpoint.Value, error) {
 	now := time.Now()
 
 	if s.SpreadMaker == nil || !s.SpreadMaker.Enabled || s.makerBook == nil {
-		return pos, nil
+		return hedgeDelta, nil
 	}
 
-	side := types.SideTypeBuy
-	if pos.Sign() < 0 {
-		side = types.SideTypeSell
+	orderSide := types.SideTypeBuy
+	if hedgeDelta.Sign() < 0 {
+		orderSide = types.SideTypeSell
 	}
 
 	makerBid, makerAsk, hasMakerPrice := s.makerBook.BestBidAndAsk()
 	if !hasMakerPrice {
-		return pos, nil
+		return hedgeDelta, nil
 	}
 
 	curOrder, hasOrder := s.SpreadMaker.getOrder()
@@ -1606,13 +1606,13 @@ func (s *Strategy) spreadMakerHedge(
 				// the side here is reversed from the position side
 				// long position -> sell side order to close the long position
 				// short position -> buy side order to close the short position
-				switch side {
+				switch orderSide {
 				case types.SideTypeSell:
 					s.positionExposure.Cover(retOrder.Quantity)
-					pos = pos.Add(retOrder.Quantity)
+					hedgeDelta = hedgeDelta.Add(retOrder.Quantity)
 				case types.SideTypeBuy:
 					s.positionExposure.Cover(retOrder.Quantity.Neg())
-					pos = pos.Add(retOrder.Quantity.Neg())
+					hedgeDelta = hedgeDelta.Add(retOrder.Quantity.Neg())
 				}
 			}
 		}
@@ -1632,7 +1632,7 @@ func (s *Strategy) spreadMakerHedge(
 		}
 	}
 
-	return pos, nil
+	return hedgeDelta, nil
 }
 
 func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
@@ -1647,7 +1647,9 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	// if the uncovered position is a negative number, e.g., -10 BTC,
 	// then we need to buy 10 BTC, hence call .Neg() here
 	hedgeDelta := uncoveredToDelta(uncoveredPosition)
-	side := positionToSide(hedgeDelta)
+
+	// side is the order side
+	side := deltaToSide(hedgeDelta)
 
 	sig := s.lastAggregatedSignal.Get()
 
@@ -1660,6 +1662,10 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	}
 
 	if hedgeDelta.IsZero() {
+		return
+	}
+
+	if s.sourceMarket.IsDustQuantity(hedgeDelta, s.lastPrice.Get()) {
 		return
 	}
 
@@ -2150,18 +2156,11 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				s.setPositionStartTime(tt)
 			}
 
-			uncoverPosition := s.getUncoveredPosition()
-			absPos := uncoverPosition.Abs()
-
-			// TODO: consider synthetic hedge here
-			if s.sourceMarket.IsDustQuantity(absPos, s.lastPrice.Get()) {
-				continue
-			}
-
 			if s.DisableHedge {
 				continue
 			}
 
+			uncoverPosition := s.getUncoveredPosition()
 			s.hedge(ctx, uncoverPosition)
 			profitChanged = true
 
@@ -2484,6 +2483,7 @@ func (s *Strategy) CrossRun(
 		if setter, ok := sigProvider.(signal.MarketTradeStreamSetter); ok {
 			s.logger.Infof("setting market trade stream on signal %T", sigProvider)
 			setter.SetMarketTradeStream(s.marketTradeStream)
+
 		}
 
 		// pass logger to the signal provider
