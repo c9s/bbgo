@@ -203,6 +203,12 @@ func (environ *Environment) ConfigureDatabase(ctx context.Context, config *Confi
 	} else if val, ok := os.LookupEnv("MYSQL_URL"); ok && (dbDriver == "" || dbDriver == "mysql") {
 		dbDSN = val
 		dbDriver = "mysql"
+	} else if val, ok := os.LookupEnv("POSTGRES_URL"); ok && (dbDriver == "" || dbDriver == "postgres") {
+		dbDSN = val
+		dbDriver = "postgres"
+	} else if val, ok := os.LookupEnv("POSTGRESQL_URL"); ok && (dbDriver == "" || dbDriver == "postgres") {
+		dbDSN = val
+		dbDriver = "postgres"
 	}
 
 	// database is optional

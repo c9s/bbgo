@@ -58,11 +58,23 @@ type TradingVolumeQueryOptions struct {
 }
 
 type TradeService struct {
-	DB *sqlx.DB
+    DB      *sqlx.DB
+    dialect DatabaseDialect
 }
 
 func NewTradeService(db *sqlx.DB) *TradeService {
-	return &TradeService{db}
+    return &TradeService{
+        DB:      db,
+        dialect: GetDialect(db.DriverName()),
+    }
+}
+
+// ensureDialect initializes the dialect if the service was constructed without NewTradeService.
+func (s *TradeService) ensureDialect() DatabaseDialect {
+    if s.dialect == nil {
+        s.dialect = GetDialect(s.DB.DriverName())
+    }
+    return s.dialect
 }
 
 func (s *TradeService) Sync(
@@ -145,13 +157,8 @@ func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVo
 		"start_time": startTime,
 	}
 
-	sql := ""
-	driverName := s.DB.DriverName()
-	if driverName == "mysql" {
-		sql = generateMysqlTradingVolumeQuerySQL(options)
-	} else {
-		sql = generateSqliteTradingVolumeSQL(options)
-	}
+	dialect := GetDialect(s.DB.DriverName())
+	sql := GenerateTradingVolumeQuerySQL(dialect, options)
 
 	log.Info(sql)
 
@@ -181,82 +188,18 @@ func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVo
 	return records, rows.Err()
 }
 
-func generateSqliteTradingVolumeSQL(options TradingVolumeQueryOptions) string {
+// GenerateTradingVolumeQuerySQL builds a cross-dialect SQL statement that aggregates trade
+// records into quote currency volume (SUM(quantity * price)) since :start_time. The
+// aggregation granularity is determined by options.GroupByPeriod ("day", "month", "year"),
+// using dialect-specific date extraction functions to produce year/month/day selector,
+// GROUP BY, and ORDER BY components. If options.SegmentBy is "symbol" or "exchange", the
+// respective column is additionally selected and grouped. The query always filters on
+// traded_at > :start_time and expects the caller to bind that named parameter (and to
+// append any further constraints if needed). It returns the raw SQL string only; value
+// binding and execution are the caller's responsibility.
+func GenerateTradingVolumeQuerySQL(dialect DatabaseDialect, options TradingVolumeQueryOptions) string {
 	timeRangeColumn := "traded_at"
-	sel, groupBys, orderBys := generateSqlite3TimeRangeClauses(timeRangeColumn, options.GroupByPeriod)
-
-	switch options.SegmentBy {
-	case "symbol":
-		sel = append(sel, "symbol")
-		groupBys = append([]string{"symbol"}, groupBys...)
-		orderBys = append(orderBys, "symbol")
-	case "exchange":
-		sel = append(sel, "exchange")
-		groupBys = append([]string{"exchange"}, groupBys...)
-		orderBys = append(orderBys, "exchange")
-	}
-
-	sel = append(sel, "SUM(quantity * price) AS quote_volume")
-	where := []string{timeRangeColumn + " > :start_time"}
-	sql := `SELECT ` + strings.Join(sel, ", ") + ` FROM trades` +
-		` WHERE ` + strings.Join(where, " AND ") +
-		` GROUP BY ` + strings.Join(groupBys, ", ") +
-		` ORDER BY ` + strings.Join(orderBys, ", ")
-
-	return sql
-}
-
-func generateSqlite3TimeRangeClauses(timeRangeColumn, period string) (selectors []string, groupBys []string, orderBys []string) {
-	switch period {
-	case "month":
-		selectors = append(selectors, "strftime('%Y',"+timeRangeColumn+") AS year", "strftime('%m',"+timeRangeColumn+") AS month")
-		groupBys = append([]string{"month", "year"}, groupBys...)
-		orderBys = append(orderBys, "year ASC", "month ASC")
-
-	case "year":
-		selectors = append(selectors, "strftime('%Y',"+timeRangeColumn+") AS year")
-		groupBys = append([]string{"year"}, groupBys...)
-		orderBys = append(orderBys, "year ASC")
-
-	case "day":
-		fallthrough
-
-	default:
-		selectors = append(selectors, "strftime('%Y',"+timeRangeColumn+") AS year", "strftime('%m',"+timeRangeColumn+") AS month", "strftime('%d',"+timeRangeColumn+") AS day")
-		groupBys = append([]string{"day", "month", "year"}, groupBys...)
-		orderBys = append(orderBys, "year ASC", "month ASC", "day ASC")
-	}
-
-	return
-}
-
-func generateMysqlTimeRangeClauses(timeRangeColumn, period string) (selectors []string, groupBys []string, orderBys []string) {
-	switch period {
-	case "month":
-		selectors = append(selectors, "YEAR("+timeRangeColumn+") AS year", "MONTH("+timeRangeColumn+") AS month")
-		groupBys = append([]string{"MONTH(" + timeRangeColumn + ")", "YEAR(" + timeRangeColumn + ")"}, groupBys...)
-		orderBys = append(orderBys, "year ASC", "month ASC")
-
-	case "year":
-		selectors = append(selectors, "YEAR("+timeRangeColumn+") AS year")
-		groupBys = append([]string{"YEAR(" + timeRangeColumn + ")"}, groupBys...)
-		orderBys = append(orderBys, "year ASC")
-
-	case "day":
-		fallthrough
-
-	default:
-		selectors = append(selectors, "YEAR("+timeRangeColumn+") AS year", "MONTH("+timeRangeColumn+") AS month", "DAY("+timeRangeColumn+") AS day")
-		groupBys = append([]string{"DAY(" + timeRangeColumn + ")", "MONTH(" + timeRangeColumn + ")", "YEAR(" + timeRangeColumn + ")"}, groupBys...)
-		orderBys = append(orderBys, "year ASC", "month ASC", "day ASC")
-	}
-
-	return
-}
-
-func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) string {
-	timeRangeColumn := "traded_at"
-	sel, groupBys, orderBys := generateMysqlTimeRangeClauses(timeRangeColumn, options.GroupByPeriod)
+	sel, groupBys, orderBys := GenerateTimeRangeClauses(dialect, timeRangeColumn, options.GroupByPeriod)
 
 	switch options.SegmentBy {
 	case "symbol":
@@ -440,7 +383,9 @@ func genTradeSelectColumns(driver string) []string {
 				continue
 			}
 			if colName == "order_uuid" {
-				columns = append(columns, binUuidSelector("trades", "order_uuid"))
+				// Use dialect-aware UUID selector for cross-database compatibility
+				dialect := GetDialect(driver)
+				columns = append(columns, dialectUuidSelector(dialect, "trades", "order_uuid"))
 			} else {
 				columns = append(columns, colName)
 			}
@@ -463,17 +408,17 @@ func (s *TradeService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err erro
 }
 
 func (s *TradeService) Insert(trade types.Trade) error {
-	if s.DB.DriverName() == "mysql" {
-		_, err := s.DB.NamedExec(`
-			INSERT INTO trades (id, order_id, order_uuid, exchange, price, quantity, quote_quantity, symbol, side, is_buyer, is_maker, traded_at, fee, fee_currency, is_margin, is_futures, is_isolated, strategy, pnl)
-			VALUES (:id, :order_id, IF(:order_uuid != '', UUID_TO_BIN(:order_uuid, true), ''), :exchange, :price, :quantity, :quote_quantity, :symbol, :side, :is_buyer, :is_maker, :traded_at, :fee, :fee_currency, :is_margin, :is_futures, :is_isolated, :strategy, :pnl)
-			ON DUPLICATE KEY UPDATE id=:id, order_id=:order_id, order_uuid=:order_uuid, exchange=:exchange, price=:price, quantity=:quantity, quote_quantity=:quote_quantity, symbol=:symbol, side=:side, is_buyer=:is_buyer, is_maker=:is_maker, traded_at=:traded_at, fee=:fee, fee_currency=:fee_currency, is_margin=:is_margin, is_futures=:is_futures, is_isolated=:is_isolated, strategy=:strategy, pnl=:pnl;`,
-			trade)
-		return err
-	}
-	sql := dbCache.InsertSqlOf(trade)
-	_, err := s.DB.NamedExec(sql, trade)
-	return err
+    d := s.ensureDialect()
+    insertClause := "id, order_id, order_uuid, exchange, price, quantity, quote_quantity, symbol, side, is_buyer, is_maker, traded_at, fee, fee_currency, is_margin, is_futures, is_isolated, strategy, pnl"
+
+    // Use dialect-aware UUID handling
+    valuesClause := ":id, :order_id, " + d.IfExpr(":order_uuid != ''", d.UUIDBinaryConversion(":order_uuid"), "''") + ", :exchange, :price, :quantity, :quote_quantity, :symbol, :side, :is_buyer, :is_maker, :traded_at, :fee, :fee_currency, :is_margin, :is_futures, :is_isolated, :strategy, :pnl"
+
+    updateClause := "id=:id, order_id=:order_id, order_uuid=:order_uuid, exchange=:exchange, price=:price, quantity=:quantity, quote_quantity=:quote_quantity, symbol=:symbol, side=:side, is_buyer=:is_buyer, is_maker=:is_maker, traded_at=:traded_at, fee=:fee, fee_currency=:fee_currency, is_margin=:is_margin, is_futures=:is_futures, is_isolated=:is_isolated, strategy=:strategy, pnl=:pnl"
+
+    sql := d.TradeUpsertSQL(insertClause, valuesClause, updateClause)
+    _, err := s.DB.NamedExec(sql, trade)
+    return err
 }
 
 func (s *TradeService) DeleteAll() error {

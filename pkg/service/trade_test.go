@@ -40,20 +40,34 @@ func Test_tradeService(t *testing.T) {
 }
 
 func Test_queryTradingVolumeSQL(t *testing.T) {
-	t.Run("group by different period", func(t *testing.T) {
+	t.Run("group by different period with MySQL dialect", func(t *testing.T) {
+		mysqlDialect := &MySQLDialect{}
+
 		o := TradingVolumeQueryOptions{
 			GroupByPeriod: "month",
 		}
-		assert.Equal(t, "SELECT YEAR(traded_at) AS year, MONTH(traded_at) AS month, SUM(quantity * price) AS quote_volume FROM trades WHERE traded_at > :start_time GROUP BY MONTH(traded_at), YEAR(traded_at) ORDER BY year ASC, month ASC", generateMysqlTradingVolumeQuerySQL(o))
+		assert.Equal(t, "SELECT YEAR(traded_at) AS year, MONTH(traded_at) AS month, SUM(quantity * price) AS quote_volume FROM trades WHERE traded_at > :start_time GROUP BY MONTH(traded_at), YEAR(traded_at) ORDER BY year ASC, month ASC", GenerateTradingVolumeQuerySQL(mysqlDialect, o))
 
 		o.GroupByPeriod = "year"
-		assert.Equal(t, "SELECT YEAR(traded_at) AS year, SUM(quantity * price) AS quote_volume FROM trades WHERE traded_at > :start_time GROUP BY YEAR(traded_at) ORDER BY year ASC", generateMysqlTradingVolumeQuerySQL(o))
+		assert.Equal(t, "SELECT YEAR(traded_at) AS year, SUM(quantity * price) AS quote_volume FROM trades WHERE traded_at > :start_time GROUP BY YEAR(traded_at) ORDER BY year ASC", GenerateTradingVolumeQuerySQL(mysqlDialect, o))
 
 		expectedDefaultSQL := "SELECT YEAR(traded_at) AS year, MONTH(traded_at) AS month, DAY(traded_at) AS day, SUM(quantity * price) AS quote_volume FROM trades WHERE traded_at > :start_time GROUP BY DAY(traded_at), MONTH(traded_at), YEAR(traded_at) ORDER BY year ASC, month ASC, day ASC"
 		for _, s := range []string{"", "day"} {
 			o.GroupByPeriod = s
-			assert.Equal(t, expectedDefaultSQL, generateMysqlTradingVolumeQuerySQL(o))
+			assert.Equal(t, expectedDefaultSQL, GenerateTradingVolumeQuerySQL(mysqlDialect, o))
 		}
+	})
+
+	t.Run("group by different period with PostgreSQL dialect", func(t *testing.T) {
+		pgDialect := &PostgreSQLDialect{}
+
+		o := TradingVolumeQueryOptions{
+			GroupByPeriod: "month",
+		}
+		assert.Equal(t, "SELECT EXTRACT(YEAR FROM traded_at) AS year, EXTRACT(MONTH FROM traded_at) AS month, SUM(quantity * price) AS quote_volume FROM trades WHERE traded_at > :start_time GROUP BY EXTRACT(MONTH FROM traded_at), EXTRACT(YEAR FROM traded_at) ORDER BY year ASC, month ASC", GenerateTradingVolumeQuerySQL(pgDialect, o))
+
+		o.GroupByPeriod = "year"
+		assert.Equal(t, "SELECT EXTRACT(YEAR FROM traded_at) AS year, SUM(quantity * price) AS quote_volume FROM trades WHERE traded_at > :start_time GROUP BY EXTRACT(YEAR FROM traded_at) ORDER BY year ASC", GenerateTradingVolumeQuerySQL(pgDialect, o))
 	})
 
 }
@@ -125,5 +139,7 @@ func TestTradeService_Query(t *testing.T) {
 
 func Test_genTradeSelectColumns(t *testing.T) {
 	assert.Equal(t, []string{"*"}, genTradeSelectColumns("sqlite3"))
-	assert.Equal(t, []string{"gid", "id", "order_id", binUuidSelector("trades", "order_uuid"), "exchange", "price", "quantity", "quote_quantity", "symbol", "side", "is_buyer", "is_maker", "traded_at", "fee", "fee_currency", "is_margin", "is_futures", "is_isolated", "strategy", "pnl", "inserted_at"}, genTradeSelectColumns("mysql"))
+	mysqlDialect := &MySQLDialect{}
+	expectedMySQLColumns := []string{"gid", "id", "order_id", dialectUuidSelector(mysqlDialect, "trades", "order_uuid"), "exchange", "price", "quantity", "quote_quantity", "symbol", "side", "is_buyer", "is_maker", "traded_at", "fee", "fee_currency", "is_margin", "is_futures", "is_isolated", "strategy", "pnl", "inserted_at"}
+	assert.Equal(t, expectedMySQLColumns, genTradeSelectColumns("mysql"))
 }

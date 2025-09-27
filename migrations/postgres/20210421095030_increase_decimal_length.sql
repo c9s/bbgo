@@ -1,0 +1,25 @@
+-- +up
+ALTER TABLE klines
+ALTER COLUMN volume TYPE NUMERIC(20,8);
+
+ALTER TABLE okex_klines
+ALTER COLUMN volume TYPE NUMERIC(20,8);
+
+ALTER TABLE binance_klines
+ALTER COLUMN volume TYPE NUMERIC(20,8);
+
+ALTER TABLE max_klines
+ALTER COLUMN volume TYPE NUMERIC(20,8);
+
+-- +down
+ALTER TABLE klines
+ALTER COLUMN volume TYPE NUMERIC(16,8);
+
+ALTER TABLE okex_klines
+ALTER COLUMN volume TYPE NUMERIC(16,8);
+
+ALTER TABLE binance_klines
+ALTER COLUMN volume TYPE NUMERIC(16,8);
+
+ALTER TABLE max_klines
+ALTER COLUMN volume TYPE NUMERIC(16,8);

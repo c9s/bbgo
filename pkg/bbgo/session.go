@@ -609,7 +609,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	} else {
 		session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 			if _, ok := session.startPrices[kline.Symbol]; !ok {
-				session.setLastPrice(kline.Symbol, kline.Open)
+				session.startPrices[kline.Symbol] = kline.Open
 			}
 
 			session.setLastPrice(kline.Symbol, kline.Close)

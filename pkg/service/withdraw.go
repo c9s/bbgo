@@ -13,8 +13,24 @@ import (
 )
 
 type WithdrawService struct {
-	DB *sqlx.DB
+    DB      *sqlx.DB
+    dialect DatabaseDialect
 }
+
+func NewWithdrawService(db *sqlx.DB) *WithdrawService {
+    return &WithdrawService{
+        DB:      db,
+        dialect: GetDialect(db.DriverName()),
+    }
+}
+
+func (s *WithdrawService) ensureDialect() DatabaseDialect {
+    if s.dialect == nil {
+        s.dialect = GetDialect(s.DB.DriverName())
+    }
+    return s.dialect
+}
+
 
 // Sync syncs the withdrawal records into db
 func (s *WithdrawService) Sync(ctx context.Context, ex types.Exchange, startTime time.Time) error {
@@ -82,7 +98,8 @@ func SelectLastWithdraws(ex types.ExchangeName, limit uint64) sq.SelectBuilder {
 }
 
 func (s *WithdrawService) QueryLast(ex types.ExchangeName, limit int) ([]types.Withdraw, error) {
-	sql := "SELECT * FROM `withdraws` WHERE `exchange` = :exchange ORDER BY `time` DESC LIMIT :limit"
+    d := s.ensureDialect()
+    sql := "SELECT * FROM " + d.EscapeTableName("withdraws") + " WHERE " + d.EscapeColumnName("exchange") + " = :exchange ORDER BY " + d.EscapeColumnName("time") + " DESC LIMIT :limit"
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"exchange": ex,
 		"limit":    limit,
@@ -96,10 +113,11 @@ func (s *WithdrawService) QueryLast(ex types.ExchangeName, limit int) ([]types.W
 }
 
 func (s *WithdrawService) Query(exchangeName types.ExchangeName) ([]types.Withdraw, error) {
-	args := map[string]interface{}{
-		"exchange": exchangeName,
-	}
-	sql := "SELECT * FROM `withdraws` WHERE `exchange` = :exchange ORDER BY `time` ASC"
+    args := map[string]interface{}{
+        "exchange": exchangeName,
+    }
+    d := s.ensureDialect()
+    sql := "SELECT * FROM " + d.EscapeTableName("withdraws") + " WHERE " + d.EscapeColumnName("exchange") + " = :exchange ORDER BY " + d.EscapeColumnName("time") + " ASC"
 	rows, err := s.DB.NamedQuery(sql, args)
 	if err != nil {
 		return nil, err

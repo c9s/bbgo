@@ -155,6 +155,7 @@ func (c *ReflectCache) InsertSqlOf(t interface{}) string {
 	return sql
 }
 
+// OBSOLETE: use UpsertSqlOfWithDialect instead
 func (c *ReflectCache) UpsertSqlOf(t interface{}) string {
 	rt := reflect.TypeOf(t)
 	if rt.Kind() == reflect.Ptr {
@@ -181,6 +182,36 @@ func (c *ReflectCache) UpsertSqlOf(t interface{}) string {
 	// NOTE: `ON DUPLICATE KEY UPDATE` is only supported in mysql
 	sql = `INSERT INTO ` + tableName + ` (` + fieldClause + `) VALUES (` + placeholderClause + `)` + `
 ON DUPLICATE KEY UPDATE ` + updatesClause + ";"
+	c.insertSqls[key] = sql
+	return sql
+}
+
+func (c *ReflectCache) UpsertSqlOfWithDialect(t interface{}, driverName string) string {
+	rt := reflect.TypeOf(t)
+	if rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+	}
+
+	typeName := rt.Name()
+	key := typeName + "_upsert_" + driverName
+	sql, ok := c.insertSqls[key]
+	if ok {
+		return sql
+	}
+
+	dialect := GetDialect(driverName)
+	tableName := dbCache.TableNameOf(t)
+	fields := dbCache.FieldsOf(t)
+	placeholders := dbCache.PlaceholderOf(t)
+	fieldClause := strings.Join(fields, ", ")
+	placeholderClause := strings.Join(placeholders, ", ")
+	updates := make([]string, 0, len(fields))
+	for idx, field := range fields {
+		updates = append(updates, field+"="+placeholders[idx])
+	}
+	updatesClause := strings.Join(updates, ", ")
+
+	sql = dialect.UpsertSQL(tableName, fieldClause, placeholderClause, updatesClause)
 	c.insertSqls[key] = sql
 	return sql
 }
@@ -260,22 +291,29 @@ func scanRowsOfType(rows *sqlx.Rows, tpe interface{}) (interface{}, error) {
 }
 
 func insertType(db *sqlx.DB, record interface{}, useUpsert bool) error {
-	// TODO: support upsert for other databases (ex: postgres)
 	var sql string
-	sqlFunc := dbCache.InsertSqlOf
 	if useUpsert {
-		if db.DriverName() != "mysql" {
-			logrus.Warnf("upsert is only supported in mysql")
-		} else {
-			sqlFunc = dbCache.UpsertSqlOf
+		// Now supports upsert for MySQL, PostgreSQL, and SQLite using dialect-specific syntax
+		// WARNING: For PostgreSQL, the generic upsert may not update existing records
+		// Consider using table-specific upsert methods for critical operations
+		sql = dbCache.UpsertSqlOfWithDialect(record, db.DriverName())
+		if db.DriverName() == "postgres" {
+			logrus.Warnf("Using generic upsert with PostgreSQL - existing records may not be updated. Consider using table-specific upsert methods.")
 		}
+	} else {
+		sql = dbCache.InsertSqlOf(record)
 	}
-	sql = sqlFunc(record)
 	_, err := db.NamedExec(sql, record)
 	return err
 }
 
 func selectAndScanType(ctx context.Context, db *sqlx.DB, sel squirrel.SelectBuilder, tpe interface{}) (interface{}, error) {
+	// Configure placeholder format based on database driver
+	switch db.DriverName() {
+	case "postgres":
+		sel = sel.PlaceholderFormat(squirrel.Dollar)
+	}
+
 	sql, args, err := sel.ToSql()
 	if err != nil {
 		return nil, err

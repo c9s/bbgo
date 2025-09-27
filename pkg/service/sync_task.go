@@ -252,6 +252,13 @@ func detectLastestSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, reco
 	query := squirrel.Select("*").
 		From("trades").
 		Where(squirrel.Eq{"id": lastTradeId})
+
+	// Configure the correct placeholder format for the database driver
+	switch db.DriverName() {
+	case "postgres":
+		query = query.PlaceholderFormat(squirrel.Dollar)
+	}
+
 	sql, args, err := query.ToSql()
 	if err != nil {
 		logrus.Warnf("can not build sql for self-trade records: %s", err)

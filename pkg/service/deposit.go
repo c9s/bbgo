@@ -13,8 +13,24 @@ import (
 )
 
 type DepositService struct {
-	DB *sqlx.DB
+    DB      *sqlx.DB
+    dialect DatabaseDialect
 }
+
+func NewDepositService(db *sqlx.DB) *DepositService {
+    return &DepositService{
+        DB:      db,
+        dialect: GetDialect(db.DriverName()),
+    }
+}
+
+func (s *DepositService) ensureDialect() DatabaseDialect {
+    if s.dialect == nil {
+        s.dialect = GetDialect(s.DB.DriverName())
+    }
+    return s.dialect
+}
+
 
 // Sync syncs the withdraw records into db
 func (s *DepositService) Sync(ctx context.Context, ex types.Exchange, startTime time.Time) error {
@@ -64,10 +80,11 @@ func (s *DepositService) Sync(ctx context.Context, ex types.Exchange, startTime 
 }
 
 func (s *DepositService) Query(exchangeName types.ExchangeName) ([]types.Deposit, error) {
-	args := map[string]interface{}{
-		"exchange": exchangeName,
-	}
-	sql := "SELECT * FROM `deposits` WHERE `exchange` = :exchange ORDER BY `time` ASC"
+    args := map[string]interface{}{
+        "exchange": exchangeName,
+    }
+    d := s.ensureDialect()
+    sql := "SELECT * FROM " + d.EscapeTableName("deposits") + " WHERE " + d.EscapeColumnName("exchange") + " = :exchange ORDER BY " + d.EscapeColumnName("time") + " ASC"
 	rows, err := s.DB.NamedQuery(sql, args)
 	if err != nil {
 		return nil, err
