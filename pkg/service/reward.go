@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,7 +20,22 @@ import (
 // TODO: add summary query for calculating the reward amounts
 // CREATE VIEW reward_summary_by_years AS SELECT YEAR(created_at) as year, reward_type, currency, SUM(quantity) FROM rewards WHERE reward_type != 'airdrop' GROUP BY YEAR(created_at), reward_type, currency ORDER BY year DESC;
 type RewardService struct {
-	DB *sqlx.DB
+	DB      *sqlx.DB
+	dialect DatabaseDialect
+}
+
+func NewRewardService(db *sqlx.DB) *RewardService {
+	return &RewardService{
+		DB:      db,
+		dialect: GetDialect(db.DriverName()),
+	}
+}
+
+func (s *RewardService) ensureDialect() DatabaseDialect {
+	if s.dialect == nil {
+		s.dialect = GetDialect(s.DB.DriverName())
+	}
+	return s.dialect
 }
 
 func (s *RewardService) Sync(ctx context.Context, exchange types.Exchange, startTime time.Time) error {
@@ -83,24 +97,29 @@ func (s *RewardService) AggregateUnspentCurrencyPosition(ctx context.Context, ex
 }
 
 func (s *RewardService) QueryUnspentSince(ctx context.Context, ex types.ExchangeName, since time.Time, rewardTypes ...types.RewardType) ([]types.Reward, error) {
+	d := s.ensureDialect()
 	sql := "SELECT * FROM rewards WHERE created_at >= :since AND exchange = :exchange AND spent IS FALSE "
 
+	args := map[string]interface{}{
+		"exchange": ex,
+		"since":    since,
+	}
+
 	if len(rewardTypes) == 0 {
-		sql += " AND `reward_type` NOT IN ('airdrop') "
+		sql += " AND " + d.EscapeColumnName("reward_type") + " NOT IN ('airdrop') "
 	} else {
-		var args []string
-		for _, n := range rewardTypes {
-			args = append(args, strconv.Quote(string(n)))
+		var placeholders []string
+		for i, n := range rewardTypes {
+			key := fmt.Sprintf("rt%d", i)
+			placeholders = append(placeholders, ":"+key)
+			args[key] = string(n)
 		}
-		sql += " AND `reward_type` IN (" + strings.Join(args, ", ") + ") "
+		sql += " AND " + d.EscapeColumnName("reward_type") + " IN (" + strings.Join(placeholders, ", ") + ") "
 	}
 
 	sql += " ORDER BY created_at ASC"
 
-	rows, err := s.DB.NamedQueryContext(ctx, sql, map[string]interface{}{
-		"exchange": ex,
-		"since":    since,
-	})
+	rows, err := s.DB.NamedQueryContext(ctx, sql, args)
 
 	if err != nil {
 		return nil, err
@@ -111,21 +130,25 @@ func (s *RewardService) QueryUnspentSince(ctx context.Context, ex types.Exchange
 }
 
 func (s *RewardService) QueryUnspent(ctx context.Context, ex types.ExchangeName, rewardTypes ...types.RewardType) ([]types.Reward, error) {
+	d := s.ensureDialect()
 	sql := "SELECT * FROM rewards WHERE exchange = :exchange AND spent IS FALSE "
+	args := map[string]interface{}{
+		"exchange": ex,
+	}
 	if len(rewardTypes) == 0 {
-		sql += " AND `reward_type` NOT IN ('airdrop') "
+		sql += " AND " + d.EscapeColumnName("reward_type") + " NOT IN ('airdrop') "
 	} else {
-		var args []string
-		for _, n := range rewardTypes {
-			args = append(args, strconv.Quote(string(n)))
+		var placeholders []string
+		for i, n := range rewardTypes {
+			key := fmt.Sprintf("rt%d", i)
+			placeholders = append(placeholders, ":"+key)
+			args[key] = string(n)
 		}
-		sql += " AND `reward_type` IN (" + strings.Join(args, ", ") + ") "
+		sql += " AND " + d.EscapeColumnName("reward_type") + " IN (" + strings.Join(placeholders, ", ") + ") "
 	}
 
 	sql += " ORDER BY created_at ASC"
-	rows, err := s.DB.NamedQueryContext(ctx, sql, map[string]interface{}{
-		"exchange": ex,
-	})
+	rows, err := s.DB.NamedQueryContext(ctx, sql, args)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +158,8 @@ func (s *RewardService) QueryUnspent(ctx context.Context, ex types.ExchangeName,
 }
 
 func (s *RewardService) MarkCurrencyAsSpent(ctx context.Context, currency string) error {
-	result, err := s.DB.NamedExecContext(ctx, "UPDATE `rewards` SET `spent` = TRUE WHERE `currency` = :currency AND `spent` IS FALSE", map[string]interface{}{
+	d := s.ensureDialect()
+	result, err := s.DB.NamedExecContext(ctx, "UPDATE "+d.EscapeTableName("rewards")+" SET "+d.EscapeColumnName("spent")+" = TRUE WHERE "+d.EscapeColumnName("currency")+" = :currency AND "+d.EscapeColumnName("spent")+" IS FALSE", map[string]interface{}{
 		"currency": currency,
 	})
 
@@ -148,7 +172,8 @@ func (s *RewardService) MarkCurrencyAsSpent(ctx context.Context, currency string
 }
 
 func (s *RewardService) MarkAsSpent(ctx context.Context, uuid string) error {
-	result, err := s.DB.NamedExecContext(ctx, "UPDATE `rewards` SET `spent` = TRUE WHERE `uuid` = :uuid", map[string]interface{}{
+	d := s.ensureDialect()
+	result, err := s.DB.NamedExecContext(ctx, "UPDATE "+d.EscapeTableName("rewards")+" SET "+d.EscapeColumnName("spent")+" = TRUE WHERE "+d.EscapeColumnName("uuid")+" = :uuid", map[string]interface{}{
 		"uuid": uuid,
 	})
 	if err != nil {

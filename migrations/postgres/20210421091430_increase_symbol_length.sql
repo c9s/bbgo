@@ -1,0 +1,25 @@
+-- +up
+ALTER TABLE klines
+ALTER COLUMN symbol TYPE VARCHAR(12);
+
+ALTER TABLE okex_klines
+ALTER COLUMN symbol TYPE VARCHAR(12);
+
+ALTER TABLE binance_klines
+ALTER COLUMN symbol TYPE VARCHAR(12);
+
+ALTER TABLE max_klines
+ALTER COLUMN symbol TYPE VARCHAR(12);
+
+-- +down
+ALTER TABLE klines
+ALTER COLUMN symbol TYPE VARCHAR(10);
+
+ALTER TABLE okex_klines
+ALTER COLUMN symbol TYPE VARCHAR(10);
+
+ALTER TABLE binance_klines
+ALTER COLUMN symbol TYPE VARCHAR(10);
+
+ALTER TABLE max_klines
+ALTER COLUMN symbol TYPE VARCHAR(10);

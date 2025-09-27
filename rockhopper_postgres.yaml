@@ -1,0 +1,13 @@
+# vim:filetype=yaml:
+# you can copy this file to rockhopper_postgres_local.yaml to have your modification
+---
+driver: postgres
+dialect: postgres
+package: main
+
+# tcp connection to postgresql with password
+dsn: "postgres://postgres:postgres@localhost:5432/bbgo?sslmode=disable"
+
+# tcp connection to postgresql without password
+# dsn: "postgres://user@localhost:5432/bbgo?sslmode=disable"
+migrationsDir: migrations/postgres

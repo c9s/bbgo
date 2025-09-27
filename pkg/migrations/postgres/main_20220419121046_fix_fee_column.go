@@ -1,0 +1,37 @@
+package postgres
+
+import (
+	"context"
+
+	"github.com/c9s/rockhopper/v2"
+)
+
+func init() {
+	AddMigration("main", up_main_fixFeeColumn, down_main_fixFeeColumn)
+}
+
+func up_main_fixFeeColumn(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
+	// This code is executed when the migration is applied.
+	_, err = tx.ExecContext(ctx, "ALTER TABLE trades\n    ALTER COLUMN fee TYPE NUMERIC(16, 8);")
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, "ALTER TABLE profits\n    ALTER COLUMN fee TYPE NUMERIC(16, 8);")
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, "ALTER TABLE profits\n    ALTER COLUMN fee_in_usd TYPE NUMERIC(16, 8);")
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func down_main_fixFeeColumn(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
+	// This code is executed when the migration is rolled back.
+	_, err = tx.ExecContext(ctx, "SELECT 1;")
+	if err != nil {
+		return err
+	}
+	return err
+}

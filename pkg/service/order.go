@@ -18,7 +18,22 @@ import (
 )
 
 type OrderService struct {
-	DB *sqlx.DB
+    DB      *sqlx.DB
+    dialect DatabaseDialect
+}
+
+func NewOrderService(db *sqlx.DB) *OrderService {
+    return &OrderService{
+        DB:      db,
+        dialect: GetDialect(db.DriverName()),
+    }
+}
+
+func (s *OrderService) ensureDialect() DatabaseDialect {
+    if s.dialect == nil {
+        s.dialect = GetDialect(s.DB.DriverName())
+    }
+    return s.dialect
 }
 
 func (s *OrderService) Sync(
@@ -137,6 +152,8 @@ func (s *OrderService) Query(options QueryOrdersOptions) ([]AggOrder, error) {
 }
 
 func genOrderSQL(driver string, options QueryOrdersOptions) string {
+	dialect := GetDialect(driver)
+
 	// ascending
 	ordering := "ASC"
 	switch v := strings.ToUpper(options.Ordering); v {
@@ -162,6 +179,7 @@ func genOrderSQL(driver string, options QueryOrdersOptions) string {
 		where = append(where, "orders.symbol = :symbol")
 	}
 
+	// Build column list. In MySQL, expand columns to apply BIN_TO_UUID on uuid.
 	var selColumns []string
 	if driver == "mysql" {
 		to := reflect.TypeOf(types.Order{})
@@ -172,23 +190,26 @@ func genOrderSQL(driver string, options QueryOrdersOptions) string {
 				continue
 			}
 			if colName == "uuid" {
-				selColumns = append(selColumns, binUuidSelector("orders", "uuid"))
+				selColumns = append(selColumns, dialectUuidSelector(dialect, "orders", "uuid"))
 			} else {
 				selColumns = append(selColumns, "orders."+colName)
 			}
-
 		}
 	} else {
 		selColumns = append(selColumns, "orders.*")
 	}
-	selColumns = append(selColumns, "IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price")
 
-	sql := `SELECT ` + strings.Join(selColumns, ", ") + ` FROM orders` +
-		` LEFT JOIN trades AS t ON (t.order_id = orders.order_id)`
+	// Compute average price via an aggregated subquery to avoid GROUP BY issues on Postgres
+	// and to keep outer select free of aggregates.
+	avgSub := `SELECT order_id, exchange, SUM(price * quantity)/NULLIF(SUM(quantity), 0) AS avg_price FROM trades GROUP BY exchange, order_id`
+	// Cross-database null-coalesce for fallback to orders.price when no trades
+	avgColumn := dialect.Coalesce("avg_trades.avg_price", "orders.price") + " AS average_price"
+
+	sql := `SELECT ` + strings.Join(selColumns, ", ") + `, ` + avgColumn + ` FROM orders` +
+		` LEFT JOIN (` + avgSub + `) AS avg_trades ON (avg_trades.order_id = orders.order_id AND avg_trades.exchange = orders.exchange)`
 	if len(where) > 0 {
 		sql += ` WHERE ` + strings.Join(where, " AND ")
 	}
-	sql += ` GROUP BY orders.gid `
 	sql += ` ORDER BY orders.gid ` + ordering
 	sql += ` LIMIT ` + strconv.Itoa(500)
 
@@ -223,18 +244,15 @@ func (s *OrderService) scanRows(rows *sqlx.Rows) (orders []types.Order, err erro
 }
 
 func (s *OrderService) Insert(order types.Order) (err error) {
-	if s.DB.DriverName() == "mysql" {
-		_, err = s.DB.NamedExec(`
-			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_futures, is_isolated, uuid)
-			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_futures, :is_isolated, IF(:uuid != '', UUID_TO_BIN(:uuid, true), ''))
-			ON DUPLICATE KEY UPDATE status=:status, executed_quantity=:executed_quantity, is_working=:is_working, updated_at=:updated_at`, order)
-		return err
-	}
+    d := s.ensureDialect()
+    insertClause := "exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_futures, is_isolated, uuid"
 
-	_, err = s.DB.NamedExec(`
-			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_futures, is_isolated, uuid)
-			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_futures, :is_isolated, :uuid)
-	`, order)
+    // Use dialect-aware UUID handling
+    valuesClause := ":exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_futures, :is_isolated, " + d.IfExpr(":uuid != ''", d.UUIDBinaryConversion(":uuid"), "''")
 
-	return err
+    updateClause := "status=:status, executed_quantity=:executed_quantity, is_working=:is_working, updated_at=:updated_at"
+
+    sql := d.OrderUpsertSQL(insertClause, valuesClause, updateClause)
+    _, err = s.DB.NamedExec(sql, order)
+    return err
 }

@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -19,12 +18,28 @@ import (
 )
 
 type BacktestService struct {
-	DB *sqlx.DB
+    DB      *sqlx.DB
+    dialect DatabaseDialect
+}
+
+func NewBacktestService(db *sqlx.DB) *BacktestService {
+    return &BacktestService{
+        DB:      db,
+        dialect: GetDialect(db.DriverName()),
+    }
+}
+
+func (s *BacktestService) ensureDialect() DatabaseDialect {
+    if s.dialect == nil {
+        s.dialect = GetDialect(s.DB.DriverName())
+    }
+    return s.dialect
 }
 
 func (s *BacktestService) SyncKLineByInterval(
-	ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time,
+    ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time,
 ) error {
+    s.ensureDialect()
 	_, isFutures, isIsolated, isolatedSymbol := exchange2.GetSessionAttributes(exchange)
 
 	// override symbol if isolatedSymbol is not empty
@@ -140,23 +155,34 @@ func (s *BacktestService) SyncFresh(
 
 // QueryKLine queries the klines from the database
 func (s *BacktestService) QueryKLine(
-	ex types.Exchange, symbol string, interval types.Interval, orderBy string, limit int,
+    ex types.Exchange, symbol string, interval types.Interval, orderBy string, limit int,
 ) (*types.KLine, error) {
+    s.ensureDialect()
 	log.Infof("querying last kline exchange = %s AND symbol = %s AND interval = %s", ex, symbol, interval)
 
 	tableName := targetKlineTable(ex)
-	// make the SQL syntax IDE friendly, so that it can analyze it.
-	sql := fmt.Sprintf("SELECT * FROM `%s` WHERE  `symbol` = :symbol AND `interval` = :interval ORDER BY end_time "+orderBy+" LIMIT "+strconv.Itoa(limit), tableName)
 
-	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
-		"interval": interval,
-		"symbol":   symbol,
-	})
-	defer rows.Close()
+	// Build query using Squirrel for proper cross-database compatibility
+	query := sq.Select("*").
+		From(tableName).
+		Where(sq.Eq{"symbol": symbol}).
+		Where(sq.Eq{s.dialect.EscapeColumnName("interval"): interval.String()}).
+		OrderBy("end_time " + orderBy).
+		Limit(uint64(limit))
 
+	// Configure database-specific placeholder format
+	query = s.dialect.ConfigurePlaceholder(query)
+
+	sql, args, err := query.ToSql()
+	if err != nil {
+		return nil, errors.Wrap(err, "build query error")
+	}
+
+	rows, err := s.DB.Queryx(sql, args...)
 	if err != nil {
 		return nil, errors.Wrap(err, "query kline error")
 	}
+	defer rows.Close()
 
 	if rows.Err() != nil {
 		return nil, rows.Err()
@@ -173,19 +199,31 @@ func (s *BacktestService) QueryKLine(
 
 // QueryKLinesForward is used for querying klines to back-testing
 func (s *BacktestService) QueryKLinesForward(
-	exchange types.Exchange, symbol string, interval types.Interval, startTime time.Time, limit int,
+    exchange types.Exchange, symbol string, interval types.Interval, startTime time.Time, limit int,
 ) ([]types.KLine, error) {
+    s.ensureDialect()
 	tableName := targetKlineTable(exchange)
-	sql := "SELECT * FROM `binance_klines` WHERE `end_time` >= :start_time AND `symbol` = :symbol AND `interval` = :interval and exchange = :exchange ORDER BY end_time ASC LIMIT :limit"
-	sql = strings.ReplaceAll(sql, "binance_klines", tableName)
 
-	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
-		"start_time": startTime,
-		"limit":      limit,
-		"symbol":     symbol,
-		"interval":   interval,
-		"exchange":   exchange.Name().String(),
-	})
+	// Build query using Squirrel for proper cross-database compatibility
+	query := sq.Select("*").
+		From(tableName).
+		Where(sq.GtOrEq{"end_time": startTime}).
+		Where(sq.Eq{"symbol": symbol}).
+		Where(sq.Eq{s.dialect.EscapeColumnName("interval"): interval.String()}).
+		Where(sq.Eq{"exchange": exchange.Name().String()}).
+		OrderBy("end_time ASC").
+		Limit(uint64(limit))
+
+	// Configure database-specific placeholder format
+	query = s.dialect.ConfigurePlaceholder(query)
+
+	sql, args, err := query.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := s.DB.Queryx(sql, args...)
+	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -194,21 +232,35 @@ func (s *BacktestService) QueryKLinesForward(
 }
 
 func (s *BacktestService) QueryKLinesBackward(
-	exchange types.Exchange, symbol string, interval types.Interval, endTime time.Time, limit int,
+    exchange types.Exchange, symbol string, interval types.Interval, endTime time.Time, limit int,
 ) ([]types.KLine, error) {
+    s.ensureDialect()
 	tableName := targetKlineTable(exchange)
 
-	sql := "SELECT * FROM `binance_klines` WHERE `end_time` <= :end_time  and exchange = :exchange  AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time DESC LIMIT :limit"
-	sql = strings.ReplaceAll(sql, "binance_klines", tableName)
-	sql = "SELECT t.* FROM (" + sql + ") AS t ORDER BY t.end_time ASC"
+	// Build subquery using Squirrel for proper cross-database compatibility
+	subQuery := sq.Select("*").
+		From(tableName).
+		Where(sq.LtOrEq{"end_time": endTime}).
+		Where(sq.Eq{"exchange": exchange.Name().String()}).
+		Where(sq.Eq{"symbol": symbol}).
+		Where(sq.Eq{s.dialect.EscapeColumnName("interval"): interval.String()}).
+		OrderBy("end_time DESC").
+		Limit(uint64(limit))
 
-	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
-		"limit":    limit,
-		"end_time": endTime,
-		"symbol":   symbol,
-		"interval": interval,
-		"exchange": exchange.Name().String(),
-	})
+	// Configure database-specific placeholder format for subquery
+	subQuery = s.dialect.ConfigurePlaceholder(subQuery)
+
+	subSql, subArgs, err := subQuery.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap in outer query to reverse order
+	// Note: Using raw SQL here as Squirrel doesn't handle subqueries in FROM clause well
+	sql := "SELECT t.* FROM (" + subSql + ") AS t ORDER BY t.end_time ASC"
+
+	rows, err := s.DB.Queryx(sql, subArgs...)
+	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -217,38 +269,47 @@ func (s *BacktestService) QueryKLinesBackward(
 }
 
 func (s *BacktestService) QueryKLinesCh(
-	since, until time.Time, exchange types.Exchange, symbols []string, intervals []types.Interval,
+    since, until time.Time, exchange types.Exchange, symbols []string, intervals []types.Interval,
 ) (chan types.KLine, chan error) {
+    s.ensureDialect()
 	if len(symbols) == 0 {
 		return returnError(errors.Errorf("symbols is empty when querying kline, plesae check your strategy setting. "))
 	}
 
 	tableName := targetKlineTable(exchange)
-	var query string
 
-	// need to sort by start_time desc in order to let matching engine process 1m first
-	// otherwise any other close event could peek on the final close price
-	if len(symbols) == 1 {
-		query = "SELECT * FROM `binance_klines` WHERE `end_time` BETWEEN :since AND :until AND `symbol` = :symbols AND `interval` IN (:intervals) ORDER BY end_time ASC, start_time DESC"
-	} else {
-		query = "SELECT * FROM `binance_klines` WHERE `end_time` BETWEEN :since AND :until AND `symbol` IN (:symbols) AND `interval` IN (:intervals) ORDER BY end_time ASC, start_time DESC"
+	// Convert intervals to strings for query
+	intervalStrs := make([]string, len(intervals))
+	for i, interval := range intervals {
+		intervalStrs[i] = interval.String()
 	}
 
-	query = strings.ReplaceAll(query, "binance_klines", tableName)
+	// Build query using Squirrel for proper cross-database compatibility
+	query := sq.Select("*").
+		From(tableName).
+		Where(sq.And{
+			sq.GtOrEq{"end_time": since},
+			sq.LtOrEq{"end_time": until},
+		}).
+		OrderBy("end_time ASC", "start_time DESC")
 
-	sql, args, err := sqlx.Named(query, map[string]interface{}{
-		"since":     since,
-		"until":     until,
-		"symbol":    symbols[0],
-		"symbols":   symbols,
-		"intervals": types.IntervalSlice(intervals),
-	})
+	// Handle symbols - use single value if only one symbol, otherwise use IN clause
+	if len(symbols) == 1 {
+		query = query.Where(sq.Eq{"symbol": symbols[0]})
+	} else {
+		query = query.Where(sq.Eq{"symbol": symbols})
+	}
 
-	sql, args, err = sqlx.In(sql, args...)
+	// Handle intervals - always use IN clause since we have multiple intervals
+	query = query.Where(sq.Eq{s.dialect.EscapeColumnName("interval"): intervalStrs})
+
+	// Configure database-specific placeholder format
+	query = s.dialect.ConfigurePlaceholder(query)
+
+	sql, args, err := query.ToSql()
 	if err != nil {
 		return returnError(err)
 	}
-	sql = s.DB.Rebind(sql)
 
 	rows, err := s.DB.Queryx(sql, args...)
 	if err != nil {
@@ -330,14 +391,25 @@ func targetKlineTable(exchange types.Exchange) string {
 var errExchangeFieldIsUnset = errors.New("kline.Exchange field should not be empty")
 
 func (s *BacktestService) Insert(kline types.KLine, ex types.Exchange) error {
+    s.ensureDialect()
 	if len(kline.Exchange) == 0 {
 		return errExchangeFieldIsUnset
 	}
 
 	tableName := targetKlineTable(ex)
 
-	sql := fmt.Sprintf("INSERT INTO `%s` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)"+
-		"VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume)", tableName)
+	// Generate the appropriate SQL using dialect for cross-database compatibility
+	columns := []string{
+		s.dialect.EscapeColumnName("exchange"), s.dialect.EscapeColumnName("start_time"), s.dialect.EscapeColumnName("end_time"), s.dialect.EscapeColumnName("symbol"),
+		s.dialect.EscapeColumnName("interval"), s.dialect.EscapeColumnName("open"), s.dialect.EscapeColumnName("high"), s.dialect.EscapeColumnName("low"),
+		s.dialect.EscapeColumnName("close"), s.dialect.EscapeColumnName("closed"), s.dialect.EscapeColumnName("volume"), s.dialect.EscapeColumnName("quote_volume"),
+		s.dialect.EscapeColumnName("taker_buy_base_volume"), s.dialect.EscapeColumnName("taker_buy_quote_volume"),
+	}
+	insertClause := strings.Join(columns, ", ")
+	valuesClause := ":exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume"
+
+	// Use dialect-specific INSERT with conflict handling (ignore duplicates)
+	sql := s.dialect.KLineInsertSQL(s.dialect.EscapeTableName(tableName), insertClause, valuesClause)
 
 	_, err := s.DB.NamedExec(sql, kline)
 	return err
@@ -345,14 +417,25 @@ func (s *BacktestService) Insert(kline types.KLine, ex types.Exchange) error {
 
 // BatchInsert Note: all kline should be same exchange, or it will cause issue.
 func (s *BacktestService) BatchInsert(kline []types.KLine, ex types.Exchange) error {
+    s.ensureDialect()
 	if len(kline) == 0 {
 		return nil
 	}
 
 	tableName := targetKlineTable(ex)
 
-	sql := fmt.Sprintf("INSERT INTO `%s` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)"+
-		" VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume); ", tableName)
+	// Generate the appropriate SQL using dialect for cross-database compatibility
+	columns := []string{
+		s.dialect.EscapeColumnName("exchange"), s.dialect.EscapeColumnName("start_time"), s.dialect.EscapeColumnName("end_time"), s.dialect.EscapeColumnName("symbol"),
+		s.dialect.EscapeColumnName("interval"), s.dialect.EscapeColumnName("open"), s.dialect.EscapeColumnName("high"), s.dialect.EscapeColumnName("low"),
+		s.dialect.EscapeColumnName("close"), s.dialect.EscapeColumnName("closed"), s.dialect.EscapeColumnName("volume"), s.dialect.EscapeColumnName("quote_volume"),
+		s.dialect.EscapeColumnName("taker_buy_base_volume"), s.dialect.EscapeColumnName("taker_buy_quote_volume"),
+	}
+	insertClause := strings.Join(columns, ", ")
+	valuesClause := ":exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume"
+
+	// Use dialect-specific INSERT with conflict handling (ignore duplicates)
+	sql := s.dialect.KLineInsertSQL(s.dialect.EscapeTableName(tableName), insertClause, valuesClause)
 
 	tx := s.DB.MustBegin()
 	if _, err := tx.NamedExec(sql, kline); err != nil {
@@ -448,19 +531,22 @@ func (s *BacktestService) SyncPartial(
 // FindMissingTimeRanges returns the missing time ranges, the start/end time represents the existing data time points.
 // So when sending kline query to the exchange API, we need to add one second to the start time and minus one second to the end time.
 func (s *BacktestService) FindMissingTimeRanges(
-	ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time,
+    ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time,
 ) ([]TimeRange, error) {
+    s.ensureDialect()
 	query := s.SelectKLineTimePoints(ex, symbol, interval, since, until)
+	// Configure the correct placeholder format for the database driver
+	query = s.dialect.ConfigurePlaceholder(query)
 	sql, args, err := query.ToSql()
 	if err != nil {
 		return nil, err
 	}
 
 	rows, err := s.DB.QueryContext(ctx, sql, args...)
-	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var timeRanges []TimeRange
 	var lastTime = since
@@ -493,9 +579,12 @@ func (s *BacktestService) FindMissingTimeRanges(
 }
 
 func (s *BacktestService) QueryExistingDataRange(
-	ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, tArgs ...time.Time,
+    ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, tArgs ...time.Time,
 ) (start, end *types.Time, err error) {
+    s.ensureDialect()
 	sel := s.SelectKLineTimeRange(ex, symbol, interval, tArgs...)
+	// Configure the correct placeholder format for the database driver
+	sel = s.dialect.ConfigurePlaceholder(sel)
 	sql, args, err := sel.ToSql()
 	if err != nil {
 		return nil, nil, err
@@ -525,21 +614,24 @@ func (s *BacktestService) SelectKLineTimePoints(
 ) sq.SelectBuilder {
 	conditions := sq.And{
 		sq.Eq{"symbol": symbol},
-		sq.Eq{"`interval`": interval.String()},
+		sq.Eq{s.dialect.EscapeColumnName("interval"): interval.String()},
 	}
 
 	if len(args) == 2 {
 		since := args[0]
 		until := args[1]
-		conditions = append(conditions, sq.Expr("`start_time` BETWEEN ? AND ?", since, until))
+		conditions = append(conditions, sq.Expr(s.dialect.EscapeColumnName("start_time")+" BETWEEN ? AND ?", since, until))
 	}
 
 	tableName := targetKlineTable(ex)
 
-	return sq.Select("start_time").
+	sel := sq.Select("start_time").
 		From(tableName).
 		Where(conditions).
 		OrderBy("start_time ASC")
+
+	// Configure the correct placeholder format for the database driver
+	return s.dialect.ConfigurePlaceholder(sel)
 }
 
 // SelectKLineTimeRange returns the existing klines time range (since < kline.start_time < until)
@@ -548,7 +640,7 @@ func (s *BacktestService) SelectKLineTimeRange(
 ) sq.SelectBuilder {
 	conditions := sq.And{
 		sq.Eq{"symbol": symbol},
-		sq.Eq{"`interval`": interval.String()},
+		sq.Eq{s.dialect.EscapeColumnName("interval"): interval.String()},
 	}
 
 	if len(args) == 2 {
@@ -557,14 +649,17 @@ func (s *BacktestService) SelectKLineTimeRange(
 		// mysql works in this case, so this is a workaround
 		since := args[0]
 		until := args[1]
-		conditions = append(conditions, sq.Expr("`start_time` BETWEEN ? AND ?", since, until))
+		conditions = append(conditions, sq.Expr(s.dialect.EscapeColumnName("start_time")+" BETWEEN ? AND ?", since, until))
 	}
 
 	tableName := targetKlineTable(ex)
 
-	return sq.Select("MIN(start_time) AS t1, MAX(start_time) AS t2").
+	sel := sq.Select("MIN(start_time) AS t1, MAX(start_time) AS t2").
 		From(tableName).
 		Where(conditions)
+
+	// Configure the correct placeholder format for the database driver
+	return s.dialect.ConfigurePlaceholder(sel)
 }
 
 // TODO: add is_futures column since the klines data is different
@@ -572,13 +667,16 @@ func (s *BacktestService) SelectLastKLines(
 	ex types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time, limit uint64,
 ) sq.SelectBuilder {
 	tableName := targetKlineTable(ex)
-	return sq.Select("*").
+	sel := sq.Select("*").
 		From(tableName).
 		Where(sq.And{
 			sq.Eq{"symbol": symbol},
-			sq.Eq{"`interval`": interval.String()},
-			sq.Expr("start_time BETWEEN ? AND ?", startTime, endTime),
+			sq.Eq{s.dialect.EscapeColumnName("interval"): interval.String()},
+			sq.Expr(s.dialect.EscapeColumnName("start_time")+" BETWEEN ? AND ?", startTime, endTime),
 		}).
 		OrderBy("start_time DESC").
 		Limit(limit)
+
+	// Configure the correct placeholder format for the database driver
+	return s.dialect.ConfigurePlaceholder(sel)
 }
