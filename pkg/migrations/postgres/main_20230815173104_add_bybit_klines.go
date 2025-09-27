@@ -12,7 +12,7 @@ func init() {
 
 func up_main_addBybitKlines(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is applied.
-	_, err = tx.ExecContext(ctx, "CREATE TABLE bybit_klines\n(\n    gid           BIGSERIAL               NOT NULL,\n    exchange      VARCHAR(10)             NOT NULL,\n    start_time    TIMESTAMP(3)            NOT NULL,\n    end_time      TIMESTAMP(3)            NOT NULL,\n    interval      VARCHAR(3)              NOT NULL,\n    symbol        VARCHAR(20)             NOT NULL,\n    open          NUMERIC(20, 8)          NOT NULL CHECK (open >= 0),\n    high          NUMERIC(20, 8)          NOT NULL CHECK (high >= 0),\n    low           NUMERIC(20, 8)          NOT NULL CHECK (low >= 0),\n    close         NUMERIC(20, 8)          NOT NULL DEFAULT 0.0 CHECK (close >= 0),\n    volume        NUMERIC(20, 8)          NOT NULL DEFAULT 0.0 CHECK (volume >= 0),\n    closed        BOOLEAN                 NOT NULL DEFAULT TRUE,\n    last_trade_id INTEGER                 NOT NULL DEFAULT 0 CHECK (last_trade_id >= 0),\n    num_trades    INTEGER                 NOT NULL DEFAULT 0 CHECK (num_trades >= 0),\n    PRIMARY KEY (gid)\n);")
+	_, err = tx.ExecContext(ctx, "CREATE TABLE bybit_klines\n(\n    gid           BIGSERIAL               NOT NULL,\n    exchange      VARCHAR(10)             NOT NULL,\n    start_time    TIMESTAMP(3)            NOT NULL,\n    end_time      TIMESTAMP(3)            NOT NULL,\n    interval      VARCHAR(3)              NOT NULL,\n    symbol        VARCHAR(20)             NOT NULL,\n    open          NUMERIC(20, 8)          NOT NULL CHECK (open >= 0),\n    high          NUMERIC(20, 8)          NOT NULL CHECK (high >= 0),\n    low           NUMERIC(20, 8)          NOT NULL CHECK (low >= 0),\n    close         NUMERIC(20, 8)          NOT NULL DEFAULT 0.0 CHECK (close >= 0),\n    volume        NUMERIC(20, 8)          NOT NULL DEFAULT 0.0 CHECK (volume >= 0),\n    closed        BOOLEAN                 NOT NULL DEFAULT TRUE,\n    last_trade_id INTEGER                 NOT NULL DEFAULT 0 CHECK (last_trade_id >= 0),\n    num_trades    INTEGER                 NOT NULL DEFAULT 0 CHECK (num_trades >= 0),\n    PRIMARY KEY (gid)\n);\nCREATE UNIQUE INDEX idx_kline_bybit_unique\n    ON bybit_klines (symbol, interval, start_time);")
 	if err != nil {
 		return err
 	}
@@ -21,7 +21,7 @@ func up_main_addBybitKlines(ctx context.Context, tx rockhopper.SQLExecutor) (err
 
 func down_main_addBybitKlines(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is rolled back.
-	_, err = tx.ExecContext(ctx, "DROP TABLE IF EXISTS bybit_klines;")
+	_, err = tx.ExecContext(ctx, "DROP INDEX IF EXISTS idx_kline_bybit_unique;\nDROP TABLE IF EXISTS bybit_klines;")
 	if err != nil {
 		return err
 	}
