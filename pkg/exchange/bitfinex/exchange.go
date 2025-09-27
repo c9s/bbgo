@@ -443,8 +443,8 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 func (e *Exchange) QueryTrades(
 	ctx context.Context, symbol string, options *types.TradeQueryOptions,
 ) ([]types.Trade, error) {
-
-	req := e.client.NewGetTradeHistoryBySymbolRequest().Symbol(symbol)
+	req := e.client.NewGetTradeHistoryBySymbolRequest().
+		Symbol(toLocalSymbol(symbol))
 
 	if options != nil {
 		if options.StartTime != nil {
@@ -539,6 +539,10 @@ func (e *Exchange) QueryDepth(
 	}
 
 	return convertDepth(response, symbol), 0, nil
+}
+
+func (e *Exchange) GetApiClient() *bfxapi.Client {
+	return e.client
 }
 
 func MapSlice[T, M any](input []T, f func(T) M) []M {
