@@ -39,7 +39,7 @@ type Instrument struct {
 type GetInstrumentsInfoRequest struct {
 	client requestgen.APIClient
 
-	category Category `param:"category,query" validValues:"spot"`
+	category Category `param:"category,query" validValues:"spot,linear"`
 	symbol   *string  `param:"symbol,query"`
 
 	// limit is invalid if category spot.
