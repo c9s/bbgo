@@ -70,9 +70,14 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 	// check category field -> json key category
 	category := g.category
 
+	// TEMPLATE check-required
+	if len(category) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// TEMPLATE check-valid-values
 	switch category {
-	case "spot":
+	case "spot", "linear":
 		params["category"] = category
 
 	default:
@@ -87,6 +92,11 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 	if g.symbol != nil {
 		symbol := *g.symbol
 
+		// TEMPLATE check-required
+		if len(symbol) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of symbol
 		params["symbol"] = symbol
 	} else {
@@ -94,6 +104,11 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 	// check baseCoin field -> json key baseCoin
 	if g.baseCoin != nil {
 		baseCoin := *g.baseCoin
+
+		// TEMPLATE check-required
+		if len(baseCoin) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of baseCoin
 		params["baseCoin"] = baseCoin
@@ -103,6 +118,11 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 	if g.settleCoin != nil {
 		settleCoin := *g.settleCoin
 
+		// TEMPLATE check-required
+		if len(settleCoin) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of settleCoin
 		params["settleCoin"] = settleCoin
 	} else {
@@ -110,6 +130,11 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 	// check orderId field -> json key orderId
 	if g.orderId != nil {
 		orderId := *g.orderId
+
+		// TEMPLATE check-required
+		if len(orderId) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of orderId
 		params["orderId"] = orderId
@@ -119,6 +144,11 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 	if g.orderLinkId != nil {
 		orderLinkId := *g.orderLinkId
 
+		// TEMPLATE check-required
+		if len(orderLinkId) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of orderLinkId
 		params["orderLinkId"] = orderLinkId
 	} else {
@@ -126,6 +156,11 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 	// check openOnly field -> json key openOnly
 	if g.openOnly != nil {
 		openOnly := *g.openOnly
+
+		// TEMPLATE check-required
+		if openOnly == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// TEMPLATE check-valid-values
 		switch openOnly {
@@ -146,6 +181,11 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 	if g.orderFilter != nil {
 		orderFilter := *g.orderFilter
 
+		// TEMPLATE check-required
+		if len(orderFilter) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of orderFilter
 		params["orderFilter"] = orderFilter
 	} else {
@@ -153,6 +193,9 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 	// check limit field -> json key limit
 	if g.limit != nil {
 		limit := *g.limit
+
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
 
 		// assign parameter of limit
 		params["limit"] = limit
@@ -162,6 +205,11 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 	if g.cursor != nil {
 		cursor := *g.cursor
 
+		// TEMPLATE check-required
+		if len(cursor) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of cursor
 		params["cursor"] = cursor
 	} else {
@@ -169,7 +217,13 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil

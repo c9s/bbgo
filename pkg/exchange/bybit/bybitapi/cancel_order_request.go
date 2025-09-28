@@ -16,7 +16,7 @@ type CancelOrderResponse struct {
 type CancelOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	category Category `param:"category" validValues:"spot"`
+	category Category `param:"category" validValues:"spot,linear"`
 	symbol   string   `param:"symbol"`
 	// User customised order ID. Either orderId or orderLinkId is required
 	orderLinkId string `param:"orderLinkId"`

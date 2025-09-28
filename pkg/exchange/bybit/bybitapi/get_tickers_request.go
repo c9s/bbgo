@@ -43,7 +43,7 @@ type Ticker struct {
 type GetTickersRequest struct {
 	client requestgen.APIClient
 
-	category Category `param:"category,query" validValues:"spot"`
+	category Category `param:"category,query" validValues:"spot,linear"`
 	symbol   *string  `param:"symbol,query"`
 }
 

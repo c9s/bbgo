@@ -32,9 +32,14 @@ func (g *GetFeeRatesRequest) GetQueryParameters() (url.Values, error) {
 	// check category field -> json key category
 	category := g.category
 
+	// TEMPLATE check-required
+	if len(category) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// TEMPLATE check-valid-values
 	switch category {
-	case "spot":
+	case "spot", "linear":
 		params["category"] = category
 
 	default:
@@ -49,6 +54,11 @@ func (g *GetFeeRatesRequest) GetQueryParameters() (url.Values, error) {
 	if g.symbol != nil {
 		symbol := *g.symbol
 
+		// TEMPLATE check-required
+		if len(symbol) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of symbol
 		params["symbol"] = symbol
 	} else {
@@ -57,6 +67,11 @@ func (g *GetFeeRatesRequest) GetQueryParameters() (url.Values, error) {
 	if g.baseCoin != nil {
 		baseCoin := *g.baseCoin
 
+		// TEMPLATE check-required
+		if len(baseCoin) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of baseCoin
 		params["baseCoin"] = baseCoin
 	} else {
@@ -64,7 +79,13 @@ func (g *GetFeeRatesRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -186,15 +207,29 @@ func (g *GetFeeRatesRequest) Do(ctx context.Context) (*FeeRates, error) {
 	}
 
 	var apiResponse APIResponse
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
 	}
 
 	type responseValidator interface {
 		Validate() error
 	}
-	validator, ok := interface{}(apiResponse).(responseValidator)
-	if ok {
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
 		if err := validator.Validate(); err != nil {
 			return nil, err
 		}

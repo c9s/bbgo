@@ -165,7 +165,13 @@ func (p *PlaceOrderRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if p.isVarSlice(_v) {
+			p.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -177,9 +183,14 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check category field -> json key category
 	category := p.category
 
+	// TEMPLATE check-required
+	if len(category) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// TEMPLATE check-valid-values
 	switch category {
-	case "spot":
+	case "spot", "linear":
 		params["category"] = category
 
 	default:
@@ -193,10 +204,20 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check symbol field -> json key symbol
 	symbol := p.symbol
 
+	// TEMPLATE check-required
+	if len(symbol) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// assign parameter of symbol
 	params["symbol"] = symbol
 	// check side field -> json key side
 	side := p.side
+
+	// TEMPLATE check-required
+	if len(side) == 0 {
+	}
+	// END TEMPLATE check-required
 
 	// TEMPLATE check-valid-values
 	switch side {
@@ -214,6 +235,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check orderType field -> json key orderType
 	orderType := p.orderType
 
+	// TEMPLATE check-required
+	if len(orderType) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// TEMPLATE check-valid-values
 	switch orderType {
 	case "Market", "Limit":
@@ -230,15 +256,30 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check qty field -> json key qty
 	qty := p.qty
 
+	// TEMPLATE check-required
+	if len(qty) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// assign parameter of qty
 	params["qty"] = qty
 	// check orderLinkId field -> json key orderLinkId
 	orderLinkId := p.orderLinkId
 
+	// TEMPLATE check-required
+	if len(orderLinkId) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// assign parameter of orderLinkId
 	params["orderLinkId"] = orderLinkId
 	// check timeInForce field -> json key timeInForce
 	timeInForce := p.timeInForce
+
+	// TEMPLATE check-required
+	if len(timeInForce) == 0 {
+	}
+	// END TEMPLATE check-required
 
 	// TEMPLATE check-valid-values
 	switch timeInForce {
@@ -256,6 +297,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check marketUnit field -> json key marketUnit
 	if p.marketUnit != nil {
 		marketUnit := *p.marketUnit
+
+		// TEMPLATE check-required
+		if len(marketUnit) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// TEMPLATE check-valid-values
 		switch marketUnit {
@@ -276,6 +322,9 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if p.isLeverage != nil {
 		isLeverage := *p.isLeverage
 
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
+
 		// assign parameter of isLeverage
 		params["isLeverage"] = isLeverage
 	} else {
@@ -283,6 +332,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check price field -> json key price
 	if p.price != nil {
 		price := *p.price
+
+		// TEMPLATE check-required
+		if len(price) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of price
 		params["price"] = price
@@ -292,6 +346,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if p.triggerDirection != nil {
 		triggerDirection := *p.triggerDirection
 
+		// TEMPLATE check-required
+		if triggerDirection == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of triggerDirection
 		params["triggerDirection"] = triggerDirection
 	} else {
@@ -299,6 +358,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check orderFilter field -> json key orderFilter
 	if p.orderFilter != nil {
 		orderFilter := *p.orderFilter
+
+		// TEMPLATE check-required
+		if len(orderFilter) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of orderFilter
 		params["orderFilter"] = orderFilter
@@ -308,6 +372,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if p.triggerPrice != nil {
 		triggerPrice := *p.triggerPrice
 
+		// TEMPLATE check-required
+		if len(triggerPrice) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of triggerPrice
 		params["triggerPrice"] = triggerPrice
 	} else {
@@ -315,6 +384,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check triggerBy field -> json key triggerBy
 	if p.triggerBy != nil {
 		triggerBy := *p.triggerBy
+
+		// TEMPLATE check-required
+		if len(triggerBy) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of triggerBy
 		params["triggerBy"] = triggerBy
@@ -324,6 +398,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if p.orderIv != nil {
 		orderIv := *p.orderIv
 
+		// TEMPLATE check-required
+		if len(orderIv) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of orderIv
 		params["orderIv"] = orderIv
 	} else {
@@ -331,6 +410,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check positionIdx field -> json key positionIdx
 	if p.positionIdx != nil {
 		positionIdx := *p.positionIdx
+
+		// TEMPLATE check-required
+		if len(positionIdx) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of positionIdx
 		params["positionIdx"] = positionIdx
@@ -340,6 +424,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if p.takeProfit != nil {
 		takeProfit := *p.takeProfit
 
+		// TEMPLATE check-required
+		if len(takeProfit) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of takeProfit
 		params["takeProfit"] = takeProfit
 	} else {
@@ -347,6 +436,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check stopLoss field -> json key stopLoss
 	if p.stopLoss != nil {
 		stopLoss := *p.stopLoss
+
+		// TEMPLATE check-required
+		if len(stopLoss) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of stopLoss
 		params["stopLoss"] = stopLoss
@@ -356,6 +450,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if p.tpTriggerBy != nil {
 		tpTriggerBy := *p.tpTriggerBy
 
+		// TEMPLATE check-required
+		if len(tpTriggerBy) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of tpTriggerBy
 		params["tpTriggerBy"] = tpTriggerBy
 	} else {
@@ -363,6 +462,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check slTriggerBy field -> json key slTriggerBy
 	if p.slTriggerBy != nil {
 		slTriggerBy := *p.slTriggerBy
+
+		// TEMPLATE check-required
+		if len(slTriggerBy) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of slTriggerBy
 		params["slTriggerBy"] = slTriggerBy
@@ -372,6 +476,9 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if p.reduceOnly != nil {
 		reduceOnly := *p.reduceOnly
 
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
+
 		// assign parameter of reduceOnly
 		params["reduceOnly"] = reduceOnly
 	} else {
@@ -379,6 +486,9 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check closeOnTrigger field -> json key closeOnTrigger
 	if p.closeOnTrigger != nil {
 		closeOnTrigger := *p.closeOnTrigger
+
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
 
 		// assign parameter of closeOnTrigger
 		params["closeOnTrigger"] = closeOnTrigger
@@ -388,6 +498,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if p.smpType != nil {
 		smpType := *p.smpType
 
+		// TEMPLATE check-required
+		if len(smpType) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of smpType
 		params["smpType"] = smpType
 	} else {
@@ -395,6 +510,9 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check mmp field -> json key mmp
 	if p.mmp != nil {
 		mmp := *p.mmp
+
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
 
 		// assign parameter of mmp
 		params["mmp"] = mmp
@@ -404,6 +522,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if p.tpslMode != nil {
 		tpslMode := *p.tpslMode
 
+		// TEMPLATE check-required
+		if len(tpslMode) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of tpslMode
 		params["tpslMode"] = tpslMode
 	} else {
@@ -411,6 +534,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check tpLimitPrice field -> json key tpLimitPrice
 	if p.tpLimitPrice != nil {
 		tpLimitPrice := *p.tpLimitPrice
+
+		// TEMPLATE check-required
+		if len(tpLimitPrice) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of tpLimitPrice
 		params["tpLimitPrice"] = tpLimitPrice
@@ -420,6 +548,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if p.slLimitPrice != nil {
 		slLimitPrice := *p.slLimitPrice
 
+		// TEMPLATE check-required
+		if len(slLimitPrice) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of slLimitPrice
 		params["slLimitPrice"] = slLimitPrice
 	} else {
@@ -428,6 +561,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if p.tpOrderType != nil {
 		tpOrderType := *p.tpOrderType
 
+		// TEMPLATE check-required
+		if len(tpOrderType) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of tpOrderType
 		params["tpOrderType"] = tpOrderType
 	} else {
@@ -435,6 +573,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check slOrderType field -> json key slOrderType
 	if p.slOrderType != nil {
 		slOrderType := *p.slOrderType
+
+		// TEMPLATE check-required
+		if len(slOrderType) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of slOrderType
 		params["slOrderType"] = slOrderType

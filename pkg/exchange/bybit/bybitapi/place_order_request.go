@@ -16,7 +16,7 @@ type PlaceOrderResponse struct {
 type PlaceOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	category    Category    `param:"category" validValues:"spot"`
+	category    Category    `param:"category" validValues:"spot,linear"`
 	symbol      string      `param:"symbol"`
 	side        Side        `param:"side" validValues:"Buy,Sell"`
 	orderType   OrderType   `param:"orderType" validValues:"Market,Limit"`

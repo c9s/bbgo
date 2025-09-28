@@ -85,7 +85,7 @@ func (k *KLine) UnmarshalJSON(data []byte) error {
 type GetKLinesRequest struct {
 	client requestgen.APIClient
 
-	category Category `param:"category,query" validValues:"spot"`
+	category Category `param:"category,query" validValues:"spot,linear"`
 	symbol   string   `param:"symbol,query"`
 	// Kline interval.
 	// - 1,3,5,15,30,60,120,240,360,720: minute
