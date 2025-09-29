@@ -40,11 +40,13 @@ var two = fixedpoint.NewFromInt(2)
 
 const feeTokenQuoteCurrency = "USDT"
 
-const priceUpdateTimeout = 60 * time.Second
+const priceUpdateTimeout = 120 * time.Second
 
 const ID = "xmaker"
 
 var log = logrus.WithField("strategy", ID)
+
+var raiseWarningLevelLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 
 func nopCover(v fixedpoint.Value) {}
 
@@ -864,11 +866,19 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 		bookLastUpdateTime := s.sourceBook.LastUpdateTime()
 		if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
-			s.logger.WithError(err).Errorf(
-				"quote update error, %s price not updating, order book last update: %s ago",
-				s.Symbol,
-				time.Since(bookLastUpdateTime),
-			)
+			if raiseWarningLevelLimiter.Allow() {
+				s.logger.WithError(err).Warnf(
+					"quote update error, %s price not updating, order book last update: %s ago",
+					s.Symbol,
+					time.Since(bookLastUpdateTime),
+				)
+			} else {
+				s.logger.WithError(err).Errorf(
+					"quote update error persists, %s price not updating for a while, order book last update: %s ago",
+					s.Symbol,
+					time.Since(bookLastUpdateTime),
+				)
+			}
 
 			s.sourceSession.MarketDataStream.Reconnect()
 			s.sourceBook.Reset()
@@ -876,11 +886,19 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		}
 
 		if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
-			s.logger.WithError(err).Errorf(
-				"quote update error, %s price not updating, order book last update: %s ago",
-				s.Symbol,
-				time.Since(bookLastUpdateTime),
-			)
+			if raiseWarningLevelLimiter.Allow() {
+				s.logger.WithError(err).Warnf(
+					"quote update error, %s price not updating, order book last update: %s ago",
+					s.Symbol,
+					time.Since(bookLastUpdateTime),
+				)
+			} else {
+				s.logger.WithError(err).Errorf(
+					"quote update error persists, %s price not updating for a while, order book last update: %s ago",
+					s.Symbol,
+					time.Since(bookLastUpdateTime),
+				)
+			}
 
 			s.sourceSession.MarketDataStream.Reconnect()
 			s.sourceBook.Reset()
@@ -1304,7 +1322,11 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	)
 
 	if err != nil {
-		s.logger.WithError(err).Warnf("unable to place maker orders: %+v", formattedOrders)
+		if raiseWarningLevelLimiter.Allow() {
+			s.logger.WithError(err).Warnf("unable to place maker orders, will retry in the next round: %+v", formattedOrders)
+		} else {
+			s.logger.WithError(err).Errorf("unable to place maker orders, error persists (rate %f): %+v", raiseWarningLevelLimiter.Limit(), formattedOrders)
+		}
 
 		var recoverErr *types.RecoverOrderError
 		if errors.As(err, recoverErr) {
