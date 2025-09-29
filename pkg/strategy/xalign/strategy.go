@@ -181,7 +181,7 @@ func (s *Strategy) selectSessionForCurrency(
 	ctx context.Context, sessions map[string]*bbgo.ExchangeSession, currency string, changeQuantity fixedpoint.Value,
 ) (*bbgo.ExchangeSession, *types.SubmitOrder) {
 	var taker = s.UseTakerOrder
-	var side types.SideType = s.selectAdjustmentOrderSide(changeQuantity)
+	var side = s.selectAdjustmentOrderSide(changeQuantity)
 	var quoteCurrencies []string
 	if changeQuantity.Sign() > 0 {
 		quoteCurrencies = s.PreferredQuoteCurrencies.Buy
@@ -663,6 +663,13 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 
 		selectedSession, submitOrder := s.selectSessionForCurrency(ctx, sessions, currency, q)
 		if selectedSession != nil && submitOrder != nil {
+			if market, hasMarket := selectedSession.Market(submitOrder.Symbol); hasMarket && submitOrder.Price.Sign() > 0 {
+				if market.IsDustQuantity(q.Abs(), submitOrder.Price) {
+					log.Infof("skip placing dust order for %s: %+v", currency, submitOrder)
+					return
+				}
+			}
+
 			log.Infof("placing %s order on %s: %+v", submitOrder.Symbol, selectedSession.Name, submitOrder)
 
 			bbgo.Notify("Aligning %s position on exchange session %s, delta: %f %s, expected balance: %f %s",
