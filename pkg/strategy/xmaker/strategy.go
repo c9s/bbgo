@@ -1665,9 +1665,9 @@ func (s *Strategy) spreadMakerHedge(
 	return hedgeDelta, nil
 }
 
-func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
+func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) bool {
 	if uncoveredPosition.IsZero() && s.positionExposure.IsClosed() {
-		return
+		return false
 	}
 
 	// hedgeDelta is the reverse of the uncovered position
@@ -1692,35 +1692,36 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	}
 
 	if hedgeDelta.IsZero() {
-		return
+		return false
 	}
 
 	if s.sourceMarket.IsDustQuantity(hedgeDelta, s.lastPrice.Get()) {
-		return
+		return false
 	}
 
 	if s.canDelayHedge(side, hedgeDelta) {
-		return
+		return false
 	}
 
 	if s.SplitHedge != nil && s.SplitHedge.Enabled {
 		if err := s.SplitHedge.Hedge(ctx, uncoveredPosition); err != nil {
 			s.logger.WithError(err).Errorf("unable to hedge via split hedge")
-			return
+			return false
 		}
 	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 		if err := s.SyntheticHedge.Hedge(ctx, uncoveredPosition); err != nil {
 			s.logger.WithError(err).Errorf("unable to place synthetic hedge order")
-			return
+			return false
 		}
 	} else {
 		if _, err := s.directHedge(ctx, uncoveredPosition); err != nil {
 			s.logger.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
-			return
+			return false
 		}
 	}
 
 	s.resetPositionStartTime()
+	return true
 }
 
 func (s *Strategy) directHedge(
@@ -2191,8 +2192,9 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 			}
 
 			uncoverPosition := s.getUncoveredPosition()
-			s.hedge(ctx, uncoverPosition)
-			profitChanged = true
+			if s.hedge(ctx, uncoverPosition) {
+				profitChanged = true
+			}
 
 		case <-reportTicker.C:
 			if profitChanged {
