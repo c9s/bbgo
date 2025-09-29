@@ -1297,11 +1297,20 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	defer s.tradeCollector.Process()
 
 	makerOrderPlacementProfile := timeprofile.Start("makerOrderPlacement")
-	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(
+
+	// we don't retry here, so errIdx is not used, if the order placement fails, we just skip this round
+	createdOrders, _, err := bbgo.BatchPlaceOrder(
 		ctx, s.makerSession.Exchange, s.makerOrderCreateCallback, formattedOrders...,
 	)
+
 	if err != nil {
-		s.logger.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
+		s.logger.WithError(err).Warnf("unable to place maker orders: %+v", formattedOrders)
+
+		var recoverErr *types.RecoverOrderError
+		if errors.As(err, recoverErr) {
+			recoverErr.Debug(true)
+		}
+
 		return err
 	}
 
@@ -1309,7 +1318,6 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	s.openOrderBidExposureInUsdMetrics.Set(bidExposureInUsd.Float64())
 	s.openOrderAskExposureInUsdMetrics.Set(askExposureInUsd.Float64())
 
-	_ = errIdx
 	_ = createdOrders
 	return nil
 }

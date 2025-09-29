@@ -631,14 +631,12 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	logger := log.WithFields(o.LogFields())
 	retOrder, err := req.Do(ctx)
 	if err != nil {
-		logger.WithError(err).Errorf("submit order error, now trying to recover the order: %+v", o)
+		logger.WithError(err).Warnf("submit order error, now trying to recover the order: %+v", o)
 
 		if errors.Is(err, io.EOF) {
-			recoveredOrder, recoverErr := e.recoverOrder(ctx, o)
+			recoveredOrder, recoverErr := e.recoverOrder(ctx, o, err)
 			if recoverErr != nil {
-				return nil, fmt.Errorf("unable to recover order, error: %w", recoverErr)
-			} else if recoveredOrder == nil {
-				return nil, fmt.Errorf("unable to recover order, error: %w", err)
+				return nil, recoverErr
 			}
 
 			// note, recoveredOrder could be nil if the order is not found
@@ -647,18 +645,16 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 
 		var responseErr *requestgen.ErrResponse
 		if errors.As(err, &responseErr) {
-			logger.WithError(err).Errorf("submit order api responded an error: %s, status code: %d, now trying to recover the order with query %+v",
+			logger.WithError(err).Warnf("submit order api responded an error: %s, status code: %d, now trying to recover the order with query %+v",
 				responseErr.Error(),
 				responseErr.StatusCode,
 				o.AsQuery(),
 			)
 
 			if responseErr.StatusCode >= 400 {
-				recoveredOrder, recoverErr := e.recoverOrder(ctx, o)
+				recoveredOrder, recoverErr := e.recoverOrder(ctx, o, err)
 				if recoverErr != nil {
-					return nil, fmt.Errorf("unable to recover order, error: %w", recoverErr)
-				} else if recoveredOrder == nil {
-					return nil, fmt.Errorf("unable to recover order, error: %w", err)
+					return nil, recoverErr
 				}
 
 				// note, recoveredOrder could be nil if the order is not found
@@ -677,23 +673,24 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	return createdOrder, err
 }
 
-func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder) (*types.Order, error) {
-	var err error
+func (e *Exchange) recoverOrder(
+	ctx context.Context, orderForm types.SubmitOrder, originalErr error,
+) (*types.Order, error) {
+	var queryErr error
 	var order *types.Order
 	var query = orderForm.AsQuery()
 	var logFields = orderForm.LogFields()
 
 	log.WithFields(logFields).Warnf("start recovering the order with query %+v", query)
 
-	var op = func() (err2 error) {
-		order, err2 = e.QueryOrder(ctx, query)
-
-		if err2 == nil {
+	var op = func() error {
+		order, queryErr = e.QueryOrder(ctx, query)
+		if queryErr == nil {
 			return nil
 		}
 
 		var responseErr *requestgen.ErrResponse
-		if errors.As(err2, &responseErr) {
+		if errors.As(queryErr, &responseErr) {
 			log.WithFields(logFields).Warnf("recover query order error: %s, status code: %d", responseErr.Status, responseErr.StatusCode)
 
 			switch responseErr.StatusCode {
@@ -702,23 +699,24 @@ func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder
 				return nil
 			default:
 				if responseErr.StatusCode >= 400 && responseErr.StatusCode < 500 {
-					return err2
+					return queryErr
 				}
 			}
 		}
 
-		return err2
+		return queryErr
 	}
 
-	// at this point, order and err can be both nil since we try to return an error to break the retry
-	err = retry.GeneralBackoff(ctx, op)
+	// at this point, order and finalErr can be both nil since we try to return an error to break the retry
+	finalErr := retry.GeneralBackoff(ctx, op)
 	if order != nil {
 		return order, nil
+	} else if finalErr != nil {
+		return nil, types.NewRecoverOrderError(types.ExchangeMax, orderForm, originalErr, finalErr)
 	}
-	if err == nil {
-		err = errors.New("order still not found after recovery")
-	}
-	return nil, err
+
+	// order == nil and finalErr == nil means the order is not found
+	return nil, types.NewRecoverOrderError(types.ExchangeMax, orderForm, originalErr, types.ErrOrderNotFound)
 }
 
 // PlatformFeeCurrency
