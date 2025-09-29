@@ -8,6 +8,7 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -303,6 +304,8 @@ type Strategy struct {
 	simpleHedgeMode bool
 
 	connectors []connector
+
+	profitChanged int64
 }
 
 func (s *Strategy) ID() string {
@@ -2158,7 +2161,6 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 	ticker := time.NewTicker(timejitter.Milliseconds(s.HedgeInterval.Duration(), 200))
 	defer ticker.Stop()
 
-	profitChanged := false
 	reportTicker := time.NewTicker(5 * time.Minute)
 
 	for {
@@ -2192,17 +2194,15 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 			}
 
 			uncoverPosition := s.getUncoveredPosition()
-			if s.hedge(ctx, uncoverPosition) {
-				profitChanged = true
-			}
+			s.hedge(ctx, uncoverPosition)
 
 		case <-reportTicker.C:
-			if profitChanged {
+			if atomic.LoadInt64(&s.profitChanged) > 0 {
 				if s.reportProfitStatsRateLimiter.Allow() {
 					bbgo.Notify(s.ProfitStats)
 				}
 
-				profitChanged = false
+				atomic.StoreInt64(&s.profitChanged, 0)
 			}
 		}
 	}
@@ -2567,7 +2567,6 @@ func (s *Strategy) CrossRun(
 			}
 
 			s.ProfitStats.AddTrade(trade)
-
 		},
 	)
 
@@ -2582,7 +2581,10 @@ func (s *Strategy) CrossRun(
 		if profit == nil {
 			return
 		}
+
 		s.Environment.RecordPosition(s.Position, trade, profit)
+
+		atomic.AddInt64(&s.profitChanged, 1)
 	})
 
 	shouldNotifyProfit := func(trade types.Trade, profit *types.Profit) bool {
