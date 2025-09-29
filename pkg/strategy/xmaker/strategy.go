@@ -1333,7 +1333,9 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 		var recoverErr *types.RecoverOrderError
 		if errors.As(err, recoverErr) {
-			recoverErr.Debug(true)
+			if !recoverErr.IsNotFound() {
+				recoverErr.Debug(true)
+			}
 		}
 
 		return err
