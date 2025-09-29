@@ -8,6 +8,7 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -40,11 +41,13 @@ var two = fixedpoint.NewFromInt(2)
 
 const feeTokenQuoteCurrency = "USDT"
 
-const priceUpdateTimeout = 60 * time.Second
+const priceUpdateTimeout = 120 * time.Second
 
 const ID = "xmaker"
 
 var log = logrus.WithField("strategy", ID)
+
+var raiseWarningLevelLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 
 func nopCover(v fixedpoint.Value) {}
 
@@ -301,6 +304,8 @@ type Strategy struct {
 	simpleHedgeMode bool
 
 	connectors []connector
+
+	profitChanged int64
 }
 
 func (s *Strategy) ID() string {
@@ -864,11 +869,19 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 		bookLastUpdateTime := s.sourceBook.LastUpdateTime()
 		if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
-			s.logger.WithError(err).Errorf(
-				"quote update error, %s price not updating, order book last update: %s ago",
-				s.Symbol,
-				time.Since(bookLastUpdateTime),
-			)
+			if raiseWarningLevelLimiter.Allow() {
+				s.logger.WithError(err).Warnf(
+					"quote update error, %s price not updating, order book last update: %s ago",
+					s.Symbol,
+					time.Since(bookLastUpdateTime),
+				)
+			} else {
+				s.logger.WithError(err).Errorf(
+					"quote update error persists, %s price not updating for a while, order book last update: %s ago",
+					s.Symbol,
+					time.Since(bookLastUpdateTime),
+				)
+			}
 
 			s.sourceSession.MarketDataStream.Reconnect()
 			s.sourceBook.Reset()
@@ -876,11 +889,19 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		}
 
 		if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
-			s.logger.WithError(err).Errorf(
-				"quote update error, %s price not updating, order book last update: %s ago",
-				s.Symbol,
-				time.Since(bookLastUpdateTime),
-			)
+			if raiseWarningLevelLimiter.Allow() {
+				s.logger.WithError(err).Warnf(
+					"quote update error, %s price not updating, order book last update: %s ago",
+					s.Symbol,
+					time.Since(bookLastUpdateTime),
+				)
+			} else {
+				s.logger.WithError(err).Errorf(
+					"quote update error persists, %s price not updating for a while, order book last update: %s ago",
+					s.Symbol,
+					time.Since(bookLastUpdateTime),
+				)
+			}
 
 			s.sourceSession.MarketDataStream.Reconnect()
 			s.sourceBook.Reset()
@@ -1297,11 +1318,26 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	defer s.tradeCollector.Process()
 
 	makerOrderPlacementProfile := timeprofile.Start("makerOrderPlacement")
-	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(
+
+	// we don't retry here, so errIdx is not used, if the order placement fails, we just skip this round
+	createdOrders, _, err := bbgo.BatchPlaceOrder(
 		ctx, s.makerSession.Exchange, s.makerOrderCreateCallback, formattedOrders...,
 	)
+
 	if err != nil {
-		s.logger.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
+		if raiseWarningLevelLimiter.Allow() {
+			s.logger.WithError(err).Warnf("unable to place maker orders, will retry in the next round: %+v", formattedOrders)
+		} else {
+			s.logger.WithError(err).Errorf("unable to place maker orders, error persists (rate %f): %+v", raiseWarningLevelLimiter.Limit(), formattedOrders)
+		}
+
+		var recoverErr *types.RecoverOrderError
+		if errors.As(err, recoverErr) {
+			if !recoverErr.IsNotFound() {
+				recoverErr.Debug(true)
+			}
+		}
+
 		return err
 	}
 
@@ -1309,7 +1345,6 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	s.openOrderBidExposureInUsdMetrics.Set(bidExposureInUsd.Float64())
 	s.openOrderAskExposureInUsdMetrics.Set(askExposureInUsd.Float64())
 
-	_ = errIdx
 	_ = createdOrders
 	return nil
 }
@@ -1635,9 +1670,9 @@ func (s *Strategy) spreadMakerHedge(
 	return hedgeDelta, nil
 }
 
-func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
+func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) bool {
 	if uncoveredPosition.IsZero() && s.positionExposure.IsClosed() {
-		return
+		return false
 	}
 
 	// hedgeDelta is the reverse of the uncovered position
@@ -1662,35 +1697,36 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	}
 
 	if hedgeDelta.IsZero() {
-		return
+		return false
 	}
 
 	if s.sourceMarket.IsDustQuantity(hedgeDelta, s.lastPrice.Get()) {
-		return
+		return false
 	}
 
 	if s.canDelayHedge(side, hedgeDelta) {
-		return
+		return false
 	}
 
 	if s.SplitHedge != nil && s.SplitHedge.Enabled {
 		if err := s.SplitHedge.Hedge(ctx, uncoveredPosition); err != nil {
 			s.logger.WithError(err).Errorf("unable to hedge via split hedge")
-			return
+			return false
 		}
 	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 		if err := s.SyntheticHedge.Hedge(ctx, uncoveredPosition); err != nil {
 			s.logger.WithError(err).Errorf("unable to place synthetic hedge order")
-			return
+			return false
 		}
 	} else {
 		if _, err := s.directHedge(ctx, uncoveredPosition); err != nil {
 			s.logger.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
-			return
+			return false
 		}
 	}
 
 	s.resetPositionStartTime()
+	return true
 }
 
 func (s *Strategy) directHedge(
@@ -2127,7 +2163,6 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 	ticker := time.NewTicker(timejitter.Milliseconds(s.HedgeInterval.Duration(), 200))
 	defer ticker.Stop()
 
-	profitChanged := false
 	reportTicker := time.NewTicker(5 * time.Minute)
 
 	for {
@@ -2162,15 +2197,14 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 
 			uncoverPosition := s.getUncoveredPosition()
 			s.hedge(ctx, uncoverPosition)
-			profitChanged = true
 
 		case <-reportTicker.C:
-			if profitChanged {
+			if atomic.LoadInt64(&s.profitChanged) > 0 {
 				if s.reportProfitStatsRateLimiter.Allow() {
 					bbgo.Notify(s.ProfitStats)
 				}
 
-				profitChanged = false
+				atomic.StoreInt64(&s.profitChanged, 0)
 			}
 		}
 	}
@@ -2535,7 +2569,6 @@ func (s *Strategy) CrossRun(
 			}
 
 			s.ProfitStats.AddTrade(trade)
-
 		},
 	)
 
@@ -2550,7 +2583,10 @@ func (s *Strategy) CrossRun(
 		if profit == nil {
 			return
 		}
+
 		s.Environment.RecordPosition(s.Position, trade, profit)
+
+		atomic.AddInt64(&s.profitChanged, 1)
 	})
 
 	shouldNotifyProfit := func(trade types.Trade, profit *types.Profit) bool {

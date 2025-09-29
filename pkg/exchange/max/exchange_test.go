@@ -27,7 +27,7 @@ func TestExchange_recoverOrder(t *testing.T) {
 	_, err := ex.recoverOrder(ctx, types.SubmitOrder{
 		Symbol:        "BTCUSDT",
 		ClientOrderID: "test" + strconv.FormatInt(time.Now().UnixMilli(), 10),
-	})
+	}, nil)
 	t.Logf("recover order error: %v", err)
 	assert.Nil(t, err, "order should be nil if not found")
 
@@ -40,7 +40,7 @@ func TestExchange_recoverOrder(t *testing.T) {
 		Quantity:      Number(0.001),
 	}
 
-	order, err := ex.recoverOrder(ctx, orderForm)
+	order, err := ex.recoverOrder(ctx, orderForm, nil)
 
 	if assert.NoError(t, err) {
 		t.Logf("order: %+v", order)
@@ -53,7 +53,7 @@ func TestExchange_recoverOrder(t *testing.T) {
 				err = ex.CancelOrders(ctx, *order)
 				assert.NoError(t, err)
 
-				order2, err2 := ex.recoverOrder(ctx, orderForm)
+				order2, err2 := ex.recoverOrder(ctx, orderForm, nil)
 
 				t.Logf("recovered order: %+v", order2)
 				assert.NoError(t, err2)
