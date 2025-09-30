@@ -1665,7 +1665,7 @@ func (s *Strategy) spreadMakerHedge(
 		} else {
 			shouldKeep := s.SpreadMaker.shouldKeepOrder(curOrder, now)
 			if !shouldKeep {
-				s.logger.Infof("canceling current spread maker order...")
+				s.logger.Infof("canceling current spread maker order due to expiry time...")
 				returnedCover := s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
 
 				// add back the returned cover to the hedge delta, so that we can hedge it directly
