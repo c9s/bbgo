@@ -11,7 +11,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var repayRateLimiter = rate.NewLimiter(rate.Every(30*time.Second), 1)
+var repayRateLimiter = rate.NewLimiter(rate.Every(10*time.Minute), 1)
 
 func tryToRepayDebts(ctx context.Context, session *bbgo.ExchangeSession) bool {
 	if !repayRateLimiter.Allow() {
