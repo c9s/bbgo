@@ -16,10 +16,13 @@ const (
 	LogLevelNone LogLevel = iota
 	LogLevelInfo
 	LogLevelWarn
+	LogLevelWarnFirst
 	LogLevelError
 )
 
 type State int64
+
+type TransitionHandler func(context.Context) (error, LogLevel)
 
 const (
 	None State = iota
@@ -34,7 +37,8 @@ type StateMachine struct {
 	once util.Reonce
 	mu   sync.Mutex
 
-	logger *logrus.Entry
+	logger           *logrus.Entry
+	warnFirstLoggers map[State]map[State]*util.WarnFirstLogger
 
 	// current state
 	state State
@@ -45,7 +49,7 @@ type StateMachine struct {
 	// closeC is used to signal the state machine to stop processing.
 	closeC chan struct{}
 	// stateTransitionFunc is a map of state transitions, where each key is a current state
-	stateTransitionFunc map[State]map[State]func(context.Context) (error, LogLevel)
+	stateTransitionFunc map[State]map[State]TransitionHandler
 
 	// callbacks
 	startCallbacks []func()
@@ -139,14 +143,30 @@ func (s *StateMachine) WaitForRunningIs(isRunning bool, checkInterval, timeout t
 	}
 }
 
-func (s *StateMachine) RegisterTransitionFunc(from State, to State, fn func(context.Context) (error, LogLevel)) {
+func (s *StateMachine) RegisterTransitionHandler(from State, to State, fn TransitionHandler) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.stateTransitionFunc == nil {
-		s.stateTransitionFunc = make(map[State]map[State]func(context.Context) (error, LogLevel))
+		s.stateTransitionFunc = make(map[State]map[State]TransitionHandler)
 	}
 	if s.stateTransitionFunc[from] == nil {
-		s.stateTransitionFunc[from] = make(map[State]func(context.Context) (error, LogLevel))
+		s.stateTransitionFunc[from] = make(map[State]TransitionHandler)
 	}
 	s.stateTransitionFunc[from][to] = fn
+}
+
+func (s *StateMachine) RegisterWarnFirstLoggers(from State, to State, logger *util.WarnFirstLogger) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.warnFirstLoggers == nil {
+		s.warnFirstLoggers = make(map[State]map[State]*util.WarnFirstLogger)
+	}
+	if s.warnFirstLoggers[from] == nil {
+		s.warnFirstLoggers[from] = make(map[State]*util.WarnFirstLogger)
+	}
+	s.warnFirstLoggers[from][to] = logger
 }
 
 func (s *StateMachine) Run(ctx context.Context) {
@@ -194,6 +214,12 @@ func (s *StateMachine) processStateTransition(ctx context.Context, nextState Sta
 					s.logger.WithError(err).Infof("failed to transition from state %d to %d", s.state, nextState)
 				case LogLevelWarn:
 					s.logger.WithError(err).Warnf("failed to transition from state %d to %d", s.state, nextState)
+				case LogLevelWarnFirst:
+					if warnFirstLogger, ok := s.warnFirstLoggers[s.state][nextState]; ok {
+						warnFirstLogger.WarnOrError(err, "failed to transition from state %d to %d", s.state, nextState)
+					} else {
+						s.logger.WithError(err).Warnf("failed to transition from state %d to %d", s.state, nextState)
+					}
 				case LogLevelError:
 					s.logger.WithError(err).Errorf("failed to transition from state %d to %d", s.state, nextState)
 				}

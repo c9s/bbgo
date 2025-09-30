@@ -189,7 +189,7 @@ func (s *Strategy) recoverStateOpenPosition(ctx context.Context, currentRound Ro
 	}
 
 	if s.Position.GetBase().Compare(s.Market.MinQuantity) >= 0 {
-		if err := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
+		if err, _ := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
 			return None, fmt.Errorf("failed to place take-profit order when recovering at open-position stage: %w", err)
 		}
 		return StateOpenPositionMOQReached, nil
@@ -209,7 +209,7 @@ func (s *Strategy) recoverStateTakeProfit(
 		if tpQuantity.Compare(s.Market.MinQuantity) < 0 {
 			return StateIdleWaiting, nil
 		}
-		if err := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
+		if err, _ := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
 			return None, fmt.Errorf("failed to place take-profit order when recovering at take-profit stage: %w", err)
 		}
 		return StateTakeProfitReached, nil

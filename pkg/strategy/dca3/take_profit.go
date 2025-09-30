@@ -38,17 +38,17 @@ func (s *Strategy) startTakeProfitStage(ctx context.Context) (error, LogLevel) {
 		return fmt.Errorf("executed quantity (%f) is less than min quantity (%f), not placing take-profit order", executedQuantity.Float64(), s.Market.MinQuantity.Float64()), LogLevelError
 	}
 
-	if err := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
-		return fmt.Errorf("failed to place take-profit order: %w", err), LogLevelError
+	if err, logLevel := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
+		return fmt.Errorf("failed to start take-profit stage when placing take-profit order: %w", err), logLevel
 	}
 
 	return nil, LogLevelNone
 }
 
-func (s *Strategy) placeTakeProfitOrder(ctx context.Context, currentRound Round) error {
+func (s *Strategy) placeTakeProfitOrder(ctx context.Context, currentRound Round) (error, LogLevel) {
 	trades, err := s.collector.CollectRoundTrades(ctx, currentRound)
 	if err != nil {
-		return errors.Wrap(err, "failed to place the take-profit order when collecting round trades")
+		return errors.Wrap(err, "failed to place the take-profit order when collecting round trades"), LogLevelError
 	}
 
 	roundPosition := types.NewPositionFromMarket(s.Market)
@@ -62,7 +62,7 @@ func (s *Strategy) placeTakeProfitOrder(ctx context.Context, currentRound Round)
 	for i, trade := range trades {
 		s.logger.Infof("add #%d trade into the position of this round %s", i, trade.String())
 		if trade.FeeProcessing {
-			return fmt.Errorf("failed to place the take-profit order because there is a trade's fee not ready")
+			return fmt.Errorf("failed to place the take-profit order because there is a trade's fee not ready"), LogLevelWarn
 		}
 
 		roundPosition.AddTrade(trade)
@@ -86,28 +86,28 @@ func (s *Strategy) placeTakeProfitOrder(ctx context.Context, currentRound Round)
 	// verify the volume of order
 	bals, err := retry.QueryAccountBalancesUntilSuccessfulLite(ctx, s.ExchangeSession.Exchange)
 	if err != nil {
-		return errors.Wrapf(err, "failed to query balance to verify")
+		return fmt.Errorf("failed to place the take-profit order due to querying account balances with error: %w", err), LogLevelError
 	}
 
 	bal, exist := bals[s.Market.BaseCurrency]
 	if !exist {
-		return fmt.Errorf("there is no %s in the balances %+v", s.Market.BaseCurrency, bals)
+		return fmt.Errorf("failed to place the take-profit order because there is no %s in the balances %+v", s.Market.BaseCurrency, bals), LogLevelError
 	}
 
 	if bal.Available.Compare(order.Quantity) < 0 {
-		return fmt.Errorf("the available base balance (%s) is not enough for the order (%s)", bal.Available.String(), order.Quantity.String())
+		return fmt.Errorf("failed to place the take-profit order because the base available balance (%s) is not enough for the order (%s)", bal.Available.String(), order.Quantity.String()), LogLevelWarnFirst
 	}
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, order)
 	if err != nil {
-		return err
+		return err, LogLevelError
 	}
 
 	for _, createdOrder := range createdOrders {
 		s.logger.Infof("submit take-profit order successfully: %s", createdOrder.String())
 	}
 
-	return nil
+	return nil, LogLevelNone
 }
 
 func (s *Strategy) cancelTakeProfitOrders(ctx context.Context) (error, LogLevel) {
@@ -155,8 +155,8 @@ func (s *Strategy) updateTakeProfitOrder(ctx context.Context) (error, LogLevel) 
 		return fmt.Errorf("executed quantity (%f) is less than min quantity (%f), not placing take-profit order", executedQuantity.Float64(), s.Market.MinQuantity.Float64()), LogLevelError
 	}
 
-	if err := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
-		return fmt.Errorf("failed to place take-profit order: %w", err), LogLevelError
+	if err, logLevel := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
+		return fmt.Errorf("failed to update take-profit order: %w", err), logLevel
 	}
 
 	return nil, LogLevelNone

@@ -1,7 +1,11 @@
 package util
 
 import (
+	"time"
+
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 )
 
 // LogErr logs the error with the message and arguments if the error is not nil.
@@ -26,4 +30,29 @@ func LogErr(err error, msgAndArgs ...interface{}) bool {
 	}
 
 	return true
+}
+
+type WarnFirstLogger struct {
+	logger      logrus.FieldLogger
+	warnLimiter *rate.Limiter
+}
+
+func NewWarnFirstLogger(threshold int, window time.Duration, logger logrus.FieldLogger) *WarnFirstLogger {
+	return &WarnFirstLogger{
+		logger:      logger,
+		warnLimiter: rate.NewLimiter(rate.Every(window), threshold),
+	}
+}
+
+func (w *WarnFirstLogger) WarnOrError(err error, msg string, args ...interface{}) {
+	log := w.logger
+	if err != nil {
+		log = log.WithError(err)
+	}
+
+	if w.warnLimiter.Allow() {
+		log.Warnf(msg, args...)
+	} else {
+		log.Errorf(msg, args...)
+	}
 }
