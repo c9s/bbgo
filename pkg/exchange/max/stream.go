@@ -175,7 +175,7 @@ func (s *Stream) handleConnect() {
 			}
 		}
 
-		log.Debugf("user data websocket channels: %v", filters)
+		log.Debugf("user data websocket filters: %v", filters)
 
 		apiKey, apiSecret := s.exchange.client.SelectApiKey()
 		nonce := s.exchange.client.GetNonce(apiKey)
@@ -188,7 +188,7 @@ func (s *Stream) handleConnect() {
 			Signature: maxapi.SignPayload(strconv.FormatInt(nonce, 10), apiSecret),
 
 			ID: uuid.New().String(),
-		
+
 			Filters:    filters,
 			SubAccount: s.exchange.client.SubAccount,
 		}
@@ -200,7 +200,6 @@ func (s *Stream) handleConnect() {
 }
 
 func (s *Stream) handleDisconnect() {
-	log.Info("resetting depth snapshots...")
 	for _, f := range s.depthBuffers {
 		f.Reset()
 	}
@@ -291,7 +290,7 @@ func (s *Stream) handleBookEvent(ex *Exchange) func(e maxapi.BookEvent) {
 		// if we receive orderbook event with both asks and bids are empty, it means we need to rebuild this orderbook
 		shouldReset := len(e.Asks) == 0 && len(e.Bids) == 0
 		if shouldReset {
-			log.Infof("resetting %s orderbook due to both empty asks/bids...", e.Market)
+			log.Warnf("resetting %s orderbook due to both empty asks/bids...", e.Market)
 			f.Reset()
 			return
 		}
