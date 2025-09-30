@@ -83,7 +83,7 @@ func NewStream(ex *Exchange) *Stream {
 	return stream
 }
 
-func (s *Stream) getEndpoint(ctx context.Context) (string, error) {
+func (s *Stream) getEndpoint(_ context.Context) (string, error) {
 	url := os.Getenv("MAX_API_WS_URL")
 	if url == "" {
 		url = maxapi.WebSocketURL
@@ -180,14 +180,17 @@ func (s *Stream) handleConnect() {
 		apiKey, apiSecret := s.exchange.client.SelectApiKey()
 		nonce := s.exchange.client.GetNonce(apiKey)
 		auth := &maxapi.AuthMessage{
-			// pragma: allowlist nextline secret
 			Action: "auth",
 			// pragma: allowlist nextline secret
-			APIKey:    apiKey,
-			Nonce:     nonce,
+			APIKey: apiKey,
+			Nonce:  nonce,
+
 			Signature: maxapi.SignPayload(strconv.FormatInt(nonce, 10), apiSecret),
-			ID:        uuid.New().String(),
-			Filters:   filters,
+
+			ID: uuid.New().String(),
+		
+			Filters:    filters,
+			SubAccount: s.exchange.client.SubAccount,
 		}
 
 		if err := s.Conn.WriteJSON(auth); err != nil {
