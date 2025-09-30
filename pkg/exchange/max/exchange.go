@@ -652,6 +652,23 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 			)
 
 			if responseErr.StatusCode >= 400 {
+				if responseErr.IsJSON() {
+					var maxError maxapi.ErrorResponse
+					if decodeErr := responseErr.DecodeJSON(&maxError); decodeErr != nil {
+						logger.WithError(decodeErr).Errorf("unable to decode max api error response: %s", responseErr.Response.Body)
+						return nil, errors.Join(err, decodeErr)
+					}
+
+					switch maxError.Err.Code {
+					// 2007: invalid nonce error
+					// 2006: The nonce has already been used by access key.
+
+					case 2016: // 2016 amount too small
+						return nil, err
+
+					}
+				}
+
 				recoveredOrder, recoverErr := e.recoverOrder(ctx, o, err)
 				if recoverErr != nil {
 					return nil, recoverErr

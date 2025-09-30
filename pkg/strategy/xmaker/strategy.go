@@ -1677,9 +1677,9 @@ func (s *Strategy) spreadMakerHedge(
 	return hedgeDelta, nil
 }
 
-func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) bool {
+func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
 	if uncoveredPosition.IsZero() && s.positionExposure.IsClosed() {
-		return false
+		return
 	}
 
 	// hedgeDelta is the reverse of the uncovered position
@@ -1692,8 +1692,12 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 
 	// side is the order side
 	side := deltaToSide(hedgeDelta)
-
+	lastPrice := s.lastPrice.Get()
 	sig := s.lastAggregatedSignal.Get()
+
+	if lastPrice.IsZero() {
+		s.logger.Warnf("last price is zero, skip hedging")
+	}
 
 	var err error
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
@@ -1704,42 +1708,40 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	}
 
 	if hedgeDelta.IsZero() {
-		return false
+		return
 	}
 
-	if s.sourceMarket.IsDustQuantity(hedgeDelta, s.lastPrice.Get()) {
-		return false
+	if lastPrice.Sign() > 0 && s.sourceMarket.IsDustQuantity(hedgeDelta, lastPrice) {
+		return
 	}
 
 	if s.canDelayHedge(side, hedgeDelta) {
-		return false
+		return
 	}
 
 	if s.SplitHedge != nil && s.SplitHedge.Enabled {
-		if err := s.SplitHedge.Hedge(ctx, uncoveredPosition); err != nil {
+		if err := s.SplitHedge.Hedge(ctx, uncoveredPosition, hedgeDelta); err != nil {
 			s.logger.WithError(err).Errorf("unable to hedge via split hedge")
-			return false
+			return
 		}
 	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-		if err := s.SyntheticHedge.Hedge(ctx, uncoveredPosition); err != nil {
+		if err := s.SyntheticHedge.Hedge(ctx, uncoveredPosition, hedgeDelta); err != nil {
 			s.logger.WithError(err).Errorf("unable to place synthetic hedge order")
-			return false
+			return
 		}
 	} else {
-		if _, err := s.directHedge(ctx, uncoveredPosition); err != nil {
+		if _, err := s.directHedge(ctx, uncoveredPosition, hedgeDelta); err != nil {
 			s.logger.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
-			return false
+			return
 		}
 	}
 
 	s.resetPositionStartTime()
-	return true
 }
 
 func (s *Strategy) directHedge(
-	ctx context.Context, uncoveredPosition fixedpoint.Value,
+	ctx context.Context, uncoveredPosition, hedgeDelta fixedpoint.Value,
 ) (*types.Order, error) {
-	hedgeDelta := uncoveredToDelta(uncoveredPosition)
 	quantity := hedgeDelta.Abs()
 	side := deltaToSide(hedgeDelta)
 
@@ -2452,8 +2454,10 @@ func (s *Strategy) CrossRun(
 	// allocate required isolated streams to the connectors
 	if (s.FastCancel != nil && s.FastCancel.Enabled) || (s.EnableSignalMargin && s.SignalConfigList != nil && len(s.SignalConfigList.Signals) > 0) {
 		s.marketTradeStream = bbgo.NewMarketTradeStream(s.sourceSession, s.SourceSymbol)
+		s.marketTradeStream.OnMarketTrade(func(trade types.Trade) {
+			s.lastPrice.Set(trade.Price)
+		})
 		s.addConnector(s.marketTradeStream)
-
 	}
 
 	if s.FastCancel != nil && s.FastCancel.Enabled {
@@ -2524,7 +2528,6 @@ func (s *Strategy) CrossRun(
 		if setter, ok := sigProvider.(signal.MarketTradeStreamSetter); ok {
 			s.logger.Infof("setting market trade stream on signal %T", sigProvider)
 			setter.SetMarketTradeStream(s.marketTradeStream)
-
 		}
 
 		// pass logger to the signal provider
