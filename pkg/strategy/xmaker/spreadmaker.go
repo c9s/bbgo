@@ -76,7 +76,7 @@ func (c *SpreadMaker) updateOrder(ctx context.Context) (*types.Order, error) {
 // if true, then it returns the order to be placed
 func (c *SpreadMaker) canSpreadMaking(
 	signal float64, position *types.Position,
-	uncoveredPosition fixedpoint.Value,
+	uncoveredPosition, hedgeDelta fixedpoint.Value,
 	makerMarket types.Market,
 	bestBidPrice, bestAskPrice fixedpoint.Value,
 ) (*types.SubmitOrder, bool) {
@@ -107,11 +107,19 @@ func (c *SpreadMaker) canSpreadMaking(
 	case types.SideTypeSell:
 		targetPrice := bestBidPrice.Add(makerMarket.TickSize)
 		targetPrice = fixedpoint.Max(profitPrice, targetPrice)
+		if c.market.IsDustQuantity(orderQuantity, targetPrice) {
+			return nil, false
+		}
+
 		return c.newMakerOrder(makerMarket, orderSide, targetPrice, orderQuantity), true
 
 	case types.SideTypeBuy:
 		targetPrice := bestAskPrice.Sub(makerMarket.TickSize)
 		targetPrice = fixedpoint.Min(profitPrice, targetPrice)
+		if c.market.IsDustQuantity(orderQuantity, targetPrice) {
+			return nil, false
+		}
+
 		return c.newMakerOrder(makerMarket, orderSide, targetPrice, orderQuantity), true
 	}
 

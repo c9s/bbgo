@@ -1602,7 +1602,7 @@ func (s *Strategy) spreadMakerHedge(
 	curOrder, hasOrder := s.SpreadMaker.getOrder()
 
 	if makerOrderForm, ok := s.SpreadMaker.canSpreadMaking(
-		sig, s.Position, uncoveredPosition, s.makerMarket, makerBid.Price, makerAsk.Price,
+		sig, s.Position, uncoveredPosition, hedgeDelta, s.makerMarket, makerBid.Price, makerAsk.Price,
 	); ok {
 		s.logger.Infof(
 			"position: %f@%f, maker book bid: %f/%f, spread maker order form: %+v",
