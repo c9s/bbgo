@@ -43,16 +43,18 @@ type Exchange struct {
 func New(key, secret, subAccount string) *Exchange {
 	client := maxapi.NewRestClientDefault()
 	client.Auth(key, secret)
+
 	if subAccount != "" {
 		client.SetSubAccount(subAccount)
 	}
 
+	v3client := v3.NewClient(client)
 	return &Exchange{
 		client: client,
 		key:    key,
 		// pragma: allowlist nextline secret
 		secret:   secret,
-		v3client: v3.NewClient(client),
+		v3client: v3client,
 
 		queryTradeLimiter: rate.NewLimiter(rate.Every(250*time.Millisecond), 2),
 
@@ -179,7 +181,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	stream := NewStream(e, e.key, e.secret)
+	stream := NewStream(e)
 	stream.MarginSettings = e.MarginSettings
 	return stream
 }
@@ -662,8 +664,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 					switch maxError.Err.Code {
 					// 2007: invalid nonce error
 					// 2006: The nonce has already been used by access key.
-
-					case 2016: // 2016 amount too small
+					// 2018: can not lock fund
+					// 2016 amount too small
+					case 2016, 2018: // we don't try to recover the order for these errors
 						return nil, err
 
 					}

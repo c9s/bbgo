@@ -20,8 +20,6 @@ type Stream struct {
 	types.StandardStream
 	types.MarginSettings
 
-	key, secret string
-
 	privateChannels []string
 
 	authEventCallbacks         []func(e maxapi.AuthEvent)
@@ -52,18 +50,12 @@ type Stream struct {
 	exchange *Exchange
 }
 
-func NewStream(ex *Exchange, key, secret string) *Stream {
+func NewStream(ex *Exchange) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
-
-		key: key,
-
-		// pragma: allowlist nextline secret
-		secret: secret,
-	
-		depthBuffers: make(map[string]*depth.Buffer),
-		debts:        make(map[string]maxapi.Debt, 20),
-		exchange:     ex,
+		depthBuffers:   make(map[string]*depth.Buffer),
+		debts:          make(map[string]maxapi.Debt, 20),
+		exchange:       ex,
 	}
 	stream.SetEndpointCreator(stream.getEndpoint)
 	stream.SetParser(maxapi.ParseMessage)
@@ -91,7 +83,7 @@ func NewStream(ex *Exchange, key, secret string) *Stream {
 	return stream
 }
 
-func (s *Stream) getEndpoint(ctx context.Context) (string, error) {
+func (s *Stream) getEndpoint(_ context.Context) (string, error) {
 	url := os.Getenv("MAX_API_WS_URL")
 	if url == "" {
 		url = maxapi.WebSocketURL
@@ -183,19 +175,22 @@ func (s *Stream) handleConnect() {
 			}
 		}
 
-		log.Debugf("user data websocket channels: %v", filters)
+		log.Debugf("user data websocket filters: %v", filters)
 
 		apiKey, apiSecret := s.exchange.client.SelectApiKey()
 		nonce := s.exchange.client.GetNonce(apiKey)
 		auth := &maxapi.AuthMessage{
-			// pragma: allowlist nextline secret
 			Action: "auth",
 			// pragma: allowlist nextline secret
-			APIKey:    apiKey,
-			Nonce:     nonce,
+			APIKey: apiKey,
+			Nonce:  nonce,
+
 			Signature: maxapi.SignPayload(strconv.FormatInt(nonce, 10), apiSecret),
-			ID:        uuid.New().String(),
-			Filters:   filters,
+
+			ID: uuid.New().String(),
+
+			Filters:    filters,
+			SubAccount: s.exchange.client.SubAccount,
 		}
 
 		if err := s.Conn.WriteJSON(auth); err != nil {
@@ -205,7 +200,6 @@ func (s *Stream) handleConnect() {
 }
 
 func (s *Stream) handleDisconnect() {
-	log.Info("resetting depth snapshots...")
 	for _, f := range s.depthBuffers {
 		f.Reset()
 	}
@@ -296,7 +290,7 @@ func (s *Stream) handleBookEvent(ex *Exchange) func(e maxapi.BookEvent) {
 		// if we receive orderbook event with both asks and bids are empty, it means we need to rebuild this orderbook
 		shouldReset := len(e.Asks) == 0 && len(e.Bids) == 0
 		if shouldReset {
-			log.Infof("resetting %s orderbook due to both empty asks/bids...", e.Market)
+			log.Warnf("resetting %s orderbook due to both empty asks/bids...", e.Market)
 			f.Reset()
 			return
 		}
