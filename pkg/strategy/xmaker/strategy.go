@@ -1692,8 +1692,12 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 
 	// side is the order side
 	side := deltaToSide(hedgeDelta)
-
+	lastPrice := s.lastPrice.Get()
 	sig := s.lastAggregatedSignal.Get()
+
+	if lastPrice.IsZero() {
+		s.logger.Warnf("last price is zero, skip hedging")
+	}
 
 	var err error
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
@@ -1707,7 +1711,7 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		return
 	}
 
-	if s.sourceMarket.IsDustQuantity(hedgeDelta, s.lastPrice.Get()) {
+	if lastPrice.Sign() > 0 && s.sourceMarket.IsDustQuantity(hedgeDelta, lastPrice) {
 		return
 	}
 
@@ -2450,8 +2454,10 @@ func (s *Strategy) CrossRun(
 	// allocate required isolated streams to the connectors
 	if (s.FastCancel != nil && s.FastCancel.Enabled) || (s.EnableSignalMargin && s.SignalConfigList != nil && len(s.SignalConfigList.Signals) > 0) {
 		s.marketTradeStream = bbgo.NewMarketTradeStream(s.sourceSession, s.SourceSymbol)
+		s.marketTradeStream.OnMarketTrade(func(trade types.Trade) {
+			s.lastPrice.Set(trade.Price)
+		})
 		s.addConnector(s.marketTradeStream)
-
 	}
 
 	if s.FastCancel != nil && s.FastCancel.Enabled {
@@ -2522,7 +2528,6 @@ func (s *Strategy) CrossRun(
 		if setter, ok := sigProvider.(signal.MarketTradeStreamSetter); ok {
 			s.logger.Infof("setting market trade stream on signal %T", sigProvider)
 			setter.SetMarketTradeStream(s.marketTradeStream)
-
 		}
 
 		// pass logger to the signal provider
