@@ -446,7 +446,7 @@ func (m *HedgeMarket) allowMarginHedge(
 
 	// if the margin level is lower than the minimal margin level,
 	// we need to repay the debt first
-	if account.MarginLevel.Compare(minMarginLevel) < 0 {
+	if account.MarginLevel.Sign() > 0 && account.MarginLevel.Compare(minMarginLevel) < 0 {
 		// check if we can repay the debt via available balance (the reverse side)
 		if tryToRepayDebts(context.Background(), session) {
 			return m.allowMarginHedge(session, minMarginLevel, maxLeverage, side, price)
