@@ -654,8 +654,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 			if responseErr.StatusCode >= 400 {
 				if responseErr.IsJSON() {
 					var maxError maxapi.ErrorResponse
-					if err := responseErr.DecodeJSON(&maxError); err != nil {
-						logger.WithError(err).Errorf("unable to decode max api error response: %s", responseErr.Response.Body)
+					if decodeErr := responseErr.DecodeJSON(&maxError); decodeErr != nil {
+						logger.WithError(decodeErr).Errorf("unable to decode max api error response: %s", responseErr.Response.Body)
+						return nil, errors.Join(err, decodeErr)
 					}
 
 					switch maxError.Err.Code {
