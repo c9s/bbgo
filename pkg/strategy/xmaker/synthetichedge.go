@@ -221,7 +221,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 // 6) merge the positions.
 func (s *SyntheticHedge) Hedge(
 	_ context.Context,
-	uncoveredPosition fixedpoint.Value,
+	uncoveredPosition, hedgeDelta fixedpoint.Value,
 ) error {
 	if uncoveredPosition.IsZero() {
 		return nil

@@ -1677,9 +1677,9 @@ func (s *Strategy) spreadMakerHedge(
 	return hedgeDelta, nil
 }
 
-func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) bool {
+func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
 	if uncoveredPosition.IsZero() && s.positionExposure.IsClosed() {
-		return false
+		return
 	}
 
 	// hedgeDelta is the reverse of the uncovered position
@@ -1704,42 +1704,40 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	}
 
 	if hedgeDelta.IsZero() {
-		return false
+		return
 	}
 
 	if s.sourceMarket.IsDustQuantity(hedgeDelta, s.lastPrice.Get()) {
-		return false
+		return
 	}
 
 	if s.canDelayHedge(side, hedgeDelta) {
-		return false
+		return
 	}
 
 	if s.SplitHedge != nil && s.SplitHedge.Enabled {
-		if err := s.SplitHedge.Hedge(ctx, uncoveredPosition); err != nil {
+		if err := s.SplitHedge.Hedge(ctx, uncoveredPosition, hedgeDelta); err != nil {
 			s.logger.WithError(err).Errorf("unable to hedge via split hedge")
-			return false
+			return
 		}
 	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-		if err := s.SyntheticHedge.Hedge(ctx, uncoveredPosition); err != nil {
+		if err := s.SyntheticHedge.Hedge(ctx, uncoveredPosition, hedgeDelta); err != nil {
 			s.logger.WithError(err).Errorf("unable to place synthetic hedge order")
-			return false
+			return
 		}
 	} else {
-		if _, err := s.directHedge(ctx, uncoveredPosition); err != nil {
+		if _, err := s.directHedge(ctx, uncoveredPosition, hedgeDelta); err != nil {
 			s.logger.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
-			return false
+			return
 		}
 	}
 
 	s.resetPositionStartTime()
-	return true
 }
 
 func (s *Strategy) directHedge(
-	ctx context.Context, uncoveredPosition fixedpoint.Value,
+	ctx context.Context, uncoveredPosition, hedgeDelta fixedpoint.Value,
 ) (*types.Order, error) {
-	hedgeDelta := uncoveredToDelta(uncoveredPosition)
 	quantity := hedgeDelta.Abs()
 	side := deltaToSide(hedgeDelta)
 

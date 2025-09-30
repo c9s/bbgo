@@ -659,6 +659,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 					}
 
 					switch maxError.Err.Code {
+					// 2006: The nonce has already been used by access key.
 					case 2016:
 						return nil, err
 

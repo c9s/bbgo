@@ -181,15 +181,14 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 
 func (h *SplitHedge) hedgeWithProportionAlgo(
 	ctx context.Context,
-	uncoveredPosition fixedpoint.Value,
+	uncoveredPosition, hedgeDelta fixedpoint.Value,
 ) error {
 	if h.ProportionAlgo == nil || len(h.ProportionAlgo.ProportionMarkets) == 0 {
 		return fmt.Errorf("splitHedge: proportion algo requires proportion markets")
 	}
 
-	delta := uncoveredToDelta(uncoveredPosition)
-	side := deltaToSide(delta)
-	remainingQuantity := delta.Abs()
+	side := deltaToSide(hedgeDelta)
+	remainingQuantity := hedgeDelta.Abs()
 
 	for _, proportionMarket := range h.ProportionAlgo.ProportionMarkets {
 		hedgeMarket, ok := h.hedgeMarketInstances[proportionMarket.Name]
@@ -238,7 +237,7 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 
 func (h *SplitHedge) Hedge(
 	ctx context.Context,
-	uncoveredPosition fixedpoint.Value,
+	uncoveredPosition, hedgeDelta fixedpoint.Value,
 ) error {
 	if uncoveredPosition.IsZero() {
 		return nil
@@ -248,7 +247,7 @@ func (h *SplitHedge) Hedge(
 
 	switch h.Algo {
 	case SplitHedgeAlgoProportion:
-		return h.hedgeWithProportionAlgo(ctx, uncoveredPosition)
+		return h.hedgeWithProportionAlgo(ctx, uncoveredPosition, hedgeDelta)
 
 	default:
 		return fmt.Errorf("invalid split hedge algo: %s", h.Algo)
