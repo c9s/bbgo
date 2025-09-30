@@ -664,8 +664,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 					switch maxError.Err.Code {
 					// 2007: invalid nonce error
 					// 2006: The nonce has already been used by access key.
-
-					case 2016: // 2016 amount too small
+					// 2018: can not lock fund
+					// 2016 amount too small
+					case 2016, 2018: // we don't try to recover the order for these errors
 						return nil, err
 
 					}
