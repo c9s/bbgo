@@ -652,6 +652,19 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 			)
 
 			if responseErr.StatusCode >= 400 {
+				if responseErr.IsJSON() {
+					var maxError maxapi.ErrorResponse
+					if err := responseErr.DecodeJSON(&maxError); err != nil {
+						logger.WithError(err).Errorf("unable to decode max api error response: %s", responseErr.Response.Body)
+					}
+
+					switch maxError.Err.Code {
+					case 2016:
+						return nil, err
+
+					}
+				}
+
 				recoveredOrder, recoverErr := e.recoverOrder(ctx, o, err)
 				if recoverErr != nil {
 					return nil, recoverErr
