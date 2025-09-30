@@ -1023,7 +1023,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			disableMakerAsk = true
 		}
 
-		if disableMakerBid || disableMakerAsk {
+		if disableMakerBid && disableMakerAsk {
 			tryToRepayDebts(ctx, s.sourceSession)
 		}
 	} else {
