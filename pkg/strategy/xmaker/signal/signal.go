@@ -41,6 +41,7 @@ func init() {
 	Register(&OrderBookBestPriceVolumeSignal{})
 	Register(&TradeVolumeWindowSignal{})
 	Register(&LiquidityDemandSignal{})
+	Register(&PremiumSignal{})
 	// Register(&KLineShapeSignal{})
 }
 
