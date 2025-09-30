@@ -20,8 +20,6 @@ type Stream struct {
 	types.StandardStream
 	types.MarginSettings
 
-	key, secret string
-
 	privateChannels []string
 
 	authEventCallbacks         []func(e maxapi.AuthEvent)
@@ -52,18 +50,12 @@ type Stream struct {
 	exchange *Exchange
 }
 
-func NewStream(ex *Exchange, key, secret string) *Stream {
+func NewStream(ex *Exchange) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
-
-		key: key,
-
-		// pragma: allowlist nextline secret
-		secret: secret,
-	
-		depthBuffers: make(map[string]*depth.Buffer),
-		debts:        make(map[string]maxapi.Debt, 20),
-		exchange:     ex,
+		depthBuffers:   make(map[string]*depth.Buffer),
+		debts:          make(map[string]maxapi.Debt, 20),
+		exchange:       ex,
 	}
 	stream.SetEndpointCreator(stream.getEndpoint)
 	stream.SetParser(maxapi.ParseMessage)
