@@ -101,7 +101,9 @@ func TestHedgeMarket_hedge(t *testing.T) {
 		},
 	})
 
-	err = hm.hedge(context.Background(), testhelper.Number(1.0))
+	hm.positionExposure.Open(testhelper.Number(1.0))
+
+	err = hm.hedge(context.Background())
 	assert.NoError(t, err)
 }
 
@@ -135,7 +137,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	submitOrder := types.SubmitOrder{
 		Market:           market,
 		Symbol:           market.Symbol,
-		Quantity:         testhelper.Number(2.0),
+		Quantity:         testhelper.Number(1.0),
 		Side:             types.SideTypeSell,
 		Type:             types.OrderTypeMarket,
 		MarginSideEffect: types.SideEffectTypeMarginBuy,
@@ -143,10 +145,26 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	createdOrder := types.Order{
 		OrderID:          1,
 		SubmitOrder:      submitOrder,
-		ExecutedQuantity: testhelper.Number(2.0),
+		ExecutedQuantity: testhelper.Number(1.0),
 		Status:           types.OrderStatusFilled,
 	}
 	mockExchange.EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, nil)
+
+	submitOrder2 := types.SubmitOrder{
+		Market:           market,
+		Symbol:           market.Symbol,
+		Quantity:         testhelper.Number(1.0),
+		Side:             types.SideTypeSell,
+		Type:             types.OrderTypeMarket,
+		MarginSideEffect: types.SideEffectTypeMarginBuy,
+	}
+	createdOrder2 := types.Order{
+		OrderID:          2,
+		SubmitOrder:      submitOrder2,
+		ExecutedQuantity: testhelper.Number(1.0),
+		Status:           types.OrderStatusFilled,
+	}
+	mockExchange.EXPECT().SubmitOrder(gomock.Any(), submitOrder2).Return(&createdOrder2, nil)
 
 	marketDataStream.EmitConnect()
 
@@ -182,6 +200,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	})
 
 	time.Sleep(stepTime)
+	<-hm.hedgedC
 
 	assert.Equal(t, testhelper.Number(1.0), hm.positionExposure.pending.Get())
 	assert.Equal(t, testhelper.Number(1.0), hm.positionExposure.net.Get())
@@ -201,6 +220,8 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	})
 
 	time.Sleep(stepTime)
+	<-hm.hedgedC
+
 	assert.Equal(t, testhelper.Number(0.0), hm.positionExposure.pending.Get())
 	assert.Equal(t, testhelper.Number(0.0), hm.positionExposure.net.Get())
 

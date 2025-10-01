@@ -409,9 +409,11 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		FeeCurrency:   "",
 	})
 
+	// Make sure the position is added correctly
 	assert.Equal(t, Number(1.0).Float64(), makerPosition.GetBase().Float64(), "make sure position is updated correctly")
 	assert.Equal(t, Number(3_110_000.0).Float64(), makerPosition.GetAverageCost().Float64(), "make sure average cost is updated correctly")
 
+	// The first hedge order
 	submitOrder1 := types.SubmitOrder{
 		Market:   sourceMarket,
 		Symbol:   "BTCUSDT",
@@ -427,6 +429,8 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		Status:           types.OrderStatusNew,
 	}
 	sourceSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().SubmitOrder(gomock.Any(), submitOrder1).Return(&createdOrder1, nil)
+
+	// Since it's not fully filled, we expect a cancel and a query later to check the filled quantity
 	sourceSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().CancelOrders(gomock.Any(), createdOrder1).Return(nil)
 	sourceSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().
 		QueryOrder(gomock.Any(), createdOrder1.AsQuery()).
@@ -437,6 +441,7 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 			Status:           types.OrderStatusCanceled,
 		}, nil)
 
+	// The second hedge order for the remaining quantity
 	submitOrder2 := types.SubmitOrder{
 		Market:   sourceMarket,
 		Symbol:   "BTCUSDT",
@@ -452,6 +457,8 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		Status:           types.OrderStatusNew,
 	}
 	sourceSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().SubmitOrder(gomock.Any(), submitOrder2).Return(&createdOrder2, nil)
+
+	// Expect a cancel and a query for the second order as well
 	sourceSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().CancelOrders(gomock.Any(), createdOrder2).Return(nil)
 	sourceSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().QueryOrder(gomock.Any(), createdOrder2.AsQuery()).Return(&types.Order{
 		OrderID:          createdOrder2.OrderID,
@@ -463,8 +470,9 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 	// TRIGGER: send position delta to source hedge market
 	sourceHedgeMarket.positionDeltaC <- Number(1.0)
 
-	// Wait for the hedge done
+	// Wait for the hedge done, 2 orders
 	<-sourceHedgeMarket.hedgedC
+	time.Sleep(stepTime)
 
 	// fiatHedgeMarket should receive a position update later after sourceHedgeMarket sent a hedge order
 	// then this should trigger a hedge order to the fiat market
@@ -483,6 +491,12 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		Status:           types.OrderStatusFilled,
 	}
 	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().SubmitOrder(gomock.Any(), submitOrder4).Return(&createdOrder4, nil)
+	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().QueryOrder(gomock.Any(), createdOrder4.AsQuery()).Return(&types.Order{
+		OrderID:          createdOrder4.OrderID,
+		SubmitOrder:      submitOrder4,
+		ExecutedQuantity: Number(104000.0 * 0.4),
+		Status:           types.OrderStatusFilled,
+	}, nil)
 
 	// TRIGGER the fiat market hedge
 	sourceUserDataStream.EmitTradeUpdate(types.Trade{
@@ -513,12 +527,6 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		Status:           types.OrderStatusCanceled,
 	})
 
-	<-fiatHedgeMarket.hedgedC
-	// the fiat hedge market should have a position now
-	assert.Equal(t, Number(-0.4).Float64(), sourceHedgeMarket.Position.Base.Float64(), "source position should be updated to 0.5")
-	assert.Equal(t, Number(104000.0*0.4).Float64(), fiatHedgeMarket.Position.Base.Float64(), "fiat position should be updated to the quote quantity")
-
-	// the fiat hedge market should send a hedge order
 	fiatUserDataStream.EmitTradeUpdate(types.Trade{
 		ID:            createdOrder4.OrderID,
 		OrderID:       createdOrder4.OrderID,
@@ -534,17 +542,12 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		Fee:           fixedpoint.Zero,
 		FeeCurrency:   "",
 	})
-	time.Sleep(stepTime)
-	assert.Equal(t, Number(0.).Float64(), sourceHedgeMarket.Position.Base.Float64(), "source position should be closed to 0.5")
-	assert.Equal(t, Number(0.).Float64(), fiatHedgeMarket.Position.Base.Float64(), "fiat position should be updated to the quote quantity")
 
-	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().CancelOrders(gomock.Any(), createdOrder4).Return(nil)
-	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().QueryOrder(gomock.Any(), createdOrder4.AsQuery()).Return(&types.Order{
-		OrderID:          4,
-		SubmitOrder:      submitOrder4,
-		ExecutedQuantity: Number(104000.0 * 0.4),
-		Status:           types.OrderStatusCanceled,
-	}, nil)
+	<-fiatHedgeMarket.hedgedC
+	time.Sleep(stepTime)
+
+	assert.Equal(t, Number(0.).Float64(), sourceHedgeMarket.Position.GetBase().Float64(), "source position should be closed to 0.5")
+	assert.Equal(t, Number(0.).Float64(), fiatHedgeMarket.Position.GetBase().Float64(), "fiat position should be updated to the quote quantity")
 
 	submitOrder5 := types.SubmitOrder{
 		Market:   fiatMarket,
@@ -561,7 +564,6 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		Status:           types.OrderStatusFilled,
 	}
 	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().SubmitOrder(gomock.Any(), submitOrder5).Return(&createdOrder5, nil)
-	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().CancelOrders(gomock.Any(), createdOrder5).Return(nil)
 	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().QueryOrder(gomock.Any(), createdOrder5.AsQuery()).Return(&types.Order{
 		OrderID:          5,
 		SubmitOrder:      submitOrder5,

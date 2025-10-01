@@ -205,7 +205,7 @@ func newHedgeMarket(
 		tradeCollector:    tradeCollector,
 		activeMakerOrders: activeMakerOrders,
 
-		hedgedC: make(chan struct{}, 1),
+		hedgedC: make(chan struct{}, 2),
 		doneC:   make(chan struct{}),
 
 		logger: logger,
@@ -551,15 +551,19 @@ func (m *HedgeMarket) calculateDebtQuota(totalValue, debtValue, minMarginLevel, 
 	return debtQuota
 }
 
-func (m *HedgeMarket) hedge(
-	ctx context.Context, uncoveredPosition fixedpoint.Value,
-) error {
-	hedgeDelta := uncoveredPosition.Neg()
-	quantity := hedgeDelta.Abs()
-	side := deltaToSide(hedgeDelta)
-
+func (m *HedgeMarket) hedge(ctx context.Context) error {
 	if err := m.hedgeExecutor.clear(ctx); err != nil {
 		return fmt.Errorf("failed to clear hedge executor: %w", err)
+	}
+
+	// update uncovered position after clear
+	uncoveredPosition := m.positionExposure.GetUncovered()
+	hedgeDelta := uncoveredToDelta(uncoveredPosition)
+	quantity := hedgeDelta.Abs()
+	side := deltaToSide(hedgeDelta)
+	if m.market.MinQuantity.Compare(uncoveredPosition.Abs()) > 0 {
+		// skip dust position
+		return nil
 	}
 
 	err := m.hedgeExecutor.hedge(ctx, uncoveredPosition, hedgeDelta, quantity, side)
@@ -669,8 +673,7 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 				continue
 			}
 
-			uncoveredPosition := m.positionExposure.GetUncovered()
-			if err := m.hedge(ctx, uncoveredPosition); err != nil {
+			if err := m.hedge(ctx); err != nil {
 				m.logger.WithError(err).Errorf("hedge failed")
 			}
 
@@ -680,6 +683,10 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 			}
 
 			m.positionExposure.Open(delta)
+
+			if err := m.hedge(ctx); err != nil {
+				m.logger.WithError(err).Errorf("hedge failed")
+			}
 		}
 	}
 }

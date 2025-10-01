@@ -101,12 +101,15 @@ func (m *MarketOrderHedgeExecutor) hedge(
 
 	m.logger.Infof("MarketOrderHedgeExecutor: submitting hedge order: %+v", orderForm)
 
+	coverDelta := quantity.Mul(toSign(uncoveredPosition))
+	m.positionExposure.Cover(coverDelta)
+
 	hedgeOrder, err := m.submitOrder(ctx, orderForm)
 	if err != nil {
+		// if error occurs, revert the covered position
+		m.positionExposure.Cover(coverDelta.Neg())
 		return err
 	}
-
-	m.positionExposure.Cover(quantity.Mul(toSign(uncoveredPosition)))
 
 	m.logger.Infof("hedge order created: %+v", hedgeOrder)
 	return nil
@@ -151,18 +154,29 @@ func (m *CounterpartyHedgeExecutor) clear(ctx context.Context) error {
 		return nil
 	}
 
-	if err := m.session.Exchange.CancelOrders(ctx, *m.hedgeOrder); err != nil {
-		m.logger.WithError(err).Errorf("failed to cancel order: %+v", m.hedgeOrder)
+	if o, ok := m.HedgeMarket.activeMakerOrders.Get(m.hedgeOrder.OrderID); ok {
+		m.hedgeOrder = &o
+	}
+
+	// trigger CancelOrders only if the order is not already closed
+	switch m.hedgeOrder.Status {
+	case types.OrderStatusNew, types.OrderStatusPartiallyFilled:
+		m.logger.Infof("cancelling existing hedge order: %+v", m.hedgeOrder)
+		if err := m.session.Exchange.CancelOrders(ctx, *m.hedgeOrder); err != nil {
+			m.logger.WithError(err).Errorf("failed to cancel order: %+v", m.hedgeOrder)
+		}
 	}
 
 	hedgeOrder, err := retry.QueryOrderUntilCanceled(ctx, m.session.Exchange.(types.ExchangeOrderQueryService), m.hedgeOrder.AsQuery())
 	if err != nil {
 		m.logger.WithError(err).Errorf("failed to query order after cancel: %+v", m.hedgeOrder)
 	} else {
-		m.logger.Infof("hedge order canceled: %+v, returning covered position...", hedgeOrder)
 
 		// return covered position from the canceled order
 		delta := quantityToDelta(hedgeOrder.GetRemainingQuantity(), hedgeOrder.Side)
+
+		m.logger.Infof("hedge order is %s: %+v, returning covered position %s", hedgeOrder.Status, hedgeOrder, delta.String())
+
 		if !delta.IsZero() {
 			m.positionExposure.Cover(delta)
 		}
