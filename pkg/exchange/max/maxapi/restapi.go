@@ -201,6 +201,7 @@ func (c *RestClient) GetNonce(apiKey string) int64 {
 func (c *RestClient) SelectApiKey() (string, string) {
 	apiKey := c.APIKey
 	apiSecret := c.APISecret
+
 	if c.ApiKeyRotator != nil {
 		apiKey, apiSecret = c.ApiKeyRotator.Next().GetKeySecret()
 	}
@@ -212,15 +213,15 @@ func (c *RestClient) SelectApiKey() (string, string) {
 func (c *RestClient) NewAuthenticatedRequest(
 	ctx context.Context, m string, refURL string, params url.Values, data interface{},
 ) (*http.Request, error) {
-	if len(c.APIKey) == 0 {
+	apiKey, apiSecret := c.SelectApiKey()
+
+	if len(apiKey) == 0 {
 		return nil, errors.New("empty api key")
 	}
 
-	if len(c.APISecret) == 0 {
+	if len(apiSecret) == 0 {
 		return nil, errors.New("empty api secret")
 	}
-
-	apiKey, apiSecret := c.SelectApiKey()
 
 	rel, err := url.Parse(refURL)
 	if err != nil {
