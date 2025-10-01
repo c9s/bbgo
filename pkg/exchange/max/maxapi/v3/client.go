@@ -131,18 +131,14 @@ func NewClient(legacyClient *maxapi.RestClient) *Client {
 func (c *Client) NewAuthenticatedRequest(
 	ctx context.Context, m string, refURL string, params url.Values, data interface{},
 ) (*http.Request, error) {
-	if len(c.RestClient.APIKey) == 0 {
+	apiKey, apiSecret := c.RestClient.SelectApiKey()
+
+	if len(apiKey) == 0 {
 		return nil, errors.New("empty api key")
 	}
 
-	if len(c.RestClient.APISecret) == 0 {
+	if len(apiSecret) == 0 {
 		return nil, errors.New("empty api secret")
-	}
-
-	apiKey := c.RestClient.APIKey
-	apiSecret := c.RestClient.APISecret
-	if c.RestClient.ApiKeyRotator != nil {
-		apiKey, apiSecret = c.RestClient.ApiKeyRotator.Next().GetKeySecret()
 	}
 
 	rel, err := url.Parse(refURL)
