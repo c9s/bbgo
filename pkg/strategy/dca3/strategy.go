@@ -74,6 +74,8 @@ type Strategy struct {
 	// log
 	logger    *logrus.Entry
 	LogFields logrus.Fields `json:"logFields"`
+	// takeProfitOrderLogger is a logger that logs when place take profit orders with rate limiter
+	takeProfitOrderLogger *util.WarnFirstLogger
 
 	// PrometheusLabels will be used as the base prometheus labels
 	PrometheusLabels prometheus.Labels `json:"prometheusLabels"`
@@ -126,6 +128,7 @@ func (s *Strategy) Defaults() error {
 
 func (s *Strategy) Initialize() error {
 	s.logger = log.WithFields(s.LogFields)
+	s.takeProfitOrderLogger = util.NewWarnFirstLogger(3, time.Minute*5, s.logger)
 	return nil
 }
 
@@ -302,13 +305,16 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 
 	// state machine register state transition functions
-	s.stateMachine.RegisterTransitionFunc(StateIdleWaiting, StateOpenPositionReady, s.openPosition)
-	s.stateMachine.RegisterTransitionFunc(StateOpenPositionReady, StateOpenPositionMOQReached, s.startTakeProfitStage)
-	s.stateMachine.RegisterTransitionFunc(StateOpenPositionMOQReached, StateTakeProfitOrderReset, s.cancelTakeProfitOrders)
-	s.stateMachine.RegisterTransitionFunc(StateTakeProfitOrderReset, StateOpenPositionMOQReached, s.updateTakeProfitOrder)
-	s.stateMachine.RegisterTransitionFunc(StateOpenPositionMOQReached, StateTakeProfitReached, s.cancelOpenPositionOrders)
-	s.stateMachine.RegisterTransitionFunc(StateOpenPositionMOQReached, StateIdleWaiting, s.finishTakeProfitStage)
-	s.stateMachine.RegisterTransitionFunc(StateTakeProfitReached, StateIdleWaiting, s.finishTakeProfitStage)
+	s.stateMachine.RegisterTransitionHandler(StateIdleWaiting, StateOpenPositionReady, s.openPosition)
+	s.stateMachine.RegisterTransitionHandler(StateOpenPositionReady, StateOpenPositionMOQReached, s.startTakeProfitStage)
+	s.stateMachine.RegisterTransitionHandler(StateOpenPositionMOQReached, StateTakeProfitOrderReset, s.cancelTakeProfitOrders)
+	s.stateMachine.RegisterTransitionHandler(StateTakeProfitOrderReset, StateOpenPositionMOQReached, s.updateTakeProfitOrder)
+	s.stateMachine.RegisterTransitionHandler(StateOpenPositionMOQReached, StateTakeProfitReached, s.cancelOpenPositionOrders)
+	s.stateMachine.RegisterTransitionHandler(StateOpenPositionMOQReached, StateIdleWaiting, s.finishTakeProfitStage)
+	s.stateMachine.RegisterTransitionHandler(StateTakeProfitReached, StateIdleWaiting, s.finishTakeProfitStage)
+
+	s.stateMachine.RegisterWarnFirstLoggers(StateOpenPositionReady, StateOpenPositionMOQReached, s.takeProfitOrderLogger)
+	s.stateMachine.RegisterWarnFirstLoggers(StateTakeProfitOrderReset, StateOpenPositionMOQReached, s.takeProfitOrderLogger)
 
 	// sync periodically
 	go s.syncPeriodically(ctx, s.stateValidateC)
