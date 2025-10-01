@@ -2222,7 +2222,10 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 }
 
 func (s *Strategy) isSimpleHedgeMode() bool {
-	return s.SourceSymbol != "" && s.SplitHedge == nil && s.SyntheticHedge == nil
+	return s.SourceSymbol != "" &&
+		(s.SplitHedge == nil || !s.SplitHedge.Enabled) &&
+		(s.SyntheticHedge == nil || !s.SyntheticHedge.Enabled) &&
+		(s.SpreadMaker == nil || !s.SpreadMaker.Enabled)
 }
 
 func (s *Strategy) CrossRun(
@@ -2569,14 +2572,24 @@ func (s *Strategy) CrossRun(
 			delta := trade.PositionDelta()
 
 			// for direct hedge: trades from source session are always hedge trades
-			if s.simpleHedgeMode && trade.Exchange == s.sourceSession.ExchangeName {
-				s.positionExposure.Close(delta)
-			} else if trade.Exchange == s.makerSession.ExchangeName {
-				// spread maker: trades from maker session can be hedge trades only when spread maker is enabled and it's a spread maker order
-				if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.SpreadMaker.orderStore.Exists(trade.OrderID) {
+			if s.simpleHedgeMode {
+				switch trade.Exchange {
+				case s.sourceSession.ExchangeName:
 					s.positionExposure.Close(delta)
-				} else {
+				case s.makerSession.ExchangeName:
 					s.positionExposure.Open(delta)
+				default:
+				}
+			} else {
+				// for complex hedge like split hedge or synthetic hedge:
+				// for example, split hedge should close the position exposure from the component itself
+				if trade.Exchange == s.makerSession.ExchangeName {
+					// spread maker: trades from maker session can be hedge trades only when spread maker is enabled and it's a spread maker order
+					if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.SpreadMaker.orderStore.Exists(trade.OrderID) {
+						s.positionExposure.Close(delta)
+					} else {
+						s.positionExposure.Open(delta)
+					}
 				}
 			}
 
