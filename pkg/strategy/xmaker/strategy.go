@@ -2159,12 +2159,6 @@ func (s *Strategy) getUncoveredPosition() fixedpoint.Value {
 	return s.positionExposure.GetUncovered()
 }
 
-func (s *Strategy) cancelSideOrders(side types.SideType) error {
-	// s.makerSession.Exchange
-
-	return nil
-}
-
 func (s *Strategy) hedgeWorker(ctx context.Context) {
 	s.wg.Add(1)
 	defer s.wg.Done()
