@@ -2206,7 +2206,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				continue
 			}
 
-			uncoveredPosition := s.getUncoveredPosition()
+			uncoveredPosition := s.positionExposure.GetUncovered()
 			s.logger.Infof("hedging uncovered position %s (%s)",
 				uncoveredPosition.String(), s.positionExposure.String(),
 			)

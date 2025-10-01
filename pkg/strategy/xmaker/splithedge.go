@@ -172,6 +172,13 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 				strategy.orderStore.Add(order)
 			}
 
+			// override the trade symbol for calculating the position data correctly
+			// if we hold BTCUSDT position, convert BTCUSD into BTCUSDT
+			trade.Symbol = h.strategy.makerMarket.Symbol
+			if trade.FeeCurrency == "USD" && h.strategy.makerMarket.QuoteCurrency == "USDT" {
+				trade.FeeCurrency = h.strategy.makerMarket.QuoteCurrency
+			}
+
 			// this triggers position update and profit updates
 			strategy.tradeCollector.ProcessTrade(trade)
 		})
