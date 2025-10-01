@@ -1679,6 +1679,7 @@ func (s *Strategy) spreadMakerHedge(
 
 func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
 	if uncoveredPosition.IsZero() && s.positionExposure.IsClosed() {
+		s.logger.Warnf("no uncovered position and no exposure, skip hedging")
 		return
 	}
 
@@ -1708,10 +1709,13 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	}
 
 	if hedgeDelta.IsZero() {
+		s.logger.Warnf("no hedge delta after spread maker, skip hedging")
 		return
 	}
 
-	if lastPrice.Sign() > 0 && s.sourceMarket.IsDustQuantity(hedgeDelta, lastPrice) {
+	qty := hedgeDelta.Abs()
+	if lastPrice.Sign() > 0 && s.sourceMarket.IsDustQuantity(qty, lastPrice) {
+		s.logger.Warnf("hedge quantity %s is dust, skip hedging", qty.String())
 		return
 	}
 
@@ -2198,8 +2202,12 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				continue
 			}
 
-			uncoverPosition := s.getUncoveredPosition()
-			s.hedge(ctx, uncoverPosition)
+			uncoveredPosition := s.getUncoveredPosition()
+			s.logger.Infof("hedging uncovered position %s (%s)",
+				uncoveredPosition.String(), s.positionExposure.String(),
+			)
+
+			s.hedge(ctx, uncoveredPosition)
 
 		case <-reportTicker.C:
 			if atomic.LoadInt64(&s.profitChanged) > 0 {
