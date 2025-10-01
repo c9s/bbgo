@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
 // GetQueryParameters builds and checks the query parameters and returns url.Values
@@ -17,7 +18,13 @@ func (g *GetAccountsRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -69,9 +76,19 @@ func (g *GetAccountsRequest) GetSlugParameters() (map[string]interface{}, error)
 	return params, nil
 }
 
+var GetAccountsRequestSlugReCache sync.Map
+
 func (g *GetAccountsRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetAccountsRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetAccountsRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 

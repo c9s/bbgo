@@ -10,29 +10,45 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
+/*
+ * Currency sets
+ */
 func (g *GetWithdrawHistoryRequest) Currency(currency string) *GetWithdrawHistoryRequest {
 	g.currency = &currency
 	return g
 }
 
+/*
+ * State sets
+ */
 func (g *GetWithdrawHistoryRequest) State(state string) *GetWithdrawHistoryRequest {
 	g.state = &state
 	return g
 }
 
+/*
+ * Timestamp sets
+ */
 func (g *GetWithdrawHistoryRequest) Timestamp(timestamp time.Time) *GetWithdrawHistoryRequest {
 	g.timestamp = &timestamp
 	return g
 }
 
+/*
+ * Order sets order could be desc or asc
+ */
 func (g *GetWithdrawHistoryRequest) Order(order string) *GetWithdrawHistoryRequest {
 	g.order = &order
 	return g
 }
 
+/*
+ * Limit sets limit's default = 50
+ */
 func (g *GetWithdrawHistoryRequest) Limit(limit int) *GetWithdrawHistoryRequest {
 	g.limit = &limit
 	return g
@@ -44,7 +60,13 @@ func (g *GetWithdrawHistoryRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -57,6 +79,11 @@ func (g *GetWithdrawHistoryRequest) GetParameters() (map[string]interface{}, err
 	if g.currency != nil {
 		currency := *g.currency
 
+		// TEMPLATE check-required
+		if len(currency) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of currency
 		params["currency"] = currency
 	} else {
@@ -65,6 +92,11 @@ func (g *GetWithdrawHistoryRequest) GetParameters() (map[string]interface{}, err
 	if g.state != nil {
 		state := *g.state
 
+		// TEMPLATE check-required
+		if len(state) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of state
 		params["state"] = state
 	} else {
@@ -72,6 +104,12 @@ func (g *GetWithdrawHistoryRequest) GetParameters() (map[string]interface{}, err
 	// check timestamp field -> json key timestamp
 	if g.timestamp != nil {
 		timestamp := *g.timestamp
+
+		// TEMPLATE check-required
+
+		if timestamp.IsZero() {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of timestamp
 		// convert time.Time to milliseconds time stamp
@@ -82,6 +120,11 @@ func (g *GetWithdrawHistoryRequest) GetParameters() (map[string]interface{}, err
 	if g.order != nil {
 		order := *g.order
 
+		// TEMPLATE check-required
+		if len(order) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of order
 		params["order"] = order
 	} else {
@@ -89,6 +132,12 @@ func (g *GetWithdrawHistoryRequest) GetParameters() (map[string]interface{}, err
 	// check limit field -> json key limit
 	if g.limit != nil {
 		limit := *g.limit
+
+		// TEMPLATE check-required
+
+		if limit == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of limit
 		params["limit"] = limit
@@ -137,9 +186,19 @@ func (g *GetWithdrawHistoryRequest) GetSlugParameters() (map[string]interface{},
 	return params, nil
 }
 
+var GetWithdrawHistoryRequestSlugReCache sync.Map
+
 func (g *GetWithdrawHistoryRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetWithdrawHistoryRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetWithdrawHistoryRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 

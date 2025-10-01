@@ -5,17 +5,19 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/testutil"
 )
 
-func TestRewardService_GetRewardsRequest(t *testing.T) {
-	key, secret, ok := integrationTestConfigured(t, "MAX")
+func TestRewards(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
 	if !ok {
 		t.SkipNow()
 	}
 
 	ctx := context.Background()
 
-	client := NewRestClient(ProductionAPIURL)
+	client := NewRestClientDefault()
 	client.Auth(key, secret)
 
 	t.Run("v2/rewards", func(t *testing.T) {
@@ -28,7 +30,7 @@ func TestRewardService_GetRewardsRequest(t *testing.T) {
 	})
 
 	t.Run("v2/rewards with type", func(t *testing.T) {
-		req := client.RewardService.NewGetRewardsOfTypeRequest(RewardCommission)
+		req := client.RewardService.NewGetRewardsOfTypeRequest(RewardHolding)
 		rewards, err := req.Do(ctx)
 		assert.NoError(t, err)
 		assert.NotNil(t, rewards)
@@ -37,7 +39,7 @@ func TestRewardService_GetRewardsRequest(t *testing.T) {
 		t.Logf("rewards: %+v", rewards)
 
 		for _, reward := range rewards {
-			assert.Equal(t, RewardCommission, reward.Type)
+			assert.Equal(t, RewardHolding, reward.Type)
 		}
 	})
 }

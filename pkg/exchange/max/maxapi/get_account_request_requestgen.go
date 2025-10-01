@@ -9,8 +9,12 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
+/*
+ * Currency sets
+ */
 func (g *GetAccountRequest) Currency(currency string) *GetAccountRequest {
 	g.currency = currency
 	return g
@@ -22,7 +26,13 @@ func (g *GetAccountRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -73,15 +83,30 @@ func (g *GetAccountRequest) GetSlugParameters() (map[string]interface{}, error) 
 	// check currency field -> json key currency
 	currency := g.currency
 
+	// TEMPLATE check-required
+	if len(currency) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// assign parameter of currency
 	params["currency"] = currency
 
 	return params, nil
 }
 
+var GetAccountRequestSlugReCache sync.Map
+
 func (g *GetAccountRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetAccountRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetAccountRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
