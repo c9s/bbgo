@@ -165,13 +165,15 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 		hedgeMarket.tradeCollector.OnTrade(func(
 			trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value,
 		) {
-			strategy.positionExposure.Close(trade.PositionDelta())
+			delta := trade.PositionDelta()
+			strategy.positionExposure.Close(delta)
 
 			if order, ok := hedgeMarket.orderStore.Get(trade.OrderID); ok {
 				strategy.orderStore.Add(order)
 			}
 
-			strategy.tradeCollector.ProcessTrade(trade) // this triggers position update and profit updates
+			// this triggers position update and profit updates
+			strategy.tradeCollector.ProcessTrade(trade)
 		})
 
 	}

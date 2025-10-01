@@ -2202,6 +2202,10 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				continue
 			}
 
+			if s.positionExposure.IsClosed() {
+				continue
+			}
+
 			uncoveredPosition := s.getUncoveredPosition()
 			s.logger.Infof("hedging uncovered position %s (%s)",
 				uncoveredPosition.String(), s.positionExposure.String(),
