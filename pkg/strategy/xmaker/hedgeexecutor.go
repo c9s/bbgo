@@ -101,12 +101,15 @@ func (m *MarketOrderHedgeExecutor) hedge(
 
 	m.logger.Infof("MarketOrderHedgeExecutor: submitting hedge order: %+v", orderForm)
 
+	coverDelta := quantity.Mul(toSign(uncoveredPosition))
+	m.positionExposure.Cover(coverDelta)
+
 	hedgeOrder, err := m.submitOrder(ctx, orderForm)
 	if err != nil {
+		// if error occurs, revert the covered position
+		m.positionExposure.Cover(coverDelta.Neg())
 		return err
 	}
-
-	m.positionExposure.Cover(quantity.Mul(toSign(uncoveredPosition)))
 
 	m.logger.Infof("hedge order created: %+v", hedgeOrder)
 	return nil
