@@ -1679,6 +1679,7 @@ func (s *Strategy) spreadMakerHedge(
 
 func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
 	if uncoveredPosition.IsZero() && s.positionExposure.IsClosed() {
+		s.logger.Warnf("no uncovered position and no exposure, skip hedging")
 		return
 	}
 
@@ -1708,10 +1709,13 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	}
 
 	if hedgeDelta.IsZero() {
+		s.logger.Warnf("no hedge delta after spread maker, skip hedging")
 		return
 	}
 
-	if lastPrice.Sign() > 0 && s.sourceMarket.IsDustQuantity(hedgeDelta, lastPrice) {
+	qty := hedgeDelta.Abs()
+	if lastPrice.Sign() > 0 && s.sourceMarket.IsDustQuantity(qty, lastPrice) {
+		s.logger.Warnf("hedge quantity %s is dust, skip hedging", qty.String())
 		return
 	}
 
@@ -2159,12 +2163,6 @@ func (s *Strategy) getUncoveredPosition() fixedpoint.Value {
 	return s.positionExposure.GetUncovered()
 }
 
-func (s *Strategy) cancelSideOrders(side types.SideType) error {
-	// s.makerSession.Exchange
-
-	return nil
-}
-
 func (s *Strategy) hedgeWorker(ctx context.Context) {
 	s.wg.Add(1)
 	defer s.wg.Done()
@@ -2204,8 +2202,16 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				continue
 			}
 
-			uncoverPosition := s.getUncoveredPosition()
-			s.hedge(ctx, uncoverPosition)
+			if s.positionExposure.IsClosed() {
+				continue
+			}
+
+			uncoveredPosition := s.getUncoveredPosition()
+			s.logger.Infof("hedging uncovered position %s (%s)",
+				uncoveredPosition.String(), s.positionExposure.String(),
+			)
+
+			s.hedge(ctx, uncoveredPosition)
 
 		case <-reportTicker.C:
 			if atomic.LoadInt64(&s.profitChanged) > 0 {
@@ -2220,7 +2226,10 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 }
 
 func (s *Strategy) isSimpleHedgeMode() bool {
-	return s.SourceSymbol != "" && s.SplitHedge == nil && s.SyntheticHedge == nil
+	return s.SourceSymbol != "" &&
+		(s.SplitHedge == nil || !s.SplitHedge.Enabled) &&
+		(s.SyntheticHedge == nil || !s.SyntheticHedge.Enabled) &&
+		(s.SpreadMaker == nil || !s.SpreadMaker.Enabled)
 }
 
 func (s *Strategy) CrossRun(
@@ -2567,14 +2576,24 @@ func (s *Strategy) CrossRun(
 			delta := trade.PositionDelta()
 
 			// for direct hedge: trades from source session are always hedge trades
-			if s.simpleHedgeMode && trade.Exchange == s.sourceSession.ExchangeName {
-				s.positionExposure.Close(delta)
-			} else if trade.Exchange == s.makerSession.ExchangeName {
-				// spread maker: trades from maker session can be hedge trades only when spread maker is enabled and it's a spread maker order
-				if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.SpreadMaker.orderStore.Exists(trade.OrderID) {
+			if s.simpleHedgeMode {
+				switch trade.Exchange {
+				case s.sourceSession.ExchangeName:
 					s.positionExposure.Close(delta)
-				} else {
+				case s.makerSession.ExchangeName:
 					s.positionExposure.Open(delta)
+				default:
+				}
+			} else {
+				// for complex hedge like split hedge or synthetic hedge:
+				// for example, split hedge should close the position exposure from the component itself
+				if trade.Exchange == s.makerSession.ExchangeName {
+					// spread maker: trades from maker session can be hedge trades only when spread maker is enabled and it's a spread maker order
+					if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.SpreadMaker.orderStore.Exists(trade.OrderID) {
+						s.positionExposure.Close(delta)
+					} else {
+						s.positionExposure.Open(delta)
+					}
 				}
 			}
 

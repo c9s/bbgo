@@ -1,6 +1,8 @@
 package xmaker
 
 import (
+	"fmt"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -107,6 +109,15 @@ func (m *PositionExposure) Close(delta fixedpoint.Value) {
 
 func (m *PositionExposure) IsClosed() bool {
 	return m.net.Get().IsZero() && m.pending.Get().IsZero()
+}
+
+func (m *PositionExposure) String() string {
+	return fmt.Sprintf("PositionExposure<%s> net:%s pending:%s uncovered:%s",
+		m.symbol,
+		m.net.Get().String(),
+		m.pending.Get().String(),
+		m.GetUncovered().String(),
+	)
 }
 
 func (m *PositionExposure) GetUncovered() fixedpoint.Value {
