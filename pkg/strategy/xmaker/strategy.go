@@ -2359,6 +2359,10 @@ func (s *Strategy) CrossRun(
 	s.Position.UpdateMetrics()
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 
+	// restore position into the position exposure
+	s.logger.Infof("restoring position into the exposure: %s", s.Position.GetBase().String())
+	s.positionExposure.Open(s.Position.GetBase())
+
 	if s.ProfitStats == nil {
 		s.ProfitStats = &ProfitStats{
 			ProfitStats:   types.NewProfitStats(s.makerMarket),
@@ -2727,10 +2731,6 @@ func (s *Strategy) CrossRun(
 			go s.tradeRecover(s.tradingCtx)
 		}
 
-		if !s.Position.IsDust() {
-			// restore position into the position exposure
-			s.positionExposure.Open(s.Position.GetBase())
-		}
 	}()
 
 	bbgo.OnShutdown(
