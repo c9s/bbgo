@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -62,7 +63,7 @@ func init() {
 	client := NewRestClientDefault()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	for {
+	for maxTries := 10; maxTries > 0; maxTries-- {
 		select {
 		case <-ctx.Done():
 			logger.Error("unable to update server time offset due to timeout")
@@ -70,12 +71,22 @@ func init() {
 		default:
 
 		}
-		serverTime, err := client.NewGetTimestampRequest().Do(context.Background())
+
+		serverTime, err := client.NewGetTimestampRequest().Do(ctx)
 		if err != nil {
-			logger.WithError(err).Error("unable to get max exchange server timestamp")
+			var errResponse *requestgen.ErrResponse
+			if errors.Is(err, &net.DNSError{}) {
+				return
+			} else if errors.As(err, &errResponse) {
+				if errResponse.StatusCode >= 400 && errResponse.StatusCode < 500 {
+					return
+				}
+			}
+
+			logger.WithError(err).Errorf("unable to get max exchange server timestamp, #%d tries left", maxTries)
 			continue
 		} else if serverTime == nil {
-			logger.Error("unable to get max exchange server timestamp: empty response")
+			logger.Errorf("unable to get max exchange server timestamp: empty response, #%d tries left", maxTries)
 			continue
 		}
 
