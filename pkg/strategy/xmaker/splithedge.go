@@ -50,7 +50,7 @@ func (m *SplitHedgeProportionMarket) CalculateQuantity(totalQuantity, price fixe
 		}
 	}
 
-	log.Infof("calculated split quantity for market %s: ratio=%s, total=%s, allocated=%s, price=%s, finalQuantity=%s",
+	log.Infof("splitHedge: calculated split quantity for market %s: ratio=%s, total=%s, allocated=%s, price=%s, finalQuantity=%s",
 		m.Name,
 		m.Ratio.String(),
 		totalQuantity.String(), allocated.String(), price.String(), finalQuantity.String())
@@ -159,20 +159,24 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 
 		hedgeMarket.Position.StrategyInstanceID = strategy.InstanceID()
 
-		// handle position cover and close here
-		hedgeMarket.positionExposure.OnCover(strategy.positionExposure.Cover)
+		// complex hedge needs to trigger the strategy position close
 		hedgeMarket.positionExposure.OnClose(strategy.positionExposure.Close)
 
 		hedgeMarket.tradeCollector.OnTrade(func(
 			trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value,
 		) {
-			delta := trade.PositionDelta()
-			strategy.positionExposure.Close(delta)
-
 			// override the trade symbol for calculating the position data correctly
 			// if we hold BTCUSDT position, convert BTCUSD into BTCUSDT
 			trade.Symbol = h.strategy.makerMarket.Symbol
-			strategy.Position.AddTrade(trade)
+
+			if order, ok := hedgeMarket.orderStore.Get(trade.OrderID); ok {
+				// patch order symbol so that the order store won't filter the order out
+				order.Symbol = h.strategy.makerMarket.Symbol
+				strategy.orderStore.Add(order)
+			}
+
+			// this updates strategy's profit stats
+			strategy.tradeCollector.ProcessTrade(trade)
 		})
 
 	}
@@ -188,8 +192,9 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 		return fmt.Errorf("splitHedge: proportion algo requires proportion markets")
 	}
 
-	side := deltaToSide(hedgeDelta)
-	remainingQuantity := hedgeDelta.Abs()
+	orderSide := deltaToSide(hedgeDelta)
+	totalQuantity := hedgeDelta.Abs()
+	remainingQuantity := totalQuantity
 
 	for _, proportionMarket := range h.ProportionAlgo.ProportionMarkets {
 		hedgeMarket, ok := h.hedgeMarketInstances[proportionMarket.Name]
@@ -209,8 +214,9 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 
 		h.logger.Infof("splitHedge: hedge market %s can hedge max quantity %s", proportionMarket.Name, maxQuantity.String())
 
+		// TODO: use depth to calculate a better price
 		bid, ask := hedgeMarket.getQuotePrice()
-		price := sideTakerPrice(bid, ask, side)
+		price := sideTakerPrice(bid, ask, orderSide)
 		proportionQuantity := proportionMarket.CalculateQuantity(remainingQuantity, price)
 		proportionQuantity = fixedpoint.Min(proportionQuantity, maxQuantity)
 
@@ -225,11 +231,26 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 			continue
 		}
 
-		remainingQuantity = remainingQuantity.Sub(proportionQuantity)
+		if proportionQuantity.Compare(remainingQuantity) > 0 {
+			h.logger.Warnf("splitHedge: calculated proportion quantity %s is greater than remaining quantity %s, adjusting",
+				proportionQuantity.String(), remainingQuantity.String())
+
+			proportionQuantity = remainingQuantity
+			remainingQuantity = fixedpoint.Zero
+		} else {
+			remainingQuantity = remainingQuantity.Sub(proportionQuantity)
+		}
+
+		h.logger.Infof("splitHedge: hedging %s %s on market %s at price %f, remaining quantity %s",
+			orderSide, proportionQuantity.String(), hedgeMarket.InstanceID(), price.Float64(), remainingQuantity.String())
+
+		coverDelta := quantityToDelta(proportionQuantity, orderSide).Neg()
+		h.strategy.positionExposure.Cover(coverDelta)
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case hedgeMarket.positionDeltaC <- quantityToDelta(proportionQuantity, side).Neg():
+		case hedgeMarket.positionDeltaC <- quantityToDelta(proportionQuantity, orderSide).Neg():
 		}
 	}
 
@@ -240,11 +261,7 @@ func (h *SplitHedge) Hedge(
 	ctx context.Context,
 	uncoveredPosition, hedgeDelta fixedpoint.Value,
 ) error {
-	if uncoveredPosition.IsZero() {
-		return nil
-	}
-
-	h.logger.Infof("splitHedge: split hedging with delta: %f", uncoveredPosition.Float64())
+	h.logger.Infof("splitHedge: split hedging with delta: %f", hedgeDelta.Float64())
 
 	switch h.Algo {
 	case SplitHedgeAlgoProportion:

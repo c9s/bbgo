@@ -238,16 +238,8 @@ func newHedgeMarket(
 	tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
 		delta := trade.PositionDelta()
 		m.positionExposure.Close(delta)
-
 		m.logger.Infof("trade collector received trade: %+v, position delta: %f, position exposure: %s",
 			trade, delta.Float64(), m.positionExposure.String())
-
-		// TODO: pass Environment to HedgeMarket
-		/*
-			if profit.Compare(fixedpoint.Zero) == 0 {
-				s.Environment.RecordPosition(s.Position, trade, nil)
-			}
-		*/
 	})
 
 	return m
@@ -561,7 +553,7 @@ func (m *HedgeMarket) hedge(ctx context.Context) error {
 	hedgeDelta := uncoveredToDelta(uncoveredPosition)
 	quantity := hedgeDelta.Abs()
 	side := deltaToSide(hedgeDelta)
-	if m.market.MinQuantity.Compare(uncoveredPosition.Abs()) > 0 {
+	if m.market.MinQuantity.Compare(quantity) > 0 {
 		// skip dust position
 		return nil
 	}
@@ -582,7 +574,14 @@ func (m *HedgeMarket) WaitForReady(ctx context.Context) {
 	case <-ctx.Done():
 		return
 	case <-m.connectivity.ConnectedC():
-		return
+	}
+
+	if m.session != nil && m.session.UserDataConnectivity != nil {
+		select {
+		case <-ctx.Done():
+			return
+		case <-m.session.UserDataConnectivity.AuthedC():
+		}
 	}
 }
 
@@ -683,7 +682,6 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 			}
 
 			m.positionExposure.Open(delta)
-
 			if err := m.hedge(ctx); err != nil {
 				m.logger.WithError(err).Errorf("hedge failed")
 			}

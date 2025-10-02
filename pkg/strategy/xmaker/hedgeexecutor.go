@@ -101,13 +101,13 @@ func (m *MarketOrderHedgeExecutor) hedge(
 
 	m.logger.Infof("MarketOrderHedgeExecutor: submitting hedge order: %+v", orderForm)
 
-	coverDelta := quantity.Mul(toSign(uncoveredPosition))
+	coverDelta := quantityToDelta(quantity, side).Neg()
 	m.positionExposure.Cover(coverDelta)
 
 	hedgeOrder, err := m.submitOrder(ctx, orderForm)
 	if err != nil {
 		// if error occurs, revert the covered position
-		m.positionExposure.Cover(coverDelta.Neg())
+		m.positionExposure.Uncover(coverDelta)
 		return err
 	}
 
@@ -173,13 +173,9 @@ func (m *CounterpartyHedgeExecutor) clear(ctx context.Context) error {
 	} else {
 
 		// return covered position from the canceled order
-		delta := quantityToDelta(hedgeOrder.GetRemainingQuantity(), hedgeOrder.Side)
-
-		m.logger.Infof("hedge order is %s: %+v, returning covered position %s", hedgeOrder.Status, hedgeOrder, delta.String())
-
-		if !delta.IsZero() {
-			m.positionExposure.Cover(delta)
-		}
+		coverDelta := quantityToDelta(hedgeOrder.GetRemainingQuantity(), hedgeOrder.Side).Neg()
+		m.logger.Infof("hedge order is %s: %+v, returning covered position %s", hedgeOrder.Status, hedgeOrder, coverDelta.String())
+		m.positionExposure.Uncover(coverDelta)
 	}
 
 	m.hedgeOrder = nil
@@ -236,6 +232,9 @@ func (m *CounterpartyHedgeExecutor) hedge(
 		return nil
 	}
 
+	coverDelta := quantityToDelta(quantity, side).Neg()
+	m.positionExposure.Cover(coverDelta)
+
 	hedgeOrder, err := m.submitOrder(ctx, types.SubmitOrder{
 		Symbol:   m.market.Symbol,
 		Market:   m.market,
@@ -246,11 +245,11 @@ func (m *CounterpartyHedgeExecutor) hedge(
 	})
 
 	if err != nil {
+		m.positionExposure.Uncover(coverDelta)
 		return err
 	}
 
 	m.hedgeOrder = hedgeOrder
-	m.positionExposure.Cover(quantity.Mul(toSign(uncoveredPosition)))
 	m.logger.Infof("hedge order created: %+v", hedgeOrder)
 	return nil
 }
