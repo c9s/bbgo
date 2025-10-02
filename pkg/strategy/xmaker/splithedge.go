@@ -161,6 +161,7 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 
 		// handle position cover and close here
 		hedgeMarket.positionExposure.OnCover(strategy.positionExposure.Cover)
+		hedgeMarket.positionExposure.OnClose(strategy.positionExposure.Close)
 
 		hedgeMarket.tradeCollector.OnTrade(func(
 			trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value,
@@ -168,19 +169,10 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 			delta := trade.PositionDelta()
 			strategy.positionExposure.Close(delta)
 
-			if order, ok := hedgeMarket.orderStore.Get(trade.OrderID); ok {
-				strategy.orderStore.Add(order)
-			}
-
 			// override the trade symbol for calculating the position data correctly
 			// if we hold BTCUSDT position, convert BTCUSD into BTCUSDT
 			trade.Symbol = h.strategy.makerMarket.Symbol
-			if trade.FeeCurrency == "USD" && h.strategy.makerMarket.QuoteCurrency == "USDT" {
-				trade.FeeCurrency = h.strategy.makerMarket.QuoteCurrency
-			}
-
-			// this triggers position update and profit updates
-			strategy.tradeCollector.ProcessTrade(trade)
+			strategy.Position.AddTrade(trade)
 		})
 
 	}

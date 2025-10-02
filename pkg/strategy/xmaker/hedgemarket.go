@@ -239,8 +239,8 @@ func newHedgeMarket(
 		delta := trade.PositionDelta()
 		m.positionExposure.Close(delta)
 
-		m.logger.Infof("trade collector received trade: %+v, position delta: %f, covered position: %f",
-			trade, delta.Float64(), m.positionExposure.pending.Get().Float64())
+		m.logger.Infof("trade collector received trade: %+v, position delta: %f, position exposure: %s",
+			trade, delta.Float64(), m.positionExposure.String())
 
 		// TODO: pass Environment to HedgeMarket
 		/*
