@@ -582,7 +582,14 @@ func (m *HedgeMarket) WaitForReady(ctx context.Context) {
 	case <-ctx.Done():
 		return
 	case <-m.connectivity.ConnectedC():
-		return
+	}
+
+	if m.session != nil && m.session.UserDataConnectivity != nil {
+		select {
+		case <-ctx.Done():
+			return
+		case <-m.session.UserDataConnectivity.AuthedC():
+		}
 	}
 }
 
