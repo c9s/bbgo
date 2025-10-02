@@ -88,7 +88,6 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 	// BTC/USDT -> USDC/USDT = reverse (!forward)
 	s.forward = s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency
 
-	s.sourceMarket.positionExposure.OnCover(strategy.positionExposure.Cover)
 	s.sourceMarket.positionExposure.OnClose(strategy.positionExposure.Close)
 	return s.initialize(strategy)
 }
@@ -223,11 +222,10 @@ func (s *SyntheticHedge) Hedge(
 	_ context.Context,
 	uncoveredPosition, hedgeDelta fixedpoint.Value,
 ) error {
-	if uncoveredPosition.IsZero() {
-		return nil
-	}
-
 	s.logger.Infof("[syntheticHedge] synthetic hedging with delta: %f", uncoveredPosition.Float64())
+
+	s.strategy.positionExposure.Cover(uncoveredPosition)
+
 	s.sourceMarket.positionDeltaC <- uncoveredPosition
 	return nil
 }

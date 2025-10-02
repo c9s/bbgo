@@ -78,6 +78,22 @@ func (m *PositionExposure) Open(delta fixedpoint.Value) {
 	m.EmitOpen(delta)
 }
 
+func (m *PositionExposure) Uncover(delta fixedpoint.Value) {
+	delta = delta.Neg()
+
+	m.pending.Add(delta)
+
+	log.Infof(
+		"%s uncovered:%f netPosition:%f coveredPosition: %f",
+		m.symbol,
+		delta.Float64(),
+		m.net.Get().Float64(),
+		m.pending.Get().Float64(),
+	)
+
+	m.EmitCover(delta)
+}
+
 func (m *PositionExposure) Cover(delta fixedpoint.Value) {
 	m.pending.Add(delta)
 

@@ -1677,11 +1677,17 @@ func (s *Strategy) spreadMakerHedge(
 	return hedgeDelta, nil
 }
 
-func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
+func (s *Strategy) hedge(ctx context.Context) {
+	uncoveredPosition := s.positionExposure.GetUncovered()
+
 	if uncoveredPosition.IsZero() && s.positionExposure.IsClosed() {
 		s.logger.Warnf("no uncovered position and no exposure, skip hedging")
 		return
 	}
+
+	s.logger.Infof("hedging uncovered position %s (%s)",
+		uncoveredPosition.String(), s.positionExposure.String(),
+	)
 
 	// hedgeDelta is the reverse of the uncovered position
 	//
@@ -1715,7 +1721,7 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 
 	qty := hedgeDelta.Abs()
 	if lastPrice.Sign() > 0 && s.sourceMarket.IsDustQuantity(qty, lastPrice) {
-		s.logger.Warnf("hedge quantity %s is dust, skip hedging", qty.String())
+		s.logger.Debugf("hedge quantity %s is dust, skip hedging", qty.String())
 		return
 	}
 
@@ -1748,7 +1754,6 @@ func (s *Strategy) directHedge(
 ) (*types.Order, error) {
 	quantity := hedgeDelta.Abs()
 	side := deltaToSide(hedgeDelta)
-
 	price := s.lastPrice.Get()
 
 	bestBid, bestAsk, ok := s.sourceBook.BestBidAndAsk()
@@ -1822,31 +1827,29 @@ func (s *Strategy) directHedge(
 
 	defer s.tradeCollector.Process()
 
+	// if it's selling, then we should add a positive position,
+	// if it's buying, then we should add a negative position,
+	coverDelta := quantityToDelta(quantity, side).Neg()
+	s.positionExposure.Cover(coverDelta)
+
 	createdOrders, _, err := bbgo.BatchPlaceOrder(
 		ctx, s.sourceSession.Exchange, orderCreateCallback, formattedOrders...,
 	)
 
 	if err != nil {
 		s.hedgeErrorRateReservation = s.hedgeErrorLimiter.Reserve()
+		s.positionExposure.Uncover(coverDelta)
 		return nil, fmt.Errorf("unable to place order: %w", err)
 	}
 
 	if len(createdOrders) == 0 {
+		s.positionExposure.Uncover(coverDelta)
 		return nil, fmt.Errorf("no hedge orders created")
 	}
 
 	createdOrder := createdOrders[0]
 
 	s.logger.Infof("submitted hedge orders: %+v", createdOrder)
-
-	// if it's selling, then we should add a positive position
-	switch side {
-	case types.SideTypeSell:
-		s.positionExposure.Cover(quantity)
-	case types.SideTypeBuy:
-		s.positionExposure.Cover(quantity.Neg())
-	}
-
 	return &createdOrder, nil
 }
 
@@ -2206,12 +2209,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				continue
 			}
 
-			uncoveredPosition := s.positionExposure.GetUncovered()
-			s.logger.Infof("hedging uncovered position %s (%s)",
-				uncoveredPosition.String(), s.positionExposure.String(),
-			)
-
-			s.hedge(ctx, uncoveredPosition)
+			s.hedge(ctx)
 
 		case <-reportTicker.C:
 			if atomic.LoadInt64(&s.profitChanged) > 0 {
