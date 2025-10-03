@@ -45,7 +45,13 @@ func (p *CancelOrderRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if p.isVarSlice(_v) {
+			p.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -57,9 +63,14 @@ func (p *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check category field -> json key category
 	category := p.category
 
+	// TEMPLATE check-required
+	if len(category) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// TEMPLATE check-valid-values
 	switch category {
-	case "spot":
+	case "spot", "linear":
 		params["category"] = category
 
 	default:
@@ -73,16 +84,31 @@ func (p *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check symbol field -> json key symbol
 	symbol := p.symbol
 
+	// TEMPLATE check-required
+	if len(symbol) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// assign parameter of symbol
 	params["symbol"] = symbol
 	// check orderLinkId field -> json key orderLinkId
 	orderLinkId := p.orderLinkId
+
+	// TEMPLATE check-required
+	if len(orderLinkId) == 0 {
+	}
+	// END TEMPLATE check-required
 
 	// assign parameter of orderLinkId
 	params["orderLinkId"] = orderLinkId
 	// check orderId field -> json key orderId
 	if p.orderId != nil {
 		orderId := *p.orderId
+
+		// TEMPLATE check-required
+		if len(orderId) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of orderId
 		params["orderId"] = orderId
@@ -91,6 +117,11 @@ func (p *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check orderFilter field -> json key timeInForce
 	if p.orderFilter != nil {
 		orderFilter := *p.orderFilter
+
+		// TEMPLATE check-required
+		if len(orderFilter) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// TEMPLATE check-valid-values
 		switch orderFilter {

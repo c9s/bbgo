@@ -82,7 +82,7 @@ type Order struct {
 type GetOpenOrdersRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	category    Category  `param:"category,query" validValues:"spot"`
+	category    Category  `param:"category,query" validValues:"spot,linear"`
 	symbol      *string   `param:"symbol,query"`
 	baseCoin    *string   `param:"baseCoin,query"`
 	settleCoin  *string   `param:"settleCoin,query"`

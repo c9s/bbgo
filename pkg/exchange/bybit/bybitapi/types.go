@@ -39,7 +39,8 @@ var (
 type Category string
 
 const (
-	CategorySpot Category = "spot"
+	CategorySpot   Category = "spot"
+	CategoryLinear Category = "linear"
 )
 
 type Status string

@@ -30,6 +30,11 @@ func (g *GetWalletBalancesRequest) GetQueryParameters() (url.Values, error) {
 	// check accountType field -> json key accountType
 	accountType := g.accountType
 
+	// TEMPLATE check-required
+	if len(accountType) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// TEMPLATE check-valid-values
 	switch accountType {
 	case "UNIFIED":
@@ -47,6 +52,11 @@ func (g *GetWalletBalancesRequest) GetQueryParameters() (url.Values, error) {
 	if g.coin != nil {
 		coin := *g.coin
 
+		// TEMPLATE check-required
+		if len(coin) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of coin
 		params["coin"] = coin
 	} else {
@@ -54,7 +64,13 @@ func (g *GetWalletBalancesRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
