@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -240,17 +241,31 @@ func (c *RestClient) NewAuthenticatedRequest(
 	}
 
 	nonce := c.GetNonce(apiKey)
+	apiPath := c.BaseURL.ResolveReference(rel).Path
+
+	// payload is the params to be signed
 	payload := map[string]interface{}{
 		"nonce": nonce,
-		"path":  c.BaseURL.ResolveReference(rel).Path,
+		"path":  apiPath,
 	}
 
-	switch d := data.(type) {
-	case map[string]interface{}:
-		for k, v := range d {
-			payload[k] = v
+	if m == "GET" {
+		params.Add("nonce", strconv.FormatInt(nonce, 10))
+		switch d := data.(type) {
+		case map[string]interface{}:
+			for k, v := range d {
+				params.Add(k, fmt.Sprintf("%v", v))
+			}
+		default:
 		}
-	default:
+	} else {
+		switch d := data.(type) {
+		case map[string]interface{}:
+			for k, v := range d {
+				payload[k] = v
+			}
+		default:
+		}
 	}
 
 	for k, vs := range params {
@@ -262,17 +277,17 @@ func (c *RestClient) NewAuthenticatedRequest(
 		}
 	}
 
-	p, err := castPayload(payload)
+	payloadBytes, err := castPayload(payload)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := c.NewRequest(ctx, m, refURL, params, p)
+	req, err := c.NewRequest(ctx, m, refURL, params, payloadBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	encoded := base64.StdEncoding.EncodeToString(p)
+	encoded := base64.StdEncoding.EncodeToString(payloadBytes)
 
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-MAX-ACCESSKEY", apiKey)
