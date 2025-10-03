@@ -120,8 +120,11 @@ type ExchangeSessionConfig struct {
 	// Margin Assets Configs
 	MarginInfoUpdaterInterval types.Duration `json:"marginInfoUpdaterInterval" yaml:"marginInfoUpdaterInterval"`
 
-	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty" yaml:"makerFeeRate"`
-	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty" yaml:"takerFeeRate"`
+	MakerFeeRateConfig *fixedpoint.Value `json:"makerFeeRate,omitempty" yaml:"makerFeeRate"`
+	TakerFeeRateConfig *fixedpoint.Value `json:"takerFeeRate,omitempty" yaml:"takerFeeRate"`
+
+	MakerFeeRate fixedpoint.Value `json:"-" yaml:"-"`
+	TakerFeeRate fixedpoint.Value `json:"-" yaml:"-"`
 
 	MaxLeverage fixedpoint.Value `json:"maxLeverage,omitempty" yaml:"maxLeverage,omitempty"`
 
@@ -471,15 +474,24 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		session.MakerFeeRate = session.Account.MakerFeeRate
 		session.TakerFeeRate = session.Account.TakerFeeRate
 	} else {
+		if session.MakerFeeRateConfig != nil {
+			session.MakerFeeRate = *session.MakerFeeRateConfig
+		}
+
+		if session.TakerFeeRateConfig != nil {
+			session.TakerFeeRate = *session.TakerFeeRateConfig
+		}
+
 		// apply default fee rate if the fee rate is not set
 		if feeRateProvider, ok := session.Exchange.(types.ExchangeDefaultFeeRates); ok {
 			defaultFeeRates := feeRateProvider.DefaultFeeRates()
-			if session.MakerFeeRate.IsZero() {
+			if session.MakerFeeRateConfig == nil && session.MakerFeeRate.IsZero() {
 				session.MakerFeeRate = defaultFeeRates.MakerFeeRate
+				session.MakerFeeRateConfig = &defaultFeeRates.MakerFeeRate
 			}
-
-			if session.TakerFeeRate.IsZero() {
+			if session.TakerFeeRateConfig == nil && session.TakerFeeRate.IsZero() {
 				session.TakerFeeRate = defaultFeeRates.TakerFeeRate
+				session.TakerFeeRateConfig = &defaultFeeRates.TakerFeeRate
 			}
 		}
 	}
