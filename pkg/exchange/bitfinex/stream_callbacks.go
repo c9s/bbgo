@@ -146,6 +146,26 @@ func (s *Stream) EmitFundingBookSnapshotEvent(e *bfxapi.FundingBookSnapshotEvent
 	}
 }
 
+func (s *Stream) OnFundingOfferSnapshotEvent(cb func(e *bfxapi.FundingOfferSnapshotEvent)) {
+	s.fundingOfferSnapshotEventCallbacks = append(s.fundingOfferSnapshotEventCallbacks, cb)
+}
+
+func (s *Stream) EmitFundingOfferSnapshotEvent(e *bfxapi.FundingOfferSnapshotEvent) {
+	for _, cb := range s.fundingOfferSnapshotEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnFundingOfferUpdateEvent(cb func(e *bfxapi.FundingOfferUpdateEvent)) {
+	s.fundingOfferUpdateEventCallbacks = append(s.fundingOfferUpdateEventCallbacks, cb)
+}
+
+func (s *Stream) EmitFundingOfferUpdateEvent(e *bfxapi.FundingOfferUpdateEvent) {
+	for _, cb := range s.fundingOfferUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnWalletSnapshotEvent(cb func(e *bfxapi.WalletSnapshotEvent)) {
 	s.walletSnapshotEventCallbacks = append(s.walletSnapshotEventCallbacks, cb)
 }
