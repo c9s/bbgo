@@ -768,8 +768,10 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 	//  "maker_fee": 0.0005 -> 0.05%
 	//  "taker_fee": 0.0015 -> 0.15%
 	a := &types.Account{
-		AccountType:  types.AccountTypeSpot,
-		MarginLevel:  fixedpoint.Zero,
+		AccountType: types.AccountTypeSpot,
+		MarginLevel: fixedpoint.Zero,
+
+		HasFeeRate:   true,
 		MakerFeeRate: fixedpoint.NewFromFloat(userInfo.Current.MakerFee), // 0.15% = 0.0015
 		TakerFeeRate: fixedpoint.NewFromFloat(userInfo.Current.TakerFee), // 0.15% = 0.0015
 	}
