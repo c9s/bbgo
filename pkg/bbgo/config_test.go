@@ -78,15 +78,11 @@ func TestLoadConfig(t *testing.T) {
 						"max": map[string]interface{}{
 							"exchange":                  "max",
 							"envVarPrefix":              "MAX",
-							"takerFeeRate":              0.,
-							"makerFeeRate":              0.,
 							"marginInfoUpdaterInterval": "3m0s",
 						},
 						"binance": map[string]interface{}{
 							"exchange":                  "binance",
 							"envVarPrefix":              "BINANCE",
-							"takerFeeRate":              0.,
-							"makerFeeRate":              0.,
 							"marginInfoUpdaterInterval": "5m0s",
 						},
 					},
