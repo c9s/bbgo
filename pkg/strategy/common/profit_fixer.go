@@ -104,18 +104,11 @@ func (f *ProfitFixer) Fix(
 		return err
 	}
 	if len(allTrades) == 0 {
-		log.Warnf("no trades found for %s from %s to %s, skip profit fixing", symbol, since.String(), until.String())
+		log.Warnf("[%s] no trades found between %s and %s, skip profit fixing", symbol, since.String(), until.String())
 		return nil
 	}
 
-	err = f.FixFromTrades(allTrades, stats, position)
-	if err != nil {
-		return err
-	}
-	// update position open time and changed time
-	position.OpenedAt = since
-	position.ChangedAt = allTrades[len(allTrades)-1].Time.Time()
-	return nil
+	return f.FixFromTrades(allTrades, stats, position)
 }
 
 func (f *ProfitFixer) FixFromTrades(allTrades []types.Trade, stats *types.ProfitStats, position *types.Position) error {
