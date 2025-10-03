@@ -62,6 +62,10 @@ type Account struct {
 	LiquidationPrice fixedpoint.Value `json:"liquidationPrice,omitempty"`
 	LiquidationRate  fixedpoint.Value `json:"liquidationRate,omitempty"`
 
+	// HasFeeRate indicates whether the fee rate is available
+	// If the fee rate is not available, the MakerFeeRate and TakerFeeRate will be zero,
+	// Check this field before using the fee rate
+	HasFeeRate   bool             `json:"hasFeeRate,omitempty"`
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
 

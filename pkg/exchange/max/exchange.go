@@ -797,7 +797,9 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	//  "taker_fee": 0.0015 -> 0.15%
 
 	a := &types.Account{
-		MarginLevel:  fixedpoint.Zero,
+		MarginLevel: fixedpoint.Zero,
+
+		HasFeeRate:   true,
 		MakerFeeRate: fixedpoint.NewFromFloat(userInfo.Current.MakerFee), // 0.15% = 0.0015
 		TakerFeeRate: fixedpoint.NewFromFloat(userInfo.Current.TakerFee), // 0.15% = 0.0015
 	}
