@@ -247,6 +247,7 @@ func (s *Strategy) checkDeposits(ctx context.Context, firstTime bool) {
 						d.Amount.String(), d.Asset,
 						s.session.Name,
 						bal.Available.String(), bal.Currency)
+					s.removeWatchingDeposit(d)
 					continue
 				}
 			}
