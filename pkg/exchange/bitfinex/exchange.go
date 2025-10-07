@@ -444,7 +444,7 @@ func (e *Exchange) QueryTrades(
 	ctx context.Context, symbol string, options *types.TradeQueryOptions,
 ) ([]types.Trade, error) {
 
-	req := e.client.NewGetTradeHistoryBySymbolRequest().Symbol(symbol)
+	req := e.client.NewGetTradeHistoryBySymbolRequest().Symbol(toLocalSymbol(symbol))
 
 	if options != nil {
 		if options.StartTime != nil {
