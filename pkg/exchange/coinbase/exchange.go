@@ -359,9 +359,8 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
-	var failedOrderIDs []string
+	var cancelErrors []error
 	for _, order := range orders {
-
 		req := e.client.NewCancelOrderRequest().OrderID(order.UUID)
 		// Track cancellation metrics per order
 		startTime := time.Now()
@@ -378,14 +377,15 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		}
 
 		if err != nil {
-			log.WithError(err).Errorf("failed to cancel order: %v", order.UUID)
-			failedOrderIDs = append(failedOrderIDs, order.UUID)
+			log.WithError(err).Warnf("failed to cancel order: %v", order.UUID)
+			cancelErrors = append(cancelErrors, err)
+			continue
 		} else {
 			log.Infof("order %v has been cancelled", *res)
 		}
 	}
-	if len(failedOrderIDs) > 0 {
-		return errors.Errorf("failed to cancel orders: %v", failedOrderIDs)
+	if len(cancelErrors) > 0 {
+		return errors.Errorf("failed to cancel orders: %+v", cancelErrors)
 	}
 	return nil
 }
