@@ -76,6 +76,9 @@ func (s *LiquidityDemandSignal) CalculateSignal(_ context.Context) (float64, err
 	}
 	score := (last - s.mean) / s.std
 	sig := math.Tanh(score) * 2 // scale to [-2, 2]
+	if math.IsNaN(sig) {
+		sig = 0.0
+	}
 	if s.logger != nil {
 		s.logger.Infof("[LiquidityDemandSignal] last=%.2f, mean=%.2f, std=%.2f, score=%.2f, sig=%.2f", last, s.mean, s.std, score, sig)
 	}
