@@ -4,6 +4,7 @@ package coinbase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -14,7 +15,6 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/tradingutil"
 	"github.com/c9s/requestgen"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -326,7 +326,7 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 	}
 	cbOrdersDirty, err := getOrdersReq.Do(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get orders")
+		return nil, fmt.Errorf("failed to get orders: %w", err)
 	}
 
 	donePagination := len(cbOrdersDirty) < PaginationLimit
@@ -339,7 +339,7 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 			getOrdersReq.After(after)
 			newOrders, err := getOrdersReq.Do(ctx)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to get orders while paginating")
+				return nil, fmt.Errorf("failed to get orders while paginating: %w", err)
 			}
 			cbOrdersDirty = append(cbOrdersDirty, newOrders...)
 			donePagination = len(newOrders) < PaginationLimit
@@ -359,6 +359,7 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
+	var failedOrderIDs []string
 	var cancelErrors []error
 	for _, order := range orders {
 		req := e.client.NewCancelOrderRequest().OrderID(order.UUID)
@@ -378,6 +379,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 
 		if err != nil {
 			log.WithError(err).Warnf("failed to cancel order: %v", order.UUID)
+			failedOrderIDs = append(failedOrderIDs, order.UUID)
 			cancelErrors = append(cancelErrors, err)
 			continue
 		} else {
@@ -385,7 +387,11 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		}
 	}
 	if len(cancelErrors) > 0 {
-		return errors.Errorf("failed to cancel orders: %+v", cancelErrors)
+		joinedErr := errors.Join(cancelErrors...)
+		return fmt.Errorf(
+			"failed to cancel orders: %v, due to %w",
+			failedOrderIDs,
+			joinedErr)
 	}
 	return nil
 }
@@ -399,7 +405,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	reqMarketInfo := e.client.NewGetMarketInfoRequest()
 	markets, err := reqMarketInfo.Do(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get markets")
+		return nil, fmt.Errorf("failed to get markets: %w", err)
 	}
 
 	marketMap := make(types.MarketMap)
@@ -417,7 +423,7 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 	req := e.client.NewGetTickerRequest().ProductID(toLocalSymbol(symbol))
 	cbTicker, err := req.Do(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get ticker: %v", symbol)
+		return nil, fmt.Errorf("failed to get ticker(%s): %w", symbol, err)
 	}
 	ticker := toGlobalTicker(cbTicker)
 	return &ticker, nil
@@ -428,7 +434,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 	for _, s := range symbol {
 		ticker, err := e.QueryTicker(ctx, s)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get ticker for %v", s)
+			return nil, fmt.Errorf("failed to get ticker for %s: %w", s, err)
 		}
 		tickers[s] = *ticker
 	}
@@ -437,7 +443,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 	if !e.IsSupportedInterval(interval) {
-		return nil, errors.Errorf("unsupported interval: %v", interval)
+		return nil, fmt.Errorf("unsupported interval: %v", interval)
 	}
 	// default limit is 300, which is the maximum limit of the Coinbase Exchange API
 	if options.Limit == 0 {
@@ -457,7 +463,12 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	}
 	rawCandles, err := req.Do(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get klines(%v): %v", interval, symbol)
+		return nil, fmt.Errorf(
+			"failed to get klines(%s, %v): %w",
+			symbol,
+			interval,
+			err,
+		)
 	}
 	candles := make([]api.Candle, 0, len(rawCandles))
 	for _, rawCandle := range rawCandles {
@@ -488,7 +499,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 
 	cbOrder, err := req.Do(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get order: %+v", q)
+		return nil, fmt.Errorf("failed to get order %+v: %w", q, err)
 	}
 	order := toGlobalOrder(cbOrder)
 	return &order, nil
@@ -497,7 +508,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
 	cbTrades, err := e.queryOrderTradesByPagination(ctx, q)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get order trades: %+v", q)
+		return nil, fmt.Errorf("failed to get order trades %+v: %w", q, err)
 	}
 	trades := make([]types.Trade, 0, len(cbTrades))
 	for _, cbTrade := range cbTrades {
@@ -587,7 +598,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, startTi
 	}
 	cbOrders, err := e.queryOrdersByPagination(ctx, symbol, &startTime, &endTime, []string{"done"})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to query closed orders for %s", symbol)
+		return nil, fmt.Errorf("failed to query closed orders for %s: %w", symbol, err)
 	}
 	orders := make([]types.Order, 0)
 	for _, cbOrder := range cbOrders {
@@ -602,7 +613,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		ctx, symbol, options,
 	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to query trades for %s", symbol)
+		return nil, fmt.Errorf("failed to query trades for %s: %w", symbol, err)
 	}
 	var trades []types.Trade
 	for _, cbTrade := range cbTrades {
@@ -667,7 +678,7 @@ func (e *Exchange) queryProductTradesByPagination(
 func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) ([]types.Deposit, error) {
 	transfers, err := e.queryTransferHistoryByPagination(ctx, asset, since, until, api.TransferTypeDeposit)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to query deposit history for asset %s(%s ~ %s)", asset, since, until)
+		return nil, fmt.Errorf("failed to query deposit history for asset %s(%s ~ %s): %w", asset, since, until, err)
 	}
 	deposits := make([]types.Deposit, 0, len(transfers))
 	for _, transfer := range transfers {
@@ -679,7 +690,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) ([]types.Withdraw, error) {
 	transfers, err := e.queryTransferHistoryByPagination(ctx, asset, since, until, api.TransferTypeWithdraw)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to query withdraw history for asset %s(%s ~ %s)", asset, since, until)
+		return nil, fmt.Errorf("failed to query withdraw history for asset %s(%s ~ %s): %w", asset, since, until, err)
 	}
 	withdraws := make([]types.Withdraw, 0, len(transfers))
 	for _, transfer := range transfers {
@@ -704,7 +715,7 @@ func (e *Exchange) queryTransferHistoryByPagination(ctx context.Context, asset s
 	}
 	transfersDirty, err := req.Do(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to query transfer history for asset %s", asset)
+		return nil, fmt.Errorf("failed to query transfer history for asset %s: %w", asset, err)
 	}
 	seenTransfers := make(map[string]struct{})
 	for _, transfer := range transfersDirty {
@@ -723,7 +734,7 @@ func (e *Exchange) queryTransferHistoryByPagination(ctx context.Context, asset s
 			req.After(lastTime.AddDate(0, 0, 1))
 			newTransfers, err := req.Do(ctx)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to query transfer history for asset %s while paginating", asset)
+				return nil, fmt.Errorf("failed to query transfer history for asset %s while paginating: %w", asset, err)
 			}
 			// deduplicate transfers for the overlapping pagination
 			for _, transfer := range newTransfers {
