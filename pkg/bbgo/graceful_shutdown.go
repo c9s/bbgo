@@ -19,7 +19,11 @@ type GracefulShutdown struct {
 func (g *GracefulShutdown) Shutdown(shutdownCtx context.Context) {
 	var wg sync.WaitGroup
 	wg.Add(len(g.shutdownCallbacks))
-	go g.EmitShutdown(shutdownCtx, &wg)
+
+	for _, cb := range g.shutdownCallbacks {
+		go cb(shutdownCtx, &wg)
+	}
+
 	wg.Wait()
 }
 
