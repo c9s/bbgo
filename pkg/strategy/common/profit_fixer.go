@@ -103,6 +103,10 @@ func (f *ProfitFixer) Fix(
 	if err != nil {
 		return err
 	}
+	if len(allTrades) == 0 {
+		log.Warnf("[%s] no trades found between %s and %s, skip profit fixing", symbol, since.String(), until.String())
+		return nil
+	}
 
 	return f.FixFromTrades(allTrades, stats, position)
 }

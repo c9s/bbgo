@@ -480,6 +480,10 @@ func (p *Position) SlackAttachment() slack.Attachment {
 	footer := templateutil.Render("Last updated time: {{ . }}",
 		time.Now().Format(time.RFC822))
 
+	if !p.OpenedAt.IsZero() {
+		footer += " opened at: " + p.OpenedAt.String()
+	}
+
 	if len(p.Strategy) > 0 {
 		footer += " strategy: " + p.Strategy
 	}
@@ -501,12 +505,13 @@ func (p *Position) SlackAttachment() slack.Attachment {
 
 func (p *Position) PlainText() (msg string) {
 	posType := p.Type()
-	msg = fmt.Sprintf("%s Position %s: average cost = %v, base = %v, quote = %v",
+	msg = fmt.Sprintf("%s Position %s: average cost = %v, base = %v, quote = %v, opened at %s",
 		posType,
 		p.Symbol,
 		p.AverageCost,
 		p.Base,
 		p.Quote,
+		p.OpenedAt,
 	)
 
 	if p.TotalFee != nil {
@@ -519,11 +524,12 @@ func (p *Position) PlainText() (msg string) {
 }
 
 func (p *Position) String() string {
-	return fmt.Sprintf("POSITION %s: average cost = %v, base = %v, quote = %v",
+	return fmt.Sprintf("POSITION %s: average cost = %v, base = %v, quote = %v, opened at %s",
 		p.Symbol,
 		p.AverageCost,
 		p.Base,
 		p.Quote,
+		p.OpenedAt,
 	)
 }
 
@@ -600,6 +606,10 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	quantity := td.Quantity
 	quoteQuantity := td.QuoteQuantity
 	fee := td.Fee
+
+	if quantity.IsZero() {
+		return fixedpoint.Zero, fixedpoint.Zero, false
+	}
 
 	// calculated fee in quote (some exchange accounts may enable platform currency fee discount, like BNB)
 	// convert platform fee token into USD values
