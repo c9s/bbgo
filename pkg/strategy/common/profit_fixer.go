@@ -20,6 +20,11 @@ import (
 // ProfitFixerConfig is used for fixing profitStats and position by re-playing the trade history
 type ProfitFixerConfig struct {
 	TradesSince types.Time `json:"tradesSince,omitempty"`
+	Patch       string     `json:"patch,omitempty"`
+}
+
+func (c *ProfitFixerConfig) String() string {
+	return c.TradesSince.Time().Format(time.DateOnly) + ":" + c.Patch
 }
 
 // ProfitFixer implements a trade-history-based profit fixer
