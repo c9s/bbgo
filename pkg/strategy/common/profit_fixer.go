@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -23,8 +25,16 @@ type ProfitFixerConfig struct {
 // ProfitFixer implements a trade-history-based profit fixer
 type ProfitFixer struct {
 	sessions map[string]types.ExchangeTradeHistoryService
+	// (token, date) -> price
+	tokenFeePrices map[tokenFeeKey]fixedpoint.Value
 
 	core.ConverterManager
+}
+
+type tokenFeeKey struct {
+	token        string
+	exchangeName types.ExchangeName
+	date         string
 }
 
 func NewProfitFixer() *ProfitFixer {
@@ -68,12 +78,10 @@ func (f *ProfitFixer) aggregateAllTrades(ctx context.Context, symbol string, sin
 				case <-ctx.Done():
 					return ctx.Err()
 
-				case err := <-errC:
-					return err
-
 				case trade, ok := <-tradeC:
 					if !ok {
-						return nil
+						err := <-errC
+						return err
 					}
 
 					mu.Lock()
@@ -95,6 +103,108 @@ func (f *ProfitFixer) aggregateAllTrades(ctx context.Context, symbol string, sin
 	return allTrades, nil
 }
 
+func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade, since, until time.Time) error {
+	// initialize tokenFeePrices map
+	f.tokenFeePrices = make(map[tokenFeeKey]fixedpoint.Value)
+
+	if len(trades) == 0 {
+		return nil
+	}
+
+	// token -> symbol, exchangeName
+	tokens := make(map[tokenFeeKey]struct{})
+	// exchangeName -> markets
+	markets := make(map[types.ExchangeName]types.MarketMap)
+	// exchangeName -> ExchangePublic: query required data by trade.Exchange
+	exchanges := make(map[types.ExchangeName]types.Exchange)
+	for sessionName, service := range f.sessions {
+		if ex, ok := service.(types.Exchange); ok {
+			exchanges[ex.Name()] = ex
+			mm, err := ex.QueryMarkets(ctx)
+			if err == nil {
+				markets[ex.Name()] = mm
+			}
+		} else {
+			log.Warnf("session does not implement types.Exchange: %s", sessionName)
+		}
+	}
+
+	// all exchanges do not implement ExchangePublic, can not build token fee map
+	if len(exchanges) == 0 {
+		return nil
+	}
+
+	var quoteCurrency string // quote currency is assumed to be the same for all trades
+	for _, trade := range trades {
+		// skip trade if fee currency is USD*
+		if strings.HasPrefix(trade.FeeCurrency, "USD") {
+			continue
+		}
+		// skip trade if we do not have market info
+		if _, ok := markets[trade.Exchange]; !ok {
+			continue
+		}
+		market := markets[trade.Exchange][trade.Symbol]
+
+		// skip trade if fee currency is base currency
+		// since position.AddTrade already handle base currency fee
+		if trade.FeeCurrency == market.BaseCurrency {
+			continue
+		}
+		// sanity check: all quote currency should be the same
+		if quoteCurrency != "" && quoteCurrency != market.QuoteCurrency {
+			return fmt.Errorf("quote currency mismatch: %s != %s", quoteCurrency, market.QuoteCurrency)
+		}
+		quoteCurrency = market.QuoteCurrency
+		tokens[tokenFeeKey{
+			token:        trade.FeeCurrency,
+			exchangeName: trade.Exchange,
+			date:         "", // date is a dummy here
+		}] = struct{}{}
+	}
+	// no quote currency found if:
+	// - all fees are USD*, or
+	// - all fees are base currency
+	// no need to build token fee map in this case
+	if quoteCurrency == "" {
+		return nil
+	}
+	startTime := since.Add(-24 * time.Hour).Truncate(24 * time.Hour)
+	endTime := until.Truncate(24 * time.Hour)
+	for info := range tokens {
+		ex, ok := exchanges[info.exchangeName]
+		if !ok {
+			log.Warnf("can not build token fee on exchange %s: %s", info.exchangeName, info.token)
+			continue
+		}
+		if err := func() error {
+			query := &batch.KLineBatchQuery{Exchange: ex}
+			kLineC, errC := query.Query(ctx, info.token+quoteCurrency, types.Interval1d, startTime, endTime)
+			for {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case kline, ok := <-kLineC:
+					if !ok {
+						err := <-errC
+						return err
+					}
+					// the date in tokenFeeKey is the next day of the kline date
+					// which means the token fee for the next day is calculated by the previous day's closing price
+					f.tokenFeePrices[tokenFeeKey{
+						token:        info.token,
+						exchangeName: info.exchangeName,
+						date:         kline.StartTime.Time().Add(24 * time.Hour).Format(time.DateOnly),
+					}] = kline.Close
+				}
+			}
+		}(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (f *ProfitFixer) Fix(
 	ctx context.Context, symbol string, since, until time.Time, stats *types.ProfitStats, position *types.Position,
 ) error {
@@ -107,14 +217,24 @@ func (f *ProfitFixer) Fix(
 		log.Warnf("[%s] no trades found between %s and %s, skip profit fixing", symbol, since.String(), until.String())
 		return nil
 	}
-
-	return f.FixFromTrades(allTrades, stats, position)
+	err = f.buildTokenFeeMap(ctx, allTrades, since, until)
+	if err != nil {
+		return err
+	}
+	return f.fixFromTrades(allTrades, stats, position)
 }
 
-func (f *ProfitFixer) FixFromTrades(allTrades []types.Trade, stats *types.ProfitStats, position *types.Position) error {
+func (f *ProfitFixer) fixFromTrades(allTrades []types.Trade, stats *types.ProfitStats, position *types.Position) error {
 	for _, trade := range allTrades {
 		trade = f.ConverterManager.ConvertTrade(trade)
-
+		// set fee average cost
+		if feePrice, ok := f.tokenFeePrices[tokenFeeKey{
+			token:        trade.FeeCurrency,
+			exchangeName: trade.Exchange,
+			date:         trade.Time.Time().Format(time.DateOnly),
+		}]; ok {
+			position.SetFeeAverageCost(trade.FeeCurrency, feePrice)
+		}
 		profit, netProfit, madeProfit := position.AddTrade(trade)
 		if madeProfit {
 			p := position.NewProfit(trade, profit, netProfit)
