@@ -24,7 +24,7 @@ type ProfitFixerConfig struct {
 }
 
 func (c *ProfitFixerConfig) String() string {
-	return c.TradesSince.Time().Format(time.DateOnly) + ":" + c.Patch
+	return c.TradesSince.Time().Format(time.RFC3339) + ":" + c.Patch
 }
 
 // ProfitFixer implements a trade-history-based profit fixer
