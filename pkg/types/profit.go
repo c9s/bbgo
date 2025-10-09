@@ -2,12 +2,14 @@ package types
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/style"
+	"github.com/c9s/bbgo/pkg/util/templateutil"
 )
 
 // Profit struct stores the PnL information
@@ -124,6 +126,9 @@ func (p *Profit) SlackAttachment() slack.Attachment {
 		Color:  color,
 		Title:  title,
 		Fields: fields,
+
+		FooterIcon: ExchangeFooterIcon(p.Exchange),
+		Footer:     strings.ToLower(p.Exchange.String()) + templateutil.Render(" traded at {{ . }}", p.TradedAt.Format(time.StampMilli)),
 		// Footer:        "",
 	}
 }
