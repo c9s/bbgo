@@ -20,6 +20,11 @@ import (
 // ProfitFixerConfig is used for fixing profitStats and position by re-playing the trade history
 type ProfitFixerConfig struct {
 	TradesSince types.Time `json:"tradesSince,omitempty"`
+	Patch       string     `json:"patch,omitempty"`
+}
+
+func (c *ProfitFixerConfig) String() string {
+	return c.TradesSince.Time().Format(time.RFC3339) + ":" + c.Patch
 }
 
 // ProfitFixer implements a trade-history-based profit fixer
@@ -169,7 +174,7 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 	if quoteCurrency == "" {
 		return nil
 	}
-	startTime := since.Add(-24 * time.Hour).Truncate(24 * time.Hour)
+	startTime := since.Truncate(24 * time.Hour).Add(-24 * time.Hour)
 	endTime := until.Truncate(24 * time.Hour)
 	for info := range tokens {
 		ex, ok := exchanges[info.exchangeName]
