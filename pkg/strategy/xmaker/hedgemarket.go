@@ -39,6 +39,19 @@ const (
 
 const defaultHedgeInterval = 200 * time.Millisecond
 
+// FeeMode controls which fee rate is applied when computing hedge quote prices.
+// - taker: use session.TakerFeeRate (default, crossing the spread)
+// - maker: use session.MakerFeeRate (posting liquidity)
+// - none:  do not apply any fee to the computed prices
+// Note: This affects only pricing used by HedgeMarket when evaluating hedge decisions.
+type FeeMode string
+
+const (
+	FeeModeTaker FeeMode = "taker"
+	FeeModeMaker FeeMode = "maker"
+	FeeModeNone  FeeMode = "none"
+)
+
 type HedgeMarketConfig struct {
 	SymbolSelector string         `json:"symbolSelector"`
 	HedgeMethod    HedgeMethod    `json:"hedgeMethod"`
@@ -128,6 +141,10 @@ type HedgeMarket struct {
 	quotingPrice         *types.Ticker
 	bidPricer, askPricer pricer.Pricer
 
+	// priceFeeMode controls which fee rate will be applied to compute quote prices.
+	// Defaults to FeeModeTaker.
+	priceFeeMode FeeMode
+
 	positionExposure *PositionExposure
 
 	positionDeltaC chan fixedpoint.Value // channel to receive position delta updates
@@ -205,6 +222,9 @@ func newHedgeMarket(
 
 		positionExposure: newPositionExposure(symbol),
 
+		// default to taker fee mode for backward compatibility
+		priceFeeMode: FeeModeTaker,
+
 		positionDeltaC:    make(chan fixedpoint.Value, 100), // this depends on the number of trades
 		Position:          position,
 		orderStore:        orderStore,
@@ -217,20 +237,9 @@ func newHedgeMarket(
 		logger: logger,
 	}
 
-	takerFeeRate := fixedpoint.Zero
-	if m.session != nil {
-		takerFeeRate = m.session.TakerFeeRate
-	}
+	m.bidPricer = pricer.FromBestPrice(types.SideTypeBuy, m.book)
 
-	m.bidPricer = pricer.Compose(
-		pricer.FromBestPrice(types.SideTypeBuy, m.book),
-		pricer.ApplyFeeRate(types.SideTypeBuy, takerFeeRate),
-	)
-
-	m.askPricer = pricer.Compose(
-		pricer.FromBestPrice(types.SideTypeSell, m.book),
-		pricer.ApplyFeeRate(types.SideTypeSell, takerFeeRate),
-	)
+	m.askPricer = pricer.FromBestPrice(types.SideTypeSell, m.book)
 
 	switch m.HedgeMethod {
 	case HedgeMethodMarket:
@@ -257,6 +266,33 @@ func (m *HedgeMarket) SetLogger(logger logrus.FieldLogger) {
 		"exchange":     m.session.ExchangeName,
 		"hedge_market": m.market.Symbol,
 	})
+}
+
+// SetPriceFeeMode sets the fee mode used when computing hedge quote prices.
+// This method is safe to call at runtime.
+func (m *HedgeMarket) SetPriceFeeMode(mode FeeMode) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.priceFeeMode = mode
+}
+
+// priceFeeRate returns the fee rate to apply on prices depending on the current PriceFeeMode.
+// If session is nil, it returns zero.
+func (m *HedgeMarket) priceFeeRate() fixedpoint.Value {
+	if m.session == nil {
+		return fixedpoint.Zero
+	}
+
+	switch m.priceFeeMode {
+	case FeeModeTaker:
+		return m.session.TakerFeeRate
+	case FeeModeMaker:
+		return m.session.MakerFeeRate
+	case FeeModeNone:
+		return fixedpoint.Zero
+	default:
+		return m.session.TakerFeeRate
+	}
 }
 
 func (m *HedgeMarket) newMockTrade(
@@ -338,13 +374,10 @@ func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
 		rawAsk = m.askPricer(0, fixedpoint.Zero)
 	}
 
-	// Apply taker fee to reflect effective prices when crossing the spread
-	takerFeeRate := fixedpoint.Zero
-	if m.session != nil {
-		takerFeeRate = m.session.TakerFeeRate
-	}
-	bid = pricer.ApplyFeeRate(types.SideTypeBuy, takerFeeRate)(0, rawBid)   // selling uses bid, fee reduces proceeds
-	ask = pricer.ApplyFeeRate(types.SideTypeSell, takerFeeRate)(0, rawAsk) // buying uses ask, fee increases cost
+	// Apply fee according to PriceFeeMode
+	feeRate := m.priceFeeRate()
+	bid = pricer.ApplyFeeRate(types.SideTypeBuy, feeRate)(0, rawBid)
+	ask = pricer.ApplyFeeRate(types.SideTypeSell, feeRate)(0, rawAsk)
 
 	if bid.IsZero() || ask.IsZero() {
 		bids := m.book.SideBook(types.SideTypeBuy)
@@ -373,13 +406,10 @@ func (m *HedgeMarket) getQuotePriceByQuoteAmount(quoteAmount fixedpoint.Value) (
 
 	rawBid, rawAsk := m.depthBook.BestBidAndAskAtQuoteDepth(quoteAmount)
 
-	// Apply taker fee adjustments
-	takerFeeRate := fixedpoint.Zero
-	if m.session != nil {
-		takerFeeRate = m.session.TakerFeeRate
-	}
-	bid = pricer.ApplyFeeRate(types.SideTypeBuy, takerFeeRate)(0, rawBid)
-	ask = pricer.ApplyFeeRate(types.SideTypeSell, takerFeeRate)(0, rawAsk)
+	// Apply fee according to PriceFeeMode
+	feeRate := m.priceFeeRate()
+	bid = pricer.ApplyFeeRate(types.SideTypeBuy, feeRate)(0, rawBid)
+	ask = pricer.ApplyFeeRate(types.SideTypeSell, feeRate)(0, rawAsk)
 
 	m.quotingPrice = &types.Ticker{Buy: bid, Sell: ask, Time: now}
 	return bid, ask
@@ -395,13 +425,10 @@ func (m *HedgeMarket) getQuotePriceByBaseAmount(baseAmount fixedpoint.Value) (bi
 
 	rawBid, rawAsk := m.depthBook.BestBidAndAskAtDepth(baseAmount)
 
-	// Apply taker fee adjustments
-	takerFeeRate := fixedpoint.Zero
-	if m.session != nil {
-		takerFeeRate = m.session.TakerFeeRate
-	}
-	bid = pricer.ApplyFeeRate(types.SideTypeBuy, takerFeeRate)(0, rawBid)
-	ask = pricer.ApplyFeeRate(types.SideTypeSell, takerFeeRate)(0, rawAsk)
+	// Apply fee according to PriceFeeMode
+	feeRate := m.priceFeeRate()
+	bid = pricer.ApplyFeeRate(types.SideTypeBuy, feeRate)(0, rawBid)
+	ask = pricer.ApplyFeeRate(types.SideTypeSell, feeRate)(0, rawAsk)
 
 	m.quotingPrice = &types.Ticker{Buy: bid, Sell: ask, Time: now}
 	return bid, ask
