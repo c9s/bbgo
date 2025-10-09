@@ -17,6 +17,9 @@ func ExchangeFooterIcon(exName ExchangeName) string {
 		// footerIcon = "https://www.coinbase.com/favicon.ico"
 		// footerIcon = "https://www.coinbase.com/assets/sw-cache/a_6z3OfXe9.png" // 32x32
 		footerIcon = "https://www.coinbase.com/assets/sw-cache/a_DVA0h2KN.png" // 96x96
+
+	case ExchangeBitfinex:
+		footerIcon = "https://www.bitfinex.com/assets/favicons/bitfinex.ico"
 	}
 
 	return footerIcon
