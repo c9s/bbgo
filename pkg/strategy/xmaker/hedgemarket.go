@@ -102,7 +102,7 @@ func (c *HedgeMarketConfig) Defaults() error {
 	return nil
 }
 
-func initializeHedgeMarketFromConfig(
+func InitializeHedgeMarketFromConfig(
 	c *HedgeMarketConfig,
 	sessions map[string]*bbgo.ExchangeSession,
 ) (*HedgeMarket, error) {
@@ -119,7 +119,7 @@ func initializeHedgeMarketFromConfig(
 		return nil, fmt.Errorf("failed to set defaults for hedge market %s: %w", c.SymbolSelector, err)
 	}
 
-	return newHedgeMarket(c, session, market), nil
+	return NewHedgeMarket(c, session, market), nil
 }
 
 // HedgeMarket represents a market used for hedging the main strategy's position.
@@ -172,7 +172,7 @@ type HedgeMarket struct {
 	redispatchCallback func(position fixedpoint.Value)
 }
 
-func newHedgeMarket(
+func NewHedgeMarket(
 	config *HedgeMarketConfig,
 	session *bbgo.ExchangeSession,
 	market types.Market,

@@ -142,7 +142,7 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 	h.logger = strategy.logger.WithField("feature", "split_hedge")
 
 	for name, config := range h.HedgeMarkets {
-		hedgeMarket, err := initializeHedgeMarketFromConfig(config, sessions)
+		hedgeMarket, err := InitializeHedgeMarketFromConfig(config, sessions)
 		if err != nil {
 			return err
 		}
