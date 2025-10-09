@@ -174,7 +174,7 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 	if quoteCurrency == "" {
 		return nil
 	}
-	startTime := since.Add(-24 * time.Hour).Truncate(24 * time.Hour)
+	startTime := since.Truncate(24 * time.Hour).Add(-24 * time.Hour)
 	endTime := until.Truncate(24 * time.Hour)
 	for info := range tokens {
 		ex, ok := exchanges[info.exchangeName]
