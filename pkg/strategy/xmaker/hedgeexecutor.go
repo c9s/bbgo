@@ -10,19 +10,19 @@ import (
 )
 
 type HedgeExecutor interface {
-	// hedge executes a hedge order based on the uncovered position and the hedge delta
+	// Hedge executes a hedge order based on the uncovered position and the hedge delta
 	// uncoveredPosition: the current uncovered position that needs to be hedged
 	// hedgeDelta: the delta that needs to be hedged, which is the negative of uncoveredPosition
 	// quantity: the absolute value of hedgeDelta, which is the order quantity to be hedged
 	// side: the side of the hedge order, which is determined by the sign of hedgeDelta
-	hedge(
+	Hedge(
 		ctx context.Context,
 		uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
 		side types.SideType,
 	) error
 
-	// clear clears any pending orders or state related to hedging
-	clear(ctx context.Context) error
+	// Clear clears any pending orders or state related to hedging
+	Clear(ctx context.Context) error
 }
 
 type BaseHedgeExecutorConfig struct {
@@ -50,12 +50,12 @@ func newMarketOrderHedgeExecutor(
 	}
 }
 
-func (m *MarketOrderHedgeExecutor) clear(ctx context.Context) error {
+func (m *MarketOrderHedgeExecutor) Clear(ctx context.Context) error {
 	// no-op for market order hedge executor
 	return nil
 }
 
-func (m *MarketOrderHedgeExecutor) hedge(
+func (m *MarketOrderHedgeExecutor) Hedge(
 	ctx context.Context,
 	uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
 	side types.SideType,
@@ -149,7 +149,7 @@ func (m *CounterpartyHedgeExecutor) canHedge(
 	return true, nil
 }
 
-func (m *CounterpartyHedgeExecutor) clear(ctx context.Context) error {
+func (m *CounterpartyHedgeExecutor) Clear(ctx context.Context) error {
 	if m.hedgeOrder == nil {
 		return nil
 	}
@@ -182,7 +182,7 @@ func (m *CounterpartyHedgeExecutor) clear(ctx context.Context) error {
 	return err
 }
 
-func (m *CounterpartyHedgeExecutor) hedge(
+func (m *CounterpartyHedgeExecutor) Hedge(
 	ctx context.Context,
 	uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
 	side types.SideType,

@@ -544,7 +544,7 @@ func (m *HedgeMarket) calculateDebtQuota(totalValue, debtValue, minMarginLevel, 
 }
 
 func (m *HedgeMarket) hedge(ctx context.Context) error {
-	if err := m.hedgeExecutor.clear(ctx); err != nil {
+	if err := m.hedgeExecutor.Clear(ctx); err != nil {
 		return fmt.Errorf("failed to clear hedge executor: %w", err)
 	}
 
@@ -558,7 +558,7 @@ func (m *HedgeMarket) hedge(ctx context.Context) error {
 		return nil
 	}
 
-	err := m.hedgeExecutor.hedge(ctx, uncoveredPosition, hedgeDelta, quantity, side)
+	err := m.hedgeExecutor.Hedge(ctx, uncoveredPosition, hedgeDelta, quantity, side)
 
 	// emit the hedgedC signal to notify that a hedge has been attempted
 	select {
@@ -651,7 +651,7 @@ func (m *HedgeMarket) Sync(ctx context.Context, namespace string) {
 
 func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Duration) {
 	defer func() {
-		if err := m.hedgeExecutor.clear(ctx); err != nil {
+		if err := m.hedgeExecutor.Clear(ctx); err != nil {
 			m.logger.WithError(err).Errorf("failed to clear hedge executor")
 		}
 
