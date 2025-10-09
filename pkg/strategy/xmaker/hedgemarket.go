@@ -147,6 +147,8 @@ type HedgeMarket struct {
 	cancelTrading context.CancelFunc
 
 	debtQuotaCache *fixedpoint.ExpirableValue
+
+	redispatchCallback func(position fixedpoint.Value)
 }
 
 func newHedgeMarket(
@@ -635,7 +637,7 @@ func (m *HedgeMarket) Restore(ctx context.Context, namespace string) error {
 		return fmt.Errorf("failed to load position for hedge market %s: %w", m.SymbolSelector, err)
 	}
 
-	m.logger.Infof("restored position for hedge market %s: %+v", m.SymbolSelector, m.Position)
+	m.logger.Infof("HedgeMarket: restored position %s: %+v", m.SymbolSelector, m.Position)
 	return nil
 }
 
@@ -645,8 +647,31 @@ func (m *HedgeMarket) Sync(ctx context.Context, namespace string) {
 	id := m.InstanceID()
 	store := ps.NewStore(namespace, id)
 	if err := store.Save(m.Position); err != nil {
-		m.logger.WithError(err).Errorf("failed to save position for hedge market %s", m.SymbolSelector)
+		m.logger.WithError(err).Errorf("HedgeMarket: failed to save position %s", m.SymbolSelector)
 	}
+}
+
+func (m *HedgeMarket) RedispatchPosition(position fixedpoint.Value) error {
+	if m.redispatchCallback == nil {
+		return fmt.Errorf("HedgeMarket: redispatch callback is not set, can't redispatch position")
+	}
+
+	// This Close could trigger the strategy's position close callback,
+	// which in turn could call RedispatchPosition again, so we need to be careful
+	// to avoid deadlock or infinite recursion.
+	// Here we assume that the position close callback will not call RedispatchPosition again.
+	// If it does, it should be handled gracefully by the strategy.
+	m.positionExposure.Close(position.Neg())
+	m.redispatchCallback(position)
+	return nil
+}
+
+func (m *HedgeMarket) OnRedispatchPosition(f func(position fixedpoint.Value)) {
+	if m.redispatchCallback != nil {
+		m.logger.Panicf("HedgeMarket: redispatch callback is already set")
+	}
+
+	m.redispatchCallback = f
 }
 
 func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Duration) {

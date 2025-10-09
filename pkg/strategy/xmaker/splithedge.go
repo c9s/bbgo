@@ -148,6 +148,11 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 		}
 
 		hedgeMarket.SetLogger(h.logger)
+		hedgeMarket.OnRedispatchPosition(func(position fixedpoint.Value) {
+			// return the position back to strategy position exposure
+			h.logger.Infof("splitHedge: redispatching position %s to strategy position exposure", position.String())
+			strategy.positionExposure.Open(position)
+		})
 
 		// ensure the hedge market base currency matches the maker market base currency
 		if h.strategy.makerMarket.BaseCurrency != hedgeMarket.market.BaseCurrency {
