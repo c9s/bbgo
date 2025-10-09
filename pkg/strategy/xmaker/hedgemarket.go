@@ -228,11 +228,11 @@ func newHedgeMarket(
 
 	switch m.HedgeMethod {
 	case HedgeMethodMarket:
-		m.hedgeExecutor = newMarketOrderHedgeExecutor(m, m.HedgeMethodMarket)
+		m.hedgeExecutor = NewMarketOrderHedgeExecutor(m, m.HedgeMethodMarket)
 	case HedgeMethodCounterparty:
 		m.hedgeExecutor = newCounterpartyHedgeExecutor(m, m.HedgeMethodCounterparty)
 	default:
-		m.hedgeExecutor = newMarketOrderHedgeExecutor(m, m.HedgeMethodMarket)
+		m.hedgeExecutor = NewMarketOrderHedgeExecutor(m, m.HedgeMethodMarket)
 	}
 
 	tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {

@@ -40,7 +40,7 @@ type MarketOrderHedgeExecutor struct {
 	config *MarketOrderHedgeExecutorConfig
 }
 
-func newMarketOrderHedgeExecutor(
+func NewMarketOrderHedgeExecutor(
 	market *HedgeMarket,
 	config *MarketOrderHedgeExecutorConfig,
 ) *MarketOrderHedgeExecutor {
