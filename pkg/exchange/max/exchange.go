@@ -45,6 +45,7 @@ func New(key, secret, subAccount string) *Exchange {
 	client.Auth(key, secret)
 
 	if subAccount != "" {
+		log.Infof("using MAX sub-account %s", subAccount)
 		client.SetSubAccount(subAccount)
 	}
 
