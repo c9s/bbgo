@@ -426,6 +426,7 @@ func convertWsUserOrder(uo *bfxapi.UserOrder) *types.Order {
 			}(),
 		},
 		OrderID:          uint64(uo.OrderID),
+		Exchange:         ID,
 		ExecutedQuantity: uo.AmountOrig.Abs().Sub(uo.Amount.Abs()),
 		Status:           toGlobalOrderStatus(uo.Status),
 		CreationTime:     types.Time(uo.CreatedAt.Time()),
@@ -438,6 +439,7 @@ func convertWsUserOrder(uo *bfxapi.UserOrder) *types.Order {
 func convertWsUserTrade(ut *bfxapi.TradeUpdateEvent) *types.Trade {
 	return &types.Trade{
 		ID:       uint64(ut.ID),
+		Exchange: ID,
 		OrderID:  uint64(ut.OrderID),
 		Symbol:   ut.Symbol,
 		Price:    ut.ExecPrice,
@@ -452,7 +454,7 @@ func convertWsUserTrade(ut *bfxapi.TradeUpdateEvent) *types.Trade {
 		}(),
 		FeeCurrency: func() string {
 			if ut.FeeCurrency != nil {
-				return *ut.FeeCurrency
+				return toGlobalCurrency(*ut.FeeCurrency)
 			} else {
 				return ""
 			}

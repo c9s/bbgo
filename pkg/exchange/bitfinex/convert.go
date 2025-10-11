@@ -193,7 +193,7 @@ func convertTrade(trade bfxapi.OrderTradeDetail) *types.Trade {
 		IsMaker:       trade.Maker == 1,
 		Time:          types.Time(trade.Time),
 		Fee:           trade.Fee,
-		FeeCurrency:   trade.FeeCurrency,
+		FeeCurrency:   toGlobalCurrency(trade.FeeCurrency),
 	}
 }
 
