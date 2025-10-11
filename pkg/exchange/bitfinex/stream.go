@@ -152,6 +152,9 @@ func NewStream(ex *Exchange) *Stream {
 		}
 
 		book := convertBookEntries(e.Entries, resp.Symbol)
+
+		log.Infof("book: %+v", book)
+
 		stream.EmitBookSnapshot(book)
 	})
 
@@ -164,6 +167,31 @@ func NewStream(ex *Exchange) *Stream {
 			log.Errorf("unable to find channel response key for channel ID: %d, event %T: %+v", e.ChannelID, e, e)
 		}
 
+		// Algorithm to create and keep a trading book instance updated
+		//
+		// subscribe to channel
+		//
+		// receive the book snapshot and create your in-memory book structure
+		// when count > 0 then you have to add or update the price level
+		//   3.1 if amount > 0 then add/update bids
+		//   3.2 if amount < 0 then add/update asks
+		//
+		// when count = 0 then you have to delete the price level.
+		//   4.1 if amount = 1 then remove from bids
+		//   4.2 if amount = -1 then remove from asks
+		//
+		// Algorithm to create and keep a funding book instance updated
+		//
+		// subscribe to channel
+		//
+		// receive the book snapshot and create your in-memory book structure
+		// when count > 0 then you have to add or update the price level
+		// 3.1 if amount > 0 then add/update asks (offers)
+		// 3.2 if amount < 0 then add/update bids
+		//
+		// when count = 0 then you have to delete the price level.
+		// 4.1 if amount = 1 then remove from asks (offers)
+		// 4.2 if amount = -1 then remove from bids
 		var book types.SliceOrderBook
 		book.Symbol = toGlobalSymbol(resp.Symbol)
 

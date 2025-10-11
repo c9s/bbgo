@@ -235,10 +235,11 @@ func toGlobalOrderType(t bfxapi.OrderType) types.OrderType {
 }
 
 func convertBookEntry(entry bfxapi.BookEntry) types.PriceVolume {
-	if entry.Amount.Sign() < 0 {
+	// count == 0 means the entry is removed
+	if entry.Count == 0 {
 		return types.PriceVolume{
 			Price:  entry.Price,
-			Volume: entry.Amount.Neg(),
+			Volume: fixedpoint.Zero,
 		}
 	}
 
