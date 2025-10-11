@@ -58,7 +58,9 @@ var orderbookCmd = &cobra.Command{
 
 		s := session.Exchange.NewStream()
 		s.SetPublicOnly()
-		s.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
+		s.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{
+			Depth: types.DepthLevelFull,
+		})
 		s.OnBookSnapshot(func(book types.SliceOrderBook) {
 			if dumpDepthUpdate {
 				log.Infof("orderbook snapshot: %s", book.String())

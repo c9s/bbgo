@@ -65,14 +65,14 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 
 	var err error
 
-	s.sourceMarket, err = initializeHedgeMarketFromConfig(s.Source, sessions)
+	s.sourceMarket, err = InitializeHedgeMarketFromConfig(s.Source, sessions)
 	if err != nil {
 		return err
 	}
 
 	s.sourceMarket.SetLogger(s.logger)
 
-	s.fiatMarket, err = initializeHedgeMarketFromConfig(s.Fiat, sessions)
+	s.fiatMarket, err = InitializeHedgeMarketFromConfig(s.Fiat, sessions)
 	if err != nil {
 		return err
 	}

@@ -30,7 +30,7 @@ func Test_newHedgeMarket(t *testing.T) {
 	_ = marketDataStream
 	_ = userDataStream
 
-	hm := newHedgeMarket(&HedgeMarketConfig{
+	hm := NewHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: "BTCUSDT",
 		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   depth,
@@ -82,7 +82,7 @@ func TestHedgeMarket_hedge(t *testing.T) {
 	mockExchange.EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, nil)
 
 	depth := testhelper.Number(100.0)
-	hm := newHedgeMarket(&HedgeMarketConfig{
+	hm := NewHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: "BTCUSDT",
 		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   depth,
@@ -122,7 +122,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	mockExchange := session.Exchange.(*mocks.MockExchangeExtended)
 
 	depth := testhelper.Number(100.0)
-	hm := newHedgeMarket(&HedgeMarketConfig{
+	hm := NewHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: "BTCUSDT",
 		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   depth,

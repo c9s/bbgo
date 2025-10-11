@@ -110,7 +110,7 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	sourceSession, sourceMarketDataStream, sourceUserDataStream := newMockSession(mockCtrl, ctx, sourceMarket.Symbol)
 	sourceSession.SetMarkets(AllMarkets())
 
-	sourceHedgeMarket := newHedgeMarket(&HedgeMarketConfig{
+	sourceHedgeMarket := NewHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: sourceMarket.Symbol,
 		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   Number(100.0),
@@ -128,7 +128,7 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 
 	fiatSession, fiatMarketDataStream, fiatUserDataStream := newMockSession(mockCtrl, ctx, fiatMarket.Symbol)
 	fiatSession.SetMarkets(AllMarkets())
-	fiatHedgeMarket := newHedgeMarket(&HedgeMarketConfig{
+	fiatHedgeMarket := NewHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: fiatMarket.Symbol,
 		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   Number(10.0),
@@ -297,7 +297,7 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 	sourceSession, sourceMarketDataStream, sourceUserDataStream := newMockSession(mockCtrl, ctx, sourceMarket.Symbol)
 	sourceSession.SetMarkets(AllMarkets())
 
-	sourceHedgeMarket := newHedgeMarket(&HedgeMarketConfig{
+	sourceHedgeMarket := NewHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: sourceMarket.Symbol,
 		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   Number(100.0),
@@ -321,7 +321,7 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 
 	fiatSession, fiatMarketDataStream, fiatUserDataStream := newMockSession(mockCtrl, ctx, fiatMarket.Symbol)
 	fiatSession.SetMarkets(AllMarkets())
-	fiatHedgeMarket := newHedgeMarket(&HedgeMarketConfig{
+	fiatHedgeMarket := NewHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: fiatMarket.Symbol,
 		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   Number(10.0),
@@ -705,7 +705,7 @@ func newMockMarketDataStream(
 	mockMarketDataStream := mocks.NewMockStream(mockCtrl)
 	bindMockMarketDataStream(mockMarketDataStream, marketDataStream)
 
-	// newHedgeMarket calls these methods
+	// NewHedgeMarket calls these methods
 	mockMarketDataStream.EXPECT().SetPublicOnly()
 	mockMarketDataStream.EXPECT().Subscribe(types.BookChannel, symbol, types.SubscribeOptions{
 		Depth: types.DepthLevelFull,
