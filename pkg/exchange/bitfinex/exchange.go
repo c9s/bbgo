@@ -180,8 +180,9 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 
 	for _, w := range resp {
 		if w.Type == bfxapi.WalletTypeExchange {
-			account.SetBalance(w.Currency, types.Balance{
-				Currency:  w.Currency,
+			cu := toGlobalCurrency(w.Currency)
+			account.SetBalance(cu, types.Balance{
+				Currency:  cu,
 				Available: w.AvailableBalance,
 				Locked:    w.Balance.Sub(w.AvailableBalance),
 				Interest:  w.UnsettledInterest,
