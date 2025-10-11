@@ -112,6 +112,21 @@ func NewStream(ex *Exchange) *Stream {
 
 	stream.OnCandleSnapshotEvent(func(e *bfxapi.CandleSnapshotEvent) {})
 
+	stream.OnResponse(func(resp *bfxapi.WebSocketResponse) {
+		log.Infof("response: %+v", resp)
+		switch resp.Event {
+		case "subscribed":
+			log.Infof("bitfinex websocket: subscribed to channel: %+v", resp)
+		case "auth":
+			if resp.Status == "OK" {
+				log.Info("bitfinex websocket: authenticated successfully")
+				go stream.EmitAuth()
+			} else {
+				log.Errorf("bitfinex websocket: authentication failed: %+v", resp)
+			}
+		}
+	})
+
 	stream.OnStatusEvent(func(e *bfxapi.StatusEvent) {})
 
 	stream.OnPublicTradeEvent(func(e *bfxapi.PublicTradeEvent) {
