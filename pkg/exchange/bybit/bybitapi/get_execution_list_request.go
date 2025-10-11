@@ -38,7 +38,7 @@ type Trade struct {
 type GetExecutionListRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	category Category `param:"category,query" validValues:"spot"`
+	category Category `param:"category,query" validValues:"spot,linear"`
 
 	symbol      *string `param:"symbol,query"`
 	orderId     *string `param:"orderId,query"`
