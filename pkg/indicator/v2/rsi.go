@@ -46,17 +46,3 @@ func (s *RSIStream) Calculate(_ float64) float64 {
 	rsi := 100.0 - (100.0 / (1.0 + rs))
 	return rsi
 }
-
-func max(x, y int) int {
-	if x > y {
-		return x
-	}
-	return y
-}
-
-func min(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
-}
