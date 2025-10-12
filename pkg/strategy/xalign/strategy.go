@@ -60,8 +60,9 @@ type Strategy struct {
 
 	SkipTransferCheck bool `json:"skipTransferCheck"`
 
-	MaxAmounts       map[string]fixedpoint.Value `json:"maxAmounts"`
-	LargeAmountAlert *LargeAmountAlertConfig     `json:"largeAmountAlert"`
+	MaxQuantity map[string]fixedpoint.Value `json:"maxQuantity"`
+
+	LargeAmountAlert *LargeAmountAlertConfig `json:"largeAmountAlert"`
 
 	SlackNotify                bool             `json:"slackNotify"`
 	SlackNotifyMentions        []string         `json:"slackNotifyMentions"`
@@ -269,7 +270,7 @@ func (s *Strategy) selectSessionForCurrency(
 				}
 
 				quoteBalance, ok := account.Balance(quoteCurrency)
-				if !ok {
+				if !ok || quoteBalance.Available.IsZero() {
 					continue
 				}
 
@@ -282,8 +283,10 @@ func (s *Strategy) selectSessionForCurrency(
 
 				requiredQuoteAmount = requiredQuoteAmount.Round(market.PricePrecision, fixedpoint.Up)
 				if requiredQuoteAmount.Compare(quoteBalance.Available) > 0 {
-					log.Warnf("required quote amount %f > quote balance %v, skip", requiredQuoteAmount.Float64(), quoteBalance)
-					continue
+					log.Warnf("required quote amount %f > quote balance %v, adjusting", requiredQuoteAmount.Float64(), quoteBalance)
+
+					q = quoteBalance.Available.Div(price).Round(market.VolumePrecision, fixedpoint.Down)
+					requiredQuoteAmount = q.Mul(price)
 				}
 
 				// for currency = TWD in market USDT/TWD
@@ -301,11 +304,10 @@ func (s *Strategy) selectSessionForCurrency(
 					}
 				}
 
-				maxAmount, ok := s.MaxAmounts[market.QuoteCurrency]
-				if ok && requiredQuoteAmount.Compare(maxAmount) > 0 {
-					log.Infof("adjusted required quote ammount %f %s by max amount %f %s", requiredQuoteAmount.Float64(), market.QuoteCurrency, maxAmount.Float64(), market.QuoteCurrency)
-
-					requiredQuoteAmount = maxAmount
+				maxQuantity, ok := s.MaxQuantity[market.QuoteCurrency]
+				if ok && requiredQuoteAmount.Compare(maxQuantity) > 0 {
+					log.Infof("adjusted required quote ammount %f %s by max amount %f %s", requiredQuoteAmount.Float64(), market.QuoteCurrency, maxQuantity.Float64(), market.QuoteCurrency)
+					requiredQuoteAmount = maxQuantity
 				}
 
 				if quantity, ok := market.GreaterThanMinimalOrderQuantity(side, price, requiredQuoteAmount); ok {
@@ -337,16 +339,17 @@ func (s *Strategy) selectSessionForCurrency(
 				}
 
 				baseBalance, ok := account.Balance(baseCurrency)
-				if !ok {
+				if !ok || baseBalance.Available.IsZero() {
 					continue
 				}
 
 				if q.Compare(baseBalance.Available) > 0 {
 					log.Warnf("required base amount %f < available base balance %v, skip", q.Float64(), baseBalance)
-					continue
+
+					q = baseBalance.Available
 				}
 
-				maxAmount, ok := s.MaxAmounts[market.QuoteCurrency]
+				maxAmount, ok := s.MaxQuantity[market.QuoteCurrency]
 				if ok {
 					q = bbgo.AdjustQuantityByMaxAmount(q, price, maxAmount)
 					log.Infof("adjusted quantity %f %s by max amount %f %s", q.Float64(), market.BaseCurrency, maxAmount.Float64(), market.QuoteCurrency)
@@ -684,11 +687,9 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 
 			createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
 			if err != nil {
-				log.WithError(err).Errorf("can not place order: %+v", submitOrder)
+				log.WithError(err).WithFields(submitOrder.LogFields()).Errorf("can not place order: %+v", submitOrder)
 				return
-			}
-
-			if createdOrder != nil {
+			} else if createdOrder != nil {
 				if ob, ok := s.orderBooks[selectedSession.Name]; ok {
 					ob.Add(*createdOrder)
 				} else {
