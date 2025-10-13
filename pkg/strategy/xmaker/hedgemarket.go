@@ -358,23 +358,28 @@ func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitO
 
 // GetQuotePrice returns the current bid and ask prices for hedging,
 // adjusted by the configured fee mode and quoting depth.
+//
+// Implementation detail:
+// - If QuotingDepthInQuote is configured, delegate to GetQuotePriceByQuoteAmount.
+// - Else if QuotingDepth is configured, delegate to GetQuotePriceByBaseAmount.
+// - Else, fall back to best bid/ask with fee application.
 func (m *HedgeMarket) GetQuotePrice() (bid, ask fixedpoint.Value) {
+	// Prefer configured quoting depth helpers when available to avoid code duplication.
+	if m.QuotingDepthInQuote.Sign() > 0 {
+		return m.GetQuotePriceByQuoteAmount(m.QuotingDepthInQuote)
+	}
+	if m.QuotingDepth.Sign() > 0 {
+		return m.GetQuotePriceByBaseAmount(m.QuotingDepth)
+	}
+
+	// Fallback path: use best bid/ask and apply fee.
 	now := time.Now()
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Prefer configured quoting depth if provided, otherwise fall back to best prices
-	var rawBid, rawAsk fixedpoint.Value
-	if m.QuotingDepthInQuote.Sign() > 0 {
-		rawBid, rawAsk = m.depthBook.BestBidAndAskAtQuoteDepth(m.QuotingDepthInQuote)
-	} else if m.QuotingDepth.Sign() > 0 {
-		rawBid, rawAsk = m.depthBook.BestBidAndAskAtDepth(m.QuotingDepth)
-	} else {
-		// fallback to best price if no depth provided
-		rawBid = m.bidPricer(0, fixedpoint.Zero)
-		rawAsk = m.askPricer(0, fixedpoint.Zero)
-	}
+	rawBid := m.bidPricer(0, fixedpoint.Zero)
+	rawAsk := m.askPricer(0, fixedpoint.Zero)
 
 	// Apply fee according to PriceFeeMode
 	feeRate := m.priceFeeRate()
@@ -388,11 +393,7 @@ func (m *HedgeMarket) GetQuotePrice() (bid, ask fixedpoint.Value) {
 	}
 
 	// store prices as snapshot
-	m.quotingPrice = &types.Ticker{
-		Buy:  bid,
-		Sell: ask,
-		Time: now,
-	}
+	m.quotingPrice = &types.Ticker{Buy: bid, Sell: ask, Time: now}
 
 	return bid, ask
 }
