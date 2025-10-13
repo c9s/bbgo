@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -21,6 +22,7 @@ import (
 type ProfitFixerConfig struct {
 	TradesSince types.Time `json:"tradesSince,omitempty"`
 	Patch       string     `json:"patch,omitempty"`
+	FromDB      bool       `json:"fromDB,omitempty"`
 }
 
 func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
@@ -287,4 +289,63 @@ func (f *ProfitFixerBundle) Fix(
 		time.Now(),
 		profitStats,
 		position)
+}
+
+type DBProfitFixer struct {
+	tradeService   *service.TradeService
+	sessions       map[string]types.ExchangeTradeHistoryService
+	tokenFeePrices map[tokenFeeKey]fixedpoint.Value
+
+	core.ConverterManager
+}
+
+func NewDBProfitFixer(tradeService *service.TradeService) *DBProfitFixer {
+	return &DBProfitFixer{
+		tradeService: tradeService,
+		sessions:     make(map[string]types.ExchangeTradeHistoryService),
+	}
+}
+
+func (f *DBProfitFixer) AddExchange(sessionName string, service types.ExchangeTradeHistoryService) {
+	f.sessions[sessionName] = service
+}
+
+func (f *DBProfitFixer) Fix(
+	ctx context.Context, symbol string, since, until time.Time, stats *types.ProfitStats, position *types.Position,
+) error {
+	log.Infof("starting profit fixer with time range %s <=> %s (from DB)", since, until)
+	allTrades, err := f.queryAllTrades(ctx, symbol, since, until)
+	if err != nil {
+		return err
+	}
+	if len(allTrades) == 0 {
+		log.Warnf("[%s] no trades found between %s and %s, skip profit fixing", symbol, since.String(), until.String())
+		return nil
+	}
+	fm, err := buildTokenFeeMap(ctx, f.sessions, allTrades, since, until)
+	if err != nil {
+		return err
+	}
+	f.tokenFeePrices = fm
+	return fixFromTrades(allTrades, &f.ConverterManager, f.tokenFeePrices, stats, position)
+}
+
+func (f *DBProfitFixer) queryAllTrades(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
+	var sessions []string
+	for _, s := range f.sessions {
+		if ex, ok := s.(types.Exchange); ok {
+			sessions = append(sessions, string(ex.Name()))
+		}
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		return f.tradeService.Query(service.QueryTradesOptions{
+			Sessions: sessions,
+			Symbol:   symbol,
+			Since:    &since,
+			Until:    &until,
+		})
+	}
 }
