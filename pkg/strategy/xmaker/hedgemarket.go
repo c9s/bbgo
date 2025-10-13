@@ -397,10 +397,10 @@ func (m *HedgeMarket) GetQuotePrice() (bid, ask fixedpoint.Value) {
 	return bid, ask
 }
 
-// getQuotePriceByQuoteAmount returns bid/ask prices averaged over the given quote amount,
+// GetQuotePriceByQuoteAmount returns bid/ask prices averaged over the given quote amount,
 // adjusted by taker fee (ask: +fee, bid: -fee). This reflects the effective prices when
 // submitting taker orders crossing the spread.
-func (m *HedgeMarket) getQuotePriceByQuoteAmount(quoteAmount fixedpoint.Value) (bid, ask fixedpoint.Value) {
+func (m *HedgeMarket) GetQuotePriceByQuoteAmount(quoteAmount fixedpoint.Value) (bid, ask fixedpoint.Value) {
 	now := time.Now()
 
 	m.mu.Lock()
@@ -417,9 +417,9 @@ func (m *HedgeMarket) getQuotePriceByQuoteAmount(quoteAmount fixedpoint.Value) (
 	return bid, ask
 }
 
-// getQuotePriceByBaseAmount returns bid/ask prices averaged over the given base amount,
+// GetQuotePriceByBaseAmount returns bid/ask prices averaged over the given base amount,
 // adjusted by taker fee (ask: +fee, bid: -fee).
-func (m *HedgeMarket) getQuotePriceByBaseAmount(baseAmount fixedpoint.Value) (bid, ask fixedpoint.Value) {
+func (m *HedgeMarket) GetQuotePriceByBaseAmount(baseAmount fixedpoint.Value) (bid, ask fixedpoint.Value) {
 	now := time.Now()
 
 	m.mu.Lock()
