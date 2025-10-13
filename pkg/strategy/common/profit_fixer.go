@@ -24,16 +24,10 @@ type ProfitFixerConfig struct {
 	Patch       string     `json:"patch,omitempty"`
 }
 
-func (c *ProfitFixerConfig) Equal(other *ProfitFixerConfig) bool {
-	if c == nil && other == nil {
-		return true
-	}
-	if c == nil || other == nil {
-		return false
-	}
-	rt := reflect.TypeOf(*c)
-	rv1 := reflect.ValueOf(*c)
-	rv2 := reflect.ValueOf(*other)
+func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
+	rt := reflect.TypeOf(c)
+	rv1 := reflect.ValueOf(c)
+	rv2 := reflect.ValueOf(other)
 
 	for i := 0; i < rt.NumField(); i++ {
 		f := rt.Field(i)
