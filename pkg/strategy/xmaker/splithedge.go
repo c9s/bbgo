@@ -65,14 +65,14 @@ const (
 	RatioBaseTotal     RatioBase = "total"
 )
 
-type SplitHedgeProportionAlgo struct {
-	// RatioBase controls how per-market ratio is applied when calculating each slice.
-	// - "remaining" (default): apply the ratio to the remaining quantity after prior markets.
-	// - "total": apply the ratio to the original total quantity for every market.
-	RatioBase RatioBase `json:"ratioBase"`
+	type SplitHedgeProportionAlgo struct {
+		// RatioBase controls how per-market ratio is applied when calculating each slice.
+		// - "remaining": apply the ratio to the remaining quantity after prior markets.
+		// - "total" (default): apply the ratio to the original total quantity for every market.
+		RatioBase RatioBase `json:"ratioBase"`
 
-	ProportionMarkets []*SplitHedgeProportionMarket `json:"markets"`
-}
+		ProportionMarkets []*SplitHedgeProportionMarket `json:"markets"`
+	}
 
 type SplitHedge struct {
 	Enabled bool `json:"enabled"`
@@ -122,7 +122,7 @@ func (h *SplitHedge) UnmarshalJSON(data []byte) error {
 
 			// default and validate ratioBase
 			if h.ProportionAlgo.RatioBase == "" {
-				h.ProportionAlgo.RatioBase = RatioBaseRemaining
+				h.ProportionAlgo.RatioBase = RatioBaseTotal
 			} else if h.ProportionAlgo.RatioBase != RatioBaseRemaining && h.ProportionAlgo.RatioBase != RatioBaseTotal {
 				return fmt.Errorf("splithedge: invalid proportionAlgo.ratioBase: %s (expected 'remaining' or 'total')", h.ProportionAlgo.RatioBase)
 			}
