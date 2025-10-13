@@ -58,9 +58,21 @@ func (m *SplitHedgeProportionMarket) CalculateQuantity(totalQuantity, price fixe
 	return finalQuantity
 }
 
-type SplitHedgeProportionAlgo struct {
-	ProportionMarkets []*SplitHedgeProportionMarket `json:"markets"`
-}
+type RatioBase string
+
+const (
+	RatioBaseRemaining RatioBase = "remaining"
+	RatioBaseTotal     RatioBase = "total"
+)
+
+	type SplitHedgeProportionAlgo struct {
+		// RatioBase controls how per-market ratio is applied when calculating each slice.
+		// - "remaining": apply the ratio to the remaining quantity after prior markets.
+		// - "total" (default): apply the ratio to the original total quantity for every market.
+		RatioBase RatioBase `json:"ratioBase"`
+
+		ProportionMarkets []*SplitHedgeProportionMarket `json:"markets"`
+	}
 
 type SplitHedge struct {
 	Enabled bool `json:"enabled"`
@@ -107,6 +119,14 @@ func (h *SplitHedge) UnmarshalJSON(data []byte) error {
 			if h.ProportionAlgo == nil || len(h.ProportionAlgo.ProportionMarkets) == 0 {
 				return fmt.Errorf("splithedge: proportionAlgo.markets must not be empty when enabled and algo=proportion")
 			}
+
+			// default and validate ratioBase
+			if h.ProportionAlgo.RatioBase == "" {
+				h.ProportionAlgo.RatioBase = RatioBaseTotal
+			} else if h.ProportionAlgo.RatioBase != RatioBaseRemaining && h.ProportionAlgo.RatioBase != RatioBaseTotal {
+				return fmt.Errorf("splithedge: invalid proportionAlgo.ratioBase: %s (expected 'remaining' or 'total')", h.ProportionAlgo.RatioBase)
+			}
+
 			for i, m := range h.ProportionAlgo.ProportionMarkets {
 				if m.Name == "" {
 					return fmt.Errorf("splithedge: market at index %d missing name", i)
@@ -120,6 +140,10 @@ func (h *SplitHedge) UnmarshalJSON(data []byte) error {
 				if i != len(h.ProportionAlgo.ProportionMarkets)-1 {
 					if m.Ratio.Sign() <= 0 {
 						return fmt.Errorf("splithedge: prior market %s ratio must be positive and can not be zero", m.Name)
+					}
+					// enforce upper bound ratio <= 1 for non-last entries
+					if m.Ratio.Compare(fixedpoint.One) > 0 {
+						return fmt.Errorf("splithedge: prior market %s ratio must be <= 1.0", m.Name)
 					}
 				}
 			}
@@ -148,11 +172,6 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 		}
 
 		hedgeMarket.SetLogger(h.logger)
-		hedgeMarket.OnRedispatchPosition(func(position fixedpoint.Value) {
-			// return the position back to strategy position exposure
-			h.logger.Infof("splitHedge: redispatching position %s to strategy position exposure", position.String())
-			strategy.positionExposure.Open(position)
-		})
 
 		// ensure the hedge market base currency matches the maker market base currency
 		if h.strategy.makerMarket.BaseCurrency != hedgeMarket.market.BaseCurrency {
@@ -166,6 +185,11 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 
 		// complex hedge needs to trigger the strategy position close
 		hedgeMarket.positionExposure.OnClose(strategy.positionExposure.Close)
+		hedgeMarket.OnRedispatchPosition(func(position fixedpoint.Value) {
+			// return the position back to strategy position exposure
+			h.logger.Infof("splitHedge: redispatching position %s to strategy position exposure", position.String())
+			strategy.positionExposure.Open(position)
+		})
 
 		hedgeMarket.tradeCollector.OnTrade(func(
 			trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value,
@@ -219,10 +243,19 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 
 		h.logger.Infof("splitHedge: hedge market %s can hedge max quantity %s", proportionMarket.Name, maxQuantity.String())
 
-		// TODO: use depth to calculate a better price
 		bid, ask := hedgeMarket.getQuotePrice()
 		price := sideTakerPrice(bid, ask, orderSide)
-		proportionQuantity := proportionMarket.CalculateQuantity(remainingQuantity, price)
+
+		if price.IsZero() {
+			h.logger.Warnf("splitHedge: skip zero price on market %s", hedgeMarket.InstanceID())
+			continue
+		}
+
+		baseQuantity := remainingQuantity
+		if h.ProportionAlgo.RatioBase == RatioBaseTotal {
+			baseQuantity = totalQuantity
+		}
+		proportionQuantity := proportionMarket.CalculateQuantity(baseQuantity, price)
 		proportionQuantity = fixedpoint.Min(proportionQuantity, maxQuantity)
 
 		proportionQuantity = hedgeMarket.market.TruncateQuantity(proportionQuantity)
@@ -254,8 +287,9 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 
 		select {
 		case <-ctx.Done():
+			h.strategy.positionExposure.Uncover(coverDelta)
 			return ctx.Err()
-		case hedgeMarket.positionDeltaC <- quantityToDelta(proportionQuantity, orderSide).Neg():
+		case hedgeMarket.positionDeltaC <- coverDelta:
 		}
 	}
 

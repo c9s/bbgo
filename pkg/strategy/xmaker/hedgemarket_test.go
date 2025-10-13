@@ -1,7 +1,10 @@
+//go:build !dnum
+
 package xmaker
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,7 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/testing/testhelper"
+	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/tradeid"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
@@ -19,13 +22,13 @@ func init() {
 	tradeid.GlobalGenerator = tradeid.NewDeterministicGenerator()
 }
 
-func Test_newHedgeMarket(t *testing.T) {
+func Test_NewHedgeMarket(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	market := testhelper.Market("BTCUSDT")
-	depth := testhelper.Number(100.0)
+	market := Market("BTCUSDT")
+	depth := Number(100.0)
 	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx, market.Symbol)
 	_ = marketDataStream
 	_ = userDataStream
@@ -53,12 +56,12 @@ func Test_newHedgeMarket(t *testing.T) {
 	assert.NotNil(t, hm.orderStore)
 }
 
-func TestHedgeMarket_hedge(t *testing.T) {
+func TestHedgeMarket_Hedge(t *testing.T) {
 	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	market := testhelper.Market("BTCUSDT")
+	market := Market("BTCUSDT")
 
 	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx, market.Symbol)
 	_ = userDataStream
@@ -68,7 +71,7 @@ func TestHedgeMarket_hedge(t *testing.T) {
 	submitOrder := types.SubmitOrder{
 		Market:           market,
 		Symbol:           market.Symbol,
-		Quantity:         testhelper.Number(1.0),
+		Quantity:         Number(1.0),
 		Side:             types.SideTypeSell,
 		Type:             types.OrderTypeMarket,
 		MarginSideEffect: types.SideEffectTypeMarginBuy,
@@ -76,12 +79,12 @@ func TestHedgeMarket_hedge(t *testing.T) {
 	createdOrder := types.Order{
 		OrderID:          1,
 		SubmitOrder:      submitOrder,
-		ExecutedQuantity: testhelper.Number(1.0),
+		ExecutedQuantity: Number(1.0),
 		Status:           types.OrderStatusFilled,
 	}
 	mockExchange.EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, nil)
 
-	depth := testhelper.Number(100.0)
+	depth := Number(100.0)
 	hm := NewHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: "BTCUSDT",
 		HedgeInterval:  hedgeInterval,
@@ -94,17 +97,98 @@ func TestHedgeMarket_hedge(t *testing.T) {
 	marketDataStream.EmitBookSnapshot(types.SliceOrderBook{
 		Symbol: "BTCUSDT",
 		Bids: types.PriceVolumeSlice{
-			{Price: testhelper.Number(10000), Volume: testhelper.Number(100)},
+			{Price: Number(10000), Volume: Number(100)},
 		},
 		Asks: types.PriceVolumeSlice{
-			{Price: testhelper.Number(10010), Volume: testhelper.Number(100)},
+			{Price: Number(10010), Volume: Number(100)},
 		},
 	})
 
-	hm.positionExposure.Open(testhelper.Number(1.0))
+	hm.positionExposure.Open(Number(1.0))
 
 	err = hm.hedge(context.Background())
 	assert.NoError(t, err)
+}
+
+func TestHedgeMarket_RedispatchPositionAfterFailure(t *testing.T) {
+	ctx := context.Background()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	market := Market("BTCUSDT")
+
+	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx, market.Symbol)
+	_ = userDataStream
+
+	mockExchange := session.Exchange.(*mocks.MockExchangeExtended)
+
+	submitOrder := types.SubmitOrder{
+		Market:           market,
+		Symbol:           market.Symbol,
+		Quantity:         Number(1.0),
+		Side:             types.SideTypeSell,
+		Type:             types.OrderTypeMarket,
+		MarginSideEffect: types.SideEffectTypeMarginBuy,
+	}
+	createdOrder := types.Order{
+		OrderID:          1,
+		SubmitOrder:      submitOrder,
+		ExecutedQuantity: Number(1.0),
+		Status:           types.OrderStatusFilled,
+	}
+	retError := fmt.Errorf("failed to submit order due to network issue")
+	mockExchange.EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, retError)
+
+	depth := Number(100.0)
+	hm := NewHedgeMarket(&HedgeMarketConfig{
+		SymbolSelector: "BTCUSDT",
+		HedgeInterval:  hedgeInterval,
+		QuotingDepth:   depth,
+	}, session, market)
+
+	mainPosition := NewPositionExposure("BTCUSDT")
+	redispatchTriggered := false
+	hm.OnRedispatchPosition(func(position fixedpoint.Value) {
+		redispatchTriggered = true
+
+		mainPosition.Open(position)
+	})
+	hm.positionExposure.OnClose(mainPosition.Close)
+
+	err := hm.stream.Connect(ctx)
+	assert.NoError(t, err)
+
+	marketDataStream.EmitBookSnapshot(types.SliceOrderBook{
+		Symbol: "BTCUSDT",
+		Bids: types.PriceVolumeSlice{
+			{Price: Number(10000), Volume: Number(100)},
+		},
+		Asks: types.PriceVolumeSlice{
+			{Price: Number(10010), Volume: Number(100)},
+		},
+	})
+
+	delta := Number(1.0)
+	mainPosition.Open(delta)
+	mainPosition.Cover(delta) // mark as covered since it's dispatched to hedge market
+	assert.Equal(t, Number(1.0), mainPosition.pending.Get())
+	assert.Equal(t, Number(1.0), mainPosition.net.Get())
+
+	hm.positionExposure.Open(delta)
+
+	err = hm.hedge(context.Background())
+	assert.Error(t, err)
+
+	<-hm.hedgedC
+	assert.True(t, redispatchTriggered)
+
+	assert.Equal(t, Number(0.0), hm.positionExposure.pending.Get())
+	assert.Equal(t, Number(0.0), hm.positionExposure.net.Get())
+	assert.Equal(t, Number(0.0), hm.positionExposure.GetUncovered())
+
+	assert.Equal(t, Number(0.0), mainPosition.pending.Get(), "main position should have 0.0 pending after redispatch")
+	assert.Equal(t, Number(1.0), mainPosition.net.Get(), "main position should still have 1.0 net")
+	assert.Equal(t, Number(1.0), mainPosition.GetUncovered(), "main position should have 1.0 uncovered")
 }
 
 func TestHedgeMarket_startAndHedge(t *testing.T) {
@@ -114,14 +198,14 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	market := testhelper.Market("BTCUSDT")
+	market := Market("BTCUSDT")
 
 	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx, market.Symbol)
 	_ = userDataStream
 
 	mockExchange := session.Exchange.(*mocks.MockExchangeExtended)
 
-	depth := testhelper.Number(100.0)
+	depth := Number(100.0)
 	hm := NewHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: "BTCUSDT",
 		HedgeInterval:  hedgeInterval,
@@ -137,7 +221,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	submitOrder := types.SubmitOrder{
 		Market:           market,
 		Symbol:           market.Symbol,
-		Quantity:         testhelper.Number(1.0),
+		Quantity:         Number(1.0),
 		Side:             types.SideTypeSell,
 		Type:             types.OrderTypeMarket,
 		MarginSideEffect: types.SideEffectTypeMarginBuy,
@@ -145,7 +229,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	createdOrder := types.Order{
 		OrderID:          1,
 		SubmitOrder:      submitOrder,
-		ExecutedQuantity: testhelper.Number(1.0),
+		ExecutedQuantity: Number(1.0),
 		Status:           types.OrderStatusFilled,
 	}
 	mockExchange.EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, nil)
@@ -153,7 +237,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	submitOrder2 := types.SubmitOrder{
 		Market:           market,
 		Symbol:           market.Symbol,
-		Quantity:         testhelper.Number(1.0),
+		Quantity:         Number(1.0),
 		Side:             types.SideTypeSell,
 		Type:             types.OrderTypeMarket,
 		MarginSideEffect: types.SideEffectTypeMarginBuy,
@@ -161,7 +245,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	createdOrder2 := types.Order{
 		OrderID:          2,
 		SubmitOrder:      submitOrder2,
-		ExecutedQuantity: testhelper.Number(1.0),
+		ExecutedQuantity: Number(1.0),
 		Status:           types.OrderStatusFilled,
 	}
 	mockExchange.EXPECT().SubmitOrder(gomock.Any(), submitOrder2).Return(&createdOrder2, nil)
@@ -171,15 +255,15 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	marketDataStream.EmitBookSnapshot(types.SliceOrderBook{
 		Symbol: "BTCUSDT",
 		Bids: types.PriceVolumeSlice{
-			{Price: testhelper.Number(10000), Volume: testhelper.Number(100)},
+			{Price: Number(10000), Volume: Number(100)},
 		},
 		Asks: types.PriceVolumeSlice{
-			{Price: testhelper.Number(10010), Volume: testhelper.Number(100)},
+			{Price: Number(10010), Volume: Number(100)},
 		},
 	})
 
-	hm.positionDeltaC <- testhelper.Number(1.0)
-	hm.positionDeltaC <- testhelper.Number(1.0)
+	hm.positionDeltaC <- Number(1.0)
+	hm.positionDeltaC <- Number(1.0)
 
 	// wait for 2 ticks, so that 2 delta can be merged into one hedge
 	time.Sleep(stepTime * 2)
@@ -189,9 +273,9 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 		ID:            1,
 		OrderID:       1,
 		Exchange:      types.ExchangeBinance,
-		Price:         testhelper.Number(103000.0),
-		Quantity:      testhelper.Number(1.0),
-		QuoteQuantity: testhelper.Number(103000.0 * 1.0),
+		Price:         Number(103000.0),
+		Quantity:      Number(1.0),
+		QuoteQuantity: Number(103000.0 * 1.0),
 		Symbol:        market.Symbol, // fixed to use market.Symbol
 		Side:          types.SideTypeSell,
 		IsBuyer:       false,
@@ -202,16 +286,16 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	time.Sleep(stepTime)
 	<-hm.hedgedC
 
-	assert.Equal(t, testhelper.Number(1.0), hm.positionExposure.pending.Get())
-	assert.Equal(t, testhelper.Number(1.0), hm.positionExposure.net.Get())
+	assert.Equal(t, Number(1.0), hm.positionExposure.pending.Get())
+	assert.Equal(t, Number(1.0), hm.positionExposure.net.Get())
 
 	userDataStream.EmitTradeUpdate(types.Trade{
 		ID:            2,
 		OrderID:       1,
 		Exchange:      types.ExchangeBinance,
-		Price:         testhelper.Number(103000.0),
-		Quantity:      testhelper.Number(1.0),
-		QuoteQuantity: testhelper.Number(103000.0 * 1.0),
+		Price:         Number(103000.0),
+		Quantity:      Number(1.0),
+		QuoteQuantity: Number(103000.0 * 1.0),
 		Symbol:        market.Symbol, // fixed to use market.Symbol
 		Side:          types.SideTypeSell,
 		IsBuyer:       false,
@@ -222,8 +306,8 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	time.Sleep(stepTime)
 	<-hm.hedgedC
 
-	assert.Equal(t, testhelper.Number(0.0), hm.positionExposure.pending.Get())
-	assert.Equal(t, testhelper.Number(0.0), hm.positionExposure.net.Get())
+	assert.Equal(t, Number(0.0), hm.positionExposure.pending.Get())
+	assert.Equal(t, Number(0.0), hm.positionExposure.net.Get())
 
 	cancel()
 

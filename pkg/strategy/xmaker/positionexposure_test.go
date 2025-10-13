@@ -9,7 +9,7 @@ import (
 )
 
 func TestPositionExposure(t *testing.T) {
-	pe := newPositionExposure("BTCUSDT")
+	pe := NewPositionExposure("BTCUSDT")
 
 	// initial value
 	assert.Equal(t, testhelper.Number(0), pe.net.Get())

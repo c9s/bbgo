@@ -434,7 +434,7 @@ func (s *Strategy) Initialize() error {
 		}
 	}
 
-	s.positionExposure = newPositionExposure(s.Symbol)
+	s.positionExposure = NewPositionExposure(s.Symbol)
 	s.positionExposure.SetMetricsLabels(ID, s.InstanceID(), s.MakerExchange, s.Symbol)
 	for _, sig := range s.SignalConfigList.Signals {
 		s.logger.Infof("using signal provider: %s", sig)
@@ -1580,23 +1580,18 @@ func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(
 	return reduceCover
 }
 
-func (s *Strategy) spreadMakerHedge(
-	ctx context.Context, sig float64, uncoveredPosition, hedgeDelta fixedpoint.Value,
-) (fixedpoint.Value, error) {
+func (s *Strategy) spreadMakerHedge(ctx context.Context, sig float64) error {
 	now := time.Now()
+	uncoveredPosition := s.positionExposure.GetUncovered()
+	hedgeDelta := uncoveredToDelta(uncoveredPosition)
 
 	if s.SpreadMaker == nil || !s.SpreadMaker.Enabled || s.makerBook == nil {
-		return hedgeDelta, nil
-	}
-
-	orderSide := types.SideTypeBuy
-	if hedgeDelta.Sign() < 0 {
-		orderSide = types.SideTypeSell
+		return nil
 	}
 
 	makerBid, makerAsk, hasMakerPrice := s.makerBook.BestBidAndAsk()
 	if !hasMakerPrice {
-		return hedgeDelta, nil
+		return nil
 	}
 
 	curOrder, hasOrder := s.SpreadMaker.getOrder()
@@ -1605,7 +1600,7 @@ func (s *Strategy) spreadMakerHedge(
 		sig, s.Position, uncoveredPosition, hedgeDelta, s.makerMarket, makerBid.Price, makerAsk.Price,
 	); ok {
 		s.logger.Infof(
-			"position: %f@%f, maker book bid: %f/%f, spread maker order form: %+v",
+			"spreadMaker: position %f@%f, maker book bid %f/%f order form: %+v",
 			s.Position.GetBase().Float64(),
 			s.Position.GetAverageCost().Float64(),
 			makerAsk.Price.Float64(),
@@ -1619,67 +1614,57 @@ func (s *Strategy) spreadMakerHedge(
 		if hasOrder {
 			keptOrder = s.SpreadMaker.shouldKeepOrder(curOrder, now)
 			if !keptOrder {
-				s.logger.Infof("canceling current spread maker order...")
+				s.logger.Infof("spreadMaker: canceling current spread maker order...")
 				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
 			}
 		}
 
 		if !hasOrder || !keptOrder {
 			spreadMakerCounterMetrics.With(s.metricsLabels).Inc()
-			s.logger.Infof("placing new spread maker order: %+v...", makerOrderForm)
+			s.logger.Infof("spreadMaker: placing new spread maker order: %+v...", makerOrderForm)
+
+			coverDelta := quantityToDelta(makerOrderForm.Quantity, makerOrderForm.Side).Neg()
+			s.positionExposure.Cover(coverDelta)
 
 			retOrder, err := s.SpreadMaker.placeOrder(ctx, makerOrderForm)
 			if err != nil {
-				s.logger.WithError(err).Errorf("unable to place spread maker order")
+				s.positionExposure.Uncover(coverDelta)
+
+				s.logger.WithError(err).
+					WithFields(makerOrderForm.LogFields()).
+					Errorf("spreadMaker: unable to place spread maker order: %+v", makerOrderForm)
+
 			} else if retOrder != nil {
 				s.orderStore.Add(*retOrder)
 				s.orderStore.Prune(8 * time.Hour)
 				s.logger.Infof(
-					"spread maker order placed: #%d %f@%f (%s)", retOrder.OrderID, retOrder.Quantity.Float64(),
+					"spreadMaker: order placed: #%d %f@%f (%s)", retOrder.OrderID, retOrder.Quantity.Float64(),
 					retOrder.Price.Float64(), retOrder.Status,
 				)
-
-				// the side here is reversed from the position side
-				// long position -> sell side order to close the long position
-				// short position -> buy side order to close the short position
-				switch orderSide {
-				case types.SideTypeSell:
-					s.positionExposure.Cover(retOrder.Quantity)
-					hedgeDelta = hedgeDelta.Add(retOrder.Quantity)
-				case types.SideTypeBuy:
-					s.positionExposure.Cover(retOrder.Quantity.Neg())
-					hedgeDelta = hedgeDelta.Add(retOrder.Quantity.Neg())
-				}
 			}
 		}
 	} else if hasOrder {
 		// cancel existing spread maker order if the signal is not strong enough
 		if s.SpreadMaker.ReverseSignalOrderCancel {
 			if !isSignalSidePosition(sig, s.Position.Side()) {
-				s.logger.Infof("canceling current spread maker order due to reversed signal...")
-				returnedCover := s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
-
-				// add back the returned cover to the hedge delta, so that we can hedge it directly
-				hedgeDelta = hedgeDelta.Add(returnedCover)
+				s.logger.Infof("spreadMaker: canceling current spread maker order due to reversed signal...")
+				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
 			}
 		} else {
 			shouldKeep := s.SpreadMaker.shouldKeepOrder(curOrder, now)
 			if !shouldKeep {
-				s.logger.Infof("canceling current spread maker order due to expiry time...")
-				returnedCover := s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
-
-				// add back the returned cover to the hedge delta, so that we can hedge it directly
-				hedgeDelta = hedgeDelta.Add(returnedCover)
+				s.logger.Infof("spreadMaker: canceling current spread maker order due to expiry time...")
+				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
 			}
 		}
 	}
 
-	return hedgeDelta, nil
+	return nil
 }
 
+// hedge is the main hedge dispatching function that will be executed periodically
 func (s *Strategy) hedge(ctx context.Context) {
 	uncoveredPosition := s.positionExposure.GetUncovered()
-
 	if uncoveredPosition.IsZero() && s.positionExposure.IsClosed() {
 		s.logger.Warnf("no uncovered position and no exposure, skip hedging")
 		return
@@ -1688,6 +1673,29 @@ func (s *Strategy) hedge(ctx context.Context) {
 	s.logger.Infof("hedging uncovered position %s (%s)",
 		uncoveredPosition.String(), s.positionExposure.String(),
 	)
+
+	lastPrice := s.lastPrice.Get()
+	sig := s.lastAggregatedSignal.Get()
+
+	if lastPrice.IsZero() {
+		s.logger.Warnf("last price is zero, skip hedging")
+	}
+
+	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
+		if err := s.spreadMakerHedge(ctx, sig); err != nil {
+			s.logger.WithError(err).Errorf("spreadMaker: unable to place spread maker order")
+		}
+	}
+
+	// Retrieve the uncovered position again after spread maker.
+	// The returned trades could have already closed the position,
+	// Spread maker could have also placed a new order and increase the covered position.
+	// This ensures that we hedge the correct uncovered position.
+	uncoveredPosition = s.positionExposure.GetUncovered()
+	if uncoveredPosition.IsZero() {
+		s.logger.Warnf("no uncoverd position after spread maker, skip hedging")
+		return
+	}
 
 	// hedgeDelta is the reverse of the uncovered position
 	//
@@ -1699,27 +1707,9 @@ func (s *Strategy) hedge(ctx context.Context) {
 
 	// side is the order side
 	side := deltaToSide(hedgeDelta)
-	lastPrice := s.lastPrice.Get()
-	sig := s.lastAggregatedSignal.Get()
-
-	if lastPrice.IsZero() {
-		s.logger.Warnf("last price is zero, skip hedging")
-	}
-
-	var err error
-	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
-		hedgeDelta, err = s.spreadMakerHedge(ctx, sig, uncoveredPosition, hedgeDelta)
-		if err != nil {
-			s.logger.WithError(err).Errorf("unable to place spread maker order")
-		}
-	}
-
-	if hedgeDelta.IsZero() {
-		s.logger.Warnf("no hedge delta after spread maker, skip hedging")
-		return
-	}
-
 	qty := hedgeDelta.Abs()
+
+	// check dust quantity
 	if lastPrice.Sign() > 0 && s.sourceMarket.IsDustQuantity(qty, lastPrice) {
 		s.logger.Debugf("hedge quantity %s is dust, skip hedging", qty.String())
 		return
@@ -1729,6 +1719,13 @@ func (s *Strategy) hedge(ctx context.Context) {
 		return
 	}
 
+	// dispatch the uncovered position to the hedging methods
+	// this prevents duplicated uncovered position in the future rounds.
+	// the uncovered position will be recovered if the hedging fails.
+	//
+	// if we don't do this, the uncovered position will be duplicated
+	// if the hedging fails and we will keep trying to hedge the same position
+	// in the next round, which is not what we want.
 	if s.SplitHedge != nil && s.SplitHedge.Enabled {
 		if err := s.SplitHedge.Hedge(ctx, uncoveredPosition, hedgeDelta); err != nil {
 			s.logger.WithError(err).Errorf("unable to hedge via split hedge")
@@ -1746,6 +1743,8 @@ func (s *Strategy) hedge(ctx context.Context) {
 		}
 	}
 
+	// if we reach here, means the hedge is successful,
+	// reset the position start time for the holding period
 	s.resetPositionStartTime()
 }
 
@@ -1827,8 +1826,6 @@ func (s *Strategy) directHedge(
 
 	defer s.tradeCollector.Process()
 
-	// if it's selling, then we should add a positive position,
-	// if it's buying, then we should add a negative position,
 	coverDelta := quantityToDelta(quantity, side).Neg()
 	s.positionExposure.Cover(coverDelta)
 

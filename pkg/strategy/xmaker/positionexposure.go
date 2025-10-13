@@ -58,7 +58,7 @@ type PositionExposure struct {
 	positionExposureSizeMetrics prometheus.Observer
 }
 
-func newPositionExposure(symbol string) *PositionExposure {
+func NewPositionExposure(symbol string) *PositionExposure {
 	return &PositionExposure{
 		symbol: symbol,
 	}
