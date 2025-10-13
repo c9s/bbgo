@@ -65,14 +65,14 @@ const (
 	RatioBaseTotal     RatioBase = "total"
 )
 
-	type SplitHedgeProportionAlgo struct {
-		// RatioBase controls how per-market ratio is applied when calculating each slice.
-		// - "remaining": apply the ratio to the remaining quantity after prior markets.
-		// - "total" (default): apply the ratio to the original total quantity for every market.
-		RatioBase RatioBase `json:"ratioBase"`
+type SplitHedgeProportionAlgo struct {
+	// RatioBase controls how per-market ratio is applied when calculating each slice.
+	// - "remaining": apply the ratio to the remaining quantity after prior markets.
+	// - "total" (default): apply the ratio to the original total quantity for every market.
+	RatioBase RatioBase `json:"ratioBase"`
 
-		ProportionMarkets []*SplitHedgeProportionMarket `json:"markets"`
-	}
+	ProportionMarkets []*SplitHedgeProportionMarket `json:"markets"`
+}
 
 type SplitHedge struct {
 	Enabled bool `json:"enabled"`
@@ -243,7 +243,7 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 
 		h.logger.Infof("splitHedge: hedge market %s can hedge max quantity %s", proportionMarket.Name, maxQuantity.String())
 
-		bid, ask := hedgeMarket.getQuotePrice()
+		bid, ask := hedgeMarket.GetQuotePrice()
 		price := sideTakerPrice(bid, ask, orderSide)
 
 		if price.IsZero() {

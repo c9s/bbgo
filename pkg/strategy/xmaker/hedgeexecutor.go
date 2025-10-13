@@ -64,7 +64,7 @@ func (m *MarketOrderHedgeExecutor) Hedge(
 		return nil
 	}
 
-	bid, ask := m.getQuotePrice()
+	bid, ask := m.GetQuotePrice()
 	price := sideTakerPrice(bid, ask, side)
 
 	if !m.session.Margin {

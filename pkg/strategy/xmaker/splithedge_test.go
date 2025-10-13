@@ -50,7 +50,7 @@ func TestSplitHedge_HedgeWithProportionAlgo(t *testing.T) {
 	}, session2, market)
 	assert.NoError(t, hm2.stream.Connect(ctx))
 
-	// provide order book snapshots so getQuotePrice() can work
+	// provide order book snapshots so GetQuotePrice() can work
 	orderBook := types.SliceOrderBook{
 		Symbol: market.Symbol,
 		Bids:   types.PriceVolumeSlice{{Price: Number(10000), Volume: Number(100)}},

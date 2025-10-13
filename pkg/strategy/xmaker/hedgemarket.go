@@ -356,7 +356,9 @@ func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitO
 	return &createdOrder, nil
 }
 
-func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
+// GetQuotePrice returns the current bid and ask prices for hedging,
+// adjusted by the configured fee mode and quoting depth.
+func (m *HedgeMarket) GetQuotePrice() (bid, ask fixedpoint.Value) {
 	now := time.Now()
 
 	m.mu.Lock()
@@ -442,7 +444,7 @@ func (m *HedgeMarket) canHedge(
 	side := deltaToSide(hedgeDelta)
 
 	// get quote price
-	bid, ask := m.getQuotePrice()
+	bid, ask := m.GetQuotePrice()
 	price := sideTakerPrice(bid, ask, side)
 
 	if price.IsZero() {

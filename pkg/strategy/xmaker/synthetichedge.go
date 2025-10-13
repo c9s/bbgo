@@ -105,7 +105,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 		cost := fixedpoint.Zero
 
 		// 1) get the fiat book price from the snapshot when possible
-		bid, ask := s.fiatMarket.getQuotePrice()
+		bid, ask := s.fiatMarket.GetQuotePrice()
 
 		// 2) build up fiat position from the trade quote quantity
 		fiatQuantity := trade.QuoteQuantity
@@ -235,8 +235,8 @@ func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, b
 		return fixedpoint.Zero, fixedpoint.Zero, false
 	}
 
-	bid, ask := s.sourceMarket.getQuotePrice()
-	bid2, ask2 := s.fiatMarket.getQuotePrice()
+	bid, ask := s.sourceMarket.GetQuotePrice()
+	bid2, ask2 := s.fiatMarket.GetQuotePrice()
 
 	if s.forward {
 		sBid := bid.Mul(bid2)
