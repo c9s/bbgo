@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -22,41 +21,6 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
-func TestActionHash(t *testing.T) {
-	client := NewClient()
-
-	// Test basic action hash
-	action := map[string]interface{}{
-		"type": "order",
-		"data": "test",
-	}
-
-	hash, err := client.ActionHash(action, 12345, nil)
-	if err != nil {
-		t.Errorf("ActionHash should not return error: %v", err)
-	}
-	if hash == (common.Hash{}) {
-		t.Error("ActionHash should return a valid hash")
-	}
-
-	// Test with expiration
-	expiresAfter := int64(3600)
-	hash2, err := client.ActionHash(action, 12345, &expiresAfter)
-	if err != nil {
-		t.Errorf("ActionHash with expiration should not return error: %v", err)
-	}
-	if hash2 == hash {
-		t.Error("Hash with expiration should be different from hash without expiration")
-	}
-
-	// Test with negative expiration (should error)
-	negativeExpires := int64(-1)
-	_, err = client.ActionHash(action, 12345, &negativeExpires)
-	if err == nil {
-		t.Error("ActionHash with negative expiration should return error")
-	}
-}
-
 func TestBuildActionData(t *testing.T) {
 	client := NewClient()
 
@@ -65,7 +29,7 @@ func TestBuildActionData(t *testing.T) {
 		"data": "test",
 	}
 
-	data, err := client.buildActionData(action, 12345, nil)
+	data, err := client.buildActionData(action, 12345, "", nil)
 	if err != nil {
 		t.Errorf("buildActionData should not return error: %v", err)
 	}
@@ -155,9 +119,9 @@ func TestSingL1Action(t *testing.T) {
 	}
 
 	// Test signing without expiration
-	signature, err := client.SingL1Action(action, 12345, nil)
+	signature, err := client.SignL1Action(action, 12345, nil)
 	if err != nil {
-		t.Errorf("SingL1Action should not return error: %v", err)
+		t.Errorf("SignL1Action should not return error: %v", err)
 	}
 
 	// Verify signature components
@@ -167,9 +131,9 @@ func TestSingL1Action(t *testing.T) {
 
 	// Test signing with expiration
 	expiresAfter := int64(3600)
-	signature2, err := client.SingL1Action(action, 12345, &expiresAfter)
+	signature2, err := client.SignL1Action(action, 12345, &expiresAfter)
 	if err != nil {
-		t.Errorf("SingL1Action with expiration should not return error: %v", err)
+		t.Errorf("SignL1Action with expiration should not return error: %v", err)
 	}
 
 	// Signatures should be different
@@ -211,7 +175,7 @@ func TestSign(t *testing.T) {
 		},
 	}
 
-	signature, err := client.sign(typedData)
+	signature, err := client.sign(typedData, privateKey)
 	if err != nil {
 		t.Errorf("sign should not return error: %v", err)
 	}
@@ -232,7 +196,7 @@ func TestBuildActionDataWithVault(t *testing.T) {
 	}
 
 	// Test with vault address
-	data, err := client.buildActionData(action, 12345, nil)
+	data, err := client.buildActionData(action, 12345, "", nil)
 	if err != nil {
 		t.Errorf("buildActionData with vault should not return error: %v", err)
 	}
@@ -242,7 +206,7 @@ func TestBuildActionDataWithVault(t *testing.T) {
 
 	// Test with expiration
 	expiresAfter := int64(3600)
-	data2, err := client.buildActionData(action, 12345, &expiresAfter)
+	data2, err := client.buildActionData(action, 12345, "", &expiresAfter)
 	if err != nil {
 		t.Errorf("buildActionData with expiration should not return error: %v", err)
 	}
@@ -292,7 +256,7 @@ func TestNewAuthenticatedRequest(t *testing.T) {
 	}
 }
 
-func TestCastPayload(t *testing.T) {
+func TestBuildPayload(t *testing.T) {
 	client := NewClient()
 
 	// Generate a valid private key for testing
@@ -306,7 +270,7 @@ func TestCastPayload(t *testing.T) {
 		"data": "test",
 	}
 
-	payload, err := client.castPayload(action)
+	payload, err := client.buildPayload(action, client.vaultAddress, client.nonce.GetInt64())
 	if err != nil {
 		t.Errorf("castPayload should not return error: %v", err)
 	}
@@ -322,7 +286,7 @@ func TestCastPayload(t *testing.T) {
 		"data": "test",
 	}
 
-	payload2, err := client.castPayload(usdTransferAction)
+	payload2, err := client.buildPayload(usdTransferAction, client.vaultAddress, client.nonce.GetInt64())
 	if err != nil {
 		t.Errorf("castPayload with usdClassTransfer should not return error: %v", err)
 	}
@@ -358,14 +322,14 @@ func TestGetAPIEndpoint(t *testing.T) {
 	defer func() { TestNet = originalTestNet }()
 
 	endpoint := getAPIEndpoint()
-	if endpoint != productionAPIURL {
-		t.Errorf("Expected production URL %s, got %s", productionAPIURL, endpoint)
+	if endpoint != ProductionURL {
+		t.Errorf("Expected production URL %s, got %s", ProductionURL, endpoint)
 	}
 
 	// Test testnet endpoint
 	TestNet = true
 	endpoint = getAPIEndpoint()
-	if endpoint != testNetAPIURL {
-		t.Errorf("Expected testnet URL %s, got %s", testNetAPIURL, endpoint)
+	if endpoint != TestNetURL {
+		t.Errorf("Expected testnet URL %s, got %s", TestNetURL, endpoint)
 	}
 }

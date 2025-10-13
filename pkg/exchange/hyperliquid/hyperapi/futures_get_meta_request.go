@@ -23,7 +23,7 @@ type FuturesGetMetaRequest struct {
 	metaType InfoReqType `param:"type" default:"meta" validValues:"meta"`
 }
 
-func (c *Client) NewGetFuturesMetaRequest() *FuturesGetMetaRequest {
+func (c *Client) NewFuturesGetMetaRequest() *FuturesGetMetaRequest {
 	return &FuturesGetMetaRequest{
 		client:   c,
 		metaType: Meta,

@@ -34,7 +34,7 @@ type SpotGetMetaRequest struct {
 	metaType InfoReqType `param:"type" default:"spotMeta" validValues:"spotMeta"`
 }
 
-func (c *Client) NewGetSpotGetMetaRequest() *SpotGetMetaRequest {
+func (c *Client) NewSpotGetMetaRequest() *SpotGetMetaRequest {
 	return &SpotGetMetaRequest{
 		client:   c,
 		metaType: SpotMeta,

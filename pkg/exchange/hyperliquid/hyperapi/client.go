@@ -25,8 +25,8 @@ import (
 
 const (
 	defaultHTTPTimeout = 15 * time.Second
-	productionAPIURL   = "https://api.hyperliquid.xyz"
-	testNetAPIURL      = "https://api.hyperliquid-testnet.xyz"
+	ProductionURL      = "https://api.hyperliquid.xyz"
+	TestNetURL         = "https://api.hyperliquid-testnet.xyz"
 )
 
 var (
@@ -79,30 +79,38 @@ func (c *Client) SetVaultAddress(address string) {
 func (c *Client) NewAuthenticatedRequest(
 	ctx context.Context, method, refURL string, params url.Values, payload interface{},
 ) (*http.Request, error) {
-	body, err := c.castPayload(payload)
+	body, err := c.buildPayload(payload, c.vaultAddress, c.nonce.GetInt64())
+	if err != nil {
+		return nil, err
+	}
+	rel, err := url.Parse(refURL)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.newAuthenticatedRequest(ctx, method, refURL, params, body)
-}
-
-func (c *Client) ActionHash(action any, nonce uint64, expiresAfter *int64) (common.Hash, error) {
-	data, err := c.buildActionData(action, nonce, expiresAfter)
-	if err != nil {
-		return common.Hash{}, err
+	pathURL := c.BaseURL.ResolveReference(rel)
+	rawQuery := params.Encode()
+	if rawQuery != "" {
+		pathURL.RawQuery = rawQuery
 	}
-	return crypto.Keccak256Hash(data), nil
+
+	req, err := http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
+	return req, nil
 }
 
-func (c *Client) SingL1Action(action any, timestamp int64, expiresAfter *int64) (SignatureResult, error) {
-	hash, err := c.ActionHash(action, uint64(timestamp), expiresAfter)
+func (c *Client) SignL1Action(action any, timestamp int64, expiresAfter *int64) (SignatureResult, error) {
+	data, err := c.buildActionData(action, uint64(timestamp), c.vaultAddress, expiresAfter)
 	if err != nil {
 		return SignatureResult{}, err
 	}
 
-	phantomAgent := c.PhantomAgent(hash.Bytes())
-
+	phantomAgent := c.PhantomAgent(crypto.Keccak256(data))
 	chainId := math.HexOrDecimal256(*big.NewInt(1337))
 	return c.sign(apitypes.TypedData{
 		Domain: apitypes.TypedDataDomain{
@@ -125,7 +133,7 @@ func (c *Client) SingL1Action(action any, timestamp int64, expiresAfter *int64) 
 		},
 		PrimaryType: "Agent",
 		Message:     phantomAgent,
-	})
+	}, c.privateKey)
 }
 
 func (c *Client) PhantomAgent(hash []byte) map[string]any {
@@ -140,7 +148,7 @@ func (c *Client) PhantomAgent(hash []byte) map[string]any {
 	}
 }
 
-func (c *Client) sign(typedData apitypes.TypedData) (SignatureResult, error) {
+func (c *Client) sign(typedData apitypes.TypedData, privateKey *ecdsa.PrivateKey) (SignatureResult, error) {
 	// Create EIP-712 hash
 	domainSeparator, err := typedData.HashStruct("EIP712Domain", typedData.Domain.Map())
 	if err != nil {
@@ -156,8 +164,7 @@ func (c *Client) sign(typedData apitypes.TypedData) (SignatureResult, error) {
 	data = append(data, domainSeparator...)
 	data = append(data, typedDataHash...)
 
-	hash := crypto.Keccak256Hash(data).Bytes()
-	signature, err := crypto.Sign(hash, c.privateKey)
+	signature, err := crypto.Sign(crypto.Keccak256(data), privateKey)
 	if err != nil {
 		return SignatureResult{}, fmt.Errorf("failed to sign message: %w", err)
 	}
@@ -175,7 +182,7 @@ func (c *Client) sign(typedData apitypes.TypedData) (SignatureResult, error) {
 }
 
 // buildActionData constructs the data for action hashing
-func (c *Client) buildActionData(action any, nonce uint64, expiresAfter *int64) ([]byte, error) {
+func (c *Client) buildActionData(action any, nonce uint64, vaultAddress string, expiresAfter *int64) ([]byte, error) {
 	// Marshal action to msgpack
 	var buf bytes.Buffer
 	enc := msgpack.NewEncoder(&buf)
@@ -192,11 +199,11 @@ func (c *Client) buildActionData(action any, nonce uint64, expiresAfter *int64) 
 	data = appendUint64(data, nonce)
 
 	// Append vault address flag and address if present
-	if c.vaultAddress == "" {
+	if vaultAddress == "" {
 		data = append(data, 0x00)
 	} else {
 		data = append(data, 0x01)
-		data = append(data, common.HexToAddress(c.vaultAddress).Bytes()...)
+		data = append(data, common.HexToAddress(vaultAddress).Bytes()...)
 	}
 
 	// Append expiration if provided
@@ -211,33 +218,8 @@ func (c *Client) buildActionData(action any, nonce uint64, expiresAfter *int64) 
 	return data, nil
 }
 
-func (c *Client) newAuthenticatedRequest(
-	ctx context.Context, method string, refURL string, params url.Values, data []byte,
-) (*http.Request, error) {
-	rel, err := url.Parse(refURL)
-	if err != nil {
-		return nil, err
-	}
-
-	pathURL := c.BaseURL.ResolveReference(rel)
-	rawQuery := params.Encode()
-	if rawQuery != "" {
-		pathURL.RawQuery = rawQuery
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Add("Accept", "application/json")
-	return req, nil
-}
-
-func (c *Client) castPayload(action any) ([]byte, error) {
-	nonce := c.nonce.GetInt64()
-	signature, err := c.SingL1Action(action, nonce, nil)
+func (c *Client) buildPayload(action any, vaultAddress string, nonce int64) ([]byte, error) {
+	signature, err := c.SignL1Action(action, nonce, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -249,27 +231,22 @@ func (c *Client) castPayload(action any) ([]byte, error) {
 		"signature": signature,
 	}
 
-	if c.vaultAddress != "" {
+	if vaultAddress != "" {
 		// Handle vault address based on action type
 		if actionMap, ok := action.(map[string]any); ok {
 			if actionMap["type"] != "usdClassTransfer" {
-				payload["vaultAddress"] = c.vaultAddress
+				payload["vaultAddress"] = vaultAddress
 			} else {
 				payload["vaultAddress"] = nil
 			}
 		} else {
 			// For struct types, we need to use reflection or type assertion
 			// For now, assume it's not usdClassTransfer
-			payload["vaultAddress"] = c.vaultAddress
+			payload["vaultAddress"] = vaultAddress
 		}
 	}
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, nil
+	return json.Marshal(payload)
 }
 
 // appendUint64 appends a uint64 as 8 bytes in big-endian format
@@ -281,7 +258,7 @@ func appendUint64(data []byte, value uint64) []byte {
 
 func getAPIEndpoint() string {
 	if TestNet {
-		return testNetAPIURL
+		return TestNetURL
 	}
-	return productionAPIURL
+	return ProductionURL
 }
