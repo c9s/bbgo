@@ -108,12 +108,12 @@ func (f *ProfitFixer) aggregateAllTrades(ctx context.Context, symbol string, sin
 	return allTrades, nil
 }
 
-func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade, since, until time.Time) error {
+func buildTokenFeeMap(ctx context.Context, sessions map[string]types.ExchangeTradeHistoryService, trades []types.Trade, since, until time.Time) (map[tokenFeeKey]fixedpoint.Value, error) {
 	// initialize tokenFeePrices map
-	f.tokenFeePrices = make(map[tokenFeeKey]fixedpoint.Value)
+	tokenFeePrices := make(map[tokenFeeKey]fixedpoint.Value)
 
 	if len(trades) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// token -> symbol, exchangeName
@@ -122,7 +122,7 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 	markets := make(map[types.ExchangeName]types.MarketMap)
 	// exchangeName -> ExchangePublic: query required data by trade.Exchange
 	exchanges := make(map[types.ExchangeName]types.Exchange)
-	for sessionName, service := range f.sessions {
+	for sessionName, service := range sessions {
 		if ex, ok := service.(types.Exchange); ok {
 			exchanges[ex.Name()] = ex
 			mm, err := ex.QueryMarkets(ctx)
@@ -136,7 +136,7 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 
 	// all exchanges do not implement ExchangePublic, can not build token fee map
 	if len(exchanges) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	var quoteCurrency string // quote currency is assumed to be the same for all trades
@@ -158,7 +158,7 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 		}
 		// sanity check: all quote currency should be the same
 		if quoteCurrency != "" && quoteCurrency != market.QuoteCurrency {
-			return fmt.Errorf("quote currency mismatch: %s != %s", quoteCurrency, market.QuoteCurrency)
+			return nil, fmt.Errorf("quote currency mismatch: %s != %s", quoteCurrency, market.QuoteCurrency)
 		}
 		quoteCurrency = market.QuoteCurrency
 		tokens[tokenFeeKey{
@@ -172,7 +172,7 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 	// - all fees are base currency
 	// no need to build token fee map in this case
 	if quoteCurrency == "" {
-		return nil
+		return nil, nil
 	}
 	startTime := since.Truncate(24 * time.Hour).Add(-24 * time.Hour)
 	endTime := until.Truncate(24 * time.Hour)
@@ -196,7 +196,7 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 					}
 					// the date in tokenFeeKey is the next day of the kline date
 					// which means the token fee for the next day is calculated by the previous day's closing price
-					f.tokenFeePrices[tokenFeeKey{
+					tokenFeePrices[tokenFeeKey{
 						token:        info.token,
 						exchangeName: info.exchangeName,
 						date:         kline.StartTime.Time().Add(24 * time.Hour).Format(time.DateOnly),
@@ -204,10 +204,10 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 				}
 			}
 		}(); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return tokenFeePrices, nil
 }
 
 func (f *ProfitFixer) Fix(
@@ -222,10 +222,11 @@ func (f *ProfitFixer) Fix(
 		log.Warnf("[%s] no trades found between %s and %s, skip profit fixing", symbol, since.String(), until.String())
 		return nil
 	}
-	err = f.buildTokenFeeMap(ctx, allTrades, since, until)
+	fm, err := buildTokenFeeMap(ctx, f.sessions, allTrades, since, until)
 	if err != nil {
 		return err
 	}
+	f.tokenFeePrices = fm
 	return f.fixFromTrades(allTrades, stats, position)
 }
 
