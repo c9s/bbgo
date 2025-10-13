@@ -345,6 +345,9 @@ func (f *DatabaseProfitFixer) Fix(
 
 func (f *DatabaseProfitFixer) queryAllTrades(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
 	var trades []types.Trade
+	if symbol == "" {
+		return nil, fmt.Errorf("symbol can not be empty")
+	}
 	for sessionName, s := range f.sessions {
 		options := service.QueryTradesOptions{
 			Symbol: symbol,
