@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -23,12 +24,6 @@ type ProfitFixerConfig struct {
 	Patch       string     `json:"patch,omitempty"`
 }
 
-// String returns a string representation of the ProfitFixerConfig
-// used for comparison
-func (c *ProfitFixerConfig) String() string {
-	return c.TradesSince.Time().Format(time.RFC3339) + ":" + c.Patch
-}
-
 func (c *ProfitFixerConfig) Equal(other *ProfitFixerConfig) bool {
 	if c == nil && other == nil {
 		return true
@@ -36,7 +31,24 @@ func (c *ProfitFixerConfig) Equal(other *ProfitFixerConfig) bool {
 	if c == nil || other == nil {
 		return false
 	}
-	return c.String() == other.String()
+	rt := reflect.TypeOf(*c)
+	rv1 := reflect.ValueOf(*c)
+	rv2 := reflect.ValueOf(*other)
+
+	for i := 0; i < rt.NumField(); i++ {
+		f := rt.Field(i)
+		if f.Type.Kind() == reflect.Pointer {
+			// skip pointer field comparison
+			log.Warnf("skip pointer field comparison for profit fixer config: %s", f.Name)
+			continue
+		}
+		v1 := rv1.FieldByName(f.Name).Interface()
+		v2 := rv2.FieldByName(f.Name).Interface()
+		if v1 != v2 {
+			return false
+		}
+	}
+	return true
 }
 
 // ProfitFixer implements a trade-history-based profit fixer
