@@ -219,9 +219,14 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 
 		h.logger.Infof("splitHedge: hedge market %s can hedge max quantity %s", proportionMarket.Name, maxQuantity.String())
 
-		// TODO: use depth to calculate a better price
 		bid, ask := hedgeMarket.getQuotePrice()
 		price := sideTakerPrice(bid, ask, orderSide)
+
+		if price.IsZero() {
+			h.logger.Warnf("splitHedge: skip zero price on market %s", hedgeMarket.InstanceID())
+			continue
+		}
+
 		proportionQuantity := proportionMarket.CalculateQuantity(remainingQuantity, price)
 		proportionQuantity = fixedpoint.Min(proportionQuantity, maxQuantity)
 
@@ -254,6 +259,7 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 
 		select {
 		case <-ctx.Done():
+			h.strategy.positionExposure.Uncover(coverDelta)
 			return ctx.Err()
 		case hedgeMarket.positionDeltaC <- coverDelta:
 		}

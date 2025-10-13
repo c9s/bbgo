@@ -444,6 +444,11 @@ func (m *HedgeMarket) canHedge(
 	// get quote price
 	bid, ask := m.getQuotePrice()
 	price := sideTakerPrice(bid, ask, side)
+
+	if price.IsZero() {
+		return false, fixedpoint.Zero, fmt.Errorf("canHedge: no valid price found for %s", m.SymbolSelector)
+	}
+
 	currency, required := determineRequiredCurrencyAndAmount(m.market, side, quantity, price)
 	// required = required amount of quote, or base currency depending on the side
 	_ = required
