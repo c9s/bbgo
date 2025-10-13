@@ -105,7 +105,7 @@ func (m *MarketOrderHedgeExecutor) Hedge(
 	// hedge delta = -3
 	// hedge delta = -3 means we need to sell 3 to hedge
 	// order side = sell
-	// to cover position, cover delta = -(-3) = +3
+	// to cover position, cover delta = -(hedge delta) = -(-3) = +3
 	// to uncover the +3 position, we need to send -3 position to cover. (uncover = -cover)
 	coverDelta := quantityToDelta(quantity, side).Neg()
 	m.positionExposure.Cover(coverDelta)
@@ -113,9 +113,9 @@ func (m *MarketOrderHedgeExecutor) Hedge(
 	hedgeOrder, err := m.submitOrder(ctx, orderForm)
 	if err != nil {
 		// if error occurs, revert the covered position
-		m.positionExposure.Uncover(coverDelta)
-		if err := m.HedgeMarket.RedispatchPosition(coverDelta); err != nil {
-			m.logger.WithError(err).Errorf("failed to redispatch position after hedge order failure: delta=%s", coverDelta.String())
+		if dispatchErr := m.HedgeMarket.RedispatchPosition(coverDelta); dispatchErr != nil {
+			m.logger.WithError(dispatchErr).
+				Errorf("failed to redispatch position after hedge order failure: delta=%s", coverDelta.String())
 		}
 
 		return err

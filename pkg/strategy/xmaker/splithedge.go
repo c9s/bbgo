@@ -148,11 +148,6 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 		}
 
 		hedgeMarket.SetLogger(h.logger)
-		hedgeMarket.OnRedispatchPosition(func(position fixedpoint.Value) {
-			// return the position back to strategy position exposure
-			h.logger.Infof("splitHedge: redispatching position %s to strategy position exposure", position.String())
-			strategy.positionExposure.Open(position)
-		})
 
 		// ensure the hedge market base currency matches the maker market base currency
 		if h.strategy.makerMarket.BaseCurrency != hedgeMarket.market.BaseCurrency {
@@ -166,6 +161,11 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 
 		// complex hedge needs to trigger the strategy position close
 		hedgeMarket.positionExposure.OnClose(strategy.positionExposure.Close)
+		hedgeMarket.OnRedispatchPosition(func(position fixedpoint.Value) {
+			// return the position back to strategy position exposure
+			h.logger.Infof("splitHedge: redispatching position %s to strategy position exposure", position.String())
+			strategy.positionExposure.Open(position)
+		})
 
 		hedgeMarket.tradeCollector.OnTrade(func(
 			trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value,
@@ -255,7 +255,7 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case hedgeMarket.positionDeltaC <- quantityToDelta(proportionQuantity, orderSide).Neg():
+		case hedgeMarket.positionDeltaC <- coverDelta:
 		}
 	}
 

@@ -220,7 +220,7 @@ func NewHedgeMarket(
 
 		connectivity: connectivity,
 
-		positionExposure: newPositionExposure(symbol),
+		positionExposure: NewPositionExposure(symbol),
 
 		// default to taker fee mode for backward compatibility
 		priceFeeMode: FeeModeTaker,
@@ -744,7 +744,7 @@ func (m *HedgeMarket) Sync(ctx context.Context, namespace string) {
 	}
 }
 
-func (m *HedgeMarket) RedispatchPosition(position fixedpoint.Value) error {
+func (m *HedgeMarket) RedispatchPosition(uncoveredPosition fixedpoint.Value) error {
 	if m.redispatchCallback == nil {
 		return fmt.Errorf("HedgeMarket: redispatch callback is not set, can't redispatch position")
 	}
@@ -754,8 +754,8 @@ func (m *HedgeMarket) RedispatchPosition(position fixedpoint.Value) error {
 	// to avoid deadlock or infinite recursion.
 	// Here we assume that the position close callback will not call RedispatchPosition again.
 	// If it does, it should be handled gracefully by the strategy.
-	m.positionExposure.Close(position.Neg())
-	m.redispatchCallback(position)
+	m.positionExposure.Close(uncoveredPosition.Neg())
+	m.redispatchCallback(uncoveredPosition)
 	return nil
 }
 
