@@ -12,6 +12,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
@@ -28,7 +29,7 @@ type ProfitFixerConfig struct {
 // String returns a string representation of the ProfitFixerConfig
 // used for comparison
 func (c *ProfitFixerConfig) String() string {
-	return c.TradesSince.Time().Format(time.RFC3339) + ":" + c.Patch
+	return c.TradesSince.Time().Format(time.RFC3339) + ":" + c.Patch + ":" + fmt.Sprintf("%v", c.UseDatabaseTrades)
 }
 
 func (c *ProfitFixerConfig) Equal(other *ProfitFixerConfig) bool {
@@ -357,21 +358,17 @@ func (f *DatabaseProfitFixer) queryAllTrades(ctx context.Context, symbol string,
 				continue
 			}
 			options.Exchange = exchangeName
-		}
-		if margin, ok := s.(types.MarginExchange); ok {
-			marginSettings := margin.GetMarginSettings()
-			options.IsMargin = &marginSettings.IsMargin
-			if marginSettings.IsolatedMarginSymbol == symbol {
-				options.IsIsolated = &marginSettings.IsIsolatedMargin
+			isMargin, isFutures, isIsolated, isolatedSymbol := exchange.GetSessionAttributes(ex)
+			options.IsMargin = &isMargin
+			options.IsFutures = &isFutures
+			if isolatedSymbol == symbol {
+				options.IsIsolated = &isIsolated
 			}
+		} else {
+			log.Warnf("session does not implement types.Exchange, skipping: %s", sessionName)
+			continue
 		}
-		if futures, ok := s.(types.FuturesExchange); ok {
-			futuresSettings := futures.GetFuturesSettings()
-			options.IsFutures = &futuresSettings.IsFutures
-			if futuresSettings.IsolatedFuturesSymbol == symbol {
-				options.IsIsolated = &futuresSettings.IsIsolatedFutures
-			}
-		}
+
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
