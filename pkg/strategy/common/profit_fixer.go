@@ -227,14 +227,16 @@ func (f *ProfitFixer) Fix(
 		return err
 	}
 	f.tokenFeePrices = fm
-	return f.fixFromTrades(allTrades, stats, position)
+	return fixFromTrades(allTrades, &f.ConverterManager, f.tokenFeePrices, stats, position)
 }
 
-func (f *ProfitFixer) fixFromTrades(allTrades []types.Trade, stats *types.ProfitStats, position *types.Position) error {
+func fixFromTrades(allTrades []types.Trade, converter *core.ConverterManager, tokenFeePrices map[tokenFeeKey]fixedpoint.Value, stats *types.ProfitStats, position *types.Position) error {
 	for _, trade := range allTrades {
-		trade = f.ConverterManager.ConvertTrade(trade)
+		if converter != nil {
+			trade = converter.ConvertTrade(trade)
+		}
 		// set fee average cost
-		if feePrice, ok := f.tokenFeePrices[tokenFeeKey{
+		if feePrice, ok := tokenFeePrices[tokenFeeKey{
 			token:        trade.FeeCurrency,
 			exchangeName: trade.Exchange,
 			date:         trade.Time.Time().Format(time.DateOnly),
