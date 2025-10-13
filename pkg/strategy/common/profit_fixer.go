@@ -331,26 +331,45 @@ func (f *DatabaseProfitFixer) Fix(
 }
 
 func (f *DatabaseProfitFixer) queryAllTrades(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
-	var sessions []string
+	var trades []types.Trade
 	for sessionName, s := range f.sessions {
+		options := service.QueryTradesOptions{
+			Symbol: symbol,
+			Since:  &since,
+			Until:  &until,
+		}
 		if ex, ok := s.(types.Exchange); ok {
-			exchangeName := string(ex.Name())
+			exchangeName := ex.Name()
 			if exchangeName == "" {
 				log.Warnf("skip empty exchange name for session: %s", sessionName)
 				continue
 			}
-			sessions = append(sessions, exchangeName)
+			options.Exchange = exchangeName
+		}
+		if margin, ok := s.(types.MarginExchange); ok {
+			marginSettings := margin.GetMarginSettings()
+			options.IsMargin = &marginSettings.IsMargin
+			if marginSettings.IsolatedMarginSymbol == symbol {
+				options.IsIsolated = &marginSettings.IsIsolatedMargin
+			}
+		}
+		if futures, ok := s.(types.FuturesExchange); ok {
+			futuresSettings := futures.GetFuturesSettings()
+			options.IsFutures = &futuresSettings.IsFutures
+			if futuresSettings.IsolatedFuturesSymbol == symbol {
+				options.IsIsolated = &futuresSettings.IsIsolatedFutures
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			trades_, err := f.tradeService.Query(options)
+			if err != nil {
+				return nil, err
+			}
+			trades = append(trades, trades_...)
 		}
 	}
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-		return f.tradeService.Query(service.QueryTradesOptions{
-			Sessions: sessions,
-			Symbol:   symbol,
-			Since:    &since,
-			Until:    &until,
-		})
-	}
+	return trades, nil
 }

@@ -33,6 +33,11 @@ type QueryTradesOptions struct {
 	// exclusive
 	Until *time.Time
 
+	// margin, futures, isolated
+	IsMargin   *bool
+	IsFutures  *bool
+	IsIsolated *bool
+
 	// ASC or DESC
 	Ordering string
 
@@ -347,6 +352,18 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 
 	if options.Limit > 0 {
 		sel = sel.Limit(options.Limit)
+	}
+
+	if options.IsMargin != nil {
+		sel = sel.Where(sq.Eq{"is_margin": *options.IsMargin})
+	}
+
+	if options.IsFutures != nil {
+		sel = sel.Where(sq.Eq{"is_futures": *options.IsFutures})
+	}
+
+	if options.IsIsolated != nil {
+		sel = sel.Where(sq.Eq{"is_isolated": *options.IsIsolated})
 	}
 
 	sql, args, err := sel.ToSql()
