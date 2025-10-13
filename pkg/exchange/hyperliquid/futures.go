@@ -12,7 +12,7 @@ import (
 const QuoteCurrency = "USDC"
 
 func (e *Exchange) queryFuturesMarkets(ctx context.Context) (types.MarketMap, error) {
-	meta, err := e.client.NewGetFuturesMetaRequest().Do(ctx)
+	meta, err := e.client.NewFuturesGetMetaRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
