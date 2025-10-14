@@ -23,8 +23,8 @@ type ProfitFixerConfig struct {
 	Patch       string     `json:"patch,omitempty"`
 }
 
-func (c *ProfitFixerConfig) String() string {
-	return c.TradesSince.Time().Format(time.RFC3339) + ":" + c.Patch
+func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
+	return c.TradesSince.Equal(other.TradesSince.Time()) && c.Patch == other.Patch
 }
 
 // ProfitFixer implements a trade-history-based profit fixer
