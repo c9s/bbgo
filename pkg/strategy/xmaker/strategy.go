@@ -687,6 +687,11 @@ func (s *Strategy) allowMarginHedge(
 	minMarginLevel, maxHedgeAccountLeverage fixedpoint.Value,
 	makerSide types.SideType,
 ) (bool, fixedpoint.Value) {
+	// a simple guard
+	if !session.Margin {
+		return false, fixedpoint.Zero
+	}
+
 	zero := fixedpoint.Zero
 
 	hedgeAccount := session.GetAccount()
@@ -701,6 +706,9 @@ func (s *Strategy) allowMarginHedge(
 	marketValue := accountValueCalculator.MarketValue()
 	debtValue := accountValueCalculator.DebtValue()
 	netValueInUsd := accountValueCalculator.NetValue()
+
+	marginInfoUpdater := session.GetMarginInfoUpdater()
+	sourceMarket := s.sourceMarket
 
 	s.logger.Infof(
 		"hedge account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
@@ -739,18 +747,46 @@ func (s *Strategy) allowMarginHedge(
 			debtQuota = fixedpoint.Min(debtQuota, leverageQuotaInUsd)
 		}
 
+		if lastPrice.IsZero() {
+			return false, zero
+		}
+
 		switch makerSide {
 		case types.SideTypeBuy:
-			return true, debtQuota
+			maxBuyableQuote := debtQuota
 
-		case types.SideTypeSell:
-			if lastPrice.IsZero() {
-				return false, zero
+			if marginInfoUpdater != nil {
+				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(sourceMarket.BaseCurrency)
+				if hasMaxBorrowable {
+					maxBuyableQuote = fixedpoint.Min(maxBuyableQuote, maxBorrowable.Mul(lastPrice))
+				}
 			}
 
-			return true, debtQuota.Div(lastPrice)
+			bal, hasBal := hedgeAccount.Balance(sourceMarket.BaseCurrency)
+			if hasBal {
+				maxBuyableQuote = fixedpoint.Max(maxBuyableQuote, bal.Available.Mul(lastPrice))
+			}
 
+			return true, maxBuyableQuote
+
+		case types.SideTypeSell:
+			maxSellable := debtQuota.Div(lastPrice)
+
+			if marginInfoUpdater != nil {
+				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(sourceMarket.QuoteCurrency)
+				if hasMaxBorrowable {
+					maxSellable = fixedpoint.Min(maxSellable, maxBorrowable.Div(lastPrice))
+				}
+			}
+
+			bal, hasBal := hedgeAccount.Balance(sourceMarket.QuoteCurrency)
+			if hasBal {
+				maxSellable = fixedpoint.Max(maxSellable, bal.Available.Div(lastPrice))
+			}
+
+			return true, maxSellable
 		}
+
 		return true, zero
 	}
 
@@ -1007,16 +1043,16 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			)
 		}
 
-		allowMarginSell, bidQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeBuy)
-		if allowMarginSell {
+		allowMakerBuy, bidQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeBuy)
+		if allowMakerBuy {
 			hedgeQuota.BaseAsset.Add(bidQuota.Div(bestBidPrice))
 		} else {
 			s.logger.Warnf("margin hedge sell is disabled, disabling maker bid orders...")
 			disableMakerBid = true
 		}
 
-		allowMarginBuy, sellQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeSell)
-		if allowMarginBuy {
+		allowMakerSell, sellQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeSell)
+		if allowMakerSell {
 			hedgeQuota.QuoteAsset.Add(sellQuota.Mul(bestAskPrice))
 		} else {
 			s.logger.Warnf("margin hedge buy is disabled, disabling maker ask orders...")
