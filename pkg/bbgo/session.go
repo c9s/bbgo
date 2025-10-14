@@ -643,13 +643,13 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 	// session-wide max borrowable updating worker
 	if session.Margin {
+		if session.MarginInfoUpdaterInterval == 0 {
+			session.MarginInfoUpdaterInterval = defaultMarginInfoUpdaterInterval
+		}
+
 		if service, ok := session.Exchange.(types.MarginBorrowRepayService); ok {
 			marginUpdater := NewMarginInfoUpdater(service)
 			session.marginInfoUpdater = marginUpdater
-
-			if session.MarginInfoUpdaterInterval == 0 {
-				session.MarginInfoUpdaterInterval = defaultMarginInfoUpdaterInterval
-			}
 
 			session.UserDataStream.OnStart(func() {
 				session.logger.Infof("starting margin info updater with update interval: %s", session.MarginInfoUpdaterInterval.Duration())
