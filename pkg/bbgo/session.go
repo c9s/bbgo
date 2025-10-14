@@ -31,6 +31,8 @@ import (
 
 const defaultMaxSessionTradeBufferSize = 3500
 
+const defaultMarginInfoUpdaterInterval = types.Duration(5 * time.Minute)
+
 var KLinePreloadLimit int64 = 1000
 
 var ErrEmptyMarketInfo = errors.New("market info should not be empty, 0 markets loaded")
@@ -646,7 +648,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 			session.marginInfoUpdater = marginUpdater
 
 			if session.MarginInfoUpdaterInterval == 0 {
-				session.MarginInfoUpdaterInterval = types.Duration(5 * time.Minute)
+				session.MarginInfoUpdaterInterval = defaultMarginInfoUpdaterInterval
 			}
 
 			session.UserDataStream.OnStart(func() {
