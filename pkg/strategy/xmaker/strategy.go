@@ -687,6 +687,11 @@ func (s *Strategy) allowMarginHedge(
 	minMarginLevel, maxHedgeAccountLeverage fixedpoint.Value,
 	makerSide types.SideType,
 ) (bool, fixedpoint.Value) {
+	// a simple guard
+	if !session.Margin {
+		return false, fixedpoint.Zero
+	}
+
 	zero := fixedpoint.Zero
 
 	hedgeAccount := session.GetAccount()
@@ -701,6 +706,9 @@ func (s *Strategy) allowMarginHedge(
 	marketValue := accountValueCalculator.MarketValue()
 	debtValue := accountValueCalculator.DebtValue()
 	netValueInUsd := accountValueCalculator.NetValue()
+
+	marginInfoUpdater := session.GetMarginInfoUpdater()
+	sourceMarket := s.sourceMarket
 
 	s.logger.Infof(
 		"hedge account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
@@ -739,18 +747,67 @@ func (s *Strategy) allowMarginHedge(
 			debtQuota = fixedpoint.Min(debtQuota, leverageQuotaInUsd)
 		}
 
+		if lastPrice.IsZero() {
+			return false, zero
+		}
+
 		switch makerSide {
 		case types.SideTypeBuy:
-			return true, debtQuota
+			// When maker side == buy, we need to return how much quote asset we can use to place the buy order
+			// Debt quota is in USD, so we can assign it directly
+			maxBuyableQuote := debtQuota
 
-		case types.SideTypeSell:
-			if lastPrice.IsZero() {
-				return false, zero
+			// Why not use Available + MaxBorrowable?
+			// Have considered it, but we calculate our own debt quota that is intentionally smaller than maxBorrowable.
+			// Because if we used maxBorrowable, we would be leveraging to the maximum limit.
+			// For example:
+			// - The hard leverage limit might be 5x.
+			// - But our soft leverage target is 3x.
+			// - Our debt quota is calculated using the soft leverage of 3x.
+			// - Using maxBorrowable + available would max out the leverage which is too risky.
+			if marginInfoUpdater != nil {
+				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(sourceMarket.BaseCurrency)
+				if hasMaxBorrowable {
+					maxBuyableQuote = fixedpoint.Min(maxBuyableQuote, maxBorrowable.Mul(lastPrice))
+				}
 			}
 
-			return true, debtQuota.Div(lastPrice)
+			// Using Max() should be correct here because this only calculates the hedge side balance
+			// The maker side balance will be limited by taking the minimum value later
+			// When maxBorrowable = 0 and there is Available balance, it means maker can use Available for hedging
+			// When maxBorrowable = 10 and Available = 5, we can still place 10 because we can:
+			// - spot sell 5 first
+			// - borrow another 5
+			// But when this goes back to the caller,
+			// it will take the minimum value with maker balance (this is what the AI doesn't understand)
+			bal, hasBal := hedgeAccount.Balance(sourceMarket.BaseCurrency)
+			if hasBal {
+				maxBuyableQuote = fixedpoint.Max(maxBuyableQuote, bal.Available.Mul(lastPrice))
+			}
 
+			return true, maxBuyableQuote
+
+		case types.SideTypeSell:
+			// When maker side == sell, we need to return how much base asset we can use to place the sell order
+			// Debt quota is in USD, so we need to convert it to base asset amount with lastPrice
+			maxSellable := debtQuota.Div(lastPrice)
+
+			if marginInfoUpdater != nil {
+				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(sourceMarket.QuoteCurrency)
+				if hasMaxBorrowable {
+					maxSellable = fixedpoint.Min(maxSellable, maxBorrowable.Div(lastPrice))
+				}
+			}
+
+			// Ditto, using Max() here should be correct because this only calculates the hedge side balance
+			bal, hasBal := hedgeAccount.Balance(sourceMarket.QuoteCurrency)
+			if hasBal {
+				maxSellable = fixedpoint.Max(maxSellable, bal.Available.Div(lastPrice))
+			}
+
+			return true, maxSellable
 		}
+
 		return true, zero
 	}
 
@@ -1007,16 +1064,16 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			)
 		}
 
-		allowMarginSell, bidQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeBuy)
-		if allowMarginSell {
+		allowMakerBuy, bidQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeBuy)
+		if allowMakerBuy {
 			hedgeQuota.BaseAsset.Add(bidQuota.Div(bestBidPrice))
 		} else {
 			s.logger.Warnf("margin hedge sell is disabled, disabling maker bid orders...")
 			disableMakerBid = true
 		}
 
-		allowMarginBuy, sellQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeSell)
-		if allowMarginBuy {
+		allowMakerSell, sellQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeSell)
+		if allowMakerSell {
 			hedgeQuota.QuoteAsset.Add(sellQuota.Mul(bestAskPrice))
 		} else {
 			s.logger.Warnf("margin hedge buy is disabled, disabling maker ask orders...")

@@ -64,17 +64,19 @@ func TestStrategy_allowMarginHedge(t *testing.T) {
 			sourceMarket:   market,
 			sourceSession:  session,
 			logger:         logger,
+
+			MaxHedgeAccountLeverage: Number(3.0),
 		}
 		s.lastPrice.Set(Number(98000.0))
 
 		allowed, quota := s.allowMarginHedge(session, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeBuy)
 		if assert.True(t, allowed) {
-			assert.InDelta(t, 2.47735853175711e+06, quota.Float64(), 0.0001, "should be able to borrow %f USDT", quota.Float64())
+			assert.InDelta(t, 796000.0, quota.Float64(), 0.0001, "should be able to borrow %f USDT", quota.Float64())
 		}
 
 		allowed, quota = s.allowMarginHedge(session, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeSell)
 		if assert.True(t, allowed) {
-			assert.InDelta(t, 25.27916869, quota.Float64(), 0.0001, "should be able to borrow %f BTC", quota.Float64())
+			assert.InDelta(t, 8.12244, quota.Float64(), 0.0001, "should be able to borrow %f BTC", quota.Float64())
 		}
 	})
 

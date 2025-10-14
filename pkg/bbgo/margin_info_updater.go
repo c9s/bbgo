@@ -2,7 +2,10 @@ package bbgo
 
 import (
 	"context"
+	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -13,20 +16,22 @@ type MaxBorrowableCallback func(asset string, amount fixedpoint.Value)
 
 //go:generate callbackgen -type MarginInfoUpdater
 type MarginInfoUpdater struct {
-	BorrowRepayService types.MarginBorrowRepayService
+	service types.MarginBorrowRepayService
 
-	assets                 map[string]struct{}
+	assets map[string]fixedpoint.Value
+
 	maxBorrowableCallbacks []MaxBorrowableCallback
+
+	mu sync.Mutex
 }
 
-func NewMarginInfoUpdaterFromExchange(
-	exchange types.Exchange,
-) MarginInfoUpdater {
-	m := MarginInfoUpdater{}
-	if s, ok := exchange.(types.MarginBorrowRepayService); ok {
-		m.BorrowRepayService = s
+func NewMarginInfoUpdater(
+	service types.MarginBorrowRepayService,
+) *MarginInfoUpdater {
+	return &MarginInfoUpdater{
+		assets:  make(map[string]fixedpoint.Value),
+		service: service,
 	}
-	return m
 }
 
 // Run starts the update workers for the given interval.
@@ -37,45 +42,57 @@ func (m *MarginInfoUpdater) Run(
 	ticker := time.NewTicker(timejitter.Milliseconds(interval.Duration(), 500))
 	defer ticker.Stop()
 
+	m.Update(ctx)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			m.UpdateMaxBorrowable(ctx)
+			m.Update(ctx)
 		}
 	}
 }
 
-// AddAssets adds the assets to the updater.
-func (m *MarginInfoUpdater) AddAssets(
+// AddBorrowableAssets adds the assets to the updater.
+func (m *MarginInfoUpdater) AddBorrowableAssets(
 	assets ...string,
 ) {
-	if m.assets == nil {
-		m.assets = make(map[string]struct{})
-	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	for _, asset := range assets {
-		m.assets[asset] = struct{}{}
+		m.assets[asset] = fixedpoint.Zero
 	}
 }
 
-// UpdateMaxBorrowable queries the max borrowable amount for each asset and emit update events.
-func (m *MarginInfoUpdater) UpdateMaxBorrowable(
+func (m *MarginInfoUpdater) GetMaxBorrowable(asset string) (fixedpoint.Value, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	amount, ok := m.assets[asset]
+	return amount, ok
+}
+
+// Update queries the max borrowable amount for each asset and emit update events.
+func (m *MarginInfoUpdater) Update(
 	ctx context.Context,
-) (failedAssets []string) {
-	if m.BorrowRepayService == nil {
-		return
-	}
+) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	for asset := range m.assets {
-		maxBorrable, err := m.BorrowRepayService.QueryMarginAssetMaxBorrowable(
+		maxBorrowable, err := m.service.QueryMarginAssetMaxBorrowable(
 			ctx,
 			asset,
 		)
+
 		if err != nil {
-			failedAssets = append(failedAssets, asset)
+			log.WithError(err).Errorf("query margin asset max borrowable error: %s", asset)
 			continue
 		}
-		m.EmitMaxBorrowable(asset, maxBorrable)
+
+		m.assets[asset] = maxBorrowable
+
+		m.EmitMaxBorrowable(asset, maxBorrowable)
 	}
-	return
 }

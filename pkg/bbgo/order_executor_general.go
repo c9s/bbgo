@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -96,28 +95,22 @@ func NewGeneralOrderExecutor(
 		position:           position,
 		tradeCollector:     core.NewTradeCollector(symbol, position, orderStore),
 	}
-	if session != nil && executor.position != nil {
-		session.OnMaxBorrowable(
-			func(asset string, maxBorrowable fixedpoint.Value) {
-				switch asset {
-				case executor.position.BaseCurrency:
-					log.Infof("updating margin base asset %s max borrowable amount: %f", asset, maxBorrowable.Float64())
-					executor.marginBaseMaxBorrowable = maxBorrowable
-				case executor.position.QuoteCurrency:
-					log.Infof("updating margin quote asset %s max borrowable amount: %f", asset, maxBorrowable.Float64())
-					executor.marginQuoteMaxBorrowable = maxBorrowable
-				default:
-					log.Warnf("unknown asset %s for margin base/quote", asset)
-				}
-			},
-		)
-		session.AddMarginAssets(
-			executor.position.BaseCurrency,
-			executor.position.QuoteCurrency,
-		)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
-		defer cancel()
-		session.UpdateMaxBorrowable(ctx)
+
+	if executor.position != nil && session.Margin {
+		market := executor.position.Market
+		marginInfoUpdater := session.GetMarginInfoUpdater()
+		marginInfoUpdater.AddBorrowableAssets(market.BaseCurrency, market.QuoteCurrency)
+		marginInfoUpdater.OnMaxBorrowable(func(asset string, amount fixedpoint.Value) {
+			switch asset {
+			case market.BaseCurrency:
+				log.Infof("updating margin base asset %s max borrowable amount: %f", asset, amount.Float64())
+				executor.marginBaseMaxBorrowable = amount
+			case market.QuoteCurrency:
+				log.Infof("updating margin quote asset %s max borrowable amount: %f", asset, amount.Float64())
+				executor.marginQuoteMaxBorrowable = amount
+			default:
+			}
+		})
 	}
 
 	return executor
