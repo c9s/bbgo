@@ -33,8 +33,6 @@ func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
 // ProfitFixer implements a trade-history-based profit fixer
 type ProfitFixer struct {
 	sessions map[string]types.ExchangeTradeHistoryService
-	// (token, date) -> price
-	tokenFeePrices map[tokenFeeKey]fixedpoint.Value
 
 	core.ConverterManager
 }
@@ -229,8 +227,7 @@ func (f *ProfitFixer) Fix(
 	if err != nil {
 		return err
 	}
-	f.tokenFeePrices = fm
-	return fixFromTrades(allTrades, &f.ConverterManager, f.tokenFeePrices, stats, position)
+	return fixFromTrades(allTrades, &f.ConverterManager, fm, stats, position)
 }
 
 func fixFromTrades(allTrades []types.Trade, converter *core.ConverterManager, tokenFeePrices map[tokenFeeKey]fixedpoint.Value, stats *types.ProfitStats, position *types.Position) error {
@@ -293,9 +290,8 @@ func (f *ProfitFixerBundle) Fix(
 }
 
 type DatabaseProfitFixer struct {
-	tradeService   *service.TradeService
-	sessions       map[string]types.ExchangeTradeHistoryService
-	tokenFeePrices map[tokenFeeKey]fixedpoint.Value
+	tradeService *service.TradeService
+	sessions     map[string]types.ExchangeTradeHistoryService
 
 	core.ConverterManager
 }
@@ -327,8 +323,7 @@ func (f *DatabaseProfitFixer) Fix(
 	if err != nil {
 		return err
 	}
-	f.tokenFeePrices = fm
-	return fixFromTrades(allTrades, &f.ConverterManager, f.tokenFeePrices, stats, position)
+	return fixFromTrades(allTrades, &f.ConverterManager, fm, stats, position)
 }
 
 func (f *DatabaseProfitFixer) queryAllTrades(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
