@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -25,24 +24,7 @@ type ProfitFixerConfig struct {
 }
 
 func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
-	rt := reflect.TypeOf(c)
-	rv1 := reflect.ValueOf(c)
-	rv2 := reflect.ValueOf(other)
-
-	for i := 0; i < rt.NumField(); i++ {
-		f := rt.Field(i)
-		if f.Type.Kind() == reflect.Pointer {
-			// skip pointer field comparison
-			log.Warnf("skip pointer field comparison for profit fixer config: %s", f.Name)
-			continue
-		}
-		v1 := rv1.FieldByName(f.Name).Interface()
-		v2 := rv2.FieldByName(f.Name).Interface()
-		if v1 != v2 {
-			return false
-		}
-	}
-	return true
+	return c.TradesSince.Equal(other.TradesSince.Time()) && c.Patch == other.Patch
 }
 
 // ProfitFixer implements a trade-history-based profit fixer
