@@ -753,6 +753,8 @@ func (s *Strategy) allowMarginHedge(
 
 		switch makerSide {
 		case types.SideTypeBuy:
+			// When maker side == buy, we need to return how much quote asset we can use to place the buy order
+			// Debt quota is in USD, so we can assign it directly
 			maxBuyableQuote := debtQuota
 
 			// Why not use Available + MaxBorrowable?
@@ -786,6 +788,8 @@ func (s *Strategy) allowMarginHedge(
 			return true, maxBuyableQuote
 
 		case types.SideTypeSell:
+			// When maker side == sell, we need to return how much base asset we can use to place the sell order
+			// Debt quota is in USD, so we need to convert it to base asset amount with lastPrice
 			maxSellable := debtQuota.Div(lastPrice)
 
 			if marginInfoUpdater != nil {
