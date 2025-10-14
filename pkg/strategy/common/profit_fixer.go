@@ -27,7 +27,7 @@ type ProfitFixerConfig struct {
 }
 
 func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
-	return c.TradesSince.Equal(other.TradesSince.Time()) && c.Patch == other.Patch
+	return c.TradesSince.Equal(other.TradesSince.Time()) && c.Patch == other.Patch && c.UseDatabaseTrades == other.UseDatabaseTrades
 }
 
 // ProfitFixer implements a trade-history-based profit fixer
