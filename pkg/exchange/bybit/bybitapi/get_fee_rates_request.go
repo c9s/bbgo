@@ -23,7 +23,7 @@ type FeeRate struct {
 type GetFeeRatesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	category Category `param:"category,query" validValues:"spot"`
+	category Category `param:"category,query" validValues:"spot,linear"`
 	// Symbol name. Valid for linear, inverse, spot
 	symbol *string `param:"symbol,query"`
 	// Base coin. SOL, BTC, ETH. Valid for option

@@ -11,6 +11,7 @@ import (
 	"go.uber.org/multierr"
 	"golang.org/x/time/rate"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -48,7 +49,12 @@ var (
 	_ types.ExchangeOrderQueryService = &Exchange{}
 )
 
+// Enable dual side position mode (hedge mode) for futures trading
+var dualSidePosition = false
+
 type Exchange struct {
+	types.FuturesSettings
+
 	key, secret string
 	client      *bybitapi.RestClient
 	marketsInfo types.MarketMap
@@ -58,6 +64,12 @@ type Exchange struct {
 	// fee rate to get the fee currency.
 	// https://bybit-exchange.github.io/docs/v5/enum#spot-fee-currency-instruction
 	FeeRatePoller
+}
+
+func init() {
+	if val, ok := envvar.Bool("BYBIT_ENABLE_FUTURES_HEDGE_MODE"); ok {
+		dualSidePosition = val
+	}
 }
 
 func New(key, secret string) (*Exchange, error) {
@@ -101,7 +113,10 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		return nil, fmt.Errorf("markets rate limiter wait error: %w", err)
 	}
 
-	instruments, err := e.client.NewGetInstrumentsInfoRequest().Do(ctx)
+	instruments, err := e.client.NewGetInstrumentsInfoRequest().
+		Category(e.getCategory()).
+		Do(ctx)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get instruments, err: %v", err)
 	}
@@ -119,7 +134,10 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 		return nil, fmt.Errorf("ticker order rate limiter wait error: %w", err)
 	}
 
-	s, err := e.client.NewGetTickersRequest().Symbol(symbol).DoWithResponseTime(ctx)
+	s, err := e.client.NewGetTickersRequest().
+		Category(e.getCategory()).
+		Symbol(symbol).
+		DoWithResponseTime(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call ticker, symbol: %s, err: %w", symbol, err)
 	}
@@ -150,7 +168,9 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 	if err := sharedRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("tickers rate limiter wait error: %w", err)
 	}
-	allTickers, err := e.client.NewGetTickersRequest().DoWithResponseTime(ctx)
+	allTickers, err := e.client.NewGetTickersRequest().
+		Category(e.getCategory()).
+		DoWithResponseTime(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call ticker, err: %w", err)
 	}
@@ -173,7 +193,10 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	cursor := ""
 	// OpenOnlyOrder: UTA2.0, UTA1.0, classic account query open status orders (e.g., New, PartiallyFilled) only
-	req := e.client.NewGetOpenOrderRequest().Symbol(symbol).OpenOnly(bybitapi.OpenOnlyOrder).Limit(defaultQueryLimit)
+	req := e.client.NewGetOpenOrderRequest().Symbol(symbol).
+		Category(e.getCategory()).
+		OpenOnly(bybitapi.OpenOnlyOrder).
+		Limit(defaultQueryLimit)
 	for {
 		if len(cursor) != 0 {
 			// the default limit is 20.
@@ -212,7 +235,8 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		return nil, errors.New("only accept one parameter of OrderID/ClientOrderID")
 	}
 
-	req := e.client.NewGetOrderHistoriesRequest()
+	req := e.client.NewGetOrderHistoriesRequest().
+		Category(e.getCategory())
 	if len(q.Symbol) != 0 {
 		req.Symbol(q.Symbol)
 	}
@@ -242,7 +266,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 // QueryOrderTrades You can query by symbol, baseCoin, orderId and orderLinkId, and if you pass multiple params,
 // the system will process them according to this priority: orderId > orderLinkId > symbol > baseCoin.
 func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (trades []types.Trade, err error) {
-	req := e.client.NewGetExecutionListRequest()
+	req := e.client.NewGetExecutionListRequest().Category(e.getCategory())
 	if len(q.ClientOrderID) != 0 {
 		req.OrderLinkId(q.ClientOrderID)
 	}
@@ -265,7 +289,8 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	}
 
 	req := e.client.NewPlaceOrderRequest()
-	req.Symbol(order.Market.Symbol)
+	req.Symbol(order.Market.Symbol).
+		Category(e.getCategory())
 
 	// set order type
 	orderType, err := toLocalOrderType(order.Type)
@@ -281,6 +306,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	}
 	req.Side(side)
 	req.Qty(order.Market.FormatQuantity(order.Quantity))
+
+	if dualSidePosition {
+		setDualSidePosition(req, order)
+	}
 
 	switch order.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
@@ -345,7 +374,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	}
 
 	for _, order := range orders {
-		req := e.client.NewCancelOrderRequest()
+		req := e.client.NewCancelOrderRequest().Category(e.getCategory())
 
 		reqId := ""
 		switch {
@@ -416,7 +445,9 @@ func (e *Exchange) QueryClosedOrders(
 		log.Warnf("!!!BYBIT EXCHANGE API NOTICE!!! The time range exceeds the server boundary: %s, start time: %s, end time: %s, updated start time %s -> %s", queryTradeDurationLimit, since.String(), until.String(), since.String(), newStartTime.String())
 		since = newStartTime
 	}
+
 	req := e.client.NewGetOrderHistoriesRequest().
+		Category(e.getCategory()).
 		Symbol(symbol).
 		Limit(defaultQueryLimit).
 		StartTime(since).
@@ -490,7 +521,7 @@ QueryTrades queries trades by time range.
 ** If both are passed, the rule is endTime - startTime <= 7 days **
 */
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
-	req := e.client.NewGetExecutionListRequest()
+	req := e.client.NewGetExecutionListRequest().Category(e.getCategory())
 	req.Symbol(symbol)
 
 	if options.StartTime != nil && options.EndTime != nil {
@@ -560,7 +591,10 @@ e.q. 15m interval k line can be represented as 00:00:00.000 ~ 00:14:59.999
 func (e *Exchange) QueryKLines(
 	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
 ) ([]types.KLine, error) {
-	req := e.client.NewGetKLinesRequest().Symbol(symbol)
+	req := e.client.NewGetKLinesRequest().
+		Symbol(symbol).
+		Category(e.getCategory())
+
 	intervalStr, err := toLocalInterval(interval)
 	if err != nil {
 		return nil, err
@@ -591,10 +625,6 @@ func (e *Exchange) QueryKLines(
 		return nil, fmt.Errorf("failed to call k line, err: %w", err)
 	}
 
-	if resp.Category != bybitapi.CategorySpot {
-		return nil, fmt.Errorf("unexpected category: %s", resp.Category)
-	}
-
 	if resp.Symbol != symbol {
 		return nil, fmt.Errorf("unexpected symbol: %s, exp: %s", resp.Category, symbol)
 	}
@@ -617,7 +647,7 @@ func (e *Exchange) GetAllFeeRates(ctx context.Context) (bybitapi.FeeRates, error
 	if err := sharedRateLimiter.Wait(ctx); err != nil {
 		return bybitapi.FeeRates{}, fmt.Errorf("query fee rate limiter wait error: %w", err)
 	}
-	feeRates, err := e.client.NewGetFeeRatesRequest().Do(ctx)
+	feeRates, err := e.client.NewGetFeeRatesRequest().Category(e.getCategory()).Do(ctx)
 	if err != nil {
 		return bybitapi.FeeRates{}, fmt.Errorf("failed to get fee rates, err: %w", err)
 	}
@@ -627,4 +657,28 @@ func (e *Exchange) GetAllFeeRates(ctx context.Context) (bybitapi.FeeRates, error
 
 func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e.key, e.secret, e)
+}
+
+func (e *Exchange) getCategory() bybitapi.Category {
+	if e.IsFutures {
+		return bybitapi.CategoryLinear
+	}
+	return bybitapi.CategorySpot
+}
+
+func setDualSidePosition(req *bybitapi.PlaceOrderRequest, order types.SubmitOrder) {
+	switch order.Side {
+	case types.SideTypeBuy:
+		if order.ReduceOnly {
+			req.PositionIdx("2").ReduceOnly(true)
+		} else {
+			req.PositionIdx("1")
+		}
+	case types.SideTypeSell:
+		if order.ReduceOnly {
+			req.PositionIdx("1").ReduceOnly(true)
+		} else {
+			req.PositionIdx("2")
+		}
+	}
 }

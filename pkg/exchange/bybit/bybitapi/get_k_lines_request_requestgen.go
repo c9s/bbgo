@@ -49,9 +49,14 @@ func (g *GetKLinesRequest) GetQueryParameters() (url.Values, error) {
 	// check category field -> json key category
 	category := g.category
 
+	// TEMPLATE check-required
+	if len(category) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// TEMPLATE check-valid-values
 	switch category {
-	case "spot":
+	case "spot", "linear":
 		params["category"] = category
 
 	default:
@@ -65,10 +70,20 @@ func (g *GetKLinesRequest) GetQueryParameters() (url.Values, error) {
 	// check symbol field -> json key symbol
 	symbol := g.symbol
 
+	// TEMPLATE check-required
+	if len(symbol) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// assign parameter of symbol
 	params["symbol"] = symbol
 	// check interval field -> json key interval
 	interval := g.interval
+
+	// TEMPLATE check-required
+	if len(interval) == 0 {
+	}
+	// END TEMPLATE check-required
 
 	// TEMPLATE check-valid-values
 	switch interval {
@@ -87,6 +102,9 @@ func (g *GetKLinesRequest) GetQueryParameters() (url.Values, error) {
 	if g.startTime != nil {
 		startTime := *g.startTime
 
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
+
 		// assign parameter of startTime
 		// convert time.Time to milliseconds time stamp
 		params["start"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
@@ -95,6 +113,9 @@ func (g *GetKLinesRequest) GetQueryParameters() (url.Values, error) {
 	// check endTime field -> json key end
 	if g.endTime != nil {
 		endTime := *g.endTime
+
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
 
 		// assign parameter of endTime
 		// convert time.Time to milliseconds time stamp
@@ -105,6 +126,9 @@ func (g *GetKLinesRequest) GetQueryParameters() (url.Values, error) {
 	if g.limit != nil {
 		limit := *g.limit
 
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
+
 		// assign parameter of limit
 		params["limit"] = limit
 	} else {
@@ -112,7 +136,13 @@ func (g *GetKLinesRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -234,15 +264,29 @@ func (g *GetKLinesRequest) Do(ctx context.Context) (*KLinesResponse, error) {
 	}
 
 	var apiResponse APIResponse
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
 	}
 
 	type responseValidator interface {
 		Validate() error
 	}
-	validator, ok := interface{}(apiResponse).(responseValidator)
-	if ok {
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
 		if err := validator.Validate(); err != nil {
 			return nil, err
 		}
