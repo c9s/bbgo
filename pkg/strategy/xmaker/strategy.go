@@ -755,6 +755,14 @@ func (s *Strategy) allowMarginHedge(
 		case types.SideTypeBuy:
 			maxBuyableQuote := debtQuota
 
+			// Why not use Available + MaxBorrowable?
+			// Have considered it, but we calculate our own debt quota that is intentionally smaller than maxBorrowable.
+			// Because if we used maxBorrowable, we would be leveraging to the maximum limit.
+			// For example:
+			// - The hard leverage limit might be 5x.
+			// - But our soft leverage target is 3x.
+			// - Our debt quota is calculated using the soft leverage of 3x.
+			// - Using maxBorrowable + available would max out the leverage which is too risky.
 			if marginInfoUpdater != nil {
 				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(sourceMarket.BaseCurrency)
 				if hasMaxBorrowable {
@@ -762,6 +770,14 @@ func (s *Strategy) allowMarginHedge(
 				}
 			}
 
+			// Using Max() should be correct here because this only calculates the hedge side balance
+			// The maker side balance will be limited by taking the minimum value later
+			// When maxBorrowable = 0 and there is Available balance, it means maker can use Available for hedging
+			// When maxBorrowable = 10 and Available = 5, we can still place 10 because we can:
+			// - spot sell 5 first
+			// - borrow another 5
+			// But when this goes back to the caller,
+			// it will take the minimum value with maker balance (this is what the AI doesn't understand)
 			bal, hasBal := hedgeAccount.Balance(sourceMarket.BaseCurrency)
 			if hasBal {
 				maxBuyableQuote = fixedpoint.Max(maxBuyableQuote, bal.Available.Mul(lastPrice))
@@ -779,6 +795,7 @@ func (s *Strategy) allowMarginHedge(
 				}
 			}
 
+			// Ditto, using Max() here should be correct because this only calculates the hedge side balance
 			bal, hasBal := hedgeAccount.Balance(sourceMarket.QuoteCurrency)
 			if hasBal {
 				maxSellable = fixedpoint.Max(maxSellable, bal.Available.Div(lastPrice))
