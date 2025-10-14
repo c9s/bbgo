@@ -96,6 +96,7 @@ func NewGeneralOrderExecutor(
 		position:           position,
 		tradeCollector:     core.NewTradeCollector(symbol, position, orderStore),
 	}
+
 	if session != nil && executor.position != nil {
 		session.OnMaxBorrowable(
 			func(asset string, maxBorrowable fixedpoint.Value) {

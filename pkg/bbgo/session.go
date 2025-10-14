@@ -641,14 +641,20 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 	// session-wide max borrowable updating worker
 	if session.Margin {
-		marginUpdater := NewMarginInfoUpdaterFromExchange(session.Exchange)
-		session.marginInfoUpdater = &marginUpdater
+		if service, ok := session.Exchange.(types.MarginBorrowRepayService); ok {
+			marginUpdater := NewMarginInfoUpdater(service)
+			session.marginInfoUpdater = marginUpdater
 
-		if session.MarginInfoUpdaterInterval == 0 {
-			session.MarginInfoUpdaterInterval = types.Duration(30 * time.Minute)
+			if session.MarginInfoUpdaterInterval == 0 {
+				session.MarginInfoUpdaterInterval = types.Duration(5 * time.Minute)
+			}
+
+			session.UserDataStream.OnStart(func() {
+				session.logger.Infof("starting margin info updater with update interval: %s", session.MarginInfoUpdaterInterval.Duration())
+
+				go session.marginInfoUpdater.Run(ctx, session.MarginInfoUpdaterInterval)
+			})
 		}
-		session.logger.Infof("max borrowable update interval: %s", session.MarginInfoUpdaterInterval.Duration())
-		go session.marginInfoUpdater.Run(ctx, session.MarginInfoUpdaterInterval)
 	}
 
 	session.IsInitialized = true
@@ -1374,7 +1380,7 @@ func (session *ExchangeSession) AddMarginAssets(
 		return
 	}
 	session.logger.Infof("adding margin assets: %v", assets)
-	session.marginInfoUpdater.AddAssets(assets...)
+	session.marginInfoUpdater.AddBorrowableAssets(assets...)
 }
 
 func (session *ExchangeSession) OnMaxBorrowable(cb MaxBorrowableCallback) {
@@ -1388,7 +1394,7 @@ func (session *ExchangeSession) UpdateMaxBorrowable(ctx context.Context) {
 	if session.marginInfoUpdater == nil {
 		return
 	}
-	session.marginInfoUpdater.UpdateMaxBorrowable(ctx)
+	session.marginInfoUpdater.Update(ctx)
 }
 
 func (session *ExchangeSession) setLastPrice(symbol string, price fixedpoint.Value) {
