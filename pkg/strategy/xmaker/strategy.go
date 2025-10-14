@@ -1030,15 +1030,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
 			// to make bid orders, we need enough base asset in the foreign makerExchange,
 			// if the base asset balance is not enough for selling
-			if s.StopHedgeBaseBalance.Sign() > 0 {
-				minAvailable := s.StopHedgeBaseBalance.Add(s.sourceMarket.MinQuantity)
-				if b.Available.Compare(minAvailable) > 0 {
-					hedgeQuota.BaseAsset.Add(b.Available.Sub(minAvailable))
-				} else {
-					s.logger.Warnf("%s maker bid disabled: insufficient hedge base balance %s", s.Symbol, b.String())
-					disableMakerBid = true
-				}
-			} else if b.Available.Compare(s.sourceMarket.MinQuantity) > 0 {
+			if b.Available.Compare(s.sourceMarket.MinQuantity) > 0 {
 				hedgeQuota.BaseAsset.Add(b.Available)
 			} else {
 				s.logger.Warnf("%s maker bid disabled: insufficient hedge base balance %s", s.Symbol, b.String())
@@ -1063,6 +1055,15 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				s.logger.Warnf("%s maker ask disabled: insufficient hedge quote balance %s", s.Symbol, b.String())
 				disableMakerAsk = true
 			}
+		}
+	}
+
+	if s.StopHedgeBaseBalance.Sign() > 0 {
+		minAvailable := s.StopHedgeBaseBalance.Add(s.sourceMarket.MinQuantity)
+		b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]
+		if !ok || b.Available.Compare(minAvailable) < 0 {
+			s.logger.Warnf("%s maker bid disabled: insufficient hedge base balance %s < stop %s", s.Symbol, b.String(), s.StopHedgeBaseBalance.String())
+			disableMakerBid = true
 		}
 	}
 
