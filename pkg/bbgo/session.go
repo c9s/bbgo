@@ -1371,30 +1371,13 @@ func (session *ExchangeSession) FormatOrders(orders []types.SubmitOrder) (format
 	return formattedOrders, err
 }
 
-// Expose margin updator APIs via ExchangeSession
-
-func (session *ExchangeSession) AddMarginAssets(
-	assets ...string,
-) {
-	if session.marginInfoUpdater == nil {
-		return
-	}
-	session.logger.Infof("adding margin assets: %v", assets)
-	session.marginInfoUpdater.AddBorrowableAssets(assets...)
-}
-
-func (session *ExchangeSession) OnMaxBorrowable(cb MaxBorrowableCallback) {
-	if session.marginInfoUpdater == nil {
-		return
-	}
-	session.marginInfoUpdater.OnMaxBorrowable(cb)
-}
-
-func (session *ExchangeSession) UpdateMaxBorrowable(ctx context.Context) {
-	if session.marginInfoUpdater == nil {
-		return
-	}
-	session.marginInfoUpdater.Update(ctx)
+// GetMarginInfoUpdater returns the margin info updater
+// it could be nil if the session is not a margin session
+// be sure to check nil before using it:
+//
+//	if session.Margin { ... := session.GetMarginInfoUpdater() }
+func (session *ExchangeSession) GetMarginInfoUpdater() *MarginInfoUpdater {
+	return session.marginInfoUpdater
 }
 
 func (session *ExchangeSession) setLastPrice(symbol string, price fixedpoint.Value) {
