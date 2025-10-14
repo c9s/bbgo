@@ -390,11 +390,11 @@ func (s *Stream) addRiskBalance(balance types.Balance) types.Balance {
 	s.mu.RUnlock()
 
 	if hasRb {
+		balance.Borrowed = rb.Borrowed
+		balance.Interest = rb.Interest
 		return balance
 	}
 
-	balance.Borrowed = rb.Borrowed
-	balance.Interest = rb.Interest
 	return balance
 }
 
