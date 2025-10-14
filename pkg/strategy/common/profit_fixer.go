@@ -12,26 +12,27 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 // ProfitFixerConfig is used for fixing profitStats and position by re-playing the trade history
 type ProfitFixerConfig struct {
-	TradesSince types.Time `json:"tradesSince,omitempty"`
-	Patch       string     `json:"patch,omitempty"`
+	TradesSince       types.Time `json:"tradesSince,omitempty"`
+	Patch             string     `json:"patch,omitempty"`
+	UseDatabaseTrades bool       `json:"useDatabaseTrades,omitempty"`
 }
 
 func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
-	return c.TradesSince.Equal(other.TradesSince.Time()) && c.Patch == other.Patch
+	return c.TradesSince.Equal(other.TradesSince.Time()) && c.Patch == other.Patch && c.UseDatabaseTrades == other.UseDatabaseTrades
 }
 
 // ProfitFixer implements a trade-history-based profit fixer
 type ProfitFixer struct {
 	sessions map[string]types.ExchangeTradeHistoryService
-	// (token, date) -> price
-	tokenFeePrices map[tokenFeeKey]fixedpoint.Value
 
 	core.ConverterManager
 }
@@ -108,12 +109,12 @@ func (f *ProfitFixer) aggregateAllTrades(ctx context.Context, symbol string, sin
 	return allTrades, nil
 }
 
-func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade, since, until time.Time) error {
+func buildTokenFeeDatePrices(ctx context.Context, sessions map[string]types.ExchangeTradeHistoryService, trades []types.Trade, since, until time.Time) (map[tokenFeeKey]fixedpoint.Value, error) {
 	// initialize tokenFeePrices map
-	f.tokenFeePrices = make(map[tokenFeeKey]fixedpoint.Value)
+	tokenFeePrices := make(map[tokenFeeKey]fixedpoint.Value)
 
 	if len(trades) == 0 {
-		return nil
+		return tokenFeePrices, nil
 	}
 
 	// token -> symbol, exchangeName
@@ -122,7 +123,7 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 	markets := make(map[types.ExchangeName]types.MarketMap)
 	// exchangeName -> ExchangePublic: query required data by trade.Exchange
 	exchanges := make(map[types.ExchangeName]types.Exchange)
-	for sessionName, service := range f.sessions {
+	for sessionName, service := range sessions {
 		if ex, ok := service.(types.Exchange); ok {
 			exchanges[ex.Name()] = ex
 			mm, err := ex.QueryMarkets(ctx)
@@ -136,7 +137,7 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 
 	// all exchanges do not implement ExchangePublic, can not build token fee map
 	if len(exchanges) == 0 {
-		return nil
+		return tokenFeePrices, nil
 	}
 
 	var quoteCurrency string // quote currency is assumed to be the same for all trades
@@ -158,7 +159,7 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 		}
 		// sanity check: all quote currency should be the same
 		if quoteCurrency != "" && quoteCurrency != market.QuoteCurrency {
-			return fmt.Errorf("quote currency mismatch: %s != %s", quoteCurrency, market.QuoteCurrency)
+			return nil, fmt.Errorf("quote currency mismatch: %s != %s", quoteCurrency, market.QuoteCurrency)
 		}
 		quoteCurrency = market.QuoteCurrency
 		tokens[tokenFeeKey{
@@ -172,7 +173,7 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 	// - all fees are base currency
 	// no need to build token fee map in this case
 	if quoteCurrency == "" {
-		return nil
+		return tokenFeePrices, nil
 	}
 	startTime := since.Truncate(24 * time.Hour).Add(-24 * time.Hour)
 	endTime := until.Truncate(24 * time.Hour)
@@ -196,7 +197,7 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 					}
 					// the date in tokenFeeKey is the next day of the kline date
 					// which means the token fee for the next day is calculated by the previous day's closing price
-					f.tokenFeePrices[tokenFeeKey{
+					tokenFeePrices[tokenFeeKey{
 						token:        info.token,
 						exchangeName: info.exchangeName,
 						date:         kline.StartTime.Time().Add(24 * time.Hour).Format(time.DateOnly),
@@ -204,10 +205,10 @@ func (f *ProfitFixer) buildTokenFeeMap(ctx context.Context, trades []types.Trade
 				}
 			}
 		}(); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return tokenFeePrices, nil
 }
 
 func (f *ProfitFixer) Fix(
@@ -222,18 +223,20 @@ func (f *ProfitFixer) Fix(
 		log.Warnf("[%s] no trades found between %s and %s, skip profit fixing", symbol, since.String(), until.String())
 		return nil
 	}
-	err = f.buildTokenFeeMap(ctx, allTrades, since, until)
+	fm, err := buildTokenFeeDatePrices(ctx, f.sessions, allTrades, since, until)
 	if err != nil {
 		return err
 	}
-	return f.fixFromTrades(allTrades, stats, position)
+	return fixFromTrades(allTrades, &f.ConverterManager, fm, stats, position)
 }
 
-func (f *ProfitFixer) fixFromTrades(allTrades []types.Trade, stats *types.ProfitStats, position *types.Position) error {
+func fixFromTrades(allTrades []types.Trade, converter *core.ConverterManager, tokenFeePrices map[tokenFeeKey]fixedpoint.Value, stats *types.ProfitStats, position *types.Position) error {
 	for _, trade := range allTrades {
-		trade = f.ConverterManager.ConvertTrade(trade)
+		if converter != nil {
+			trade = converter.ConvertTrade(trade)
+		}
 		// set fee average cost
-		if feePrice, ok := f.tokenFeePrices[tokenFeeKey{
+		if feePrice, ok := tokenFeePrices[tokenFeeKey{
 			token:        trade.FeeCurrency,
 			exchangeName: trade.Exchange,
 			date:         trade.Time.Time().Format(time.DateOnly),
@@ -284,4 +287,84 @@ func (f *ProfitFixerBundle) Fix(
 		time.Now(),
 		profitStats,
 		position)
+}
+
+type DatabaseProfitFixer struct {
+	tradeService *service.TradeService
+	sessions     map[string]types.ExchangeTradeHistoryService
+
+	core.ConverterManager
+}
+
+func NewDBProfitFixer(tradeService *service.TradeService) *DatabaseProfitFixer {
+	return &DatabaseProfitFixer{
+		tradeService: tradeService,
+		sessions:     make(map[string]types.ExchangeTradeHistoryService),
+	}
+}
+
+func (f *DatabaseProfitFixer) AddExchange(sessionName string, service types.ExchangeTradeHistoryService) {
+	f.sessions[sessionName] = service
+}
+
+func (f *DatabaseProfitFixer) Fix(
+	ctx context.Context, symbol string, since, until time.Time, stats *types.ProfitStats, position *types.Position,
+) error {
+	log.Infof("starting profit fixer with time range %s <=> %s (from DB)", since, until)
+	allTrades, err := f.queryAllTrades(ctx, symbol, since, until)
+	if err != nil {
+		return err
+	}
+	if len(allTrades) == 0 {
+		log.Warnf("[%s] no trades found between %s and %s, skip profit fixing", symbol, since.String(), until.String())
+		return nil
+	}
+	fm, err := buildTokenFeeDatePrices(ctx, f.sessions, allTrades, since, until)
+	if err != nil {
+		return err
+	}
+	return fixFromTrades(allTrades, &f.ConverterManager, fm, stats, position)
+}
+
+func (f *DatabaseProfitFixer) queryAllTrades(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
+	var trades []types.Trade
+	if symbol == "" {
+		return nil, fmt.Errorf("symbol can not be empty")
+	}
+	for sessionName, s := range f.sessions {
+		options := service.QueryTradesOptions{
+			Symbol: symbol,
+			Since:  &since,
+			Until:  &until,
+		}
+		if ex, ok := s.(types.Exchange); ok {
+			exchangeName := ex.Name()
+			if exchangeName == "" {
+				log.Warnf("skip empty exchange name for session: %s", sessionName)
+				continue
+			}
+			options.Exchange = exchangeName
+			isMargin, isFutures, isIsolated, isolatedSymbol := exchange.GetSessionAttributes(ex)
+			options.IsMargin = &isMargin
+			options.IsFutures = &isFutures
+			if isolatedSymbol == symbol {
+				options.IsIsolated = &isIsolated
+			}
+		} else {
+			log.Warnf("session does not implement types.Exchange, skipping: %s", sessionName)
+			continue
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			trades_, err := f.tradeService.Query(options)
+			if err != nil {
+				return nil, err
+			}
+			trades = append(trades, trades_...)
+		}
+	}
+	return trades, nil
 }
