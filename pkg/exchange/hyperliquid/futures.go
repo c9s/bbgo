@@ -24,7 +24,7 @@ func (e *Exchange) queryFuturesMarkets(ctx context.Context) (types.MarketMap, er
 		markets.Add(types.Market{
 			Exchange:        types.ExchangeHyperliquid,
 			Symbol:          u.Name + QuoteCurrency,
-			LocalSymbol:     strconv.Itoa(i),
+			LocalSymbol:     u.Name + "@" + strconv.Itoa(i),
 			BaseCurrency:    u.Name,
 			QuoteCurrency:   QuoteCurrency,
 			PricePrecision:  8,

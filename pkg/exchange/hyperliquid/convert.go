@@ -17,7 +17,7 @@ func toGlobalSpotMarket(s hyperapi.UniverseMeta, tokens []hyperapi.TokenMeta) ty
 	return types.Market{
 		Exchange:        types.ExchangeHyperliquid,
 		Symbol:          base.Name + quote.Name,
-		LocalSymbol:     strconv.Itoa(s.Index + 1000),
+		LocalSymbol:     "@" + strconv.Itoa(s.Index),
 		BaseCurrency:    base.Name,
 		QuoteCurrency:   quote.Name,
 		TickSize:        tickSize,

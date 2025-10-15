@@ -42,7 +42,7 @@ func TestQueryMarkets(t *testing.T) {
 		assert.Equal(t, "PURRUSDC", purrUsdcMarket.Symbol)
 		assert.Equal(t, "PURR", purrUsdcMarket.BaseCurrency)
 		assert.Equal(t, "USDC", purrUsdcMarket.QuoteCurrency)
-		assert.Equal(t, "1000", purrUsdcMarket.LocalSymbol)
+		assert.Equal(t, "@0", purrUsdcMarket.LocalSymbol)
 		assert.Equal(t, 8, purrUsdcMarket.PricePrecision)
 		assert.Equal(t, 0, purrUsdcMarket.VolumePrecision)
 	})
