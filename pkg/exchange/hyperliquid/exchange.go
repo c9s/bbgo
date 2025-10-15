@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/hyperliquid/hyperapi"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
@@ -122,10 +123,26 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	return nil, fmt.Errorf("not implemented")
 }
 
+// DefaultFeeRates returns the hyperliquid base fee schedule
+// See futures fee at: https://hyperliquid.gitbook.io/hyperliquid-docs/trading/fees
+func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
+	if e.IsFutures {
+		return types.ExchangeFee{
+			MakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.0150), // 0.0150%
+			TakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.0450), // 0.0450%
+		}
+	}
+
+	return types.ExchangeFee{
+		MakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.040), // 0.040%
+		TakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.070), // 0.070%
+	}
+}
+
 func (e *Exchange) SupportedInterval() map[types.Interval]int {
-	return hyperapi.SupportedIntervals
+	return SupportedIntervals
 }
 func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
-	_, ok := hyperapi.SupportedIntervals[interval]
+	_, ok := SupportedIntervals[interval]
 	return ok
 }

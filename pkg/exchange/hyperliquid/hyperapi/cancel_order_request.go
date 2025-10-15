@@ -11,21 +11,23 @@ type CancelResponse struct {
 	Statuses []any `json:"statuses"`
 }
 
+type CancelOrder struct {
+	Asset   int `json:"a"`
+	OrderId int `json:"o"`
+}
+
 //go:generate PostRequest -url "/exchange" -type CancelOrderRequest -responseDataType CancelResponse
 type CancelOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	metaType InfoReqType `param:"type" default:"cancel" validValues:"cancel"`
+	metaType ReqTypeInfo `param:"type" default:"cancel" validValues:"cancel"`
 
-	cancelOrders []struct {
-		Asset   int `json:"a"`
-		OrderId int `json:"o"`
-	} `param:"cancels,required"`
+	cancelOrders []CancelOrder `param:"cancels,required"`
 }
 
 func (c *Client) NewCancelOrderRequest() *CancelOrderRequest {
 	return &CancelOrderRequest{
 		client:   c,
-		metaType: CancelOrder,
+		metaType: ReqCancelOrder,
 	}
 }
