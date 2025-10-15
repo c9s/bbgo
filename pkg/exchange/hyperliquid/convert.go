@@ -3,6 +3,7 @@ package hyperliquid
 import (
 	"math"
 	"strconv"
+	"strings"
 
 	"github.com/c9s/bbgo/pkg/exchange/hyperliquid/hyperapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -17,7 +18,7 @@ func toGlobalSpotMarket(s hyperapi.UniverseMeta, tokens []hyperapi.TokenMeta) ty
 	return types.Market{
 		Exchange:        types.ExchangeHyperliquid,
 		Symbol:          base.Name + quote.Name,
-		LocalSymbol:     strconv.Itoa(s.Index + 1000),
+		LocalSymbol:     "@" + strconv.Itoa(s.Index),
 		BaseCurrency:    base.Name,
 		QuoteCurrency:   quote.Name,
 		TickSize:        tickSize,
@@ -31,4 +32,44 @@ func toGlobalSpotMarket(s hyperapi.UniverseMeta, tokens []hyperapi.TokenMeta) ty
 		PricePrecision:  quote.SzDecimals,
 		VolumePrecision: base.SzDecimals,
 	}
+}
+
+func toLocalSpotAsset(symbol string) string {
+	if s, ok := spotSymbolSyncMap.Load(symbol); ok {
+		if localSymbol, ok := s.(string); ok {
+			at := strings.LastIndexByte(localSymbol, '@')
+			if at < 0 || at+1 >= len(localSymbol) {
+				log.Errorf("invalid local symbol format %q for %s", localSymbol, symbol)
+				return symbol
+			}
+
+			if asset, err := strconv.Atoi(localSymbol[at+1:]); err == nil {
+				return strconv.Itoa(asset + 1000)
+			}
+		}
+
+		log.Errorf("failed to convert symbol %s to local asset, but found in spotSymbolSyncMap", symbol)
+	}
+
+	log.Errorf("failed to look up local asset from %s", symbol)
+	return symbol
+}
+
+func toLocalFuturesAsset(symbol string) string {
+	if s, ok := futuresSymbolSyncMap.Load(symbol); ok {
+		if localSymbol, ok := s.(string); ok {
+			at := strings.LastIndexByte(localSymbol, '@')
+			if at < 0 || at+1 >= len(localSymbol) {
+				log.Errorf("invalid local symbol format %q for %s", localSymbol, symbol)
+				return symbol
+			}
+
+			return localSymbol[at+1:]
+		}
+
+		log.Errorf("failed to convert symbol %s to local asset, but found in spotSymbolSyncMap", symbol)
+	}
+
+	log.Errorf("failed to look up local asset from %s", symbol)
+	return symbol
 }

@@ -11,15 +11,12 @@ import (
 	"regexp"
 )
 
-func (c *CancelOrderRequest) MetaType(metaType InfoReqType) *CancelOrderRequest {
+func (c *CancelOrderRequest) MetaType(metaType ReqTypeInfo) *CancelOrderRequest {
 	c.metaType = metaType
 	return c
 }
 
-func (c *CancelOrderRequest) CancelOrders(cancelOrders []struct {
-	Asset   int "json:\"a\""
-	OrderId int "json:\"o\""
-}) *CancelOrderRequest {
+func (c *CancelOrderRequest) CancelOrders(cancelOrders []CancelOrder) *CancelOrderRequest {
 	c.cancelOrders = cancelOrders
 	return c
 }

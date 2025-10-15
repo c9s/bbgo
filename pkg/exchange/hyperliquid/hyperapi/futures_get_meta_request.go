@@ -20,12 +20,12 @@ type PerpMeta struct {
 type FuturesGetMetaRequest struct {
 	client requestgen.APIClient
 
-	metaType InfoReqType `param:"type" default:"meta" validValues:"meta"`
+	metaType ReqTypeInfo `param:"type" default:"meta" validValues:"meta"`
 }
 
 func (c *Client) NewFuturesGetMetaRequest() *FuturesGetMetaRequest {
 	return &FuturesGetMetaRequest{
 		client:   c,
-		metaType: Meta,
+		metaType: ReqMeta,
 	}
 }

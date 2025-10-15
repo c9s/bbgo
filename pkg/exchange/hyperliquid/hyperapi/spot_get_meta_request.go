@@ -31,12 +31,12 @@ type UniverseMeta struct {
 type SpotGetMetaRequest struct {
 	client requestgen.APIClient
 
-	metaType InfoReqType `param:"type" default:"spotMeta" validValues:"spotMeta"`
+	metaType ReqTypeInfo `param:"type" default:"spotMeta" validValues:"spotMeta"`
 }
 
 func (c *Client) NewSpotGetMetaRequest() *SpotGetMetaRequest {
 	return &SpotGetMetaRequest{
 		client:   c,
-		metaType: SpotMeta,
+		metaType: ReqSpotMeta,
 	}
 }

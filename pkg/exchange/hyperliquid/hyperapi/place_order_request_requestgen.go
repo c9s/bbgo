@@ -11,29 +11,12 @@ import (
 	"regexp"
 )
 
-func (p *PlaceOrderRequest) MetaType(metaType InfoReqType) *PlaceOrderRequest {
+func (p *PlaceOrderRequest) MetaType(metaType ReqTypeInfo) *PlaceOrderRequest {
 	p.metaType = metaType
 	return p
 }
 
-func (p *PlaceOrderRequest) Orders(orders []struct {
-	Asset         string  "json:\"a\""
-	IsBuy         bool    "json:\"b\""
-	Size          string  "json:\"s\""
-	Price         string  "json:\"p\""
-	ReduceOnly    bool    "json:\"r\""
-	ClientOrderID *string "json:\"c\""
-	OrderType     struct {
-		Limit struct {
-			Tif string "json:\"tif\" validValues:\"Alo,Ioc,Gtc\""
-		} "json:\"limit\""
-		Trigger struct {
-			IsMarket  bool   "json:\"isMarket\""
-			TriggerPx string "json:\"triggerPx\""
-			Tpsl      string "json:\"tpsl\" validValues:\"tp,sl\""
-		}
-	} "json:\"t\""
-}) *PlaceOrderRequest {
+func (p *PlaceOrderRequest) Orders(orders []Order) *PlaceOrderRequest {
 	p.orders = orders
 	return p
 }

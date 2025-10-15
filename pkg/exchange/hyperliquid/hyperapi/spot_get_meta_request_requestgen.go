@@ -11,7 +11,7 @@ import (
 	"regexp"
 )
 
-func (s *SpotGetMetaRequest) MetaType(metaType InfoReqType) *SpotGetMetaRequest {
+func (s *SpotGetMetaRequest) MetaType(metaType ReqTypeInfo) *SpotGetMetaRequest {
 	s.metaType = metaType
 	return s
 }

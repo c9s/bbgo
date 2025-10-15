@@ -75,6 +75,19 @@ func (c *Client) SetVaultAddress(address string) {
 	c.vaultAddress = address
 }
 
+// NewRequest create new API request. Relative url can be provided in refURL.
+func (c *Client) NewRequest(
+	ctx context.Context, method, refPath string, params url.Values, payload interface{},
+) (*http.Request, error) {
+	req, err := c.BaseAPIClient.NewRequest(ctx, method, refPath, params, payload)
+	if req != nil {
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Add("Accept", "application/json")
+	}
+
+	return req, err
+}
+
 // NewAuthenticatedRequest creates new http request for authenticated routes.
 func (c *Client) NewAuthenticatedRequest(
 	ctx context.Context, method, refURL string, params url.Values, payload interface{},

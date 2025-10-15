@@ -21,30 +21,32 @@ type OrderResponse struct {
 	} `json:"statuses"`
 }
 
+type Order struct {
+	Asset         string  `json:"a"`
+	IsBuy         bool    `json:"b"`
+	Size          string  `json:"s"`
+	Price         string  `json:"p"`
+	ReduceOnly    bool    `json:"r"`
+	ClientOrderID *string `json:"c"`
+	OrderType     struct {
+		Limit struct {
+			Tif TimeInForce `json:"tif" validate:"Alo,Ioc,Gtc"`
+		} `json:"limit"`
+		Trigger struct {
+			IsMarket  bool   `json:"isMarket"`
+			TriggerPx string `json:"triggerPx"`
+			Tpsl      string `json:"tpsl" validate:"tp,sl"`
+		}
+	} `json:"t"`
+}
+
 //go:generate PostRequest -url "/exchange" -type PlaceOrderRequest -responseDataType OrderResponse
 type PlaceOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	metaType InfoReqType `param:"type" default:"order" validValues:"order"`
+	metaType ReqTypeInfo `param:"type" default:"order" validValues:"order"`
 
-	orders []struct {
-		Asset         string  `json:"a"`
-		IsBuy         bool    `json:"b"`
-		Size          string  `json:"s"`
-		Price         string  `json:"p"`
-		ReduceOnly    bool    `json:"r"`
-		ClientOrderID *string `json:"c"`
-		OrderType     struct {
-			Limit struct {
-				Tif string `json:"tif" validValues:"Alo,Ioc,Gtc"`
-			} `json:"limit"`
-			Trigger struct {
-				IsMarket  bool   `json:"isMarket"`
-				TriggerPx string `json:"triggerPx"`
-				Tpsl      string `json:"tpsl" validValues:"tp,sl"`
-			}
-		} `json:"t"`
-	} `param:"orders,required"`
+	orders []Order `param:"orders,required"`
 
 	grouping string `param:"grouping" default:"na" validValues:"na,normalTpsl,positionTpsl"`
 
@@ -57,6 +59,6 @@ type PlaceOrderRequest struct {
 func (c *Client) NewPlaceOrderRequest() *PlaceOrderRequest {
 	return &PlaceOrderRequest{
 		client:   c,
-		metaType: SubmitOrder,
+		metaType: ReqSubmitOrder,
 	}
 }
