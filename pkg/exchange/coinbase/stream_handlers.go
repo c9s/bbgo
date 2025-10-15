@@ -410,7 +410,7 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 		return
 	}
 	// A valid order has been received and is now active.
-	orderUpdate := msg.ToGlobalOrder()
+	orderUpdate := msg.Order()
 	if orderUpdate.SubmitOrder.Type == types.OrderTypeMarket && orderUpdate.Quantity.IsZero() {
 		s.logger.Warnf("received empty order size, dropped: %s", msg.OrderID)
 		return
