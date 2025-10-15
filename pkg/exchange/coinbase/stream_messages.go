@@ -173,13 +173,30 @@ func (m *ReceivedMessage) IsMarketOrder() bool {
 }
 
 func (m *ReceivedMessage) ToGlobalOrder() types.Order {
-	return types.Order{
+	order := types.Order{
 		SubmitOrder: types.SubmitOrder{
-			ClientOrderID: m.ClientOid,
+			Symbol: toGlobalSymbol(m.ProductID),
+			Side:   toGlobalSide(m.Side),
 		},
-		Exchange:  types.ExchangeCoinBase,
-		IsWorking: false,
+		Status:     types.OrderStatusNew,
+		OrderID:    util.FNV64(m.OrderID),
+		UUID:       m.OrderID,
+		Exchange:   types.ExchangeCoinBase,
+		UpdateTime: types.Time(m.Time),
+		IsWorking:  true,
 	}
+	switch m.OrderType {
+	case "limit":
+		order.SubmitOrder.Type = types.OrderTypeLimit
+		order.SubmitOrder.Price = m.Price
+		order.SubmitOrder.Quantity = m.Size
+	case "market":
+		// NOTE: the Exchange.SubmitOrder method guarantees that the market order does not support funds.
+		// So we simply use the size for market order here.
+		order.SubmitOrder.Type = types.OrderTypeMarket
+		order.SubmitOrder.Quantity = m.Size
+	}
+	return order
 }
 
 type OpenMessage struct {

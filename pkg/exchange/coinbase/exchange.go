@@ -588,6 +588,7 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 	orders := make([]types.Order, 0, len(canceledOrderIds))
 	for _, orderID := range canceledOrderIds {
 		orders = append(orders, types.Order{
+			OrderID:   util.FNV64(orderID),
 			Exchange:  types.ExchangeCoinBase,
 			UUID:      orderID,
 			Status:    types.OrderStatusCanceled,
