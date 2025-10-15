@@ -183,7 +183,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	if order.Quantity.IsZero() {
 		return nil, fmt.Errorf("order.Quantity is required: %+v", order)
 	}
-	req := e.client.NewCreateOrderRequest().ProductID(toLocalSymbol(order.Market.Symbol))
+	req := e.client.
+		NewCreateOrderRequest().
+		ProductID(toLocalSymbol(order.Market.Symbol)).
+		Stp("cn") // cancel newest
 
 	// set order type
 	switch order.Type {
@@ -272,7 +275,11 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	if err != nil {
 		return nil, err
 	}
-
+	// note: Coinbase may adjust the order quantity, so we should
+	if !order.Quantity.Eq(res.Size) {
+		log.Warnf("the order quantity has been adjusted by the server(%s): %s -> %s", res.ID, order.Quantity, res.Size)
+		order.Quantity = res.Size
+	}
 	createdOrder = &types.Order{
 		SubmitOrder:      order,
 		Exchange:         types.ExchangeCoinBase,
