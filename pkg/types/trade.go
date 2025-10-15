@@ -305,8 +305,8 @@ func (trade Trade) LogFields() logrus.Fields {
 		"exchange":  trade.Exchange.String(),
 		"symbol":    trade.Symbol,
 		"side":      trade.Side,
-		"orderID":   orderID,
-		"tradeID":   trade.ID,
+		"order_id":  orderID,
+		"trade_id":  trade.ID,
 		"time":      trade.Time.Time().Format(time.RFC3339Nano),
 		"liquidity": trade.Liquidity(),
 	}
