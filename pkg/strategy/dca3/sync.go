@@ -66,6 +66,10 @@ func (s *Strategy) validateState(ctx context.Context) {
 		if time.Since(s.lastTradeReceivedAt) > 10*time.Second {
 			s.stateMachine.EmitNextState(StateOpenPositionMOQReached)
 		}
+	case StateTakeProfitReached:
+		if s.OrderExecutor.ActiveMakerOrders().NumOfOrders() == 0 {
+			s.stateMachine.EmitNextState(StateIdleWaiting)
+		}
 	}
 }
 
