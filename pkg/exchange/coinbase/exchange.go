@@ -279,7 +279,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		OrderID:          util.FNV64(res.ID),
 		UUID:             res.ID,
 		Status:           toGlobalOrderStatus(res.Status, res.DoneReason),
-		ExecutedQuantity: res.ExecutedValue,
+		ExecutedQuantity: res.FilledSize,
 		IsWorking:        !res.Settled,
 		CreationTime:     res.CreatedAt,
 		UpdateTime:       res.CreatedAt,
