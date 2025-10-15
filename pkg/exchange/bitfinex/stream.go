@@ -84,7 +84,7 @@ func NewStream(ex *Exchange) *Stream {
 		}
 
 		stream.EmitBookTickerUpdate(types.BookTicker{
-			Symbol:   resp.Symbol,
+			Symbol:   toGlobalSymbol(resp.Symbol),
 			Buy:      e.Ticker.Bid,
 			BuySize:  e.Ticker.BidSize,
 			Sell:     e.Ticker.Ask,
@@ -412,7 +412,7 @@ func convertWallets(ws ...bfxapi.Wallet) types.BalanceMap {
 func convertWsUserOrder(uo *bfxapi.UserOrder) *types.Order {
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
-			Symbol:   uo.Symbol,
+			Symbol:   toGlobalSymbol(uo.Symbol),
 			Type:     toGlobalOrderType(uo.OrderType),
 			Side:     toGlobalSide(uo.AmountOrig),
 			Price:    uo.Price,
@@ -441,7 +441,7 @@ func convertWsUserTrade(ut *bfxapi.TradeUpdateEvent) *types.Trade {
 		ID:       uint64(ut.ID),
 		Exchange: ID,
 		OrderID:  uint64(ut.OrderID),
-		Symbol:   ut.Symbol,
+		Symbol:   toGlobalSymbol(ut.Symbol),
 		Price:    ut.ExecPrice,
 		Quantity: ut.ExecAmount.Abs(),
 		Side:     toGlobalSide(ut.ExecAmount),
@@ -477,7 +477,7 @@ func convertPublicTrade(e *bfxapi.PublicTradeEvent, resp *bfxapi.WebSocketRespon
 	return types.Trade{
 		ID:       uint64(e.Trade.ID),
 		Exchange: ID,
-		Symbol:   resp.Symbol,
+		Symbol:   toGlobalSymbol(resp.Symbol),
 		Price:    e.Trade.Price,
 		Quantity: e.Trade.Amount.Abs(),
 		Side:     side,
