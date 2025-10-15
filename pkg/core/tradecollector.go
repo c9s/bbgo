@@ -302,7 +302,6 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 
 	c.mu.Lock()
 
-	// if it's already done, remove the trade from the trade store
 	if _, done := c.doneTrades[key]; done {
 		c.mu.Unlock()
 		return false
