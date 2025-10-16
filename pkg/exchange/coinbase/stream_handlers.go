@@ -410,34 +410,9 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 		return
 	}
 	// A valid order has been received and is now active.
-	orderUpdate := types.Order{
-		SubmitOrder: types.SubmitOrder{
-			Symbol: toGlobalSymbol(msg.ProductID),
-			Side:   toGlobalSide(msg.Side),
-		},
-		Status:     types.OrderStatusNew,
-		OrderID:    util.FNV64(msg.OrderID),
-		UUID:       msg.OrderID,
-		Exchange:   types.ExchangeCoinBase,
-		UpdateTime: types.Time(msg.Time),
-		IsWorking:  true,
-	}
-	switch msg.OrderType {
-	case "limit":
-		orderUpdate.SubmitOrder.Type = types.OrderTypeLimit
-		orderUpdate.SubmitOrder.Price = msg.Price
-		orderUpdate.SubmitOrder.Quantity = msg.Size
-	case "market":
-		// NOTE: the Exchange.SubmitOrder method guarantees that the market order does not support funds.
-		// So we simply check the size for market order here.
-		if msg.Size.IsZero() {
-			s.logger.Warnf("received empty order size, dropped: %s", msg.OrderID)
-			return
-		}
-		orderUpdate.SubmitOrder.Type = types.OrderTypeMarket
-		orderUpdate.SubmitOrder.Quantity = msg.Size
-	default:
-		s.logger.Warnf("unknown order type, dropped: %s", msg.OrderType)
+	orderUpdate := msg.Order()
+	if orderUpdate.SubmitOrder.Type == types.OrderTypeMarket && orderUpdate.Quantity.IsZero() {
+		s.logger.Warnf("received empty order size, dropped: %s", msg.OrderID)
 		return
 	}
 	s.updateWorkingOrders(orderUpdate)
