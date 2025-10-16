@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
@@ -51,12 +50,11 @@ type Exchange struct {
 	apiSecret     string
 	apiPassphrase string
 
-	// order will be added to activeOrders when it is submitted successfully
-	// once the websocket stream receives a done message of the order, it will be removed from activeOrders
-	// the purpose of activeOrders is to serve as a cache so that we can retrieve the order info when processing the websocket feed
+	// order will be added to activeOrderStore when it is submitted successfully
+	// once the websocket stream receives a done message of the order, it will be removed from activeOrderStore
+	// the purpose of activeOrderStore is to serve as a cache so that we can retrieve the order info when processing the websocket feed
 	// ex: received message
-	activeOrderMutex sync.Mutex
-	activeOrders     map[string]*ActiveOrder
+	activeOrderStore *ActiveOrderStore
 }
 
 func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
@@ -67,10 +65,8 @@ func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
 		apiKey:        key,
 		apiSecret:     secret,
 		apiPassphrase: passphrase,
-
-		activeOrders: make(map[string]*ActiveOrder),
 	}
-	go ex.trimActiveOrdersWorker()
+	ex.activeOrderStore = newActiveOrderStore(ex)
 	return ex
 }
 
@@ -304,7 +300,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		UpdateTime:       res.CreatedAt,
 		OriginalStatus:   string(res.Status),
 	}
-	e.addActiveOrder(createdOrder, res)
+	e.activeOrderStore.addActiveOrder(createdOrder, res)
 	return createdOrder, nil
 }
 
@@ -413,7 +409,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 			cancelErrors = append(cancelErrors, err)
 			continue
 		} else {
-			e.removeActiveOrderByUUID(order.UUID)
+			e.activeOrderStore.removeActiveOrderByUUID(order.UUID)
 			log.Infof("order %v has been cancelled", *res)
 		}
 	}
@@ -607,7 +603,7 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 			Status:    types.OrderStatusCanceled,
 			IsWorking: false,
 		})
-		e.removeActiveOrderByUUID(orderID)
+		e.activeOrderStore.removeActiveOrderByUUID(orderID)
 	}
 	return orders, nil
 }

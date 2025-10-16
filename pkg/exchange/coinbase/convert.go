@@ -322,9 +322,10 @@ func (msg *MatchMessage) Trade(s *Stream) types.Trade {
 func (m *ReceivedMessage) Order(s *Stream) types.Order {
 
 	var createdOrder *types.Order
-	if activeOrder, ok := s.exchange.activeOrders[m.OrderID]; ok {
+	if activeOrder, ok := s.exchange.activeOrderStore.getActiveOrderByUUID(m.OrderID); ok {
 		createdOrder = activeOrder.createdOrder
 	} else {
+		// query the order if not found in active orders
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		createdOrder, _ = s.exchange.QueryOrder(ctx, types.OrderQuery{OrderUUID: m.OrderID})
