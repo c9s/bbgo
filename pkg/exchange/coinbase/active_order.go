@@ -13,37 +13,37 @@ type ActiveOrder struct {
 }
 
 type ActiveOrderStore struct {
-	activeOrderMutex sync.Mutex
-	activeOrders     map[string]*ActiveOrder
+	mu     sync.Mutex
+	orders map[string]*ActiveOrder
 }
 
 func newActiveOrderStore() *ActiveOrderStore {
 	return &ActiveOrderStore{
-		activeOrders: make(map[string]*ActiveOrder),
+		orders: make(map[string]*ActiveOrder),
 	}
 }
 
-func (a *ActiveOrderStore) getActiveOrderByUUID(orderUUID string) (*ActiveOrder, bool) {
-	a.activeOrderMutex.Lock()
-	defer a.activeOrderMutex.Unlock()
+func (a *ActiveOrderStore) getByUUID(orderUUID string) (*ActiveOrder, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
-	order, ok := a.activeOrders[orderUUID]
+	order, ok := a.orders[orderUUID]
 	return order, ok
 }
 
-func (a *ActiveOrderStore) addActiveOrder(order types.SubmitOrder, rawOrder *api.CreateOrderResponse) {
-	a.activeOrderMutex.Lock()
-	defer a.activeOrderMutex.Unlock()
+func (a *ActiveOrderStore) add(order types.SubmitOrder, rawOrder *api.CreateOrderResponse) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
-	a.activeOrders[rawOrder.ID] = &ActiveOrder{
+	a.orders[rawOrder.ID] = &ActiveOrder{
 		submitOrder: order,
 		rawOrder:    rawOrder,
 	}
 }
 
-func (a *ActiveOrderStore) removeActiveOrderByUUID(orderUUID string) {
-	a.activeOrderMutex.Lock()
-	defer a.activeOrderMutex.Unlock()
+func (a *ActiveOrderStore) removeByUUID(orderUUID string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
-	delete(a.activeOrders, orderUUID)
+	delete(a.orders, orderUUID)
 }

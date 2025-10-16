@@ -336,7 +336,7 @@ func (msg *MatchMessage) Trade(s *Stream) types.Trade {
 
 func (m *ReceivedMessage) Order(s *Stream) types.Order {
 	var order *types.Order
-	if activeOrder, ok := s.exchange.activeOrderStore.getActiveOrderByUUID(m.OrderID); ok {
+	if activeOrder, ok := s.exchange.activeOrderStore.getByUUID(m.OrderID); ok {
 		order = submitOrderToGlobalOrder(activeOrder.submitOrder, activeOrder.rawOrder)
 	} else {
 		// query the order if not found in active orders
@@ -344,7 +344,7 @@ func (m *ReceivedMessage) Order(s *Stream) types.Order {
 		defer cancel()
 
 		createdOrder, err := s.exchange.QueryOrder(ctx, types.OrderQuery{OrderUUID: m.OrderID})
-		if err != nil {
+		if err == nil {
 			order = createdOrder
 		} else {
 			log.Warnf("fail to retrieve order info for received message: %s", m.OrderID)

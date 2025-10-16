@@ -513,7 +513,7 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 		UpdateTime:       types.Time(msg.Time),
 	}
 	s.updateWorkingOrders(orderUpdate)
-	s.exchange.activeOrderStore.removeActiveOrderByUUID(msg.OrderID)
+	s.exchange.activeOrderStore.removeByUUID(msg.OrderID)
 	s.EmitOrderUpdate(orderUpdate)
 }
 

@@ -288,7 +288,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		order.Quantity = res.Size
 	}
 	createdOrder = submitOrderToGlobalOrder(order, res)
-	e.activeOrderStore.addActiveOrder(order, res)
+	e.activeOrderStore.add(order, res)
 	return createdOrder, nil
 }
 
@@ -397,7 +397,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 			cancelErrors = append(cancelErrors, err)
 			continue
 		} else {
-			e.activeOrderStore.removeActiveOrderByUUID(order.UUID)
+			e.activeOrderStore.removeByUUID(order.UUID)
 			log.Infof("order %v has been cancelled", *res)
 		}
 	}
@@ -591,7 +591,7 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 			Status:    types.OrderStatusCanceled,
 			IsWorking: false,
 		})
-		e.activeOrderStore.removeActiveOrderByUUID(orderID)
+		e.activeOrderStore.removeByUUID(orderID)
 	}
 	return orders, nil
 }
