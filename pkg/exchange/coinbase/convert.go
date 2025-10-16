@@ -1,6 +1,7 @@
 package coinbase
 
 import (
+	"context"
 	"math"
 	"strings"
 	"time"
@@ -318,19 +319,37 @@ func (msg *MatchMessage) Trade(s *Stream) types.Trade {
 	}
 }
 
-func (m *ReceivedMessage) Order() types.Order {
-	order := types.Order{
-		SubmitOrder: types.SubmitOrder{
-			Symbol: toGlobalSymbol(m.ProductID),
-			Side:   toGlobalSide(m.Side),
-		},
-		Status:     types.OrderStatusNew,
-		OrderID:    util.FNV64(m.OrderID),
-		UUID:       m.OrderID,
-		Exchange:   types.ExchangeCoinBase,
-		UpdateTime: types.Time(m.Time),
-		IsWorking:  true,
+func (m *ReceivedMessage) Order(s *Stream) types.Order {
+
+	var createdOrder *types.Order
+	if activeOrder, ok := s.exchange.activeOrders[m.OrderID]; ok {
+		createdOrder = activeOrder.createdOrder
+	} else {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		createdOrder, _ = s.exchange.QueryOrder(ctx, types.OrderQuery{OrderUUID: m.OrderID})
 	}
+
+	var order types.Order
+	if createdOrder != nil {
+		// copy the created order
+		order = *createdOrder
+	} else {
+		log.Warnf("fail to retrieve order info for received message: %s", m.OrderID)
+		order = types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Symbol: toGlobalSymbol(m.ProductID),
+				Side:   toGlobalSide(m.Side),
+			},
+			OrderID: util.FNV64(m.OrderID),
+			UUID:    m.OrderID,
+		}
+	}
+	order.Exchange = types.ExchangeCoinBase
+	order.Status = types.OrderStatusNew
+	order.UpdateTime = types.Time(m.Time)
+	order.IsWorking = true
+
 	switch m.OrderType {
 	case "limit":
 		order.SubmitOrder.Type = types.OrderTypeLimit

@@ -49,6 +49,12 @@ type Exchange struct {
 	apiKey        string
 	apiSecret     string
 	apiPassphrase string
+
+	// order will be added to activeOrders when it is submitted successfully
+	// once the websocket stream receives a done message of the order, it will be removed from activeOrders
+	// the purpose of activeOrders is to serve as a cache so that we can retrieve the order info when processing the websocket feed
+	// ex: received message
+	activeOrders map[string]*ActiveOrder
 }
 
 func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
@@ -292,7 +298,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		UpdateTime:       res.CreatedAt,
 		OriginalStatus:   string(res.Status),
 	}
-
+	e.addActiveOrder(createdOrder, res)
 	return createdOrder, nil
 }
 
