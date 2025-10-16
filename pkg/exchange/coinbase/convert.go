@@ -70,6 +70,21 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 	return order
 }
 
+func submitOrderToGlobalOrder(submitOrder types.SubmitOrder, res *api.CreateOrderResponse) *types.Order {
+	return &types.Order{
+		SubmitOrder:      submitOrder,
+		Exchange:         types.ExchangeCoinBase,
+		OrderID:          util.FNV64(res.ID),
+		UUID:             res.ID,
+		Status:           toGlobalOrderStatus(res.Status, res.DoneReason),
+		ExecutedQuantity: res.FilledSize,
+		IsWorking:        !res.Settled,
+		CreationTime:     res.CreatedAt,
+		UpdateTime:       res.CreatedAt,
+		OriginalStatus:   string(res.Status),
+	}
+}
+
 func toGlobalTrade(cbTrade *api.Trade) types.Trade {
 	side := toGlobalSide(cbTrade.Side)
 	return types.Trade{
@@ -323,7 +338,7 @@ func (m *ReceivedMessage) Order(s *Stream) types.Order {
 
 	var createdOrder *types.Order
 	if activeOrder, ok := s.exchange.activeOrderStore.getActiveOrderByUUID(m.OrderID); ok {
-		createdOrder = activeOrder.createdOrder
+		createdOrder = submitOrderToGlobalOrder(activeOrder.submitOrder, activeOrder.rawOrder)
 	} else {
 		// query the order if not found in active orders
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

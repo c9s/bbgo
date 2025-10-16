@@ -10,8 +10,8 @@ import (
 )
 
 type ActiveOrder struct {
-	createdOrder *types.Order
-	rawOrder     *api.CreateOrderResponse
+	submitOrder types.SubmitOrder
+	rawOrder    *api.CreateOrderResponse
 }
 
 type ActiveOrderStore struct {
@@ -35,13 +35,13 @@ func (a *ActiveOrderStore) getActiveOrderByUUID(orderUUID string) (*ActiveOrder,
 	return order, ok
 }
 
-func (a *ActiveOrderStore) addActiveOrder(order *types.Order, rawOrder *api.CreateOrderResponse) {
+func (a *ActiveOrderStore) addActiveOrder(order types.SubmitOrder, rawOrder *api.CreateOrderResponse) {
 	a.activeOrderMutex.Lock()
 	defer a.activeOrderMutex.Unlock()
 
 	a.activeOrders[rawOrder.ID] = &ActiveOrder{
-		createdOrder: order,
-		rawOrder:     rawOrder,
+		submitOrder: order,
+		rawOrder:    rawOrder,
 	}
 }
 

@@ -288,19 +288,8 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		log.Warnf("the order quantity has been adjusted by the server(%s): %s -> %s", res.ID, order.Quantity, res.Size)
 		order.Quantity = res.Size
 	}
-	createdOrder = &types.Order{
-		SubmitOrder:      order,
-		Exchange:         types.ExchangeCoinBase,
-		OrderID:          util.FNV64(res.ID),
-		UUID:             res.ID,
-		Status:           toGlobalOrderStatus(res.Status, res.DoneReason),
-		ExecutedQuantity: res.FilledSize,
-		IsWorking:        !res.Settled,
-		CreationTime:     res.CreatedAt,
-		UpdateTime:       res.CreatedAt,
-		OriginalStatus:   string(res.Status),
-	}
-	e.activeOrderStore.addActiveOrder(createdOrder, res)
+	createdOrder = submitOrderToGlobalOrder(order, res)
+	e.activeOrderStore.addActiveOrder(order, res)
 	return createdOrder, nil
 }
 
