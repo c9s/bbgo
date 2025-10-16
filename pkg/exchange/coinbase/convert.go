@@ -85,6 +85,7 @@ func toGlobalTrade(cbTrade *api.Trade) types.Trade {
 		IsMaker:       cbTrade.Liquidity == api.LiquidityMaker,
 		Fee:           cbTrade.Fee,
 		FeeCurrency:   cbTrade.FundingCurrency,
+		FeeProcessing: !cbTrade.Settled,
 		Time:          cbTrade.CreatedAt,
 	}
 }
@@ -311,6 +312,7 @@ func (msg *MatchMessage) Trade(s *Stream) types.Trade {
 		IsBuyer:       side == types.SideTypeBuy,
 		IsMaker:       msg.IsAuthMaker(),
 		Time:          types.Time(msg.Time),
+		FeeProcessing: true, // assume the fee is processing when a match happens
 		FeeCurrency:   quoteCurrency,
 		Fee:           quoteQuantity.Mul(msg.FeeRate()),
 	}
