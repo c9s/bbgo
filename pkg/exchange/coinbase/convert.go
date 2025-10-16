@@ -78,7 +78,7 @@ func submitOrderToGlobalOrder(submitOrder types.SubmitOrder, res *api.CreateOrde
 		UUID:             res.ID,
 		Status:           toGlobalOrderStatus(res.Status, res.DoneReason),
 		ExecutedQuantity: res.FilledSize,
-		IsWorking:        !res.Settled,
+		IsWorking:        true,
 		CreationTime:     res.CreatedAt,
 		UpdateTime:       res.CreatedAt,
 		OriginalStatus:   string(res.Status),

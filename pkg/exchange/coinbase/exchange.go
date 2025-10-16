@@ -59,15 +59,14 @@ type Exchange struct {
 
 func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
 	client := api.NewClient(key, secret, passphrase, timeout)
-	ex := &Exchange{
+	return &Exchange{
 		client: client,
 
-		apiKey:        key,
-		apiSecret:     secret,
-		apiPassphrase: passphrase,
+		apiKey:           key,
+		apiSecret:        secret,
+		apiPassphrase:    passphrase,
+		activeOrderStore: newActiveOrderStore(),
 	}
-	ex.activeOrderStore = newActiveOrderStore(ex)
-	return ex
 }
 
 func (e *Exchange) Client() *api.RestAPIClient {
