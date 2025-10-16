@@ -85,6 +85,7 @@ func toGlobalTrade(cbTrade *api.Trade) types.Trade {
 		IsMaker:       cbTrade.Liquidity == api.LiquidityMaker,
 		Fee:           cbTrade.Fee,
 		FeeCurrency:   cbTrade.FundingCurrency,
+		FeeProcessing: !cbTrade.Settled,
 		Time:          cbTrade.CreatedAt,
 	}
 }
@@ -261,7 +262,7 @@ func isWorkingOrder(status api.OrderStatus) bool {
 // Trade() convert the message to a Trade
 // fee currency on Coinbase is USD:
 // https://help.coinbase.com/en/exchange/trading-and-funding/exchange-fees
-func (msg *MatchMessage) Trade() types.Trade {
+func (msg *MatchMessage) Trade(s *Stream) types.Trade {
 	var side types.SideType
 	// NOTE: the message side is the maker side
 	switch msg.Side {
@@ -290,6 +291,14 @@ func (msg *MatchMessage) Trade() types.Trade {
 	if orderUUID != "" {
 		orderID = util.FNV64(orderUUID)
 	}
+	var quoteCurrency string
+	market, ok := s.marketInfoMap[msg.ProductID]
+	if ok {
+		quoteCurrency = market.QuoteCurrency
+	} else {
+		log.Warnf("unknown product id: %s", msg.ProductID)
+		quoteCurrency = "USD" // fallback to USD
+	}
 	return types.Trade{
 		ID:            uint64(msg.TradeID),
 		Exchange:      types.ExchangeCoinBase,
@@ -303,7 +312,8 @@ func (msg *MatchMessage) Trade() types.Trade {
 		IsBuyer:       side == types.SideTypeBuy,
 		IsMaker:       msg.IsAuthMaker(),
 		Time:          types.Time(msg.Time),
-		FeeCurrency:   "USD",
+		FeeProcessing: true, // assume the fee is processing when a match happens
+		FeeCurrency:   quoteCurrency,
 		Fee:           quoteQuantity.Mul(msg.FeeRate()),
 	}
 }

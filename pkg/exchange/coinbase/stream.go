@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/core/klinedriver"
+	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
@@ -69,6 +70,9 @@ type Stream struct {
 	klineCtx     context.Context
 	klineCancel  context.CancelFunc
 	klineDrivers []*klinedriver.TickKLineDriver
+
+	// marketInfoMap: local symbol -> market info
+	marketInfoMap map[string]*api.MarketInfo
 }
 
 func NewStream(
@@ -91,6 +95,7 @@ func NewStream(
 		lastSequenceMsgMap:  make(map[string]SequenceNumberType),
 		workingOrdersMap:    make(map[string]types.Order),
 		channel2LocalIdsMap: make(map[types.Channel][]string),
+		marketInfoMap:       make(map[string]*api.MarketInfo),
 	}
 	s.SetParser(parseMessage)
 	s.SetDispatcher(s.dispatchEvent)
