@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
@@ -54,18 +55,23 @@ type Exchange struct {
 	// once the websocket stream receives a done message of the order, it will be removed from activeOrders
 	// the purpose of activeOrders is to serve as a cache so that we can retrieve the order info when processing the websocket feed
 	// ex: received message
-	activeOrders map[string]*ActiveOrder
+	activeOrderMutex sync.Mutex
+	activeOrders     map[string]*ActiveOrder
 }
 
 func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
 	client := api.NewClient(key, secret, passphrase, timeout)
-	return &Exchange{
+	ex := &Exchange{
 		client: client,
 
 		apiKey:        key,
 		apiSecret:     secret,
 		apiPassphrase: passphrase,
+
+		activeOrders: make(map[string]*ActiveOrder),
 	}
+	go ex.trimActiveOrdersWorker()
+	return ex
 }
 
 func (e *Exchange) Client() *api.RestAPIClient {
@@ -407,6 +413,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 			cancelErrors = append(cancelErrors, err)
 			continue
 		} else {
+			e.removeActiveOrderByUUID(order.UUID)
 			log.Infof("order %v has been cancelled", *res)
 		}
 	}
@@ -600,6 +607,7 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 			Status:    types.OrderStatusCanceled,
 			IsWorking: false,
 		})
+		e.removeActiveOrderByUUID(orderID)
 	}
 	return orders, nil
 }
