@@ -88,6 +88,19 @@ func (s *Stream) handleConnect() {
 		s.klineCtx, s.klineCancel = context.WithCancel(context.Background())
 	}
 
+	// fetch all market infos
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	req := s.exchange.client.NewGetMarketInfoRequest()
+	marketInfos, err := req.Do(ctx)
+	if err == nil {
+		for _, marketInfo := range marketInfos {
+			s.marketInfoMap[marketInfo.ID] = &marketInfo
+		}
+	} else {
+		s.logger.WithError(err).Error("failed to fetch market info")
+	}
+
 	// write subscribe json
 	s.writeSubscribeJson(s.channel2LocalIdsMap)
 
@@ -312,7 +325,7 @@ func (s *Stream) handleMatchMessage(msg *MatchMessage) {
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
-	trade := msg.Trade()
+	trade := msg.Trade(s)
 	if s.PublicOnly {
 		// the stream is a public stream, providing feeds on public market trades, emit market trade
 		s.EmitMarketTrade(trade)
