@@ -335,30 +335,27 @@ func (msg *MatchMessage) Trade(s *Stream) types.Trade {
 }
 
 func (m *ReceivedMessage) Order(s *Stream) types.Order {
-
-	var createdOrder *types.Order
+	var order *types.Order
 	if activeOrder, ok := s.exchange.activeOrderStore.getActiveOrderByUUID(m.OrderID); ok {
-		createdOrder = submitOrderToGlobalOrder(activeOrder.submitOrder, activeOrder.rawOrder)
+		order = submitOrderToGlobalOrder(activeOrder.submitOrder, activeOrder.rawOrder)
 	} else {
 		// query the order if not found in active orders
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		createdOrder, _ = s.exchange.QueryOrder(ctx, types.OrderQuery{OrderUUID: m.OrderID})
-	}
 
-	var order types.Order
-	if createdOrder != nil {
-		// copy the created order
-		order = *createdOrder
-	} else {
-		log.Warnf("fail to retrieve order info for received message: %s", m.OrderID)
-		order = types.Order{
-			SubmitOrder: types.SubmitOrder{
-				Symbol: toGlobalSymbol(m.ProductID),
-				Side:   toGlobalSide(m.Side),
-			},
-			OrderID: util.FNV64(m.OrderID),
-			UUID:    m.OrderID,
+		createdOrder, err := s.exchange.QueryOrder(ctx, types.OrderQuery{OrderUUID: m.OrderID})
+		if err != nil {
+			order = createdOrder
+		} else {
+			log.Warnf("fail to retrieve order info for received message: %s", m.OrderID)
+			order = &types.Order{
+				SubmitOrder: types.SubmitOrder{
+					Symbol: toGlobalSymbol(m.ProductID),
+					Side:   toGlobalSide(m.Side),
+				},
+				OrderID: util.FNV64(m.OrderID),
+				UUID:    m.OrderID,
+			}
 		}
 	}
 	order.Exchange = types.ExchangeCoinBase
@@ -377,5 +374,5 @@ func (m *ReceivedMessage) Order(s *Stream) types.Order {
 		order.SubmitOrder.Type = types.OrderTypeMarket
 		order.SubmitOrder.Quantity = m.Size
 	}
-	return order
+	return *order
 }
