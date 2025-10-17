@@ -1,6 +1,7 @@
 package bbgo
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
@@ -76,7 +77,7 @@ func TestActiveOrderBook_pendingOrders(t *testing.T) {
 	assert.True(t, filled, "filled event should be fired")
 }
 
-func Test_RestoreParametersOnUpdateHandler(t *testing.T) {
+func TestActiveOrderBook_RestoreParametersOnUpdateHandler(t *testing.T) {
 	now := time.Now()
 	t1 := now
 	t2 := now.Add(time.Millisecond)
@@ -151,4 +152,60 @@ func Test_isNewerUpdateTime(t *testing.T) {
 	}
 	ret := isNewerOrderUpdateTime(a, b)
 	assert.True(t, ret)
+}
+
+// TestActiveOrderBook_PendingOrderUpdatesMemoryLeak tests for memory leaks in pending order updates
+// === RUN   TestActiveOrderBook_PendingOrderUpdatesMemoryLeak
+// [Before] Alloc: 1921160 bytes (bytes of allocated heap objects)
+// [Before] TotalAlloc: 3957240 bytes (cumulative bytes allocated for heap objects)
+// [Before] Sys: 14304520 bytes (total bytes obtained from system)
+// [Before] NumGC: 2 (number of completed GC cycles)
+// [After] Alloc: 1878776 bytes (bytes of allocated heap objects)
+// [After] TotalAlloc: 1556047376 bytes (cumulative bytes allocated for heap objects)
+// [After] Sys: 19809544 bytes (total bytes obtained from system)
+// [After] NumGC: 710 (number of completed GC cycles)
+func TestActiveOrderBook_PendingOrderUpdatesMemoryLeak(t *testing.T) {
+	book := NewActiveOrderBook("BTCUSDT")
+	var memStatsBefore, memStatsAfter runtime.MemStats
+
+	runtime.GC()
+
+	runtime.ReadMemStats(&memStatsBefore)
+
+	t.Logf("[Before] Alloc: %d bytes (bytes of allocated heap objects)", memStatsBefore.Alloc)
+	t.Logf("[Before] TotalAlloc: %d bytes (cumulative bytes allocated for heap objects)", memStatsBefore.TotalAlloc)
+	t.Logf("[Before] Sys: %d bytes (total bytes obtained from system)", memStatsBefore.Sys)
+	t.Logf("[Before] NumGC: %d (number of completed GC cycles)", memStatsBefore.NumGC)
+
+	orderCount := 1_000_000
+	for i := 0; i < orderCount; i++ {
+		order := types.Order{
+			OrderID: uint64(100000 + i),
+			SubmitOrder: types.SubmitOrder{
+				Symbol: "BTCUSDT",
+			},
+			Status: types.OrderStatusNew,
+		}
+		book.pendingOrderUpdates.Add(order)
+
+		// Move pending order updates to the main order store
+		book.Add(order)
+
+		// Simulate order being filled and removed
+		book.Remove(order)
+	}
+
+	// force GC
+	runtime.GC()
+	runtime.ReadMemStats(&memStatsAfter)
+
+	t.Logf("[After] Alloc: %d bytes (bytes of allocated heap objects)", memStatsAfter.Alloc)
+	t.Logf("[After] TotalAlloc: %d bytes (cumulative bytes allocated for heap objects)", memStatsAfter.TotalAlloc)
+	t.Logf("[After] Sys: %d bytes (total bytes obtained from system)", memStatsAfter.Sys)
+	t.Logf("[After] NumGC: %d (number of completed GC cycles)", memStatsAfter.NumGC)
+
+	assert.Less(t, memStatsAfter.Alloc, memStatsBefore.Alloc+uint64(orderCount/3)*1024, "memory allocation should not grow significantly")
+
+	assert.Equal(t, 0, book.pendingOrderUpdates.Len(), "pendingOrderUpdates should be empty after cleanup")
+	assert.Equal(t, 0, book.orders.Len(), "pendingOrderUpdates should be empty after cleanup")
 }

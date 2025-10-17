@@ -312,6 +312,8 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 }
 
 func (b *ActiveOrderBook) clear() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	b.orders.Clear()
 	b.pendingOrderUpdates.Clear()
 }
@@ -469,6 +471,7 @@ func isNewerOrderUpdateTime(a, b types.Order) bool {
 
 // add the order to the active order book and check the pending order
 func (b *ActiveOrderBook) add(order types.Order) {
+	b.mu.Lock()
 	if pendingOrder, ok := b.pendingOrderUpdates.Get(order.OrderID); ok {
 		// if the pending order update time is newer than the adding order
 		// we should use the pending order rather than the adding order.
@@ -485,6 +488,10 @@ func (b *ActiveOrderBook) add(order types.Order) {
 
 		b.orders.Add(order)
 		b.pendingOrderUpdates.Remove(pendingOrder.OrderID)
+
+		// always unlock before emitting event
+		b.mu.Unlock()
+
 		b.EmitNew(order)
 
 		// when using add(order), it's usually a new maker order on the order book.
@@ -496,6 +503,10 @@ func (b *ActiveOrderBook) add(order types.Order) {
 
 	} else {
 		b.orders.Add(order)
+
+		// always unlock before emitting event
+		b.mu.Unlock()
+
 		b.EmitNew(order)
 	}
 }
@@ -528,7 +539,11 @@ func (b *ActiveOrderBook) Lookup(f func(o types.Order) bool) *types.Order {
 	return b.orders.Lookup(f)
 }
 
-func (b *ActiveOrderBook) filterExistingOrders(orders []types.Order) (existingOrders types.OrderSlice) {
+func (b *ActiveOrderBook) filterExistingOrders(orders []types.Order) types.OrderSlice {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	existingOrders := make(types.OrderSlice, 0, len(orders))
 	for _, o := range orders {
 		// skip market order
 		// this prevents if someone added a market order to the active order book
