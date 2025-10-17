@@ -46,6 +46,9 @@ type Strategy struct {
 	LongTermEMAWindow  types.IntervalWindow `json:"longTermEMAWindow"`  // 長期EMA視窗設定，可自訂天數與週期
 	ShortTermEMAWindow types.IntervalWindow `json:"shortTermEMAWindow"` // 短期EMA視窗設定，可自訂天數與週期
 
+	// Pivot High 設定
+	PivotHighWindow types.IntervalWindow `json:"pivotHighWindow"` // Pivot High 視窗設定
+
 	// 出場條件參數
 	EngulfingInterval types.Interval `json:"engulfingInterval"` // 監控吞噬型態的時間間隔 (30m)
 
@@ -56,8 +59,9 @@ type Strategy struct {
 	// orderExecutor *bbgo.GeneralOrderExecutor // 訂單執行器
 
 	// 技術指標
-	longTermEMA  *indicator.EWMA // 長期EMA指數移動平均線
-	shortTermEMA *indicator.EWMA // 短期EMA指數移動平均線
+	pivotHigh    *indicator.PivotHigh // 軸心高點指標
+	longTermEMA  *indicator.EWMA      // 長期EMA指數移動平均線
+	shortTermEMA *indicator.EWMA      // 短期EMA指數移動平均線
 
 	// 吞噬型態追踪
 	lastGreenKline *types.KLine // 記錄最後一根綠色K線，用於吞噬型態判斷
@@ -128,6 +132,15 @@ func (s *Strategy) Defaults() error {
 		s.ShortTermEMAWindow.Window = 20
 	}
 
+	// 預設 Pivot High 設定
+	if s.PivotHighWindow.Interval == "" {
+		s.PivotHighWindow.Interval = s.VolumeInterval
+	}
+
+	if s.PivotHighWindow.Window == 0 {
+		s.PivotHighWindow.Window = 5 // 預設左右各檢查 5 個點
+	}
+
 	return nil
 }
 
@@ -150,6 +163,9 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// 訂閱EMA指標所需的K線數據
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LongTermEMAWindow.Interval})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.ShortTermEMAWindow.Interval})
+
+	// 訂閱Pivot High指標所需的K線數據
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.PivotHighWindow.Interval})
 
 	// 訂閱出場方法所需的數據
 	s.ExitMethods.SetAndSubscribe(session, s)
@@ -292,6 +308,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, instanceID)
 	s.OrderExecutor.BindTradeStats(s.TradeStats)
 
+	// 初始化技術指標
+	standardIndicatorSet := session.StandardIndicatorSet(s.Symbol)
+	s.longTermEMA = standardIndicatorSet.EWMA(s.LongTermEMAWindow)
+	s.shortTermEMA = standardIndicatorSet.EWMA(s.ShortTermEMAWindow)
+	s.pivotHigh = standardIndicatorSet.PivotHigh(s.PivotHighWindow)
+
 	// 設定出場方法
 	s.ExitMethods.Bind(session, s.OrderExecutor)
 
@@ -323,11 +345,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		})
 	*/
-
-	// 初始化技術指標
-	standardIndicatorSet := session.StandardIndicatorSet(s.Symbol)
-	s.longTermEMA = standardIndicatorSet.EWMA(s.LongTermEMAWindow)
-	s.shortTermEMA = standardIndicatorSet.EWMA(s.ShortTermEMAWindow)
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// log.Info(kline.String())
@@ -424,6 +441,23 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// 不是進場用的 Interval
 		if kline.Interval != s.EngulfingInterval {
 			return
+		}
+
+		// 價格低於成本價，跳過停利出場檢查
+		if s.Position.GetAverageCost().Compare(kline.GetClose()) >= 0 {
+			return
+		}
+
+		// 只有當價格超過 pivot high 時才能停利出場
+		if s.pivotHigh != nil && s.pivotHigh.Length() > 0 {
+			currentPivotHigh := fixedpoint.NewFromFloat(s.pivotHigh.Last(0))
+			if kline.GetClose().Compare(currentPivotHigh) <= 0 {
+				log.Infof("[Exit] Price %s has not exceeded pivot high %s, skipping exit",
+					kline.GetClose(), currentPivotHigh)
+				return
+			}
+			log.Infof("[Exit] Price %s exceeded pivot high %s, allowing exit",
+				kline.GetClose(), currentPivotHigh)
 		}
 
 		// 設定最後一根綠K線
