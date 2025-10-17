@@ -423,7 +423,7 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 		return
 	}
 	// A valid order has been received and is now active.
-	orderUpdate := msg.Order()
+	orderUpdate := msg.Order(s)
 	if orderUpdate.SubmitOrder.Type == types.OrderTypeMarket && orderUpdate.Quantity.IsZero() {
 		s.logger.Warnf("received empty order size, dropped: %s", msg.OrderID)
 		return
@@ -513,6 +513,7 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 		UpdateTime:       types.Time(msg.Time),
 	}
 	s.updateWorkingOrders(orderUpdate)
+	s.exchange.activeOrderStore.removeByUUID(msg.OrderID)
 	s.EmitOrderUpdate(orderUpdate)
 }
 

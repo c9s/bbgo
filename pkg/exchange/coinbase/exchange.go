@@ -49,6 +49,12 @@ type Exchange struct {
 	apiKey        string
 	apiSecret     string
 	apiPassphrase string
+
+	// order will be added to activeOrderStore when it is submitted successfully
+	// once the websocket stream receives a done message of the order, it will be removed from activeOrderStore
+	// the purpose of activeOrderStore is to serve as a cache so that we can retrieve the order info when processing the websocket feed
+	// ex: received message
+	activeOrderStore *ActiveOrderStore
 }
 
 func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
@@ -56,9 +62,10 @@ func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
 	return &Exchange{
 		client: client,
 
-		apiKey:        key,
-		apiSecret:     secret,
-		apiPassphrase: passphrase,
+		apiKey:           key,
+		apiSecret:        secret,
+		apiPassphrase:    passphrase,
+		activeOrderStore: newActiveOrderStore(),
 	}
 }
 
@@ -280,19 +287,8 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		log.Warnf("the order quantity has been adjusted by the server(%s): %s -> %s", res.ID, order.Quantity, res.Size)
 		order.Quantity = res.Size
 	}
-	createdOrder = &types.Order{
-		SubmitOrder:      order,
-		Exchange:         types.ExchangeCoinBase,
-		OrderID:          util.FNV64(res.ID),
-		UUID:             res.ID,
-		Status:           toGlobalOrderStatus(res.Status, res.DoneReason),
-		ExecutedQuantity: res.FilledSize,
-		IsWorking:        !res.Settled,
-		CreationTime:     res.CreatedAt,
-		UpdateTime:       res.CreatedAt,
-		OriginalStatus:   string(res.Status),
-	}
-
+	createdOrder = submitOrderToGlobalOrder(order, res)
+	e.activeOrderStore.add(order, res)
 	return createdOrder, nil
 }
 
@@ -401,6 +397,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 			cancelErrors = append(cancelErrors, err)
 			continue
 		} else {
+			e.activeOrderStore.removeByUUID(order.UUID)
 			log.Infof("order %v has been cancelled", *res)
 		}
 	}
@@ -594,6 +591,7 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 			Status:    types.OrderStatusCanceled,
 			IsWorking: false,
 		})
+		e.activeOrderStore.removeByUUID(orderID)
 	}
 	return orders, nil
 }
