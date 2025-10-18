@@ -20,7 +20,7 @@ func TestRBTree_ConcurrentIndependence(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			tree := NewRBTree()
-			for stepCnt := 0; stepCnt < 10000; stepCnt++ {
+			for stepCnt := 0; stepCnt < 100_000; stepCnt++ {
 				switch opCode := rand.Intn(2); opCode {
 				case 0:
 					priceI := rand.Int63n(16)
@@ -78,7 +78,7 @@ func TestRBTree_RandomInsertSearchAndDelete(t *testing.T) {
 	var keys []fixedpoint.Value
 
 	tree := NewRBTree()
-	for i := 1; i < 100; i++ {
+	for i := 1; i < 10_000; i++ {
 		v := fixedpoint.NewFromFloat(rand.Float64()*100 + 1.0)
 		keys = append(keys, v)
 		tree.Insert(v, v)
@@ -246,4 +246,69 @@ func TestRBTree_bulkInsertAndDelete(t *testing.T) {
 		}
 		return true
 	})
+}
+
+func TestRBTree_StressInsertDeleteAndValidate(t *testing.T) {
+	tree := NewRBTree()
+	const total = 20_000
+	keyset := make(map[int64]struct{}, total)
+	for len(keyset) < total {
+		keyset[rand.Int63n(10*total)] = struct{}{}
+	}
+	keys := make([]int64, 0, total)
+	for k := range keyset {
+		keys = append(keys, k)
+	}
+
+	// insert unique keys
+	for _, k := range keys {
+		tree.Insert(itov(k), itov(k))
+	}
+	assert.Equal(t, tree.Size(), len(keys), "tree size should match unique key count after insert")
+
+	// delete half of the keys randomly
+	rand.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
+	for i := 0; i < total/2; i++ {
+		tree.Delete(itov(keys[i]))
+	}
+
+	// verify in-order traversal
+	var prev *fixedpoint.Value
+	var nodeCount int
+
+	assert.True(t, tree.Root.parent.isNil(), "root parent should be nil")
+
+	inOrderTraverse(tree.Root, func(n *RBNode) {
+		if prev != nil {
+			assert.True(t, n.key.Compare(*prev) >= 0, "in-order traversal: keys not sorted")
+		}
+
+		if n.left != nil && !n.left.isNil() {
+			assert.Equal(t, n, n.left.parent, "left child's parent should be current node")
+		}
+
+		if n.right != nil && !n.right.isNil() {
+			assert.Equal(t, n, n.right.parent, "right child's parent should be current node")
+		}
+		prev = &n.key
+		nodeCount++
+	})
+	assert.Equal(t, tree.Size(), nodeCount, "tree size should match traversed node count")
+}
+
+func inOrderTraverse(n *RBNode, visit func(*RBNode)) {
+	if n == nil || n.isNil() {
+		return
+	}
+	inOrderTraverse(n.left, visit)
+	visit(n)
+	inOrderTraverse(n.right, visit)
+}
+
+func countUnique(keys []int64) int {
+	m := make(map[int64]struct{}, len(keys))
+	for _, k := range keys {
+		m[k] = struct{}{}
+	}
+	return len(m)
 }
