@@ -364,6 +364,14 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 		}
 	}
 
+	if b.pendingOrderUpdates.Len() > 20 {
+		b.logger.Warnf("[ActiveOrderBook] uncleared pending order updates are too many (%d)", b.pendingOrderUpdates.Len())
+	}
+
+	if b.orders.Len() > 20 {
+		b.logger.Warnf("[ActiveOrderBook] uncleared active order objects are too many (%d)", b.orders.Len())
+	}
+
 	switch order.Status {
 	case types.OrderStatusFilled:
 		// make sure we have the order and we remove it
@@ -476,9 +484,9 @@ func (b *ActiveOrderBook) add(order types.Order) {
 		// if the pending order update time is newer than the adding order
 		// we should use the pending order rather than the adding order.
 		// if the pending order is older, then we should add the new one, and drop the pending order
-		b.logger.Debugf("found pending order update: %+v", pendingOrder)
+		b.logger.Debugf("[ActiveOrderBook] found pending order update: %+v", pendingOrder)
 		if isNewerOrderUpdate(pendingOrder, order) {
-			b.logger.Debugf("pending order update is newer: %+v", pendingOrder)
+			b.logger.Debugf("[ActiveOrderBook] pending order update is newer: %+v", pendingOrder)
 			if pendingOrder.Tag == "" {
 				pendingOrder.Tag = order.Tag
 				pendingOrder.GroupID = order.GroupID
