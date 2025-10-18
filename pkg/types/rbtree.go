@@ -28,20 +28,16 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 	// y = the node to be deleted
 	// x (the child of the deleted node)
 	var x, y *RBNode
-	// fmt.Printf("neel = %p %+v\n", neel, neel)
-	// fmt.Printf("deleting = %+v\n", deleting)
 
 	// the deleting node has only one child, it's easy,
 	// we just connect the child the parent of the deleting node
 	if deleting.left.isNil() || deleting.right.isNil() {
 		y = deleting
-		// fmt.Printf("y = deleting = %+v\n", y)
 	} else {
 		// if both children are not NIL (neel), we need to find the successor
 		// and copy the successor to the memory location of the deleting node.
 		// since it's successor, it always has no child connecting to it.
 		y = tree.Successor(deleting)
-		// fmt.Printf("y = successor = %+v\n", y)
 	}
 
 	// y.left or y.right could be neel
@@ -51,7 +47,6 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 		x = y.left
 	}
 
-	// fmt.Printf("x = %+v\n", y)
 	x.parent = y.parent
 
 	if y.parent.isNil() {
@@ -70,6 +65,7 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 	} else {
 		// clear the reference
 		clearNode(deleting)
+		deleting = nil
 	}
 
 	if y.color == Black {
