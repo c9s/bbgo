@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -63,7 +64,11 @@ type Order = maxapi.Order
 type Account = maxapi.Account
 
 func init() {
-	UpdateServerTimeAndOffset(context.Background())
+	// update the server time offset in the background if API key is set
+	if _, ok := os.LookupEnv("MAX_API_KEY"); ok {
+		UpdateServerTimeAndOffset(context.Background())
+	}
+
 }
 
 // UpdateServerTimeAndOffset updates the global server time and offset variables

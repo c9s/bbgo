@@ -60,6 +60,11 @@ func init() {
 		disableUserAgentHeader = val
 	}
 
+	// update the server time offset in the background if API key is set
+	if _, ok := os.LookupEnv("MAX_API_KEY"); !ok {
+		return
+	}
+
 	client := NewRestClientDefault()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
