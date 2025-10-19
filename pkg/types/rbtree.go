@@ -3,6 +3,8 @@ package types
 import (
 	"fmt"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
@@ -12,8 +14,9 @@ type RBTree struct {
 }
 
 func NewRBTree() *RBTree {
-	var root = newNilNode()
+	root := newNilNode()
 	root.parent = newNilNode()
+
 	return &RBTree{
 		Root: root,
 	}
@@ -79,65 +82,97 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 
 func (tree *RBTree) DeleteFixup(current *RBNode) {
 	for current != tree.Root && current.color == Black {
+		if current.parent == nil || current.parent.isNil() {
+			logrus.Errorf("deleteFixup: current.parent is nil or isNil, current = %+v", current)
+			break
+		}
 		if current == current.parent.left {
 			sibling := current.parent.right
+			if sibling == nil || sibling.isNil() {
+				logrus.Errorf("deleteFixup: sibling is nil or isNil (left branch), current = %+v", current)
+				break
+			}
+			// sibling is red
 			if sibling.color == Red {
 				sibling.color = Black
 				current.parent.color = Red
 				tree.RotateLeft(current.parent)
 				sibling = current.parent.right
+				if sibling == nil || sibling.isNil() {
+					logrus.Errorf("deleteFixup: sibling is nil after rotate (left branch), current = %+v", current)
+					break
+				}
 			}
-
-			// if both are black nodes
-			if sibling.left.color == Black && sibling.right.color == Black {
+			// both children are black
+			if (sibling.left == nil || sibling.left.isNil() || sibling.left.color == Black) &&
+				(sibling.right == nil || sibling.right.isNil() || sibling.right.color == Black) {
 				sibling.color = Red
 				current = current.parent
 			} else {
-				// only one of the child is black
-				if sibling.right.color == Black {
-					sibling.left.color = Black
+				// only one child is black
+				if sibling.right == nil || sibling.right.isNil() || sibling.right.color == Black {
+					if sibling.left != nil && !sibling.left.isNil() {
+						sibling.left.color = Black
+					}
 					sibling.color = Red
 					tree.RotateRight(sibling)
 					sibling = current.parent.right
+					if sibling == nil || sibling.isNil() {
+						logrus.Errorf("deleteFixup: sibling is nil after rotateRight (left branch), current = %+v", current)
+						break
+					}
 				}
-
 				sibling.color = current.parent.color
 				current.parent.color = Black
-				sibling.right.color = Black
+				if sibling.right != nil && !sibling.right.isNil() {
+					sibling.right.color = Black
+				}
 				tree.RotateLeft(current.parent)
 				current = tree.Root
 			}
-		} else { // if current is right child
+		} else {
 			sibling := current.parent.left
+			if sibling == nil || sibling.isNil() {
+				logrus.Errorf("deleteFixup: sibling is nil or isNil (right branch), current = %+v", current)
+				break
+			}
 			if sibling.color == Red {
 				sibling.color = Black
 				current.parent.color = Red
 				tree.RotateRight(current.parent)
 				sibling = current.parent.left
+				if sibling == nil || sibling.isNil() {
+					logrus.Errorf("deleteFixup: sibling is nil after rotate (right branch), current = %+v", current)
+					break
+				}
 			}
-
-			if sibling.left.color == Black && sibling.right.color == Black {
+			if (sibling.left == nil || sibling.left.isNil() || sibling.left.color == Black) &&
+				(sibling.right == nil || sibling.right.isNil() || sibling.right.color == Black) {
 				sibling.color = Red
 				current = current.parent
-			} else { // if only one of child is Black
-
-				// the left child of sibling is black, and right child is red
-				if sibling.left.color == Black {
-					sibling.right.color = Black
+			} else {
+				if sibling.left == nil || sibling.left.isNil() || sibling.left.color == Black {
+					if sibling.right != nil && !sibling.right.isNil() {
+						sibling.right.color = Black
+					}
 					sibling.color = Red
 					tree.RotateLeft(sibling)
 					sibling = current.parent.left
+					if sibling == nil || sibling.isNil() {
+						logrus.Errorf("deleteFixup: sibling is nil after rotateLeft (right branch), current = %+v", current)
+						break
+					}
 				}
-
 				sibling.color = current.parent.color
 				current.parent.color = Black
-				sibling.left.color = Black
+				if sibling.left != nil && !sibling.left.isNil() {
+					sibling.left.color = Black
+				}
 				tree.RotateRight(current.parent)
 				current = tree.Root
 			}
 		}
 	}
-
 	current.color = Black
 }
 
