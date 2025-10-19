@@ -179,35 +179,36 @@ func (tree *RBTree) DeleteFixup(current *RBNode) {
 func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 	var y *RBNode = nil
 	var x = tree.Root
-	var node = &RBNode{
-		key:    key,
-		value:  val,
-		color:  Red,
-		left:   newNilNode(),
-		right:  newNilNode(),
-		parent: newNilNode(),
-	}
 
 	for !x.isNil() {
 		y = x
 
-		if node.key == x.key {
+		if x.key == key {
 			// found node, skip insert and fix
 			x.value = val
 			return
-		} else if node.key.Compare(x.key) < 0 {
+		} else if key.Compare(x.key) < 0 {
 			x = x.left
 		} else {
 			x = x.right
 		}
 	}
 
-	if y == nil {
-		tree.Root = node
-		node.parent = newNilNode()
-	} else {
-		node.parent = y
+	node := &RBNode{
+		key:   key,
+		value: val,
+		color: Red,
+		left:  newNilNode(),
+		right: newNilNode(),
+	}
 
+	if y == nil {
+		// insert as the root node
+		node.parent = newNilNode()
+		tree.Root = node
+	} else {
+		// insert as a child
+		node.parent = y
 		if node.key.Compare(y.key) < 0 {
 			y.left = node
 		} else {
@@ -216,7 +217,6 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 	}
 
 	tree.size++
-
 	tree.InsertFixup(node)
 }
 
