@@ -223,23 +223,23 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	var y *RBNode
 	var x = tree.Root
-	var node = &RBNode{
-		key:    key,
-		value:  val,
-		color:  Red,
-		left:   newNilNode(),
-		right:  newNilNode(),
-		parent: newNilNode(),
-	}
 
 	for !x.isNil() {
 		y = x
 
-		if node.key.Compare(x.key) < 0 {
+		if key.Compare(x.key) < 0 {
 			x = x.left
 		} else {
 			x = x.right
 		}
+	}
+
+	node := &RBNode{
+		key:   key,
+		value: val,
+		color: Red,
+		left:  newNilNode(),
+		right: newNilNode(),
 	}
 
 	if y == nil {
