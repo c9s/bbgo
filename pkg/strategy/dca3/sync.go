@@ -67,7 +67,9 @@ func (s *Strategy) validateState(ctx context.Context) {
 			s.stateMachine.EmitNextState(StateOpenPositionMOQReached)
 		}
 	case StateTakeProfitReached:
-		if s.OrderExecutor.ActiveMakerOrders().NumOfOrders() == 0 {
+		if isStucked, err := s.isStuckedAtTakeProfitReached(ctx); err != nil {
+			s.logger.WithError(err).Warn("failed to check if stuck at take profit reached state, skip and wait for next validation")
+		} else if isStucked {
 			s.stateMachine.EmitNextState(StateIdleWaiting)
 		}
 	}
@@ -90,4 +92,33 @@ func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *Strategy) isStuckedAtTakeProfitReached(ctx context.Context) (bool, error) {
+	if s.OrderExecutor.ActiveMakerOrders().NumOfOrders() > 0 {
+		// there are still active orders, not stuck at TakeProfitReachedState
+		return false, nil
+	}
+
+	openOrders, err := s.ExchangeSession.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	if err != nil {
+		return false, err
+	}
+
+	if len(openOrders) > 0 {
+		if s.DisableOrderGroupIDFilter {
+			// if order group ID filter is disabled, it means we treat all open orders as active orders belonging to this strategy
+			// so do nothing because there is still active orders
+			return false, nil
+		}
+
+		for _, order := range openOrders {
+			if order.GroupID == s.OrderGroupID {
+				// there are still active orders belonging to this strategy, so do nothing
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
 }
