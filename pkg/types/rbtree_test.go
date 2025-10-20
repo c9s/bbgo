@@ -305,10 +305,49 @@ func inOrderTraverse(n *RBNode, visit func(*RBNode)) {
 	inOrderTraverse(n.right, visit)
 }
 
-func countUnique(keys []int64) int {
-	m := make(map[int64]struct{}, len(keys))
-	for _, k := range keys {
-		m[k] = struct{}{}
+func BenchmarkRBTree_OrderBookUpdate(b *testing.B) {
+	b.ReportAllocs()
+
+	tree := NewRBTree()
+	lastPrice := rand.Int63n(1_000_000_000)
+	insertedPrices := make(map[int64]struct{})
+
+	for i := 0; i < b.N; i++ {
+		var priceI int64
+		if i == 0 {
+			priceI = lastPrice
+		} else {
+			minimal := float64(lastPrice) * 0.97
+			maximum := float64(lastPrice) * 1.03
+			priceI = int64(minimal + rand.Float64()*(maximum-minimal))
+		}
+		volumeI := rand.Int63n(10_000)
+		price := fixedpoint.NewFromInt(priceI)
+		volume := fixedpoint.NewFromInt(volumeI)
+		op := rand.Intn(3)
+		if op == 0 {
+			// remove: only delete an existing price
+			if len(insertedPrices) > 0 {
+				var delPriceI int64
+				idx := rand.Intn(len(insertedPrices))
+				j := 0
+				for k := range insertedPrices {
+					if j == idx {
+						delPriceI = k
+						break
+					}
+					j++
+				}
+
+				delPrice := fixedpoint.NewFromInt(delPriceI)
+				tree.Delete(delPrice)
+				delete(insertedPrices, delPriceI)
+			}
+		} else {
+			// insert or upsert
+			tree.Upsert(price, volume)
+			insertedPrices[priceI] = struct{}{}
+		}
+		lastPrice = priceI
 	}
-	return len(m)
 }
