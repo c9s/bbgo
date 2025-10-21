@@ -4,7 +4,6 @@ package coinbase
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -382,15 +381,9 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		}
 
 		if err != nil {
-			if errResp, ok := err.(*requestgen.ErrResponse); ok {
-				var body struct {
-					Message string `json:"message"`
-				}
-				err2 := json.Unmarshal(errResp.Body, &body)
-				if err2 == nil && strings.Contains(body.Message, "not found") {
-					log.Warnf("order %v not found, consider it has been cancelled", order.UUID)
-					continue
-				}
+			if isNotFoundError(err) {
+				log.Warnf("order %v not found, consider it has been cancelled", order.UUID)
+				continue
 			}
 			log.WithError(err).Warnf("failed to cancel order: %v", order.UUID)
 			failedOrderIDs = append(failedOrderIDs, order.UUID)
@@ -511,9 +504,16 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	} else {
 		req = req.OrderID(q.OrderUUID)
 	}
+	activeOrder, found := e.activeOrderStore.getByUUID(q.OrderUUID)
 
 	cbOrder, err := req.Do(ctx)
 	if err != nil {
+		if isNotFoundError(err) && found {
+			order := submitOrderToGlobalOrder(activeOrder.submitOrder, activeOrder.rawOrder)
+			order.Status = types.OrderStatusCanceled
+			order.IsWorking = false
+			return order, nil
+		}
 		return nil, fmt.Errorf("failed to get order %+v: %w", q, err)
 	}
 	order := toGlobalOrder(cbOrder)
