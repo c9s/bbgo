@@ -12,6 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core/klinedriver"
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 )
@@ -131,7 +132,10 @@ func (s *Stream) Connect(ctx context.Context) error {
 	// NOTE: The polling is required. The documentation clearly states that
 	// the balance channel *does not* track every updates to the balance:
 	// https://docs.cdp.coinbase.com/exchange/websocket-feed/channels#balance-channel
+	// rate limit on private endpoints is 15 requests per second:
+	// https://docs.cdp.coinbase.com/exchange/rest-api/rate-limits#private-endpoints
 	go func() {
+		logger := util.NewWarnFirstLogger(5, time.Minute, s.logger)
 		ticker := time.NewTicker(time.Second * 5)
 		defer ticker.Stop()
 
@@ -142,7 +146,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 			case <-ticker.C:
 				balances, err := s.exchange.QueryAccountBalances(ctx)
 				if err != nil {
-					s.logger.WithError(err).Warn("failed to query account balances")
+					logger.WarnOrError(err, "failed to query account balances")
 					continue
 				}
 				s.EmitBalanceSnapshot(balances)
