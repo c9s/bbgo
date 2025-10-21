@@ -123,6 +123,36 @@ func NewStream(
 	return &s
 }
 
+func (s *Stream) Connect(ctx context.Context) error {
+	if err := s.StandardStream.Connect(ctx); err != nil {
+		return err
+	}
+	// start balance polling update worker
+	// NOTE: The polling is required. The documentation clearly states that
+	// the balance channel *does not* track every updates to the balance:
+	// https://docs.cdp.coinbase.com/exchange/websocket-feed/channels#balance-channel
+	go func() {
+		ticker := time.NewTicker(time.Second * 5)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				balances, err := s.exchange.QueryAccountBalances(ctx)
+				if err != nil {
+					s.logger.WithError(err).Warn("failed to query account balances")
+					continue
+				}
+				s.EmitBalanceSnapshot(balances)
+			}
+		}
+
+	}()
+	return nil
+}
+
 // types.PrivateChannelSymbolSetter
 func (s *Stream) SetPrivateChannelSymbols(symbols []string) {
 	s.privateChannelSymbols = symbols
