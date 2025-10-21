@@ -499,19 +499,26 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 // ExchangeOrderQueryService
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
 	req := e.client.NewSingleOrderRequst()
+	var orderID string
 	if len(q.OrderUUID) == 0 {
-		req = req.OrderID(q.OrderID)
+		orderID = q.OrderID
 	} else {
-		req = req.OrderID(q.OrderUUID)
+		orderID = q.OrderUUID
 	}
-	activeOrder, found := e.activeOrderStore.getByUUID(q.OrderUUID)
+	req = req.OrderID(orderID)
 
 	cbOrder, err := req.Do(ctx)
 	if err != nil {
-		if isNotFoundError(err) && found {
+		if activeOrder, found := e.activeOrderStore.getByUUID(orderID); found && isNotFoundError(err) {
+			// order is found in the active order store but not found on the server -> assume canceled by the server
+			// 1. restore the order to return
 			order := submitOrderToGlobalOrder(activeOrder.submitOrder, activeOrder.rawOrder)
+			// 2. set status to canceled
 			order.Status = types.OrderStatusCanceled
-			order.IsWorking = false
+			// 3. update order status in the active order store
+			e.activeOrderStore.update(orderID, &api.CreateOrderResponse{
+				Status: api.OrderStatusCanceled,
+			})
 			return order, nil
 		}
 		return nil, fmt.Errorf("failed to get order %+v: %w", q, err)

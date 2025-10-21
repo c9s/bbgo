@@ -37,6 +37,10 @@ func toGlobalOrderStatus(cbStatus api.OrderStatus, doneReason string) types.Orde
 		case "rejected":
 			return types.OrderStatusRejected
 		}
+	case api.OrderStatusCanceled:
+		return types.OrderStatusCanceled
+	case api.OrderStatusFilled:
+		return types.OrderStatusFilled
 	}
 	return types.OrderStatus(strings.ToUpper(string(cbStatus)))
 }
