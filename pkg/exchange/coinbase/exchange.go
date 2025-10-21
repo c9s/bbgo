@@ -510,7 +510,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	cbOrder, err := req.Do(ctx)
 	if err != nil {
 		if activeOrder, found := e.activeOrderStore.getByUUID(orderID); found && isNotFoundError(err) {
-			// order is found in the active order store but not found on the server -> assume canceled by the server
+			// order is found in the active order store but not found on the server -> assume canceled
 			// 1. restore the order to return
 			order := submitOrderToGlobalOrder(activeOrder.submitOrder, activeOrder.rawOrder)
 			// 2. set status to canceled

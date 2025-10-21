@@ -65,10 +65,12 @@ func (a *ActiveOrderStore) add(order types.SubmitOrder, rawOrder *api.CreateOrde
 }
 
 func (a *ActiveOrderStore) removeByUUID(orderUUID string) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	delete(a.orders, orderUUID)
+	a.update(
+		orderUUID,
+		&api.CreateOrderResponse{
+			Status: api.OrderStatusCanceled,
+		},
+	)
 }
 
 func (a *ActiveOrderStore) update(orderUUID string, update *api.CreateOrderResponse) {

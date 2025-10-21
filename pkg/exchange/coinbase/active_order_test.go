@@ -93,17 +93,21 @@ func TestActiveOrderStore_RemoveByUUID(t *testing.T) {
 	rawOrder := &api.CreateOrderResponse{
 		ID:        "order-to-remove",
 		ProductID: "BTC-USD",
+		Status:    api.OrderStatusOpen,
 	}
 
 	store.add(submitOrder, rawOrder)
 	assert.Equal(t, 1, len(store.orders))
 
 	store.removeByUUID("order-to-remove")
-	assert.Equal(t, 0, len(store.orders))
+	// The order should still be in the store
+	assert.Equal(t, 1, len(store.orders))
 
+	// But it should be marked as canceled
 	activeOrder, ok := store.getByUUID("order-to-remove")
-	assert.False(t, ok)
-	assert.Nil(t, activeOrder)
+	assert.True(t, ok)
+	assert.NotNil(t, activeOrder)
+	assert.Equal(t, api.OrderStatusCanceled, activeOrder.rawOrder.Status)
 }
 
 func TestActiveOrderStore_RemoveByUUID_NonExistent(t *testing.T) {
@@ -127,6 +131,7 @@ func TestActiveOrderStore_MultipleOrders(t *testing.T) {
 		rawOrder := &api.CreateOrderResponse{
 			ID:        fixedpoint.NewFromInt(int64(i)).String(),
 			ProductID: "BTC-USD",
+			Status:    api.OrderStatusOpen,
 		}
 
 		store.add(submitOrder, rawOrder)
@@ -134,18 +139,21 @@ func TestActiveOrderStore_MultipleOrders(t *testing.T) {
 
 	assert.Equal(t, 5, len(store.orders))
 
-	// Remove one order
+	// Mark one order as canceled
 	store.removeByUUID("2")
-	assert.Equal(t, 4, len(store.orders))
+	// All orders should still be in the store
+	assert.Equal(t, 5, len(store.orders))
 
-	// Verify removed order doesn't exist
-	_, ok := store.getByUUID("2")
-	assert.False(t, ok)
+	// Verify the canceled order is marked as canceled
+	canceledOrder, ok := store.getByUUID("2")
+	assert.True(t, ok)
+	assert.Equal(t, api.OrderStatusCanceled, canceledOrder.rawOrder.Status)
 
-	// Verify other orders still exist
+	// Verify other orders still exist and are still open
 	for _, id := range []string{"1", "3", "4", "5"} {
-		_, ok := store.getByUUID(id)
+		order, ok := store.getByUUID(id)
 		assert.True(t, ok)
+		assert.Equal(t, api.OrderStatusOpen, order.rawOrder.Status)
 	}
 }
 
@@ -194,7 +202,7 @@ func TestActiveOrderStore_ThreadSafety(t *testing.T) {
 	}
 	wg.Wait()
 
-	// Concurrent removes
+	// Concurrent removes (marking as canceled)
 	wg.Add(numGoroutines)
 	for i := 0; i < numGoroutines; i++ {
 		go func(goroutineID int) {
@@ -207,7 +215,18 @@ func TestActiveOrderStore_ThreadSafety(t *testing.T) {
 	}
 	wg.Wait()
 
-	assert.Equal(t, 0, len(store.orders))
+	// All orders should still be in the store, but marked as canceled
+	assert.Equal(t, numGoroutines*numOpsPerGoroutine, len(store.orders))
+
+	// Verify all orders are marked as canceled
+	for i := 0; i < numGoroutines; i++ {
+		for j := 0; j < numOpsPerGoroutine; j++ {
+			orderID := fixedpoint.NewFromInt(int64(i*numOpsPerGoroutine + j)).String()
+			order, ok := store.getByUUID(orderID)
+			assert.True(t, ok)
+			assert.Equal(t, api.OrderStatusCanceled, order.rawOrder.Status)
+		}
+	}
 }
 
 func TestActiveOrderStore_OverwriteOrder(t *testing.T) {
