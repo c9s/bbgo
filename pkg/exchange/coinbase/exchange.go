@@ -383,6 +383,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		if err != nil {
 			if isNotFoundError(err) {
 				log.Warnf("order %v not found, consider it has been cancelled", order.UUID)
+				e.activeOrderStore.removeByUUID(order.UUID) // ✅ ADD THIS LINE
 				continue
 			}
 			log.WithError(err).Warnf("failed to cancel order: %v", order.UUID)
