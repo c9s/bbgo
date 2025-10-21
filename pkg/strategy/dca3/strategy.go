@@ -310,7 +310,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.stateMachine.RegisterTransitionHandler(StateOpenPositionMOQReached, StateTakeProfitOrderReset, s.cancelTakeProfitOrders)
 	s.stateMachine.RegisterTransitionHandler(StateTakeProfitOrderReset, StateOpenPositionMOQReached, s.updateTakeProfitOrder)
 	s.stateMachine.RegisterTransitionHandler(StateOpenPositionMOQReached, StateTakeProfitReached, s.cancelOpenPositionOrders)
-	s.stateMachine.RegisterTransitionHandler(StateOpenPositionMOQReached, StateIdleWaiting, s.finishTakeProfitStage)
 	s.stateMachine.RegisterTransitionHandler(StateTakeProfitReached, StateIdleWaiting, s.finishTakeProfitStage)
 
 	s.stateMachine.RegisterWarnFirstLoggers(StateOpenPositionReady, StateOpenPositionMOQReached, s.takeProfitOrderLogger)
