@@ -13,7 +13,10 @@ func isNotFoundError(err error) bool {
 			Message string `json:"message"`
 		}
 		err2 := json.Unmarshal(errResp.Body, &body)
-		if err2 == nil && strings.Contains(body.Message, "not found") {
+		if err2 != nil {
+			return false
+		}
+		if body.Message == "NotFound" || strings.Contains(body.Message, "not found") {
 			return true
 		}
 	}

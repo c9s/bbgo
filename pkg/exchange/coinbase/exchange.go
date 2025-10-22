@@ -391,7 +391,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		if err != nil {
 			if isNotFoundError(err) {
 				logger.Warnf("order %v not found, consider it has been cancelled", order.UUID)
-				e.activeOrderStore.remove(order.UUID) // ✅ ADD THIS LINE
+				e.activeOrderStore.markCanceled(order.UUID)
 				continue
 			}
 			logger.WithError(err).Warnf("failed to cancel order: %v", order.UUID)
@@ -399,7 +399,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 			cancelErrors = append(cancelErrors, err)
 			continue
 		} else {
-			e.activeOrderStore.remove(order.UUID)
+			e.activeOrderStore.markCanceled(order.UUID)
 			logger.Infof("order %v has been cancelled", *res)
 		}
 	}
@@ -607,7 +607,7 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 			Status:    types.OrderStatusCanceled,
 			IsWorking: false,
 		})
-		e.activeOrderStore.remove(orderID)
+		e.activeOrderStore.markCanceled(orderID)
 	}
 	return orders, nil
 }

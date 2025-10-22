@@ -105,7 +105,7 @@ func (a *ActiveOrderStore) add(order types.SubmitOrder, rawOrder *api.CreateOrde
 	}
 }
 
-func (a *ActiveOrderStore) remove(orderUUID string) {
+func (a *ActiveOrderStore) markCanceled(orderUUID string) {
 	a.update(
 		orderUUID,
 		&api.CreateOrderResponse{

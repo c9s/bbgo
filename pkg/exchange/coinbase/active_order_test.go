@@ -100,11 +100,11 @@ func TestActiveOrderStore_RemoveByUUID(t *testing.T) {
 	store.add(submitOrder, rawOrder)
 	assert.Equal(t, 1, len(store.orders))
 
-	store.remove("order-to-remove")
+	store.markCanceled("order-to-remove")
 	// The order should still be in the store
 	assert.Equal(t, 1, len(store.orders))
 
-	// But it should be marked as canceled
+	// The order should be marked as canceled
 	activeOrder, ok := store.get("order-to-remove")
 	assert.True(t, ok)
 	assert.NotNil(t, activeOrder)
@@ -114,8 +114,8 @@ func TestActiveOrderStore_RemoveByUUID(t *testing.T) {
 func TestActiveOrderStore_RemoveByUUID_NonExistent(t *testing.T) {
 	store := newActiveOrderStore("test-key-5")
 
-	// Removing a non-existent order should not cause issues
-	store.remove("non-existent-order")
+	// Marking a non-existent order as canceled should not cause issues
+	store.markCanceled("non-existent-order")
 	assert.Equal(t, 0, len(store.orders))
 }
 
@@ -141,8 +141,8 @@ func TestActiveOrderStore_MultipleOrders(t *testing.T) {
 	assert.Equal(t, 5, len(store.orders))
 
 	// Mark one order as canceled
-	store.remove("2")
-	// All orders should still be in the store
+	store.markCanceled("2")
+	// markCanceled updates status but doesn't remove orders from the store
 	assert.Equal(t, 5, len(store.orders))
 
 	// Verify the canceled order is marked as canceled
@@ -210,7 +210,7 @@ func TestActiveOrderStore_ThreadSafety(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < numOpsPerGoroutine; j++ {
 				orderID := fixedpoint.NewFromInt(int64(goroutineID*numOpsPerGoroutine + j)).String()
-				store.remove(orderID)
+				store.markCanceled(orderID)
 			}
 		}(i)
 	}
