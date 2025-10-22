@@ -78,6 +78,8 @@ func (a *ActiveOrderStore) Stop() {
 
 func (a *ActiveOrderStore) cleanupWorker(ctx context.Context) {
 	ticker := time.NewTicker(time.Minute * 5)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -86,21 +88,19 @@ func (a *ActiveOrderStore) cleanupWorker(ctx context.Context) {
 		case <-ticker.C:
 			a.mu.Lock()
 			for orderUUID, activeOrder := range a.orders {
-				switch {
-				case activeOrder.rawOrder.Status == api.OrderStatusCanceled:
-					coinbaseLogger.Infof("removing canceled order from active order store: %s", orderUUID)
-					delete(a.orders, orderUUID)
-				case activeOrder.rawOrder.Status == api.OrderStatusDone:
-					coinbaseLogger.Infof("removing done order from active order store: %s", orderUUID)
-					delete(a.orders, orderUUID)
-				case activeOrder.rawOrder.Status == api.OrderStatusRejected:
-					coinbaseLogger.Infof("removing rejected order from active order store: %s", orderUUID)
-					delete(a.orders, orderUUID)
-				case time.Since(activeOrder.lastUpdate) > time.Hour*3:
-					coinbaseLogger.Infof("removing expired order from active order store: %s", orderUUID)
+				switch activeOrder.rawOrder.Status {
+				case api.OrderStatusCanceled, api.OrderStatusDone, api.OrderStatusRejected:
+					coinbaseLogger.Infof(
+						"removing %s order from active order store: %s",
+						activeOrder.rawOrder.Status,
+						orderUUID,
+					)
 					delete(a.orders, orderUUID)
 				default:
-					continue
+					if time.Since(activeOrder.lastUpdate) > time.Hour*3 {
+						coinbaseLogger.Infof("removing expired order from active order store: %s", orderUUID)
+						delete(a.orders, orderUUID)
+					}
 				}
 			}
 			a.mu.Unlock()
