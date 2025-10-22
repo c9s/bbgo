@@ -17,8 +17,8 @@ import (
 )
 
 func TestExchange_new(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	assert.Equal(t, ex.Name(), types.ExchangeCoinBase)
 	t.Log("successfully created coinbase exchange client")
@@ -39,8 +39,8 @@ func TestExchange_Symbols(t *testing.T) {
 }
 
 func TestExchange_OrdersAPI(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -102,8 +102,8 @@ func TestExchange_OrdersAPI(t *testing.T) {
 }
 
 func TestExchange_CancelOrdersBySymbol(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
@@ -147,8 +147,8 @@ func TestExchange_CancelOrdersBySymbol(t *testing.T) {
 }
 
 func TestExchange_QueryAccount(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -160,8 +160,8 @@ func TestExchange_QueryAccount(t *testing.T) {
 }
 
 func TestExchange_QueryAccountBalances(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -173,8 +173,8 @@ func TestExchange_QueryAccountBalances(t *testing.T) {
 }
 
 func TestExchange_QueryOpenOrders(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -187,8 +187,8 @@ func TestExchange_QueryOpenOrders(t *testing.T) {
 }
 
 func TestExchange_QueryMarkets(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -204,8 +204,8 @@ func TestExchange_QueryMarkets(t *testing.T) {
 }
 
 func TestExchange_QueryTicker(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -218,8 +218,8 @@ func TestExchange_QueryTicker(t *testing.T) {
 }
 
 func TestExchange_QueryTickers(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -236,8 +236,8 @@ func TestExchange_QueryTickers(t *testing.T) {
 }
 
 func TestExchange_QueryKLines(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -274,8 +274,8 @@ func TestExchange_QueryKLines(t *testing.T) {
 }
 
 func TestExchange_QueryOrderTrades(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	ctx := context.Background()
 
@@ -290,8 +290,8 @@ func TestExchange_QueryOrderTrades(t *testing.T) {
 }
 
 func TestExchange_QueryTrades(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -333,8 +333,8 @@ func TestExchange_QueryTrades(t *testing.T) {
 }
 
 func TestExchange_QueryClosedOrders(t *testing.T) {
-	ex, cleanup := getExchangeOrSkip(t)
-	defer cleanup()
+	ex, saveRecord := getExchangeOrSkip(t)
+	defer saveRecord()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -434,8 +434,8 @@ func TestExchange_QueryAccountIDs(t *testing.T) {
 	t.Run(
 		"Test_queryAccountIDsMap",
 		func(t *testing.T) {
-			ex, cleanup := getExchangeOrSkip(t)
-			defer cleanup()
+			ex, saveRecord := getExchangeOrSkip(t)
+			defer saveRecord()
 
 			accountIDsMap, err := ex.queryAccountIDsMap(context.Background())
 			assert.NoError(t, err)
@@ -453,8 +453,8 @@ func TestExchange_QueryAccountIDs(t *testing.T) {
 	t.Run(
 		"Test_queryAccountIDsBySymbols",
 		func(t *testing.T) {
-			ex, cleanup := getExchangeOrSkip(t)
-			defer cleanup()
+			ex, saveRecord := getExchangeOrSkip(t)
+			defer saveRecord()
 
 			accountIDs, err := ex.queryAccountIDsBySymbols(context.Background(), symbols)
 			sort.Slice(accountIDs, func(i, j int) bool {
@@ -477,14 +477,7 @@ func getExchangeOrSkip(t *testing.T) (*Exchange, func()) {
 		return nil, nil
 	}
 
-	cleanup := func() {
-		saveRecord()
-		if ex.activeOrderStore.IsStarted() {
-			ex.activeOrderStore.Stop()
-		}
-	}
-
-	return ex, cleanup
+	return ex, saveRecord
 }
 
 // copied from testutil, or tests for other exchanges will fail

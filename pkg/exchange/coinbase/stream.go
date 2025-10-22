@@ -62,6 +62,7 @@ type Stream struct {
 	lockSeqNumMap      sync.Mutex // lock to protect lastSequenceMsgMap
 	lastSequenceMsgMap map[string]SequenceNumberType
 
+	// TODO: replace it with exchange.activeOrderStore
 	lockWorkingOrderMap sync.Mutex // lock to protect lastOrderMap
 	workingOrdersMap    map[string]types.Order
 

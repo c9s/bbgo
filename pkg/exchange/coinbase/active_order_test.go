@@ -3,6 +3,7 @@ package coinbase
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -12,14 +13,14 @@ import (
 )
 
 func TestNewActiveOrderStore(t *testing.T) {
-	store := newActiveOrderStore("test-key-1", "test-secret-1", "test-passphrase-1")
+	store := newActiveOrderStore("test-key-1")
 	assert.NotNil(t, store)
 	assert.NotNil(t, store.orders)
 	assert.Equal(t, 0, len(store.orders))
 }
 
 func TestActiveOrderStore_Add(t *testing.T) {
-	store := newActiveOrderStore("test-key-2", "test-secret-2", "test-passphrase-2")
+	store := newActiveOrderStore("test-key-2")
 
 	submitOrder := types.SubmitOrder{
 		Symbol:      "BTCUSD",
@@ -51,7 +52,7 @@ func TestActiveOrderStore_Add(t *testing.T) {
 }
 
 func TestActiveOrderStore_GetByUUID(t *testing.T) {
-	store := newActiveOrderStore("test-key-3", "test-secret-3", "test-passphrase-3")
+	store := newActiveOrderStore("test-key-3")
 
 	t.Run("existing order", func(t *testing.T) {
 		submitOrder := types.SubmitOrder{
@@ -83,7 +84,7 @@ func TestActiveOrderStore_GetByUUID(t *testing.T) {
 }
 
 func TestActiveOrderStore_RemoveByUUID(t *testing.T) {
-	store := newActiveOrderStore("test-key-4", "test-secret-4", "test-passphrase-4")
+	store := newActiveOrderStore("test-key-4")
 
 	submitOrder := types.SubmitOrder{
 		Symbol: "BTCUSD",
@@ -111,7 +112,7 @@ func TestActiveOrderStore_RemoveByUUID(t *testing.T) {
 }
 
 func TestActiveOrderStore_RemoveByUUID_NonExistent(t *testing.T) {
-	store := newActiveOrderStore("test-key-5", "test-secret-5", "test-passphrase-5")
+	store := newActiveOrderStore("test-key-5")
 
 	// Removing a non-existent order should not cause issues
 	store.remove("non-existent-order")
@@ -119,7 +120,7 @@ func TestActiveOrderStore_RemoveByUUID_NonExistent(t *testing.T) {
 }
 
 func TestActiveOrderStore_MultipleOrders(t *testing.T) {
-	store := newActiveOrderStore("test-key-6", "test-secret-6", "test-passphrase-6")
+	store := newActiveOrderStore("test-key-6")
 
 	// Add multiple orders
 	for i := 1; i <= 5; i++ {
@@ -158,7 +159,7 @@ func TestActiveOrderStore_MultipleOrders(t *testing.T) {
 }
 
 func TestActiveOrderStore_ThreadSafety(t *testing.T) {
-	store := newActiveOrderStore("test-key-7", "test-secret-7", "test-passphrase-7")
+	store := newActiveOrderStore("test-key-7")
 	var wg sync.WaitGroup
 
 	// Number of concurrent operations
@@ -230,7 +231,7 @@ func TestActiveOrderStore_ThreadSafety(t *testing.T) {
 }
 
 func TestActiveOrderStore_OverwriteOrder(t *testing.T) {
-	store := newActiveOrderStore("test-key-8", "test-secret-8", "test-passphrase-8")
+	store := newActiveOrderStore("test-key-8")
 
 	// Add an order
 	submitOrder1 := types.SubmitOrder{
@@ -315,4 +316,116 @@ func TestActiveOrder_Fields(t *testing.T) {
 	assert.Equal(t, fixedpoint.NewFromFloat(0.5), activeOrder.rawOrder.Size)
 	assert.Equal(t, "client-order-123", activeOrder.rawOrder.ClientOrderID)
 	assert.Equal(t, api.OrderStatusOpen, activeOrder.rawOrder.Status)
+}
+
+func TestActiveOrderStore_Purge(t *testing.T) {
+	store := newActiveOrderStore("test-key-purge")
+
+	now := time.Now()
+
+	// Add orders with different statuses
+	orders := []struct {
+		id         string
+		status     api.OrderStatus
+		lastUpdate time.Time
+	}{
+		{"canceled-order", api.OrderStatusCanceled, now},
+		{"done-order", api.OrderStatusDone, now},
+		{"rejected-order", api.OrderStatusRejected, now},
+		{"open-order", api.OrderStatusOpen, now},
+		{"expired-order", api.OrderStatusOpen, now.Add(-4 * time.Hour)}, // Older than 3 hours
+		{"recent-order", api.OrderStatusOpen, now.Add(-2 * time.Hour)},  // Within 3 hours
+	}
+
+	for _, o := range orders {
+		submitOrder := types.SubmitOrder{
+			Symbol: "BTCUSD",
+			Side:   types.SideTypeBuy,
+		}
+		rawOrder := &api.CreateOrderResponse{
+			ID:     o.id,
+			Status: o.status,
+		}
+		store.add(submitOrder, rawOrder)
+		// Manually set lastUpdate time
+		if activeOrder, ok := store.get(o.id); ok {
+			activeOrder.lastUpdate = o.lastUpdate
+		}
+	}
+
+	assert.Equal(t, 6, len(store.orders))
+
+	// Run purge
+	store.purge()
+
+	// After purge, should have removed:
+	// - canceled-order (status: canceled)
+	// - done-order (status: done)
+	// - rejected-order (status: rejected)
+	// - expired-order (status: open but older than 3 hours)
+	// Should keep:
+	// - open-order (status: open, recent)
+	// - recent-order (status: open, within 3 hours)
+	assert.Equal(t, 2, len(store.orders))
+
+	// Verify the remaining orders
+	_, ok := store.get("open-order")
+	assert.True(t, ok, "open-order should still exist")
+
+	_, ok = store.get("recent-order")
+	assert.True(t, ok, "recent-order should still exist")
+
+	// Verify removed orders
+	_, ok = store.get("canceled-order")
+	assert.False(t, ok, "canceled-order should be removed")
+
+	_, ok = store.get("done-order")
+	assert.False(t, ok, "done-order should be removed")
+
+	_, ok = store.get("rejected-order")
+	assert.False(t, ok, "rejected-order should be removed")
+
+	_, ok = store.get("expired-order")
+	assert.False(t, ok, "expired-order should be removed")
+}
+
+func TestActiveOrderStore_Purge_EmptyStore(t *testing.T) {
+	store := newActiveOrderStore("test-key-purge-empty")
+
+	// Purge on empty store should not panic
+	assert.Equal(t, 0, len(store.orders))
+	store.purge()
+	assert.Equal(t, 0, len(store.orders))
+}
+
+func TestActiveOrderStore_Purge_AllExpired(t *testing.T) {
+	store := newActiveOrderStore("test-key-purge-all-expired")
+
+	now := time.Now()
+	oldTime := now.Add(-4 * time.Hour)
+
+	// Add only expired orders
+	for i := 1; i <= 3; i++ {
+		submitOrder := types.SubmitOrder{
+			Symbol: "BTCUSD",
+			Side:   types.SideTypeBuy,
+		}
+		rawOrder := &api.CreateOrderResponse{
+			ID:     fixedpoint.NewFromInt(int64(i)).String(),
+			Status: api.OrderStatusOpen,
+		}
+		store.add(submitOrder, rawOrder)
+		// Manually set lastUpdate time to old
+		if activeOrder, ok := store.get(fixedpoint.NewFromInt(int64(i)).String()); ok {
+			activeOrder.lastUpdate = oldTime
+		}
+	}
+
+	assert.Equal(t, 3, len(store.orders))
+
+	// Run purge
+	store.purge()
+
+	// All orders should be removed
+	assert.Equal(t, 0, len(store.orders))
 }

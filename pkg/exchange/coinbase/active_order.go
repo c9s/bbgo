@@ -16,64 +16,33 @@ type ActiveOrder struct {
 	lastUpdate time.Time
 }
 
-type registryKey struct {
-	key, secret, passphrase string
-}
-
-var actStoreRegistry map[registryKey]*ActiveOrderStore = make(map[registryKey]*ActiveOrderStore)
+var actStoreRegistry map[string]*ActiveOrderStore = make(map[string]*ActiveOrderStore)
 
 type ActiveOrderStore struct {
 	mu     sync.Mutex
 	orders map[string]*ActiveOrder
 
-	startTime time.Time
-	ctx       context.Context
-	cancel    context.CancelFunc
+	cleanWorkerOnce sync.Once
 }
 
-func newActiveOrderStore(key, secret, passphrase string) *ActiveOrderStore {
-	rk := registryKey{key, secret, passphrase}
-	if store, ok := actStoreRegistry[rk]; ok {
+func newActiveOrderStore(key string) *ActiveOrderStore {
+	if store, ok := actStoreRegistry[key]; ok {
 		return store
 	}
 	store := &ActiveOrderStore{
 		orders: make(map[string]*ActiveOrder),
 	}
-	store.ctx, store.cancel = context.WithCancel(context.Background())
-	actStoreRegistry[rk] = store
+	actStoreRegistry[key] = store
 	return store
 }
 
-func (a *ActiveOrderStore) IsStarted() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	return !a.startTime.IsZero()
-}
-
 // Start starts the active order store cleanup worker.
-func (a *ActiveOrderStore) Start() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+func (a *ActiveOrderStore) Start(ctx context.Context) {
+	// Ensure the cleanup worker is started only once.
+	a.cleanWorkerOnce.Do(func() {
+		go a.cleanupWorker(ctx)
+	})
 
-	if a.startTime.IsZero() {
-		a.startTime = time.Now()
-		go a.cleanupWorker(a.ctx)
-	}
-}
-
-// Stop stops the active order store cleanup worker and resets the store.
-func (a *ActiveOrderStore) Stop() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if a.startTime.IsZero() {
-		return
-	}
-	a.cancel()                                                 // stop the cleanup worker
-	a.startTime = time.Time{}                                  // reset start time
-	a.orders = make(map[string]*ActiveOrder)                   // clear orders
-	a.ctx, a.cancel = context.WithCancel(context.Background()) // create new context
 }
 
 func (a *ActiveOrderStore) cleanupWorker(ctx context.Context) {
@@ -83,27 +52,35 @@ func (a *ActiveOrderStore) cleanupWorker(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			coinbaseLogger.Info("active order store cleanup worker stopped")
+			logger.Info("active order store cleanup worker stopped")
 			return
 		case <-ticker.C:
-			a.mu.Lock()
-			for orderUUID, activeOrder := range a.orders {
-				switch activeOrder.rawOrder.Status {
-				case api.OrderStatusCanceled, api.OrderStatusDone, api.OrderStatusRejected:
-					coinbaseLogger.Infof(
-						"removing %s order from active order store: %s",
-						activeOrder.rawOrder.Status,
-						orderUUID,
-					)
-					delete(a.orders, orderUUID)
-				default:
-					if time.Since(activeOrder.lastUpdate) > time.Hour*3 {
-						coinbaseLogger.Infof("removing expired order from active order store: %s", orderUUID)
-						delete(a.orders, orderUUID)
-					}
-				}
+			a.purge()
+		}
+	}
+}
+
+// purge removes orders that are completed or expired from the active order store.
+// completed orders are those with status Canceled, Done, or Rejected.
+// expired orders are those that have not been updated for more than 3 hours.
+func (a *ActiveOrderStore) purge() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	for orderUUID, activeOrder := range a.orders {
+		switch activeOrder.rawOrder.Status {
+		case api.OrderStatusCanceled, api.OrderStatusDone, api.OrderStatusRejected:
+			logger.Infof(
+				"removing %s order from active order store: %s",
+				activeOrder.rawOrder.Status,
+				orderUUID,
+			)
+			delete(a.orders, orderUUID)
+		default:
+			if time.Since(activeOrder.lastUpdate) > time.Hour*3 {
+				logger.Infof("removing expired order from active order store: %s", orderUUID)
+				delete(a.orders, orderUUID)
 			}
-			a.mu.Unlock()
 		}
 	}
 }

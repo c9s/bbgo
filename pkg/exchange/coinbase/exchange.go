@@ -39,9 +39,9 @@ const (
 	DefaultKLineLimit = 300
 )
 
-var coinbaseLogger = logrus.WithField("exchange", ID)
+var logger = logrus.WithField("exchange", ID)
 var warnFirstLogger = util.NewWarnFirstLogger(
-	5, time.Minute, coinbaseLogger,
+	5, time.Minute, logger,
 )
 
 type Exchange struct {
@@ -67,8 +67,13 @@ func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
 		apiKey:           key,
 		apiSecret:        secret,
 		apiPassphrase:    passphrase,
-		activeOrderStore: newActiveOrderStore(key, secret, passphrase),
+		activeOrderStore: newActiveOrderStore(key),
 	}
+}
+
+func (e *Exchange) Initialize(ctx context.Context) error {
+	e.activeOrderStore.Start(ctx)
+	return nil
 }
 
 func (e *Exchange) Client() *api.RestAPIClient {
@@ -148,7 +153,7 @@ func (e *Exchange) queryAccountIDsBySymbols(ctx context.Context, symbols []strin
 	for _, symbol := range symbols {
 		market, ok := markets[symbol]
 		if !ok {
-			coinbaseLogger.Warnf("fail to find market for symbol: %s", symbol)
+			logger.Warnf("fail to find market for symbol: %s", symbol)
 			continue
 		}
 		if baseAccountId, ok := accountIDsMap[market.BaseCurrency]; ok {
@@ -186,10 +191,6 @@ func (e *Exchange) queryAccountIDsMap(ctx context.Context) (map[string]string, e
 // For the market order, though Coinbase supports both funds and size, we only support size in order to simplify the stream handler logic
 // We do not support limit order with funds.
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
-	// start the active order store on the first order submission
-	if !e.activeOrderStore.IsStarted() {
-		e.activeOrderStore.Start()
-	}
 	if len(order.Market.Symbol) == 0 {
 		return nil, fmt.Errorf("order.Market.Symbol is required: %+v", order)
 	}
@@ -242,7 +243,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	case types.OrderTypeMarket:
 		req.Size(order.Market.FormatQuantity(order.Quantity))
 		if !order.Price.IsZero() {
-			coinbaseLogger.Warning("the price is ignored for market order")
+			logger.Warning("the price is ignored for market order")
 		}
 	case types.OrderTypeStopLimit:
 		req.Size(order.Market.FormatQuantity(order.Quantity))
@@ -290,7 +291,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	}
 	// note: Coinbase may adjust the order quantity, so we should
 	if !order.Quantity.Eq(res.Size) {
-		coinbaseLogger.Warnf("the order quantity has been adjusted by the server(%s): %s -> %s", res.ID, order.Quantity, res.Size)
+		logger.Warnf("the order quantity has been adjusted by the server(%s): %s -> %s", res.ID, order.Quantity, res.Size)
 		order.Quantity = res.Size
 	}
 	createdOrder = submitOrderToGlobalOrder(order, res)
@@ -389,17 +390,17 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 
 		if err != nil {
 			if isNotFoundError(err) {
-				coinbaseLogger.Warnf("order %v not found, consider it has been cancelled", order.UUID)
+				logger.Warnf("order %v not found, consider it has been cancelled", order.UUID)
 				e.activeOrderStore.remove(order.UUID) // ✅ ADD THIS LINE
 				continue
 			}
-			coinbaseLogger.WithError(err).Warnf("failed to cancel order: %v", order.UUID)
+			logger.WithError(err).Warnf("failed to cancel order: %v", order.UUID)
 			failedOrderIDs = append(failedOrderIDs, order.UUID)
 			cancelErrors = append(cancelErrors, err)
 			continue
 		} else {
 			e.activeOrderStore.remove(order.UUID)
-			coinbaseLogger.Infof("order %v has been cancelled", *res)
+			logger.Infof("order %v has been cancelled", *res)
 		}
 	}
 	if len(cancelErrors) > 0 {
@@ -466,7 +467,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		options.Limit = DefaultKLineLimit
 	}
 	if options.Limit > DefaultKLineLimit {
-		coinbaseLogger.Warnf("limit %d is greater than the maximum limit 300, set to 300", options.Limit)
+		logger.Warnf("limit %d is greater than the maximum limit 300, set to 300", options.Limit)
 		options.Limit = DefaultKLineLimit
 	}
 	granularity := fmt.Sprintf("%d", interval.Seconds())
@@ -490,7 +491,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	for _, rawCandle := range rawCandles {
 		candle, err := rawCandle.Candle()
 		if err != nil {
-			coinbaseLogger.Warnf("invalid raw candle detected, skipping: %v", rawCandle)
+			logger.Warnf("invalid raw candle detected, skipping: %v", rawCandle)
 			continue
 		}
 		candles = append(candles, *candle)
@@ -626,7 +627,7 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 // startTime and endTime are inclusive.
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, startTime, endTime time.Time, lastOrderID uint64) ([]types.Order, error) {
 	if lastOrderID > 0 {
-		coinbaseLogger.Warning("lastOrderID is not supported for Coinbase, it will be ignored")
+		logger.Warning("lastOrderID is not supported for Coinbase, it will be ignored")
 	}
 	cbOrders, err := e.queryOrdersByPagination(ctx, symbol, &startTime, &endTime, []string{"done"})
 	if err != nil {

@@ -528,7 +528,8 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 	}
 	s.updateWorkingOrders(orderUpdate)
 	s.exchange.activeOrderStore.update(msg.OrderID, &api.CreateOrderResponse{
-		Status: apiStatus,
+		Status:     apiStatus,
+		FilledSize: quantityExecuted,
 	})
 	s.EmitOrderUpdate(orderUpdate)
 }
