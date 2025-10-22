@@ -316,7 +316,7 @@ func (msg *MatchMessage) Trade(s *Stream) types.Trade {
 	if ok {
 		quoteCurrency = market.QuoteCurrency
 	} else {
-		log.Warnf("unknown product id: %s", msg.ProductID)
+		coinbaseLogger.Warnf("unknown product id: %s", msg.ProductID)
 		quoteCurrency = "USD" // fallback to USD
 	}
 	return types.Trade{
@@ -351,7 +351,7 @@ func (m *ReceivedMessage) Order(s *Stream) types.Order {
 		if err == nil {
 			order = createdOrder
 		} else {
-			log.Warnf("fail to retrieve order info for received message: %s", m.OrderID)
+			coinbaseLogger.Warnf("fail to retrieve order info for received message: %s", m.OrderID)
 			order = &types.Order{
 				SubmitOrder: types.SubmitOrder{
 					Symbol: toGlobalSymbol(m.ProductID),

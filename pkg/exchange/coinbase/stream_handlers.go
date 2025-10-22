@@ -492,11 +492,23 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 	}
 	quantityExecuted := lastOrder.SubmitOrder.Quantity.Sub(msg.RemainingSize)
 	// msg.Reason can be "filled" or "canceled"
-	status := types.OrderStatusFilled
-	if msg.Reason == "canceled" {
+	var status types.OrderStatus
+	var apiStatus api.OrderStatus
+	switch msg.Reason {
+	case "canceled":
 		status = types.OrderStatusCanceled
-	} else {
+		apiStatus = api.OrderStatusCanceled
+	case "filled":
 		status = types.OrderStatusFilled
+		apiStatus = api.OrderStatusFilled
+	default:
+		err := fmt.Errorf("unknown done message reason: %s for order %s", msg.Reason, msg.OrderID)
+		warnFirstLogger.WarnOrError(
+			err,
+			err.Error(),
+		)
+		status = types.OrderStatusFilled
+		apiStatus = api.OrderStatusFilled
 	}
 
 	orderUpdate := types.Order{
@@ -516,7 +528,7 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 	}
 	s.updateWorkingOrders(orderUpdate)
 	s.exchange.activeOrderStore.update(msg.OrderID, &api.CreateOrderResponse{
-		Status: api.OrderStatus(msg.Reason),
+		Status: apiStatus,
 	})
 	s.EmitOrderUpdate(orderUpdate)
 }
