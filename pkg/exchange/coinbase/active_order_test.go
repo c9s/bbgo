@@ -43,7 +43,7 @@ func TestActiveOrderStore_Add(t *testing.T) {
 	store.add(submitOrder, rawOrder)
 
 	assert.Equal(t, 1, len(store.orders))
-	activeOrder, ok := store.getByUUID("order-uuid-123")
+	activeOrder, ok := store.get("order-uuid-123")
 	assert.True(t, ok)
 	assert.NotNil(t, activeOrder)
 	assert.Equal(t, submitOrder.Symbol, activeOrder.submitOrder.Symbol)
@@ -68,7 +68,7 @@ func TestActiveOrderStore_GetByUUID(t *testing.T) {
 
 		store.add(submitOrder, rawOrder)
 
-		activeOrder, ok := store.getByUUID("order-uuid-456")
+		activeOrder, ok := store.get("order-uuid-456")
 		assert.True(t, ok)
 		assert.NotNil(t, activeOrder)
 		assert.Equal(t, "ETHUSD", activeOrder.submitOrder.Symbol)
@@ -76,7 +76,7 @@ func TestActiveOrderStore_GetByUUID(t *testing.T) {
 	})
 
 	t.Run("non-existing order", func(t *testing.T) {
-		activeOrder, ok := store.getByUUID("non-existent-uuid")
+		activeOrder, ok := store.get("non-existent-uuid")
 		assert.False(t, ok)
 		assert.Nil(t, activeOrder)
 	})
@@ -99,12 +99,12 @@ func TestActiveOrderStore_RemoveByUUID(t *testing.T) {
 	store.add(submitOrder, rawOrder)
 	assert.Equal(t, 1, len(store.orders))
 
-	store.removeByUUID("order-to-remove")
+	store.remove("order-to-remove")
 	// The order should still be in the store
 	assert.Equal(t, 1, len(store.orders))
 
 	// But it should be marked as canceled
-	activeOrder, ok := store.getByUUID("order-to-remove")
+	activeOrder, ok := store.get("order-to-remove")
 	assert.True(t, ok)
 	assert.NotNil(t, activeOrder)
 	assert.Equal(t, api.OrderStatusCanceled, activeOrder.rawOrder.Status)
@@ -114,7 +114,7 @@ func TestActiveOrderStore_RemoveByUUID_NonExistent(t *testing.T) {
 	store := newActiveOrderStore()
 
 	// Removing a non-existent order should not cause issues
-	store.removeByUUID("non-existent-order")
+	store.remove("non-existent-order")
 	assert.Equal(t, 0, len(store.orders))
 }
 
@@ -140,18 +140,18 @@ func TestActiveOrderStore_MultipleOrders(t *testing.T) {
 	assert.Equal(t, 5, len(store.orders))
 
 	// Mark one order as canceled
-	store.removeByUUID("2")
+	store.remove("2")
 	// All orders should still be in the store
 	assert.Equal(t, 5, len(store.orders))
 
 	// Verify the canceled order is marked as canceled
-	canceledOrder, ok := store.getByUUID("2")
+	canceledOrder, ok := store.get("2")
 	assert.True(t, ok)
 	assert.Equal(t, api.OrderStatusCanceled, canceledOrder.rawOrder.Status)
 
 	// Verify other orders still exist and are still open
 	for _, id := range []string{"1", "3", "4", "5"} {
-		order, ok := store.getByUUID(id)
+		order, ok := store.get(id)
 		assert.True(t, ok)
 		assert.Equal(t, api.OrderStatusOpen, order.rawOrder.Status)
 	}
@@ -195,7 +195,7 @@ func TestActiveOrderStore_ThreadSafety(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < numOpsPerGoroutine; j++ {
 				orderID := fixedpoint.NewFromInt(int64(goroutineID*numOpsPerGoroutine + j)).String()
-				_, ok := store.getByUUID(orderID)
+				_, ok := store.get(orderID)
 				assert.True(t, ok)
 			}
 		}(i)
@@ -209,7 +209,7 @@ func TestActiveOrderStore_ThreadSafety(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < numOpsPerGoroutine; j++ {
 				orderID := fixedpoint.NewFromInt(int64(goroutineID*numOpsPerGoroutine + j)).String()
-				store.removeByUUID(orderID)
+				store.remove(orderID)
 			}
 		}(i)
 	}
@@ -222,7 +222,7 @@ func TestActiveOrderStore_ThreadSafety(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		for j := 0; j < numOpsPerGoroutine; j++ {
 			orderID := fixedpoint.NewFromInt(int64(i*numOpsPerGoroutine + j)).String()
-			order, ok := store.getByUUID(orderID)
+			order, ok := store.get(orderID)
 			assert.True(t, ok)
 			assert.Equal(t, api.OrderStatusCanceled, order.rawOrder.Status)
 		}
@@ -266,7 +266,7 @@ func TestActiveOrderStore_OverwriteOrder(t *testing.T) {
 	assert.Equal(t, 1, len(store.orders))
 
 	// Should have the second order's data
-	activeOrder, ok := store.getByUUID("duplicate-uuid")
+	activeOrder, ok := store.get("duplicate-uuid")
 	assert.True(t, ok)
 	assert.Equal(t, "ETHUSD", activeOrder.submitOrder.Symbol)
 	assert.Equal(t, fixedpoint.NewFromFloat(3000), activeOrder.rawOrder.Price)

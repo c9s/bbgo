@@ -186,6 +186,10 @@ func (e *Exchange) queryAccountIDsMap(ctx context.Context) (map[string]string, e
 // For the market order, though Coinbase supports both funds and size, we only support size in order to simplify the stream handler logic
 // We do not support limit order with funds.
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
+	// start the active order store on the first order submission
+	if !e.activeOrderStore.IsStarted() {
+		e.activeOrderStore.Start()
+	}
 	if len(order.Market.Symbol) == 0 {
 		return nil, fmt.Errorf("order.Market.Symbol is required: %+v", order)
 	}
@@ -386,7 +390,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		if err != nil {
 			if isNotFoundError(err) {
 				coinbaseLogger.Warnf("order %v not found, consider it has been cancelled", order.UUID)
-				e.activeOrderStore.removeByUUID(order.UUID) // ✅ ADD THIS LINE
+				e.activeOrderStore.remove(order.UUID) // ✅ ADD THIS LINE
 				continue
 			}
 			coinbaseLogger.WithError(err).Warnf("failed to cancel order: %v", order.UUID)
@@ -394,7 +398,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 			cancelErrors = append(cancelErrors, err)
 			continue
 		} else {
-			e.activeOrderStore.removeByUUID(order.UUID)
+			e.activeOrderStore.remove(order.UUID)
 			coinbaseLogger.Infof("order %v has been cancelled", *res)
 		}
 	}
@@ -513,7 +517,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 
 	cbOrder, err := req.Do(ctx)
 	if err != nil {
-		if activeOrder, found := e.activeOrderStore.getByUUID(orderID); found && isNotFoundError(err) {
+		if activeOrder, found := e.activeOrderStore.get(orderID); found && isNotFoundError(err) {
 			// order is found in the active order store but not found on the server -> assume canceled
 			// 1. restore the order to return
 			order := submitOrderToGlobalOrder(activeOrder.submitOrder, activeOrder.rawOrder)
@@ -602,7 +606,7 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 			Status:    types.OrderStatusCanceled,
 			IsWorking: false,
 		})
-		e.activeOrderStore.removeByUUID(orderID)
+		e.activeOrderStore.remove(orderID)
 	}
 	return orders, nil
 }

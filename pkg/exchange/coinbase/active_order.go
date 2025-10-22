@@ -18,14 +18,28 @@ type ActiveOrder struct {
 type ActiveOrderStore struct {
 	mu     sync.Mutex
 	orders map[string]*ActiveOrder
+
+	startTime time.Time
 }
 
 func newActiveOrderStore() *ActiveOrderStore {
 	store := &ActiveOrderStore{
 		orders: make(map[string]*ActiveOrder),
 	}
-	go store.cleanupWorker()
 	return store
+}
+
+func (a *ActiveOrderStore) IsStarted() bool {
+	return !a.startTime.IsZero()
+}
+
+func (a *ActiveOrderStore) Start() {
+	if a.startTime.IsZero() {
+		a.mu.Lock()
+		a.startTime = time.Now()
+		a.mu.Unlock()
+		go a.cleanupWorker()
+	}
 }
 
 func (a *ActiveOrderStore) cleanupWorker() {
@@ -33,18 +47,28 @@ func (a *ActiveOrderStore) cleanupWorker() {
 	for range ticker.C {
 		a.mu.Lock()
 		for orderUUID, activeOrder := range a.orders {
-			if activeOrder.rawOrder.Status == api.OrderStatusCanceled ||
-				activeOrder.rawOrder.Status == api.OrderStatusDone ||
-				activeOrder.rawOrder.Status == api.OrderStatusRejected ||
-				time.Since(activeOrder.lastUpdate) > time.Hour*3 {
+			switch {
+			case activeOrder.rawOrder.Status == api.OrderStatusCanceled:
+				coinbaseLogger.Infof("removing canceled order from active order store: %s", orderUUID)
 				delete(a.orders, orderUUID)
+			case activeOrder.rawOrder.Status == api.OrderStatusDone:
+				coinbaseLogger.Infof("removing done order from active order store: %s", orderUUID)
+				delete(a.orders, orderUUID)
+			case activeOrder.rawOrder.Status == api.OrderStatusRejected:
+				coinbaseLogger.Infof("removing rejected order from active order store: %s", orderUUID)
+				delete(a.orders, orderUUID)
+			case time.Since(activeOrder.lastUpdate) > time.Hour*3:
+				coinbaseLogger.Infof("removing expired order from active order store: %s", orderUUID)
+				delete(a.orders, orderUUID)
+			default:
+				continue
 			}
 		}
 		a.mu.Unlock()
 	}
 }
 
-func (a *ActiveOrderStore) getByUUID(orderUUID string) (*ActiveOrder, bool) {
+func (a *ActiveOrderStore) get(orderUUID string) (*ActiveOrder, bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -64,7 +88,7 @@ func (a *ActiveOrderStore) add(order types.SubmitOrder, rawOrder *api.CreateOrde
 	}
 }
 
-func (a *ActiveOrderStore) removeByUUID(orderUUID string) {
+func (a *ActiveOrderStore) remove(orderUUID string) {
 	a.update(
 		orderUUID,
 		&api.CreateOrderResponse{
