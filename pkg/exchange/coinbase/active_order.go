@@ -29,7 +29,7 @@ func newActiveOrderStore() *ActiveOrderStore {
 }
 
 func (a *ActiveOrderStore) cleanupWorker() {
-	ticker := time.NewTicker(time.Hour * 2)
+	ticker := time.NewTicker(time.Minute * 5)
 	for range ticker.C {
 		a.mu.Lock()
 		for orderUUID, activeOrder := range a.orders {
