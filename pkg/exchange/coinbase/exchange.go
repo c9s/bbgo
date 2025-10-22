@@ -67,7 +67,7 @@ func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
 		apiKey:           key,
 		apiSecret:        secret,
 		apiPassphrase:    passphrase,
-		activeOrderStore: newActiveOrderStore(),
+		activeOrderStore: newActiveOrderStore(key, secret, passphrase),
 	}
 }
 

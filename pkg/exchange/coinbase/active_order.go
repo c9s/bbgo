@@ -15,6 +15,12 @@ type ActiveOrder struct {
 	lastUpdate time.Time
 }
 
+type registryKey struct {
+	key, secret, passphrase string
+}
+
+var actStoreRegistry map[registryKey]*ActiveOrderStore = make(map[registryKey]*ActiveOrderStore)
+
 type ActiveOrderStore struct {
 	mu     sync.Mutex
 	orders map[string]*ActiveOrder
@@ -22,10 +28,15 @@ type ActiveOrderStore struct {
 	startTime time.Time
 }
 
-func newActiveOrderStore() *ActiveOrderStore {
+func newActiveOrderStore(key, secret, passphrase string) *ActiveOrderStore {
+	rk := registryKey{key, secret, passphrase}
+	if store, ok := actStoreRegistry[rk]; ok {
+		return store
+	}
 	store := &ActiveOrderStore{
 		orders: make(map[string]*ActiveOrder),
 	}
+	actStoreRegistry[rk] = store
 	return store
 }
 
