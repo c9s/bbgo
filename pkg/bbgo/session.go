@@ -424,6 +424,12 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		return ErrSessionAlreadyInitialized
 	}
 
+	if initializer, ok := session.Exchange.(types.Initializer); ok {
+		if err := initializer.Initialize(ctx); err != nil {
+			return err
+		}
+	}
+
 	var logger = environ.Logger()
 	logger = logger.WithField("session", session.Name)
 
