@@ -1,6 +1,7 @@
 package coinbase
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -26,6 +27,8 @@ type ActiveOrderStore struct {
 	orders map[string]*ActiveOrder
 
 	startTime time.Time
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 func newActiveOrderStore(key, secret, passphrase string) *ActiveOrderStore {
@@ -36,6 +39,7 @@ func newActiveOrderStore(key, secret, passphrase string) *ActiveOrderStore {
 	store := &ActiveOrderStore{
 		orders: make(map[string]*ActiveOrder),
 	}
+	store.ctx, store.cancel = context.WithCancel(context.Background())
 	actStoreRegistry[rk] = store
 	return store
 }
@@ -44,38 +48,55 @@ func (a *ActiveOrderStore) IsStarted() bool {
 	return !a.startTime.IsZero()
 }
 
+// Start starts the active order store cleanup worker.
+// **IMPORTANT**: Should be called only once per store instance.
 func (a *ActiveOrderStore) Start() {
 	if a.startTime.IsZero() {
 		a.mu.Lock()
 		a.startTime = time.Now()
 		a.mu.Unlock()
-		go a.cleanupWorker()
+		go a.cleanupWorker(a.ctx)
 	}
 }
 
-func (a *ActiveOrderStore) cleanupWorker() {
+// Stop stops the active order store cleanup worker.
+// **IMPORTANT**: Should be called only once per store instance.
+func (a *ActiveOrderStore) Stop() {
+	if a.startTime.IsZero() {
+		return
+	}
+	a.cancel()
+}
+
+func (a *ActiveOrderStore) cleanupWorker(ctx context.Context) {
 	ticker := time.NewTicker(time.Minute * 5)
-	for range ticker.C {
-		a.mu.Lock()
-		for orderUUID, activeOrder := range a.orders {
-			switch {
-			case activeOrder.rawOrder.Status == api.OrderStatusCanceled:
-				coinbaseLogger.Infof("removing canceled order from active order store: %s", orderUUID)
-				delete(a.orders, orderUUID)
-			case activeOrder.rawOrder.Status == api.OrderStatusDone:
-				coinbaseLogger.Infof("removing done order from active order store: %s", orderUUID)
-				delete(a.orders, orderUUID)
-			case activeOrder.rawOrder.Status == api.OrderStatusRejected:
-				coinbaseLogger.Infof("removing rejected order from active order store: %s", orderUUID)
-				delete(a.orders, orderUUID)
-			case time.Since(activeOrder.lastUpdate) > time.Hour*3:
-				coinbaseLogger.Infof("removing expired order from active order store: %s", orderUUID)
-				delete(a.orders, orderUUID)
-			default:
-				continue
+	for {
+		select {
+		case <-ctx.Done():
+			coinbaseLogger.Info("active order store cleanup worker stopped")
+			return
+		case <-ticker.C:
+			a.mu.Lock()
+			for orderUUID, activeOrder := range a.orders {
+				switch {
+				case activeOrder.rawOrder.Status == api.OrderStatusCanceled:
+					coinbaseLogger.Infof("removing canceled order from active order store: %s", orderUUID)
+					delete(a.orders, orderUUID)
+				case activeOrder.rawOrder.Status == api.OrderStatusDone:
+					coinbaseLogger.Infof("removing done order from active order store: %s", orderUUID)
+					delete(a.orders, orderUUID)
+				case activeOrder.rawOrder.Status == api.OrderStatusRejected:
+					coinbaseLogger.Infof("removing rejected order from active order store: %s", orderUUID)
+					delete(a.orders, orderUUID)
+				case time.Since(activeOrder.lastUpdate) > time.Hour*3:
+					coinbaseLogger.Infof("removing expired order from active order store: %s", orderUUID)
+					delete(a.orders, orderUUID)
+				default:
+					continue
+				}
 			}
+			a.mu.Unlock()
 		}
-		a.mu.Unlock()
 	}
 }
 
