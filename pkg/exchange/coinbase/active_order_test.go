@@ -12,14 +12,14 @@ import (
 )
 
 func TestNewActiveOrderStore(t *testing.T) {
-	store := newActiveOrderStore()
+	store := newActiveOrderStore("test-key-1", "test-secret-1", "test-passphrase-1")
 	assert.NotNil(t, store)
 	assert.NotNil(t, store.orders)
 	assert.Equal(t, 0, len(store.orders))
 }
 
 func TestActiveOrderStore_Add(t *testing.T) {
-	store := newActiveOrderStore()
+	store := newActiveOrderStore("test-key-2", "test-secret-2", "test-passphrase-2")
 
 	submitOrder := types.SubmitOrder{
 		Symbol:      "BTCUSD",
@@ -51,7 +51,7 @@ func TestActiveOrderStore_Add(t *testing.T) {
 }
 
 func TestActiveOrderStore_GetByUUID(t *testing.T) {
-	store := newActiveOrderStore()
+	store := newActiveOrderStore("test-key-3", "test-secret-3", "test-passphrase-3")
 
 	t.Run("existing order", func(t *testing.T) {
 		submitOrder := types.SubmitOrder{
@@ -83,7 +83,7 @@ func TestActiveOrderStore_GetByUUID(t *testing.T) {
 }
 
 func TestActiveOrderStore_RemoveByUUID(t *testing.T) {
-	store := newActiveOrderStore()
+	store := newActiveOrderStore("test-key-4", "test-secret-4", "test-passphrase-4")
 
 	submitOrder := types.SubmitOrder{
 		Symbol: "BTCUSD",
@@ -111,7 +111,7 @@ func TestActiveOrderStore_RemoveByUUID(t *testing.T) {
 }
 
 func TestActiveOrderStore_RemoveByUUID_NonExistent(t *testing.T) {
-	store := newActiveOrderStore()
+	store := newActiveOrderStore("test-key-5", "test-secret-5", "test-passphrase-5")
 
 	// Removing a non-existent order should not cause issues
 	store.remove("non-existent-order")
@@ -119,7 +119,7 @@ func TestActiveOrderStore_RemoveByUUID_NonExistent(t *testing.T) {
 }
 
 func TestActiveOrderStore_MultipleOrders(t *testing.T) {
-	store := newActiveOrderStore()
+	store := newActiveOrderStore("test-key-6", "test-secret-6", "test-passphrase-6")
 
 	// Add multiple orders
 	for i := 1; i <= 5; i++ {
@@ -158,7 +158,7 @@ func TestActiveOrderStore_MultipleOrders(t *testing.T) {
 }
 
 func TestActiveOrderStore_ThreadSafety(t *testing.T) {
-	store := newActiveOrderStore()
+	store := newActiveOrderStore("test-key-7", "test-secret-7", "test-passphrase-7")
 	var wg sync.WaitGroup
 
 	// Number of concurrent operations
@@ -230,7 +230,7 @@ func TestActiveOrderStore_ThreadSafety(t *testing.T) {
 }
 
 func TestActiveOrderStore_OverwriteOrder(t *testing.T) {
-	store := newActiveOrderStore()
+	store := newActiveOrderStore("test-key-8", "test-secret-8", "test-passphrase-8")
 
 	// Add an order
 	submitOrder1 := types.SubmitOrder{
