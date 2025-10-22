@@ -45,27 +45,35 @@ func newActiveOrderStore(key, secret, passphrase string) *ActiveOrderStore {
 }
 
 func (a *ActiveOrderStore) IsStarted() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	return !a.startTime.IsZero()
 }
 
 // Start starts the active order store cleanup worker.
-// **IMPORTANT**: Should be called only once per store instance.
 func (a *ActiveOrderStore) Start() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	if a.startTime.IsZero() {
-		a.mu.Lock()
 		a.startTime = time.Now()
-		a.mu.Unlock()
 		go a.cleanupWorker(a.ctx)
 	}
 }
 
-// Stop stops the active order store cleanup worker.
-// **IMPORTANT**: Should be called only once per store instance.
+// Stop stops the active order store cleanup worker and resets the store.
 func (a *ActiveOrderStore) Stop() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	if a.startTime.IsZero() {
 		return
 	}
-	a.cancel()
+	a.cancel()                                                 // stop the cleanup worker
+	a.startTime = time.Time{}                                  // reset start time
+	a.orders = make(map[string]*ActiveOrder)                   // clear orders
+	a.ctx, a.cancel = context.WithCancel(context.Background()) // create new context
 }
 
 func (a *ActiveOrderStore) cleanupWorker(ctx context.Context) {
