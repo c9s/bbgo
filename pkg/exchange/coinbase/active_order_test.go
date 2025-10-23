@@ -17,6 +17,10 @@ func TestNewActiveOrderStore(t *testing.T) {
 	assert.NotNil(t, store)
 	assert.NotNil(t, store.orders)
 	assert.Equal(t, 0, len(store.orders))
+
+	store2 := newActiveOrderStore("test-key-1")
+	assert.Equal(t, store, store2)
+
 }
 
 func TestActiveOrderStore_Add(t *testing.T) {

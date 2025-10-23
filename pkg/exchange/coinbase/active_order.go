@@ -16,7 +16,7 @@ type ActiveOrder struct {
 	lastUpdate time.Time
 }
 
-var actStoreRegistry map[string]*ActiveOrderStore = make(map[string]*ActiveOrderStore)
+var actStoreRegistry sync.Map
 
 type ActiveOrderStore struct {
 	mu     sync.Mutex
@@ -26,13 +26,13 @@ type ActiveOrderStore struct {
 }
 
 func newActiveOrderStore(key string) *ActiveOrderStore {
-	if store, ok := actStoreRegistry[key]; ok {
-		return store
+	if store, ok := actStoreRegistry.Load(key); ok {
+		return store.(*ActiveOrderStore)
 	}
 	store := &ActiveOrderStore{
 		orders: make(map[string]*ActiveOrder),
 	}
-	actStoreRegistry[key] = store
+	actStoreRegistry.Store(key, store)
 	return store
 }
 
