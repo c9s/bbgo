@@ -121,6 +121,10 @@ func (a *ActiveOrderStore) update(orderUUID string, update *api.CreateOrderRespo
 	now := time.Now()
 	if activeOrder, ok := a.orders[orderUUID]; ok {
 		activeOrder.rawOrder.Status = update.Status
+		// filled size should be increasing
+		if update.FilledSize.Compare(activeOrder.rawOrder.FilledSize) > 0 {
+			activeOrder.rawOrder.FilledSize = update.FilledSize
+		}
 		activeOrder.lastUpdate = now
 	}
 }

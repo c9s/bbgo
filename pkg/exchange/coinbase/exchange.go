@@ -524,10 +524,8 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 			order := submitOrderToGlobalOrder(activeOrder.submitOrder, activeOrder.rawOrder)
 			// 2. set status to canceled
 			order.Status = types.OrderStatusCanceled
-			// 3. update order status in the active order store
-			e.activeOrderStore.update(orderID, &api.CreateOrderResponse{
-				Status: api.OrderStatusCanceled,
-			})
+			// 3. mark it as canceled
+			e.activeOrderStore.markCanceled(orderID)
 			return order, nil
 		}
 		return nil, fmt.Errorf("failed to get order %+v: %w", q, err)
