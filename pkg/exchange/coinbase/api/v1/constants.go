@@ -41,6 +41,10 @@ const (
 	OrderStatusDone     OrderStatus = "done"
 	OrderStatusActive   OrderStatus = "active" // query only status
 	OrderStatusAll      OrderStatus = "all"    // query only status
+
+	// websocket statuses
+	OrderStatusCanceled OrderStatus = "canceled"
+	OrderStatusFilled   OrderStatus = "filled"
 )
 
 type OrderType string

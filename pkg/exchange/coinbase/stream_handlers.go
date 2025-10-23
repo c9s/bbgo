@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -490,11 +491,24 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 		lastOrder = *order
 	}
 	quantityExecuted := lastOrder.SubmitOrder.Quantity.Sub(msg.RemainingSize)
-	status := types.OrderStatusFilled
-	if msg.Reason == "canceled" {
+	// msg.Reason can be "filled" or "canceled"
+	var status types.OrderStatus
+	var apiStatus api.OrderStatus
+	switch msg.Reason {
+	case "canceled":
 		status = types.OrderStatusCanceled
-	} else {
+		apiStatus = api.OrderStatusCanceled
+	case "filled":
 		status = types.OrderStatusFilled
+		apiStatus = api.OrderStatusFilled
+	default:
+		err := fmt.Errorf("unknown done message reason: %s for order %s", msg.Reason, msg.OrderID)
+		warnFirstLogger.WarnOrError(
+			err,
+			err.Error(),
+		)
+		status = types.OrderStatusFilled
+		apiStatus = api.OrderStatusFilled
 	}
 
 	orderUpdate := types.Order{
@@ -513,7 +527,10 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 		UpdateTime:       types.Time(msg.Time),
 	}
 	s.updateWorkingOrders(orderUpdate)
-	s.exchange.activeOrderStore.removeByUUID(msg.OrderID)
+	s.exchange.activeOrderStore.update(msg.OrderID, &api.CreateOrderResponse{
+		Status:     apiStatus,
+		FilledSize: quantityExecuted,
+	})
 	s.EmitOrderUpdate(orderUpdate)
 }
 

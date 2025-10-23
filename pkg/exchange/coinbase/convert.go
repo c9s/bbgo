@@ -37,6 +37,10 @@ func toGlobalOrderStatus(cbStatus api.OrderStatus, doneReason string) types.Orde
 		case "rejected":
 			return types.OrderStatusRejected
 		}
+	case api.OrderStatusCanceled:
+		return types.OrderStatusCanceled
+	case api.OrderStatusFilled:
+		return types.OrderStatusFilled
 	}
 	return types.OrderStatus(strings.ToUpper(string(cbStatus)))
 }
@@ -312,7 +316,7 @@ func (msg *MatchMessage) Trade(s *Stream) types.Trade {
 	if ok {
 		quoteCurrency = market.QuoteCurrency
 	} else {
-		log.Warnf("unknown product id: %s", msg.ProductID)
+		logger.Warnf("unknown product id: %s", msg.ProductID)
 		quoteCurrency = "USD" // fallback to USD
 	}
 	return types.Trade{
@@ -336,7 +340,7 @@ func (msg *MatchMessage) Trade(s *Stream) types.Trade {
 
 func (m *ReceivedMessage) Order(s *Stream) types.Order {
 	var order *types.Order
-	if activeOrder, ok := s.exchange.activeOrderStore.getByUUID(m.OrderID); ok {
+	if activeOrder, ok := s.exchange.activeOrderStore.get(m.OrderID); ok {
 		order = submitOrderToGlobalOrder(activeOrder.submitOrder, activeOrder.rawOrder)
 	} else {
 		// query the order if not found in active orders
@@ -347,7 +351,7 @@ func (m *ReceivedMessage) Order(s *Stream) types.Order {
 		if err == nil {
 			order = createdOrder
 		} else {
-			log.Warnf("fail to retrieve order info for received message: %s", m.OrderID)
+			logger.Warnf("fail to retrieve order info for received message: %s", m.OrderID)
 			order = &types.Order{
 				SubmitOrder: types.SubmitOrder{
 					Symbol: toGlobalSymbol(m.ProductID),
