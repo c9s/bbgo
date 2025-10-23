@@ -183,6 +183,10 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 	executedVolume := maxOrder.ExecutedVolume
 	remainingVolume := maxOrder.RemainingVolume
 	isMargin := maxOrder.WalletType == max.WalletTypeMargin
+	timeInForce := types.TimeInForceGTC
+	if maxOrder.OrderType == max.OrderTypeIOCLimit {
+		timeInForce = types.TimeInForceIOC
+	}
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: maxOrder.ClientOID,
@@ -191,7 +195,7 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 			Type:          toGlobalOrderType(maxOrder.OrderType),
 			Quantity:      maxOrder.Volume,
 			Price:         maxOrder.Price,
-			TimeInForce:   types.TimeInForceGTC, // MAX only supports GTC
+			TimeInForce:   timeInForce,
 			GroupID:       maxOrder.GroupID,
 		},
 		Exchange:         types.ExchangeMax,
@@ -327,7 +331,7 @@ func convertWebSocketOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 			Quantity:      u.Volume,
 			Price:         u.Price,
 			StopPrice:     u.StopPrice,
-			TimeInForce:   timeInForce, // MAX only supports GTC
+			TimeInForce:   timeInForce,
 			GroupID:       u.GroupID,
 		},
 		Exchange:         types.ExchangeMax,
