@@ -21,13 +21,11 @@ type RBNode struct {
 	color               Color
 }
 
-func newNilNode() *RBNode {
-	return &RBNode{color: Black}
-}
-
-func (node *RBNode) isNil() bool {
-	if node == nil {
+// isNil checks if the node is a nil node
+func (n *RBNode) isNil() bool {
+	if n == nil {
 		return true
 	}
-	return node.color == Black && node.left == nil && node.right == nil
+
+	return n.color == Black && n.left == nil && n.right == nil
 }

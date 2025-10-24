@@ -2,24 +2,44 @@ package types
 
 import (
 	"fmt"
+	"sync"
+	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+type RBTreeStats struct {
+	alloc int64
+	free  int64
+}
+
 type RBTree struct {
-	Root *RBNode
-	size int
+	Root     *RBNode
+	size     int
+	nodePool *sync.Pool // pool for RBNode allocation and reuse
+
+	stats RBTreeStats
 }
 
 func NewRBTree() *RBTree {
-	root := newNilNode()
-	root.parent = newNilNode()
-
-	return &RBTree{
-		Root: root,
+	tree := &RBTree{
+		nodePool: &sync.Pool{
+			New: func() interface{} {
+				return &RBNode{
+					color: Black,
+					key:   fixedpoint.Zero,
+					value: fixedpoint.Zero,
+				}
+			},
+		},
 	}
+
+	root := tree.newNilNode()
+	root.parent = tree.newNilNode()
+	tree.Root = root
+	return tree
 }
 
 func (tree *RBTree) Delete(key fixedpoint.Value) bool {
@@ -28,51 +48,74 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 		return false
 	}
 
-	// y = the node to be deleted
-	// x (the child of the deleted node)
-	var x, y *RBNode
+	// x the child of the deleted node
+	var x *RBNode
 
 	// the deleting node has only one child, it's easy,
-	// we just connect the child the parent of the deleting node
+	// we just connect the child to the parent of the deleting node
 	if deleting.left.isNil() || deleting.right.isNil() {
-		y = deleting
+		wasBlack := deleting.color == Black
+
+		// deleting.left or deleting.right could be neel
+		if deleting.left.isNil() {
+			x = deleting.right
+
+			tree.clear(deleting.left)
+			deleting.left = nil
+		} else {
+			x = deleting.left
+
+			if deleting.right.isNil() {
+				tree.clear(deleting.right)
+				deleting.right = nil
+			}
+		}
+
+		p := deleting.parent
+
+		tree.transplant(deleting, x)
+		tree.clear(deleting)
+
+		if wasBlack {
+			if err := tree.deleteFixup(x); err != nil {
+				logrus.Errorf("delete fixup x = %+v error: %v", x, err)
+				tree.printSubTreeGraph(p)
+			}
+		}
+
 	} else {
-		// if both children are not NIL (neel), we need to find the successor
+		// if both children are not NIL (neel), we need to find the successor from the right subtree.
 		// and copy the successor to the memory location of the deleting node.
-		// since it's successor, it always has no child connecting to it.
-		y = tree.Successor(deleting)
-	}
+		// since it's a successor, it always has no child connected to it.
+		// here the right child is not nil, so it won't be nil.
+		successor := tree.SuccessorOf(deleting)
+		wasBlack := successor.color == Black
+		deleting.key = successor.key
+		deleting.value = successor.value
 
-	// y.left or y.right could be neel
-	if y.left.isNil() {
-		x = y.right
-	} else {
-		x = y.left
-	}
+		if successor.left.isNil() {
+			x = successor.right
+			tree.clear(successor.left)
+			successor.left = nil
+		} else {
+			x = successor.left
 
-	x.parent = y.parent
+			if successor.right.isNil() {
+				tree.clear(successor.right)
+				successor.right = nil
+			}
+		}
 
-	if y.parent.isNil() {
-		tree.Root = x
-	} else if y == y.parent.left {
-		y.parent.left = x
-	} else {
-		y.parent.right = x
-	}
+		// if the successor has a right child, update its parent reference
+		tree.transplant(successor, x)
+		tree.clear(successor)
 
-	// copy the data from the successor to the memory location of the deleting node
-	if y != deleting {
-		deleting.key = y.key
-		deleting.value = y.value
-		clearNode(y)
-	} else {
-		// clear the reference
-		clearNode(deleting)
-		deleting = nil
-	}
-
-	if y.color == Black {
-		tree.DeleteFixup(x)
+		if wasBlack {
+			if err := tree.deleteFixup(x); err != nil {
+				logrus.Errorf("delete fixup x = %+v error: %v", x, err)
+				tree.printSubTreeGraph(deleting)
+			}
+		}
 	}
 
 	tree.size--
@@ -80,100 +123,139 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 	return true
 }
 
-func (tree *RBTree) DeleteFixup(current *RBNode) {
-	for current != tree.Root && current.color == Black {
-		if current.parent == nil || current.parent.isNil() {
-			logrus.Errorf("deleteFixup: current.parent is nil or isNil, current = %+v", current)
-			break
+// transplant replaces sub-tree rooted at u with subtree rooted at v.
+func (tree *RBTree) transplant(u, v *RBNode) {
+	if v == nil {
+		v = tree.newNilNode()
+	}
+
+	if u.parent == nil || u.parent.isNil() {
+		tree.Root = v
+		v.parent = tree.newNilNode()
+		return
+	} else if u == u.parent.left {
+		u.parent.left = v
+	} else if u == u.parent.right {
+		u.parent.right = v
+	}
+
+	v.parent = u.parent
+}
+
+func (tree *RBTree) sanityCheck(n *RBNode) (err error) {
+	tree.InorderOf(n, func(n *RBNode) bool {
+		if n.left.isNil() {
+			if n.left != nil {
+				if n.left.color != Black {
+					err = fmt.Errorf("nil left child is not black: %+v", n.left)
+					return false
+				}
+
+				if n.left.left != nil {
+					err = fmt.Errorf("nil left child's left is not nil: %+v", n.left.left)
+					return false
+				}
+
+				if n.left.right != nil {
+					err = fmt.Errorf("nil left child's right is not nil: %+v", n.left.right)
+					return false
+				}
+			}
+		} else if !(n.key.Compare(n.left.key) > 0) {
+			err = fmt.Errorf("left child's key is not less than parent: left = %+v, parent = %+v", n.left.key, n.key)
+			return false
 		}
+
+		if n.right.isNil() {
+			if n.right != nil {
+				if n.right.color != Black {
+					err = fmt.Errorf("nil right child is not black: %+v", n.right)
+					return false
+				}
+
+				if n.right.left != nil {
+					err = fmt.Errorf("nil right child's left is not nil: %+v", n.right.left)
+					return false
+				}
+
+				if n.right.right != nil {
+					err = fmt.Errorf("nil right child's right is not nil: %+v", n.right.right)
+					return false
+				}
+			}
+		} else if !(n.key.Compare(n.right.key) < 0) {
+			err = fmt.Errorf("right child's key is not greater than parent: right = %+v, parent = %+v", n.right.key, n.key)
+			return false
+		}
+
+		return true
+	})
+
+	return err
+}
+
+func (tree *RBTree) deleteFixup(current *RBNode) error {
+	for current != tree.Root && current.color == Black {
 		if current == current.parent.left {
 			sibling := current.parent.right
-			if sibling == nil || sibling.isNil() {
-				logrus.Errorf("deleteFixup: sibling is nil or isNil (left branch), current = %+v", current)
-				break
-			}
-			// sibling is red
 			if sibling.color == Red {
 				sibling.color = Black
 				current.parent.color = Red
 				tree.RotateLeft(current.parent)
 				sibling = current.parent.right
-				if sibling == nil || sibling.isNil() {
-					logrus.Errorf("deleteFixup: sibling is nil after rotate (left branch), current = %+v", current)
-					break
-				}
 			}
-			// both children are black
-			if (sibling.left == nil || sibling.left.isNil() || sibling.left.color == Black) &&
-				(sibling.right == nil || sibling.right.isNil() || sibling.right.color == Black) {
+
+			// if both are black nodes
+			if sibling.left.color == Black && sibling.right.color == Black {
 				sibling.color = Red
 				current = current.parent
 			} else {
-				// only one child is black
-				if sibling.right == nil || sibling.right.isNil() || sibling.right.color == Black {
-					if sibling.left != nil && !sibling.left.isNil() {
-						sibling.left.color = Black
-					}
+				// only one of the child is black
+				if sibling.right.color == Black {
+					sibling.left.color = Black
 					sibling.color = Red
 					tree.RotateRight(sibling)
 					sibling = current.parent.right
-					if sibling == nil || sibling.isNil() {
-						logrus.Errorf("deleteFixup: sibling is nil after rotateRight (left branch), current = %+v", current)
-						break
-					}
 				}
+
 				sibling.color = current.parent.color
 				current.parent.color = Black
-				if sibling.right != nil && !sibling.right.isNil() {
-					sibling.right.color = Black
-				}
+				sibling.right.color = Black
 				tree.RotateLeft(current.parent)
 				current = tree.Root
 			}
-		} else {
+		} else { // if current is right child
 			sibling := current.parent.left
-			if sibling == nil || sibling.isNil() {
-				logrus.Errorf("deleteFixup: sibling is nil or isNil (right branch), current = %+v", current)
-				break
-			}
 			if sibling.color == Red {
 				sibling.color = Black
 				current.parent.color = Red
 				tree.RotateRight(current.parent)
 				sibling = current.parent.left
-				if sibling == nil || sibling.isNil() {
-					logrus.Errorf("deleteFixup: sibling is nil after rotate (right branch), current = %+v", current)
-					break
-				}
 			}
-			if (sibling.left == nil || sibling.left.isNil() || sibling.left.color == Black) &&
-				(sibling.right == nil || sibling.right.isNil() || sibling.right.color == Black) {
+
+			if sibling.left.color == Black && sibling.right.color == Black {
 				sibling.color = Red
 				current = current.parent
-			} else {
-				if sibling.left == nil || sibling.left.isNil() || sibling.left.color == Black {
-					if sibling.right != nil && !sibling.right.isNil() {
-						sibling.right.color = Black
-					}
+			} else { // if only one of child is Black
+				// the left child of sibling is black, and right child is red
+				if sibling.left.color == Black {
+					sibling.right.color = Black
 					sibling.color = Red
 					tree.RotateLeft(sibling)
 					sibling = current.parent.left
-					if sibling == nil || sibling.isNil() {
-						logrus.Errorf("deleteFixup: sibling is nil after rotateLeft (right branch), current = %+v", current)
-						break
-					}
 				}
+
 				sibling.color = current.parent.color
 				current.parent.color = Black
-				if sibling.left != nil && !sibling.left.isNil() {
-					sibling.left.color = Black
-				}
+				sibling.left.color = Black
 				tree.RotateRight(current.parent)
 				current = tree.Root
 			}
 		}
 	}
+
 	current.color = Black
+	return nil
 }
 
 func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
@@ -198,13 +280,13 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 		key:   key,
 		value: val,
 		color: Red,
-		left:  newNilNode(),
-		right: newNilNode(),
+		left:  tree.newNilNode(),
+		right: tree.newNilNode(),
 	}
 
 	if y == nil {
 		// insert as the root node
-		node.parent = newNilNode()
+		node.parent = tree.newNilNode()
 		tree.Root = node
 	} else {
 		// insert as a child
@@ -238,12 +320,12 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 		key:   key,
 		value: val,
 		color: Red,
-		left:  newNilNode(),
-		right: newNilNode(),
+		left:  tree.newNilNode(),
+		right: tree.newNilNode(),
 	}
 
 	if y == nil {
-		node.parent = newNilNode()
+		node.parent = tree.newNilNode()
 		tree.Root = node
 	} else {
 		node.parent = y
@@ -357,8 +439,9 @@ func (tree *RBTree) RotateRight(y *RBNode) {
 
 	if !x.right.isNil() {
 		if x.right == nil {
-			panic(fmt.Errorf("x.right is nil: node = %+v, left = %+v, right = %+v, parent = %+v", x, x.left, x.right, x.parent))
+			logrus.Panicf("x.right is nil: node = %+v, left = %+v, right = %+v, parent = %+v", x, x.left, x.right, x.parent)
 		}
+
 		x.right.parent = y
 	}
 
@@ -408,11 +491,12 @@ func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
 	return current
 }
 
-func (tree *RBTree) Successor(current *RBNode) *RBNode {
+func (tree *RBTree) SuccessorOf(current *RBNode) *RBNode {
 	if !current.right.isNil() {
 		return tree.LeftmostOf(current.right)
 	}
 
+	// otherwise walk up until we find a node that is a left child of its parent
 	var suc = current.parent
 	for !suc.isNil() && current == suc.right {
 		current = suc
@@ -508,10 +592,41 @@ func (tree *RBTree) Print() {
 	})
 }
 
-func clearNode(deleting *RBNode) {
-	deleting.left = nil
-	deleting.right = nil
-	deleting.parent = nil
+// newNilNode allocates a nil RBNode from the pool
+func (tree *RBTree) newNilNode() *RBNode {
+	n := tree.nodePool.Get().(*RBNode)
+	n.left = nil
+	n.right = nil
+	n.parent = nil
+	n.key = fixedpoint.Zero
+	n.value = fixedpoint.Zero
+	n.color = Black
+
+	atomic.AddInt64(&tree.stats.alloc, 1)
+	return n
+}
+
+// clear releases the node to the pool
+func (tree *RBTree) clear(n *RBNode) {
+	if n.left != nil {
+		if n.left.isNil() && n.left.parent == n {
+			tree.clear(n.left)
+		}
+
+		n.left = nil
+	}
+
+	if n.right != nil {
+		if n.right.isNil() && n.right.parent == n {
+			tree.clear(n.right)
+		}
+
+		n.right = nil
+	}
+
+	n.parent = nil
+	tree.nodePool.Put(n)
+	atomic.AddInt64(&tree.stats.free, 1)
 }
 
 func copyNodeFast(newTree *RBTree) func(n *RBNode) bool {
@@ -532,4 +647,46 @@ func copyNodeLimit(newTree *RBTree, limit int) func(n *RBNode) bool {
 		cnt++
 		return true
 	}
+}
+
+// PrintSubTreeGraph prints the graph of a sub-tree starting from the given node.
+func (tree *RBTree) printSubTreeGraph(node *RBNode) {
+	if node == nil {
+		fmt.Println("<empty>")
+		return
+	}
+	printSubTree(node, "", true)
+}
+
+func printSubTree(node *RBNode, prefix string, isTail bool) {
+	if node == nil {
+		return
+	}
+
+	color := "B"
+	if node.color == Red {
+		color = "R"
+	}
+
+	fmt.Printf("%s%s── %d(%s)\n", prefix, getBranch(isTail), node.key, color)
+
+	newPrefix := prefix + getIndent(isTail)
+	if node.left != nil || node.right != nil {
+		printSubTree(node.right, newPrefix, false)
+		printSubTree(node.left, newPrefix, true)
+	}
+}
+
+func getBranch(isTail bool) string {
+	if isTail {
+		return "└"
+	}
+	return "├"
+}
+
+func getIndent(isTail bool) string {
+	if isTail {
+		return "   "
+	}
+	return "│  "
 }

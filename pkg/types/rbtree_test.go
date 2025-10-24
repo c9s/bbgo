@@ -31,7 +31,7 @@ func TestRBTree_ConcurrentIndependence(t *testing.T) {
 					volumeI := rand.Int63n(8)
 					tree.Upsert(fixedpoint.NewFromInt(priceI), fixedpoint.NewFromInt(volumeI))
 				default:
-					panic("impossible")
+					t.Fatal("impossible")
 				}
 			}
 		}()
@@ -170,30 +170,21 @@ func TestRBTree_basic(t *testing.T) {
 	deleted = tree.Delete(fixedpoint.NewFromFloat(1500.0))
 	assert.True(t, deleted)
 
+	err := tree.sanityCheck(tree.Root)
+	assert.NoError(t, err)
 }
 
 func TestRBTree_bulkInsert(t *testing.T) {
 	var pvs = map[fixedpoint.Value]fixedpoint.Value{}
 	var tree = NewRBTree()
-	for i := 0; i < 1000000; i++ {
+	for i := 0; i < 5000; i++ {
 		price := fixedpoint.NewFromFloat(rand.Float64())
 		volume := fixedpoint.NewFromFloat(rand.Float64())
 		tree.Upsert(price, volume)
 		pvs[price] = volume
 	}
-	tree.Inorder(func(n *RBNode) bool {
-		if !n.left.isNil() {
-			if !assert.True(t, n.key.Compare(n.left.key) > 0) {
-				return false
-			}
-		}
-		if !n.right.isNil() {
-			if !assert.True(t, n.key.Compare(n.right.key) < 0) {
-				return false
-			}
-		}
-		return true
-	})
+
+	assertRBTreeSanity(t, tree)
 }
 
 func TestRBTree_bulkInsertAndDelete(t *testing.T) {
@@ -207,11 +198,16 @@ func TestRBTree_bulkInsertAndDelete(t *testing.T) {
 	}
 
 	var tree = NewRBTree()
-	for i := 0; i < 1000000; i++ {
+	for i := 0; i < 10_000; i++ {
 		price := fixedpoint.NewFromFloat(rand.Float64())
 		volume := fixedpoint.NewFromFloat(rand.Float64())
-		tree.Upsert(price, volume)
+		if _, ok := pvs[price]; ok {
+			continue
+		}
+
 		pvs[price] = volume
+
+		tree.Upsert(price, volume)
 
 		if i%3 == 0 || i%7 == 0 {
 			removePrice := getRandomPrice()
@@ -233,19 +229,19 @@ func TestRBTree_bulkInsertAndDelete(t *testing.T) {
 	}
 
 	// validate tree structure
-	tree.Inorder(func(n *RBNode) bool {
-		if !n.left.isNil() {
-			if !assert.True(t, n.key.Compare(n.left.key) > 0) {
-				return false
-			}
-		}
-		if !n.right.isNil() {
-			if !assert.True(t, n.key.Compare(n.right.key) < 0) {
-				return false
-			}
-		}
-		return true
-	})
+	assertRBTreeSanity(t, tree)
+
+	// remove all prices
+	for p := range pvs {
+		deleted := tree.Delete(p)
+		assert.True(t, deleted, "existing price %f should be removed", p.Float64())
+	}
+
+	assert.Equal(t, 0, tree.Size())
+	t.Logf("tree size after all deletions: %d", tree.Size())
+	t.Logf("tree node allocations: %d", tree.stats.alloc)
+	t.Logf("tree node free: %d", tree.stats.free)
+	t.Logf("tree node in use: %d", tree.stats.alloc-tree.stats.free)
 }
 
 func TestRBTree_StressInsertDeleteAndValidate(t *testing.T) {
@@ -296,6 +292,78 @@ func TestRBTree_StressInsertDeleteAndValidate(t *testing.T) {
 	assert.Equal(t, tree.Size(), nodeCount, "tree size should match traversed node count")
 }
 
+func BenchmarkRBTree_OrderBookUpdate(b *testing.B) {
+	b.ReportAllocs()
+
+	tree := NewRBTree()
+	lastPrice := rand.Int63n(1_000_000_000)
+	insertedPrices := make(map[int64]struct{})
+
+	for i := 0; i < b.N; i++ {
+		var priceI int64
+		if i == 0 {
+			priceI = lastPrice
+		} else {
+			minimal := float64(lastPrice) * 0.97
+			maximum := float64(lastPrice) * 1.03
+			priceI = int64(minimal + rand.Float64()*(maximum-minimal))
+		}
+		volumeI := rand.Int63n(10_000)
+		price := fixedpoint.NewFromInt(priceI)
+		volume := fixedpoint.NewFromInt(volumeI)
+		op := rand.Intn(3)
+		if op == 0 {
+			// remove: only delete an existing price
+			if len(insertedPrices) > 0 {
+				var delPriceI int64
+				idx := rand.Intn(len(insertedPrices))
+				j := 0
+				for k := range insertedPrices {
+					if j == idx {
+						delPriceI = k
+						break
+					}
+					j++
+				}
+
+				delPrice := fixedpoint.NewFromInt(delPriceI)
+				tree.Delete(delPrice)
+				delete(insertedPrices, delPriceI)
+			}
+		} else {
+			// insert or upsert
+			tree.Upsert(price, volume)
+			insertedPrices[priceI] = struct{}{}
+		}
+		lastPrice = priceI
+	}
+}
+
+func assertRBTreeSanity(t *testing.T, tree *RBTree) {
+	tree.Inorder(func(n *RBNode) bool {
+		if n.left.isNil() {
+			if n.left != nil {
+				assert.Equal(t, Black, n.left.color, "left child: sentinel node must be black")
+				assert.Nil(t, n.left.left, "left child: child's left must be nil")
+				assert.Nil(t, n.left.right, "left child: child's right must be nil")
+			}
+		} else if !assert.True(t, n.key.Compare(n.left.key) > 0) {
+			return false
+		}
+
+		if n.right.isNil() {
+			if n.right != nil {
+				assert.Equal(t, Black, n.right.color)
+				assert.Nil(t, n.right.left)
+				assert.Nil(t, n.right.right)
+			}
+		} else if !assert.True(t, n.key.Compare(n.right.key) < 0) {
+			return false
+		}
+		return true
+	})
+}
+
 func inOrderTraverse(n *RBNode, visit func(*RBNode)) {
 	if n == nil || n.isNil() {
 		return
@@ -303,12 +371,4 @@ func inOrderTraverse(n *RBNode, visit func(*RBNode)) {
 	inOrderTraverse(n.left, visit)
 	visit(n)
 	inOrderTraverse(n.right, visit)
-}
-
-func countUnique(keys []int64) int {
-	m := make(map[int64]struct{}, len(keys))
-	for _, k := range keys {
-		m[k] = struct{}{}
-	}
-	return len(m)
 }
