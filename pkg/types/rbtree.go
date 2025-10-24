@@ -279,6 +279,10 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 	node := tree.newValueNode(key, val, Red)
 
 	if y == nil {
+		if tree.Root != nil {
+			tree.clear(tree.Root.parent)
+			tree.clear(tree.Root)
+		}
 		// insert as the root node
 		node.parent = tree.newNilNode()
 		tree.Root = node
@@ -315,6 +319,11 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	node := tree.newValueNode(key, val, Red)
 
 	if y == nil {
+		if tree.Root != nil {
+			tree.clear(tree.Root.parent)
+			tree.clear(tree.Root)
+		}
+
 		node.parent = tree.newNilNode()
 		tree.Root = node
 	} else {
