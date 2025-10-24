@@ -276,13 +276,7 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 		}
 	}
 
-	node := &RBNode{
-		key:   key,
-		value: val,
-		color: Red,
-		left:  tree.newNilNode(),
-		right: tree.newNilNode(),
-	}
+	node := tree.newValueNode(key, val, Red)
 
 	if y == nil {
 		// insert as the root node
@@ -292,8 +286,10 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 		// insert as a child
 		node.parent = y
 		if node.key.Compare(y.key) < 0 {
+			tree.clear(y.left)
 			y.left = node
 		} else {
+			tree.clear(y.right)
 			y.right = node
 		}
 	}
@@ -316,13 +312,7 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 		}
 	}
 
-	node := &RBNode{
-		key:   key,
-		value: val,
-		color: Red,
-		left:  tree.newNilNode(),
-		right: tree.newNilNode(),
-	}
+	node := tree.newValueNode(key, val, Red)
 
 	if y == nil {
 		node.parent = tree.newNilNode()
@@ -330,8 +320,10 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	} else {
 		node.parent = y
 		if node.key.Compare(y.key) < 0 {
+			tree.clear(y.left)
 			y.left = node
 		} else {
+			tree.clear(y.right)
 			y.right = node
 		}
 	}
@@ -606,8 +598,24 @@ func (tree *RBTree) newNilNode() *RBNode {
 	return n
 }
 
+func (tree *RBTree) newValueNode(key, value fixedpoint.Value, color Color) *RBNode {
+	n := tree.nodePool.Get().(*RBNode)
+	n.left = tree.newNilNode()
+	n.right = tree.newNilNode()
+	n.parent = nil
+	n.key = key
+	n.value = value
+	n.color = color
+	atomic.AddInt64(&tree.stats.alloc, 1)
+	return n
+}
+
 // clear releases the node to the pool
 func (tree *RBTree) clear(n *RBNode) {
+	if n == nil {
+		return
+	}
+
 	if n.left != nil {
 		if n.left.isNil() && n.left.parent == n {
 			tree.clear(n.left)
