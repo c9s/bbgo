@@ -299,7 +299,7 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 	}
 
 	tree.size++
-	tree.InsertFixup(node)
+	tree.insertFixup(node)
 }
 
 func (tree *RBTree) Insert(key, val fixedpoint.Value) {
@@ -338,7 +338,7 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	}
 
 	tree.size++
-	tree.InsertFixup(node)
+	tree.insertFixup(node)
 }
 
 func (tree *RBTree) Search(key fixedpoint.Value) *RBNode {
@@ -362,7 +362,7 @@ func (tree *RBTree) Size() int {
 	return tree.size
 }
 
-func (tree *RBTree) InsertFixup(current *RBNode) {
+func (tree *RBTree) insertFixup(current *RBNode) {
 	// A red node can't have a red parent, we need to fix it up
 	for current.parent.color == Red {
 		if current.parent == current.parent.parent.left {
@@ -439,10 +439,6 @@ func (tree *RBTree) RotateRight(y *RBNode) {
 	y.left = x.right
 
 	if !x.right.isNil() {
-		if x.right == nil {
-			logrus.Panicf("x.right is nil: node = %+v, left = %+v, right = %+v, parent = %+v", x, x.left, x.right, x.parent)
-		}
-
 		x.right.parent = y
 	}
 
