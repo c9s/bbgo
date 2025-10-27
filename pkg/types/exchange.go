@@ -201,6 +201,29 @@ type ExchangeRiskService interface {
 	QueryPositionRisk(ctx context.Context, symbol ...string) ([]PositionRisk, error)
 }
 
+// TradeQueryOptions defines the parameters for querying historical trades from exchanges.
+//
+// Time Range Requirements:
+// All trade query implementations MUST respect the StartTime and EndTime constraints.
+// The returned trades must fall within the specified time range [StartTime, EndTime].
+// This ensures consistent behavior across different exchange implementations.
+//
+// LastTradeID Usage:
+// The LastTradeID field serves as a performance optimization mechanism. Since trade IDs
+// are typically the primary key in trade tables on exchange servers, using LastTradeID
+// can significantly accelerate server-side query execution by leveraging indexed lookups
+// instead of time-based scans.
+//
+// Implementation Guidelines:
+//
+//  1. If the exchange's API supports both time range and LastTradeID in a single request,
+//     implementations MUST use both parameters together to combine the benefits of precise
+//     time filtering with the performance advantages of ID-based queries.
+//
+//  2. If the exchange's API does not support combining both query methods, implementations
+//     MUST prioritize the time range query (StartTime/EndTime) over LastTradeID. This ensures
+//     consistent and predictable results across all exchange implementations, as time-based
+//     filtering is the primary constraint for trade queries.
 type TradeQueryOptions struct {
 	StartTime   *time.Time
 	EndTime     *time.Time
