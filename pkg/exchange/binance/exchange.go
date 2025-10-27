@@ -787,23 +787,22 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error) {
-	account, err := e.client.NewGetAccountService().Do(ctx)
+	account, err := e.client2.NewGetAccountRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	balances := make(map[string]types.Balance, len(account.Balances))
 	for _, b := range account.Balances {
-		free := fixedpoint.MustNewFromString(b.Free)
-		locked := fixedpoint.MustNewFromString(b.Locked)
-		if free.IsZero() && locked.IsZero() {
+		if b.Free.IsZero() && b.Locked.IsZero() {
 			continue
 		}
 
 		balances[b.Asset] = types.Balance{
-			Currency:             b.Asset,
-			Available:            free,
-			Locked:               locked,
+			Currency:  b.Asset,
+			Available: b.Free,
+			Locked:    b.Locked,
+
 			Borrowed:             fixedpoint.Zero,
 			Interest:             fixedpoint.Zero,
 			LongAvailableCredit:  fixedpoint.Zero,
@@ -818,6 +817,8 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 		CanDeposit:  account.CanDeposit,  // if can transfer in asset
 		CanTrade:    account.CanTrade,    // if can trade
 		CanWithdraw: account.CanWithdraw, // if can transfer out asset
+
+		RawAccount: account,
 	}
 
 	a.UpdateBalances(balances)

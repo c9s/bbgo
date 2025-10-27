@@ -35,6 +35,9 @@ const (
 type Account struct {
 	sync.Mutex `json:"-"`
 
+	// RawAccount holds the raw account data from exchange API response
+	RawAccount any `json:"rawAccount,omitempty"`
+
 	AccountType        AccountType `json:"accountType,omitempty"`
 	FuturesInfo        *FuturesAccount
 	MarginInfo         *MarginAccountInfo
