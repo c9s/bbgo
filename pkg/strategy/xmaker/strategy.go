@@ -996,12 +996,10 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	// check maker's balance quota
 	// we load the balances from the account while we're generating the orders,
 	// the balance may have a chance to be deducted by other strategies or manual orders submitted by the user
-	makerBalances := s.makerSession.GetAccount().Balances().NotZero()
-
-	s.logger.Infof("maker balances: %+v", makerBalances)
+	account := s.makerSession.GetAccount()
 
 	makerQuota := &bbgo.QuotaTransaction{}
-	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
+	if b, ok := account.Balance(s.makerMarket.BaseCurrency); ok {
 		if s.makerMarket.IsDustQuantity(b.Available, s.lastPrice.Get()) {
 			disableMakerAsk = true
 			s.logger.Infof("%s maker ask disabled: insufficient base balance %s", s.Symbol, b.String())
@@ -1013,7 +1011,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		s.logger.Infof("%s maker ask disabled: base balance %s not found", s.Symbol, b.String())
 	}
 
-	if b, ok := makerBalances[s.makerMarket.QuoteCurrency]; ok {
+	if b, ok := account.Balance(s.makerMarket.QuoteCurrency); ok {
 		if b.Available.Compare(s.makerMarket.MinNotional) > 0 {
 			if s.MaxQuoteQuotaRatio.Sign() > 0 {
 				quoteAvailable := b.Total().Mul(s.MaxQuoteQuotaRatio)
@@ -1181,7 +1179,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	s.askMarginMetrics.Set(quote.AskMargin.Float64())
 
 	if s.EnableArbitrage {
-		done, err := s.tryArbitrage(ctx, quote, makerBalances, hedgeBalances, disableMakerBid, disableMakerAsk)
+		done, err := s.tryArbitrage(ctx, quote, hedgeBalances, disableMakerBid, disableMakerAsk)
 		if err != nil {
 			s.logger.WithError(err).Errorf("unable to arbitrage")
 		} else if done {
@@ -1414,7 +1412,7 @@ func (s *Strategy) makerOrderCreateCallback(createdOrder types.Order) {
 
 // tryArbitrage tries to arbitrage between the source and maker exchange
 func (s *Strategy) tryArbitrage(
-	ctx context.Context, quote *Quote, makerBalances, hedgeBalances types.BalanceMap, disableBid, disableAsk bool,
+	ctx context.Context, quote *Quote, hedgeBalances types.BalanceMap, disableBid, disableAsk bool,
 ) (bool, error) {
 	if s.makerBook == nil {
 		return false, nil
@@ -1428,9 +1426,11 @@ func (s *Strategy) tryArbitrage(
 		return false, nil
 	}
 
+	account := s.makerSession.GetAccount()
+
 	var iocOrders []types.SubmitOrder
 	if makerAsk.Price.Compare(marginBidPrice) <= 0 {
-		quoteBalance, hasQuote := makerBalances[s.makerMarket.QuoteCurrency]
+		quoteBalance, hasQuote := account.Balance(s.makerMarket.QuoteCurrency)
 		if !hasQuote || disableBid {
 			return false, nil
 		}
@@ -1465,7 +1465,7 @@ func (s *Strategy) tryArbitrage(
 		)
 
 	} else if makerBid.Price.Compare(marginAskPrice) >= 0 {
-		baseBalance, hasBase := makerBalances[s.makerMarket.BaseCurrency]
+		baseBalance, hasBase := account.Balance(s.makerMarket.BaseCurrency)
 		if !hasBase || disableAsk {
 			return false, nil
 		}
