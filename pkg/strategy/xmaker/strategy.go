@@ -996,10 +996,10 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	// check maker's balance quota
 	// we load the balances from the account while we're generating the orders,
 	// the balance may have a chance to be deducted by other strategies or manual orders submitted by the user
-	account := s.makerSession.GetAccount()
+	makerAccount := s.makerSession.GetAccount()
 
 	makerQuota := &bbgo.QuotaTransaction{}
-	if b, ok := account.Balance(s.makerMarket.BaseCurrency); ok {
+	if b, ok := makerAccount.Balance(s.makerMarket.BaseCurrency); ok {
 		if s.makerMarket.IsDustQuantity(b.Available, s.lastPrice.Get()) {
 			disableMakerAsk = true
 			s.logger.Infof("%s maker ask disabled: insufficient base balance %s", s.Symbol, b.String())
@@ -1011,7 +1011,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		s.logger.Infof("%s maker ask disabled: base balance %s not found", s.Symbol, b.String())
 	}
 
-	if b, ok := account.Balance(s.makerMarket.QuoteCurrency); ok {
+	if b, ok := makerAccount.Balance(s.makerMarket.QuoteCurrency); ok {
 		if b.Available.Compare(s.makerMarket.MinNotional) > 0 {
 			if s.MaxQuoteQuotaRatio.Sign() > 0 {
 				quoteAvailable := b.Total().Mul(s.MaxQuoteQuotaRatio)
@@ -1037,10 +1037,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	//  2) the min margin level is configured
 	//  3) the hedge account's margin level is lower than the min margin level
 	hedgeAccount := s.sourceSession.GetAccount()
-	hedgeBalances := hedgeAccount.Balances()
 	hedgeQuota := &bbgo.QuotaTransaction{}
-
-	s.logger.Infof("hedge balances: %+v", hedgeBalances.NotZero())
 
 	if s.sourceSession.Margin &&
 		!s.MinMarginLevel.IsZero() &&
@@ -1082,7 +1079,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			tryToRepayDebts(ctx, s.sourceSession)
 		}
 	} else {
-		if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
+		if b, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
 			// to make bid orders, we need enough base asset in the foreign makerExchange,
 			// if the base asset balance is not enough for selling
 			if b.Available.Compare(s.sourceMarket.MinQuantity) > 0 {
@@ -1093,7 +1090,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			}
 		}
 
-		if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
+		if b, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
 			// to make ask orders, we need enough quote asset in the foreign makerExchange,
 			// if the quote asset balance is not enough for buying
 			if s.StopHedgeQuoteBalance.Sign() > 0 {
@@ -1115,7 +1112,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	if s.StopHedgeBaseBalance.Sign() > 0 {
 		minAvailable := s.StopHedgeBaseBalance.Add(s.sourceMarket.MinQuantity)
-		b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]
+		b, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency)
 		if !ok || b.Available.Compare(minAvailable) < 0 {
 			s.logger.Warnf("%s maker bid disabled: insufficient hedge base balance %s < stop %s", s.Symbol, b.String(), s.StopHedgeBaseBalance.String())
 			disableMakerBid = true
@@ -1179,7 +1176,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	s.askMarginMetrics.Set(quote.AskMargin.Float64())
 
 	if s.EnableArbitrage {
-		done, err := s.tryArbitrage(ctx, quote, hedgeBalances, disableMakerBid, disableMakerAsk)
+		done, err := s.tryArbitrage(ctx, quote, disableMakerBid, disableMakerAsk)
 		if err != nil {
 			s.logger.WithError(err).Errorf("unable to arbitrage")
 		} else if done {
@@ -1411,9 +1408,7 @@ func (s *Strategy) makerOrderCreateCallback(createdOrder types.Order) {
 }
 
 // tryArbitrage tries to arbitrage between the source and maker exchange
-func (s *Strategy) tryArbitrage(
-	ctx context.Context, quote *Quote, hedgeBalances types.BalanceMap, disableBid, disableAsk bool,
-) (bool, error) {
+func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, disableBid, disableAsk bool) (bool, error) {
 	if s.makerBook == nil {
 		return false, nil
 	}
@@ -1426,11 +1421,12 @@ func (s *Strategy) tryArbitrage(
 		return false, nil
 	}
 
-	account := s.makerSession.GetAccount()
+	makerAccount := s.makerSession.GetAccount()
+	hedgeAccount := s.sourceSession.GetAccount()
 
 	var iocOrders []types.SubmitOrder
 	if makerAsk.Price.Compare(marginBidPrice) <= 0 {
-		quoteBalance, hasQuote := account.Balance(s.makerMarket.QuoteCurrency)
+		quoteBalance, hasQuote := makerAccount.Balance(s.makerMarket.QuoteCurrency)
 		if !hasQuote || disableBid {
 			return false, nil
 		}
@@ -1441,7 +1437,7 @@ func (s *Strategy) tryArbitrage(
 		sumPv := aggregatePriceVolumeSliceWithPriceFilter(types.SideTypeSell, askPvs, marginBidPrice)
 		qty := fixedpoint.Min(availableQuote.Div(sumPv.Price), sumPv.Volume)
 
-		if sourceBase, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
+		if sourceBase, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
 			qty = fixedpoint.Min(qty, sourceBase.Available)
 		} else {
 			// insufficient hedge base balance for arbitrage
@@ -1465,7 +1461,7 @@ func (s *Strategy) tryArbitrage(
 		)
 
 	} else if makerBid.Price.Compare(marginAskPrice) >= 0 {
-		baseBalance, hasBase := account.Balance(s.makerMarket.BaseCurrency)
+		baseBalance, hasBase := makerAccount.Balance(s.makerMarket.BaseCurrency)
 		if !hasBase || disableAsk {
 			return false, nil
 		}
@@ -1476,7 +1472,7 @@ func (s *Strategy) tryArbitrage(
 		sumPv := aggregatePriceVolumeSliceWithPriceFilter(types.SideTypeBuy, bidPvs, marginAskPrice)
 		qty := fixedpoint.Min(availableBase, sumPv.Volume)
 
-		if sourceQuote, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
+		if sourceQuote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
 			qty = fixedpoint.Min(qty, quote.BestAskPrice.Div(sourceQuote.Available))
 		} else {
 			// insufficient hedge quote balance for arbitrage
