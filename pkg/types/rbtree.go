@@ -19,8 +19,11 @@ type RBTree struct {
 	Root     *RBNode
 	size     int
 	nodePool *sync.Pool // pool for RBNode allocation and reuse
+	nilNode  *RBNode    // shared sentinel NIL node per tree
 
 	stats RBTreeStats
+
+	mu sync.Mutex
 }
 
 func NewRBTree() *RBTree {
@@ -36,9 +39,14 @@ func NewRBTree() *RBTree {
 		},
 	}
 
-	root := tree.newNilNode()
-	root.parent = tree.newNilNode()
-	tree.Root = root
+	// initialize a shared NIL sentinel per tree
+	nilNode := &RBNode{color: Black}
+	// self-referential parent to simplify isNil checks and root handling
+	nilNode.left = nil
+	nilNode.right = nil
+	nilNode.parent = nilNode
+	tree.nilNode = nilNode
+	tree.Root = nilNode
 	return tree
 }
 
@@ -47,6 +55,9 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 	if deleting == nil {
 		return false
 	}
+
+	tree.mu.Lock()
+	defer tree.mu.Unlock()
 
 	// x the child of the deleted node
 	var x *RBNode
@@ -77,9 +88,17 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 		tree.clear(deleting)
 
 		if wasBlack {
+			// if x is NIL, temporarily set its parent for fixup navigation
+			if x.isNil() {
+				x.parent = p
+			}
 			if err := tree.deleteFixup(x); err != nil {
 				logrus.Errorf("delete fixup x = %+v error: %v", x, err)
 				tree.printSubTreeGraph(p)
+			}
+			// reset NIL parent to sentinel to avoid pollution
+			if x.isNil() {
+				x.parent = tree.nilNode
 			}
 		}
 
@@ -106,14 +125,22 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 			}
 		}
 
-		// if the successor has a right child, update its parent reference
+		// capture parent before transplant; needed if x is NIL
+		p := successor.parent
+		// replace successor with its child (possibly NIL)
 		tree.transplant(successor, x)
 		tree.clear(successor)
 
 		if wasBlack {
+			if x.isNil() {
+				x.parent = p
+			}
 			if err := tree.deleteFixup(x); err != nil {
 				logrus.Errorf("delete fixup x = %+v error: %v", x, err)
 				tree.printSubTreeGraph(deleting)
+			}
+			if x.isNil() {
+				x.parent = tree.nilNode
 			}
 		}
 	}
@@ -131,7 +158,10 @@ func (tree *RBTree) transplant(u, v *RBNode) {
 
 	if u.parent == nil || u.parent.isNil() {
 		tree.Root = v
-		v.parent = tree.newNilNode()
+		// root's parent is the sentinel
+		if !v.isNil() {
+			v.parent = tree.nilNode
+		}
 		return
 	} else if u == u.parent.left {
 		u.parent.left = v
@@ -139,7 +169,10 @@ func (tree *RBTree) transplant(u, v *RBNode) {
 		u.parent.right = v
 	}
 
-	v.parent = u.parent
+	// only set parent if v is not the shared NIL sentinel to avoid pollution
+	if !v.isNil() {
+		v.parent = u.parent
+	}
 }
 
 func (tree *RBTree) sanityCheck(n *RBNode) (err error) {
@@ -280,11 +313,10 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 
 	if y == nil {
 		if tree.Root != nil {
-			tree.clear(tree.Root.parent)
-			tree.clear(tree.Root)
+			// Root is the sentinel in an empty tree; no need to clear
 		}
 		// insert as the root node
-		node.parent = tree.newNilNode()
+		node.parent = tree.nilNode
 		tree.Root = node
 	} else {
 		// insert as a child
@@ -299,10 +331,13 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 	}
 
 	tree.size++
-	tree.InsertFixup(node)
+	tree.insertFixup(node)
 }
 
 func (tree *RBTree) Insert(key, val fixedpoint.Value) {
+	tree.mu.Lock()
+	defer tree.mu.Unlock()
+
 	var y *RBNode
 	var x = tree.Root
 
@@ -319,12 +354,8 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	node := tree.newValueNode(key, val, Red)
 
 	if y == nil {
-		if tree.Root != nil {
-			tree.clear(tree.Root.parent)
-			tree.clear(tree.Root)
-		}
-
-		node.parent = tree.newNilNode()
+		// Root is the sentinel in an empty tree; no need to clear
+		node.parent = tree.nilNode
 		tree.Root = node
 	} else {
 		node.parent = y
@@ -338,7 +369,7 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	}
 
 	tree.size++
-	tree.InsertFixup(node)
+	tree.insertFixup(node)
 }
 
 func (tree *RBTree) Search(key fixedpoint.Value) *RBNode {
@@ -362,7 +393,7 @@ func (tree *RBTree) Size() int {
 	return tree.size
 }
 
-func (tree *RBTree) InsertFixup(current *RBNode) {
+func (tree *RBTree) insertFixup(current *RBNode) {
 	// A red node can't have a red parent, we need to fix it up
 	for current.parent.color == Red {
 		if current.parent == current.parent.parent.left {
@@ -439,10 +470,6 @@ func (tree *RBTree) RotateRight(y *RBNode) {
 	y.left = x.right
 
 	if !x.right.isNil() {
-		if x.right == nil {
-			logrus.Panicf("x.right is nil: node = %+v, left = %+v, right = %+v, parent = %+v", x, x.left, x.right, x.parent)
-		}
-
 		x.right.parent = y
 	}
 
@@ -595,23 +622,15 @@ func (tree *RBTree) Print() {
 
 // newNilNode allocates a nil RBNode from the pool
 func (tree *RBTree) newNilNode() *RBNode {
-	n := tree.nodePool.Get().(*RBNode)
-	n.left = nil
-	n.right = nil
-	n.parent = nil
-	n.key = fixedpoint.Zero
-	n.value = fixedpoint.Zero
-	n.color = Black
-
-	atomic.AddInt64(&tree.stats.alloc, 1)
-	return n
+	// return the shared sentinel NIL node; do not allocate or count
+	return tree.nilNode
 }
 
 func (tree *RBTree) newValueNode(key, value fixedpoint.Value, color Color) *RBNode {
 	n := tree.nodePool.Get().(*RBNode)
-	n.left = tree.newNilNode()
-	n.right = tree.newNilNode()
-	n.parent = nil
+	n.left = tree.nilNode
+	n.right = tree.nilNode
+	n.parent = tree.nilNode
 	n.key = key
 	n.value = value
 	n.color = color
@@ -621,23 +640,17 @@ func (tree *RBTree) newValueNode(key, value fixedpoint.Value, color Color) *RBNo
 
 // clear releases the node to the pool
 func (tree *RBTree) clear(n *RBNode) {
-	if n == nil {
+	if n == nil || n.isNil() {
 		return
 	}
 
+	// disconnect children; do not attempt to clear shared sentinel
 	if n.left != nil {
-		if n.left.isNil() && n.left.parent == n {
-			tree.clear(n.left)
-		}
-
+		// children of value nodes may point to sentinel; leave sentinel untouched
 		n.left = nil
 	}
 
 	if n.right != nil {
-		if n.right.isNil() && n.right.parent == n {
-			tree.clear(n.right)
-		}
-
 		n.right = nil
 	}
 
