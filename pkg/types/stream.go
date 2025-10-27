@@ -189,10 +189,11 @@ type StandardStreamEmitter interface {
 // - pingInterval: defaults to 30s
 //
 // After construction, typical setup is:
-//  s.SetEndpointCreator(...)
-//  s.SetParser(...)
-//  s.SetDispatcher(...)
-//  s.Connect(ctx)
+//
+//	s.SetEndpointCreator(...)
+//	s.SetParser(...)
+//	s.SetDispatcher(...)
+//	s.Connect(ctx)
 func NewStandardStream() StandardStream {
 	return StandardStream{
 		ReconnectC:   make(chan struct{}, 1),
@@ -234,28 +235,6 @@ func (s *StandardStream) SetDispatcher(dispatcher Dispatcher) {
 // If not set, all text frames are emitted via OnRawMessage and not dispatched.
 func (s *StandardStream) SetParser(parser Parser) {
 	s.parser = parser
-}
-
-// SetConn atomically installs the given websocket connection and returns a derived context and cancel.
-// If a previous connection exists, its context is cancelled and internal goroutines are waited and cleared
-// before the new connection is set. This ensures only one active connection lifecycle at a time.
-func (s *StandardStream) SetConn(ctx context.Context, conn *websocket.Conn) (context.Context, context.CancelFunc) {
-	// should only start one connection one time, so we lock the mutex
-	connCtx, connCancel := context.WithCancel(ctx)
-	s.ConnLock.Lock()
-
-	// ensure the previous context is cancelled and all routines are closed.
-	if s.ConnCancel != nil {
-		s.ConnCancel()
-		s.sg.WaitAndClear()
-	}
-
-	// create a new context for this connection
-	s.Conn = conn
-	s.ConnCtx = connCtx
-	s.ConnCancel = connCancel
-	s.ConnLock.Unlock()
-	return connCtx, connCancel
 }
 
 // Read runs the main read loop for a connected websocket.
@@ -512,12 +491,26 @@ func (s *StandardStream) reconnector(ctx context.Context) {
 // It emits OnConnect after installing the connection and before starting workers.
 // Existing connection state, if any, is cleaned up by SetConn.
 func (s *StandardStream) DialAndConnect(ctx context.Context) error {
-	conn, err := s.Dial(ctx)
+	// should only start one connection one time, so we lock the mutex
+	s.ConnLock.Lock()
+	defer s.ConnLock.Unlock()
+
+	// ensure the previous context is cancelled and all routines are closed.
+	if s.ConnCancel != nil {
+		s.ConnCancel()
+		s.sg.WaitAndClear()
+	}
+
+	connCtx, connCancel := context.WithCancel(ctx)
+	conn, err := s.Dial(connCtx)
 	if err != nil {
 		return err
 	}
 
-	connCtx, connCancel := s.SetConn(ctx, conn)
+	s.Conn = conn
+	s.ConnCtx = connCtx
+	s.ConnCancel = connCancel
+
 	s.EmitConnect()
 
 	s.sg.Add(func() {
@@ -548,7 +541,7 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 		return nil, errors.New("can not dial, neither url nor endpoint creator is not defined, you should pass an url to Dial() or call SetEndpointCreator()")
 	}
 
-	conn, _, err := defaultDialer.Dial(url, nil)
+	conn, _, err := defaultDialer.DialContext(ctx, url, nil)
 	if err != nil {
 		return nil, err
 	}

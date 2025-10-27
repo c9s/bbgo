@@ -2,6 +2,7 @@ package binance
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/url"
 	"strconv"
@@ -21,6 +22,15 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// IMPORTANT DEPRECATION NOTICE (2025-10-06):
+// Receiving user data stream on wss://stream.binance.com:9443 using a listenKey is now deprecated.
+// This feature will be removed from Binance's system at a later date.
+// Users are recommended to move to the new listen token subscription method:
+// 1. POST /sapi/v1/userListenToken: Create a new user data stream and return a listenToken
+// 2. WebSocket API method userDataStream.subscribe.listenToken: Subscribe to the user data stream using listenToken
+//
+// To enable the new method, call exchange.EnableListenToken() before creating the stream.
+
 // from Binance document:
 // The websocket server will send a ping frame every 3 minutes.
 // If the websocket server does not receive a pong frame back from the connection within a 10 minute period, the connection will be disconnected.
@@ -30,7 +40,10 @@ import (
 // A PING frame
 // A PONG frame
 // A JSON controlled message (e.g. subscribe, unsubscribe)
+
+// DEPRECATED (2025-10-06): listenKey keep alive is deprecated, use new listenToken method
 const listenKeyKeepAliveInterval = 15 * time.Minute
+const listenTokenKeepAliveInterval = 15 * time.Minute
 
 type WebSocketCommand struct {
 	// request ID is required
@@ -43,6 +56,10 @@ type LogonParams struct {
 	APIKey    string `json:"apiKey"`
 	Signature string `json:"signature"`
 	Timestamp int64  `json:"timestamp"`
+}
+
+type ListenTokenSubscribeParams struct {
+	ListenToken string `json:"listenToken"`
 }
 
 type RiskBalance struct {
@@ -97,6 +114,11 @@ type Stream struct {
 	riskBalances          map[string]*RiskBalance
 	riskBalancesUpdatedAt time.Time
 	mu                    sync.RWMutex
+
+	// New listenToken support (recommended as of 2025-10-06)
+	listenToken           string
+	listenTokenExpiration time.Time
+	once                  util.Reonce
 }
 
 func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Client) *Stream {
@@ -251,6 +273,19 @@ func (s *Stream) handleConnect() {
 
 		// TODO: ensure that we receive an authorized event to trigger this auth event
 		go s.EmitAuth()
+	} else if !s.exchange.useListenKey && s.exchange.IsMargin {
+		// Skip subscription if listenToken is missing or expired
+		if len(s.listenToken) == 0 || time.Now().After(s.listenTokenExpiration) {
+			return
+		}
+
+		// Use new listenToken subscription method (recommended as of 2025-10-06)
+		// This still uses the WebSocket API endpoint but with listenToken instead of ed25519 auth
+		if err := s.sendListenTokenSubscribeCommand(); err != nil {
+			log.WithError(err).Error("listenToken subscribe error")
+		}
+
+		go s.EmitAuth()
 	} else {
 		// Emit Auth before establishing the connection to prevent the caller from missing the Update data after
 		// creating the order.
@@ -290,6 +325,17 @@ func (s *Stream) sendSubscribeUserDataStreamCommand() error {
 	return s.Conn.WriteJSON(&WebSocketCommand{
 		ID:     2,
 		Method: "userDataStream.subscribe",
+	})
+}
+
+// sendListenTokenSubscribeCommand sends the new listenToken subscription command (2025-10-06 recommended)
+func (s *Stream) sendListenTokenSubscribeCommand() error {
+	return s.Conn.WriteJSON(&WebSocketCommand{
+		ID:     2,
+		Method: "userDataStream.subscribe.listenToken",
+		Params: ListenTokenSubscribeParams{
+			ListenToken: s.listenToken,
+		},
 	})
 }
 
@@ -475,6 +521,8 @@ func (s *Stream) getPublicEndpointUrl() string {
 			return TestNetWebSocketURL + "/ws"
 		}
 
+		// Use deprecated WebSocket URL for backward compatibility
+		// Note: wss://stream.binance.com:9443 with listenKey is deprecated as of 2025-10-06
 		return WebSocketURL + "/ws"
 	}
 }
@@ -513,6 +561,16 @@ func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
 }
 
 func (s *Stream) createUserDataStreamEndpoint(ctx context.Context) (string, error) {
+	// Use new listenToken method (recommended as of 2025-10-06)
+	if s.exchange.IsMargin && !s.exchange.useListenKey {
+		return s.createUserDataStreamEndpointWithListenToken(ctx)
+	}
+
+	return s.createUserDataStreamEndpointWithListenKey(ctx)
+}
+
+func (s *Stream) createUserDataStreamEndpointWithListenKey(ctx context.Context) (string, error) {
+	// Use deprecated listenKey method
 	listenKey, err := s.fetchListenKey(ctx)
 	if err != nil {
 		return "", err
@@ -522,6 +580,27 @@ func (s *Stream) createUserDataStreamEndpoint(ctx context.Context) (string, erro
 	go s.listenKeyKeepAlive(ctx, listenKey)
 
 	return s.getUserDataStreamEndpointUrl(listenKey), nil
+}
+
+func (s *Stream) createUserDataStreamEndpointWithListenToken(ctx context.Context) (string, error) {
+	listenToken, expiration, err := s.fetchListenToken(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	s.listenToken = listenToken
+	s.listenTokenExpiration = expiration
+
+	debug("listenToken created, expires at: %s, starting token refresh worker", expiration)
+	s.once.Do(func() {
+		go s.listenTokenRefreshWorker(ctx)
+	})
+
+	// Use the new WebSocket API endpoint with listenToken subscription
+	if testNet {
+		return WsTestNetWebSocketURL, nil
+	}
+	return WsSpotWebSocketURL, nil
 }
 
 func (s *Stream) dispatchEvent(e interface{}) {
@@ -577,6 +656,31 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *MarginCallEvent:
 	}
+}
+
+// fetchListenToken creates a new user data stream using the new listenToken method (2025-10-06 recommended)
+func (s *Stream) fetchListenToken(ctx context.Context) (string, time.Time, error) {
+	if s.exchange.useListenKey {
+		return "", time.Time{}, fmt.Errorf("listenKey method is enabled, cannot use listenToken")
+	}
+
+	// Use the binanceapi client to create listenToken
+	req := s.exchange.client2.NewCreateMarginAccountListenTokenRequest()
+
+	if s.exchange.IsMargin && s.exchange.IsIsolatedMargin {
+		req.Symbol(s.exchange.IsolatedMarginSymbol)
+		req.IsIsolated(true)
+	}
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to fetch listenToken: %w", err)
+	}
+
+	expiration := resp.ExpirationTime.Time()
+	debug("listenToken created, expires at: %s, token: %s", expiration, util.MaskKey(resp.Token))
+
+	return resp.Token, expiration, nil
 }
 
 func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
@@ -641,6 +745,55 @@ func (s *Stream) closeListenKey(ctx context.Context, listenKey string) (err erro
 	}
 
 	return err
+}
+
+// listenTokenRefreshWorker manages the lifecycle of listenToken for the new WebSocket API method
+func (s *Stream) listenTokenRefreshWorker(ctx context.Context) {
+	log.Info("listenToken refresh worker started")
+
+	defer func() {
+		log.Info("listenToken refresh worker exiting, resetting once...")
+		s.once.Reset()
+	}()
+
+	// Set timeout to 3 times the keep-alive interval to ensure we refresh the token before it expires
+	timeout := listenTokenKeepAliveInterval * 3
+	ticker := time.NewTicker(listenTokenKeepAliveInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.CloseC:
+			log.Info("listenToken refresh worker exiting due to stream close")
+			return
+		case <-ctx.Done():
+			log.Info("listenToken refresh worker exiting due to context done")
+			return
+		case <-ticker.C:
+			log.Infof("checking listenToken expiration (%s)...", s.listenTokenExpiration)
+			if time.Until(s.listenTokenExpiration) > timeout {
+				continue
+			}
+
+			log.Info("listenToken is about to expire, refreshing...")
+
+			// Refresh the listenToken
+			newToken, newExpiration, err := s.fetchListenToken(ctx)
+			if err != nil {
+				log.WithError(err).Error("failed to refresh listenToken, will retry in 1 minute")
+				ticker.Reset(time.Minute)
+				continue
+			}
+
+			s.listenToken = newToken
+			s.listenTokenExpiration = newExpiration
+
+			if err := s.sendListenTokenSubscribeCommand(); err != nil {
+				log.WithError(err).Error("listenToken subscribe error")
+				continue
+			}
+		}
+	}
 }
 
 func (s *Stream) String() string {

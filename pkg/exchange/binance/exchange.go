@@ -50,7 +50,8 @@ const TestNetWebSocketURL = "wss://testnet.binance.vision"
 const TestNetFuturesBaseURL = "https://testnet.binancefuture.com"
 
 // New WebSocket API Endpoints
-// listenKey will be deprecated. Official recommendation is to use ws-api for user data stream
+// DEPRECATED (2025-10-06): listenKey via wss://stream.binance.com:9443 will be removed
+// Official recommendation is to use ws-api for user data stream or new listenToken subscription method
 const WsSpotWebSocketURL = "wss://ws-api.binance.com:443/ws-api/v3"
 const WsTestNetWebSocketURL = "wss://testnet.binance.vision/ws-api/v3"
 
@@ -119,6 +120,11 @@ type Exchange struct {
 	key, secret string
 
 	ed25519authentication
+
+	// useListenKey enables the deprecated listenKey method via wss://stream.binance.com:9443
+	// This method is deprecated as of 2025-10-06 and will be removed by Binance in the future
+	// Default behavior (false) uses the new recommended listenToken method
+	useListenKey bool
 
 	// client is used for spot & margin
 	client *binance.Client
@@ -238,6 +244,13 @@ func (e *Exchange) setServerTimeOffset(ctx context.Context) {
 	if err = e.client2.SetTimeOffsetFromServer(ctx); err != nil {
 		log.WithError(err).Error("can not set server time")
 	}
+}
+
+// EnableListenKey enables the deprecated listenKey method via wss://stream.binance.com:9443
+// This method is deprecated as of 2025-10-06 and will be removed by Binance in the future
+// By default, the new listenToken method is used
+func (e *Exchange) EnableListenKey() {
+	e.useListenKey = true
 }
 
 func (e *Exchange) Name() types.ExchangeName {
