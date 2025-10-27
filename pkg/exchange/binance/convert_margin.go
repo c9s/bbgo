@@ -68,7 +68,7 @@ func toGlobalIsolatedMarginAsset(asset binance.IsolatedMarginAsset) types.Isolat
 }
 
 func toGlobalIsolatedMarginAssets(assets []binance.IsolatedMarginAsset) (retAssets types.IsolatedMarginAssetMap) {
-	retMarginAssets := make(types.IsolatedMarginAssetMap)
+	retMarginAssets := make(types.IsolatedMarginAssetMap, len(assets))
 	for _, marginAsset := range assets {
 		retMarginAssets[marginAsset.Symbol] = toGlobalIsolatedMarginAsset(marginAsset)
 	}
@@ -76,32 +76,35 @@ func toGlobalIsolatedMarginAssets(assets []binance.IsolatedMarginAsset) (retAsse
 	return retMarginAssets
 }
 
-func toGlobalMarginUserAssets(assets []binance.UserAsset) types.MarginAssetMap {
-	retMarginAssets := make(types.MarginAssetMap)
+func toGlobalMarginUserAssets(assets []binanceapi.MarginAsset) types.MarginAssetMap {
+	retMarginAssets := make(types.MarginAssetMap, len(assets))
 	for _, marginAsset := range assets {
 		retMarginAssets[marginAsset.Asset] = types.MarginUserAsset{
 			Asset:    marginAsset.Asset,
-			Borrowed: fixedpoint.MustNewFromString(marginAsset.Borrowed),
-			Free:     fixedpoint.MustNewFromString(marginAsset.Free),
-			Interest: fixedpoint.MustNewFromString(marginAsset.Interest),
-			Locked:   fixedpoint.MustNewFromString(marginAsset.Locked),
-			NetAsset: fixedpoint.MustNewFromString(marginAsset.NetAsset),
+			Borrowed: marginAsset.Borrowed,
+			Free:     marginAsset.Free,
+			Interest: marginAsset.Interest,
+			Locked:   marginAsset.Locked,
+			NetAsset: marginAsset.NetAsset,
 		}
 	}
 
 	return retMarginAssets
 }
 
-func toGlobalMarginAccountInfo(account *binance.MarginAccount) *types.MarginAccountInfo {
+func toGlobalMarginAccountInfo(account *binanceapi.CrossMarginAccount) *types.MarginAccountInfo {
 	return &types.MarginAccountInfo{
 		BorrowEnabled:       account.BorrowEnabled,
-		MarginLevel:         fixedpoint.MustNewFromString(account.MarginLevel),
-		TotalAssetOfBTC:     fixedpoint.MustNewFromString(account.TotalAssetOfBTC),
-		TotalLiabilityOfBTC: fixedpoint.MustNewFromString(account.TotalLiabilityOfBTC),
-		TotalNetAssetOfBTC:  fixedpoint.MustNewFromString(account.TotalNetAssetOfBTC),
-		TradeEnabled:        account.TradeEnabled,
-		TransferEnabled:     account.TransferEnabled,
-		Assets:              toGlobalMarginUserAssets(account.UserAssets),
+		MarginLevel:         account.MarginLevel,
+		TotalAssetOfBTC:     account.TotalAssetOfBtc,
+		TotalLiabilityOfBTC: account.TotalLiabilityOfBtc,
+		TotalNetAssetOfBTC:  account.TotalNetAssetOfBtc,
+
+		TradeEnabled: account.TradeEnabled,
+
+		TransferEnabled: account.TransferInEnabled,
+
+		Assets: toGlobalMarginUserAssets(account.UserAssets),
 	}
 }
 

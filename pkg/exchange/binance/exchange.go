@@ -529,33 +529,32 @@ func (e *Exchange) transferCrossMarginAccountAsset(
 }
 
 func (e *Exchange) QueryCrossMarginAccount(ctx context.Context) (*types.Account, error) {
-	marginAccount, err := e.client.NewGetMarginAccountService().Do(ctx)
+	marginAccount, err := e.client2.NewGetMarginAccountRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	marginLevel := fixedpoint.MustNewFromString(marginAccount.MarginLevel)
 	a := &types.Account{
 		AccountType:     types.AccountTypeMargin,
 		MarginInfo:      toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which maintain []*AccountAsset and []*AccountPosition.
-		MarginLevel:     marginLevel,
-		MarginTolerance: util.CalculateMarginTolerance(marginLevel),
+		MarginLevel:     marginAccount.MarginLevel,
+		MarginTolerance: util.CalculateMarginTolerance(marginAccount.MarginLevel),
 		BorrowEnabled:   types.BoolPtr(marginAccount.BorrowEnabled),
-		TransferEnabled: types.BoolPtr(marginAccount.TransferEnabled),
 	}
 
 	// convert cross margin user assets into balances
-	balances := types.BalanceMap{}
+	balances := make(types.BalanceMap, len(marginAccount.UserAssets))
 	for _, userAsset := range marginAccount.UserAssets {
 		balances[userAsset.Asset] = types.Balance{
 			Currency:  userAsset.Asset,
-			Available: fixedpoint.MustNewFromString(userAsset.Free),
-			Locked:    fixedpoint.MustNewFromString(userAsset.Locked),
-			Interest:  fixedpoint.MustNewFromString(userAsset.Interest),
-			Borrowed:  fixedpoint.MustNewFromString(userAsset.Borrowed),
-			NetAsset:  fixedpoint.MustNewFromString(userAsset.NetAsset),
+			Available: userAsset.Free,
+			Locked:    userAsset.Locked,
+			Interest:  userAsset.Interest,
+			Borrowed:  userAsset.Borrowed,
+			NetAsset:  userAsset.NetAsset,
 		}
 	}
+
 	a.UpdateBalances(balances)
 	return a, nil
 }
