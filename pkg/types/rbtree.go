@@ -22,6 +22,8 @@ type RBTree struct {
 	nilNode  *RBNode    // shared sentinel NIL node per tree
 
 	stats RBTreeStats
+
+	mu sync.Mutex
 }
 
 func NewRBTree() *RBTree {
@@ -53,6 +55,9 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 	if deleting == nil {
 		return false
 	}
+
+	tree.mu.Lock()
+	defer tree.mu.Unlock()
 
 	// x the child of the deleted node
 	var x *RBNode
@@ -330,6 +335,9 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 }
 
 func (tree *RBTree) Insert(key, val fixedpoint.Value) {
+	tree.mu.Lock()
+	defer tree.mu.Unlock()
+
 	var y *RBNode
 	var x = tree.Root
 
@@ -346,10 +354,7 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	node := tree.newValueNode(key, val, Red)
 
 	if y == nil {
-		if tree.Root != nil {
-			// Root is the sentinel in an empty tree; no need to clear
-		}
-
+		// Root is the sentinel in an empty tree; no need to clear
 		node.parent = tree.nilNode
 		tree.Root = node
 	} else {
