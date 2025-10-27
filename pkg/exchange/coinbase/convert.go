@@ -175,12 +175,17 @@ func toGlobalTicker(cbTicker *api.Ticker) types.Ticker {
 }
 
 func toGlobalBalance(cur string, cbBalance *api.Balance) types.Balance {
-	balance := types.NewZeroBalance(cur)
-	balance.Currency = cur
-	balance.Available = cbBalance.Available
-	balance.Locked = cbBalance.Hold
-	balance.NetAsset = cbBalance.Balance
-	return balance
+	return types.Balance{
+		Currency:             cur,
+		Available:            cbBalance.Available,
+		Locked:               cbBalance.Hold,
+		Borrowed:             fixedpoint.Zero,
+		Interest:             fixedpoint.Zero,
+		LongAvailableCredit:  fixedpoint.Zero,
+		ShortAvailableCredit: fixedpoint.Zero,
+		NetAsset:             cbBalance.Balance,
+		MaxWithdrawAmount:    fixedpoint.Zero,
+	}
 }
 
 func toGlobalOrderType(localType string) types.OrderType {
