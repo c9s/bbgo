@@ -22,7 +22,6 @@ import (
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/exchange/sandbox"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
@@ -220,12 +219,9 @@ type Strategy struct {
 	// --------------------------------
 	// private field
 
-	makerSession, sourceSession *bbgo.ExchangeSession
+	makerSession, hedgeSession *bbgo.ExchangeSession
 
-	makerMarket, sourceMarket types.Market
-
-	// boll is the BOLLINGER indicator we used for predicting the price.
-	boll *indicatorv2.BOLLStream
+	makerMarket, hedgeMarket types.Market
 
 	state *State
 
@@ -708,7 +704,7 @@ func (s *Strategy) allowMarginHedge(
 	netValueInUsd := accountValueCalculator.NetValue()
 
 	marginInfoUpdater := session.GetMarginInfoUpdater()
-	sourceMarket := s.sourceMarket
+	sourceMarket := s.hedgeMarket
 
 	s.logger.Infof(
 		"hedge account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
@@ -813,8 +809,8 @@ func (s *Strategy) allowMarginHedge(
 
 	// makerSide here is the makerSide of maker
 	// if the margin level is too low, check if we can hedge the position with repayments to reduce the position
-	quoteBal, _ := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency)
-	baseBal, _ := hedgeAccount.Balance(s.sourceMarket.BaseCurrency)
+	quoteBal, _ := hedgeAccount.Balance(s.hedgeMarket.QuoteCurrency)
+	baseBal, _ := hedgeAccount.Balance(s.hedgeMarket.BaseCurrency)
 
 	switch makerSide {
 	case types.SideTypeBuy:
@@ -867,7 +863,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		return nil
 	}
 
-	if !s.sourceSession.Connectivity.IsConnected() {
+	if !s.hedgeSession.Connectivity.IsConnected() {
 		s.logger.Warnf("source session is disconnected, skipping update quote")
 		return nil
 	}
@@ -940,7 +936,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				)
 			}
 
-			s.sourceSession.MarketDataStream.Reconnect()
+			s.hedgeSession.MarketDataStream.Reconnect()
 			s.sourceBook.Reset()
 			return err
 		}
@@ -960,7 +956,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				)
 			}
 
-			s.sourceSession.MarketDataStream.Reconnect()
+			s.hedgeSession.MarketDataStream.Reconnect()
 			s.sourceBook.Reset()
 			return err
 		}
@@ -1036,10 +1032,10 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	//  1) the source session is a margin session
 	//  2) the min margin level is configured
 	//  3) the hedge account's margin level is lower than the min margin level
-	hedgeAccount := s.sourceSession.GetAccount()
+	hedgeAccount := s.hedgeSession.GetAccount()
 	hedgeQuota := &bbgo.QuotaTransaction{}
 
-	if s.sourceSession.Margin &&
+	if s.hedgeSession.Margin &&
 		!s.MinMarginLevel.IsZero() &&
 		!hedgeAccount.MarginLevel.IsZero() {
 
@@ -1050,7 +1046,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				s.MinMarginLevel.String(),
 			)
 
-			tryToRepayDebts(ctx, s.sourceSession)
+			tryToRepayDebts(ctx, s.hedgeSession)
 		} else {
 			s.logger.Infof(
 				"hedge account margin level %s is greater than the min margin level %s, calculating the net value",
@@ -1059,7 +1055,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			)
 		}
 
-		allowMakerBuy, bidQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeBuy)
+		allowMakerBuy, bidQuota := s.allowMarginHedge(s.hedgeSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeBuy)
 		if allowMakerBuy {
 			hedgeQuota.BaseAsset.Add(bidQuota.Div(bestBidPrice))
 		} else {
@@ -1067,7 +1063,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			disableMakerBid = true
 		}
 
-		allowMakerSell, sellQuota := s.allowMarginHedge(s.sourceSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeSell)
+		allowMakerSell, sellQuota := s.allowMarginHedge(s.hedgeSession, s.MinMarginLevel, s.MaxHedgeAccountLeverage, types.SideTypeSell)
 		if allowMakerSell {
 			hedgeQuota.QuoteAsset.Add(sellQuota.Mul(bestAskPrice))
 		} else {
@@ -1076,13 +1072,13 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		}
 
 		if disableMakerBid && disableMakerAsk {
-			tryToRepayDebts(ctx, s.sourceSession)
+			tryToRepayDebts(ctx, s.hedgeSession)
 		}
 	} else {
-		if b, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
+		if b, ok := hedgeAccount.Balance(s.hedgeMarket.BaseCurrency); ok {
 			// to make bid orders, we need enough base asset in the foreign makerExchange,
 			// if the base asset balance is not enough for selling
-			if b.Available.Compare(s.sourceMarket.MinQuantity) > 0 {
+			if b.Available.Compare(s.hedgeMarket.MinQuantity) > 0 {
 				hedgeQuota.BaseAsset.Add(b.Available)
 			} else {
 				s.logger.Warnf("%s maker bid disabled: insufficient hedge base balance %s", s.Symbol, b.String())
@@ -1090,18 +1086,18 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			}
 		}
 
-		if b, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
+		if b, ok := hedgeAccount.Balance(s.hedgeMarket.QuoteCurrency); ok {
 			// to make ask orders, we need enough quote asset in the foreign makerExchange,
 			// if the quote asset balance is not enough for buying
 			if s.StopHedgeQuoteBalance.Sign() > 0 {
-				minAvailable := s.StopHedgeQuoteBalance.Add(s.sourceMarket.MinNotional)
+				minAvailable := s.StopHedgeQuoteBalance.Add(s.hedgeMarket.MinNotional)
 				if b.Available.Compare(minAvailable) > 0 {
 					hedgeQuota.QuoteAsset.Add(b.Available.Sub(minAvailable))
 				} else {
 					s.logger.Warnf("%s maker ask disabled: insufficient hedge quote balance %s", s.Symbol, b.String())
 					disableMakerAsk = true
 				}
-			} else if b.Available.Compare(s.sourceMarket.MinNotional) > 0 {
+			} else if b.Available.Compare(s.hedgeMarket.MinNotional) > 0 {
 				hedgeQuota.QuoteAsset.Add(b.Available)
 			} else {
 				s.logger.Warnf("%s maker ask disabled: insufficient hedge quote balance %s", s.Symbol, b.String())
@@ -1111,8 +1107,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	}
 
 	if s.StopHedgeBaseBalance.Sign() > 0 {
-		minAvailable := s.StopHedgeBaseBalance.Add(s.sourceMarket.MinQuantity)
-		b, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency)
+		minAvailable := s.StopHedgeBaseBalance.Add(s.hedgeMarket.MinQuantity)
+		b, ok := hedgeAccount.Balance(s.hedgeMarket.BaseCurrency)
 		if !ok || b.Available.Compare(minAvailable) < 0 {
 			s.logger.Warnf("%s maker bid disabled: insufficient hedge base balance %s < stop %s", s.Symbol, b.String(), s.StopHedgeBaseBalance.String())
 			disableMakerBid = true
@@ -1262,7 +1258,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			// if we bought, then we need to sell the base from the hedge session
 			// if the hedge session is a margin session, we don't need to lock the base asset
 			if makerQuota.QuoteAsset.Lock(requiredQuote) &&
-				(s.sourceSession.Margin || hedgeQuota.BaseAsset.Lock(bidQuantity)) {
+				(s.hedgeSession.Margin || hedgeQuota.BaseAsset.Lock(bidQuantity)) {
 
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(
@@ -1328,7 +1324,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			}
 
 			if makerQuota.BaseAsset.Lock(requiredBase) &&
-				(s.sourceSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice))) {
+				(s.hedgeSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice))) {
 
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(
@@ -1422,7 +1418,7 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, disableBid, d
 	}
 
 	makerAccount := s.makerSession.GetAccount()
-	hedgeAccount := s.sourceSession.GetAccount()
+	hedgeAccount := s.hedgeSession.GetAccount()
 
 	var iocOrders []types.SubmitOrder
 	if makerAsk.Price.Compare(marginBidPrice) <= 0 {
@@ -1437,7 +1433,7 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, disableBid, d
 		sumPv := aggregatePriceVolumeSliceWithPriceFilter(types.SideTypeSell, askPvs, marginBidPrice)
 		qty := fixedpoint.Min(availableQuote.Div(sumPv.Price), sumPv.Volume)
 
-		if sourceBase, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
+		if sourceBase, ok := hedgeAccount.Balance(s.hedgeMarket.BaseCurrency); ok {
 			qty = fixedpoint.Min(qty, sourceBase.Available)
 		} else {
 			// insufficient hedge base balance for arbitrage
@@ -1472,7 +1468,7 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, disableBid, d
 		sumPv := aggregatePriceVolumeSliceWithPriceFilter(types.SideTypeBuy, bidPvs, marginAskPrice)
 		qty := fixedpoint.Min(availableBase, sumPv.Volume)
 
-		if sourceQuote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
+		if sourceQuote, ok := hedgeAccount.Balance(s.hedgeMarket.QuoteCurrency); ok {
 			qty = fixedpoint.Min(qty, quote.BestAskPrice.Div(sourceQuote.Available))
 		} else {
 			// insufficient hedge quote balance for arbitrage
@@ -1764,7 +1760,7 @@ func (s *Strategy) hedge(ctx context.Context) {
 	qty := hedgeDelta.Abs()
 
 	// check dust quantity
-	if lastPrice.Sign() > 0 && s.sourceMarket.IsDustQuantity(qty, lastPrice) {
+	if lastPrice.Sign() > 0 && s.hedgeMarket.IsDustQuantity(qty, lastPrice) {
 		s.logger.Debugf("hedge quantity %s is dust, skip hedging", qty.String())
 		return
 	}
@@ -1819,8 +1815,8 @@ func (s *Strategy) directHedge(
 		}
 	}
 
-	account := s.sourceSession.GetAccount()
-	if s.sourceSession.Margin {
+	account := s.hedgeSession.GetAccount()
+	if s.hedgeSession.Margin {
 		// check the margin level
 		if !s.MinMarginLevel.IsZero() && !account.MarginLevel.IsZero() && account.MarginLevel.Compare(s.MinMarginLevel) < 0 {
 			err := fmt.Errorf("margin level is too low, current margin level: %f, required margin level: %f",
@@ -1830,18 +1826,18 @@ func (s *Strategy) directHedge(
 		}
 	} else {
 		quantity = AdjustHedgeQuantityWithAvailableBalance(
-			account, s.sourceMarket, side, quantity, price,
+			account, s.hedgeMarket, side, quantity, price,
 		)
 	}
 
 	if s.MaxHedgeQuoteQuantityPerOrder.Sign() > 0 && !price.IsZero() {
-		quantity = s.sourceMarket.AdjustQuantityByMaxAmount(quantity, price, s.MaxHedgeQuoteQuantityPerOrder)
+		quantity = s.hedgeMarket.AdjustQuantityByMaxAmount(quantity, price, s.MaxHedgeQuoteQuantityPerOrder)
 	} else {
 		// truncate quantity for the supported precision
-		quantity = s.sourceMarket.TruncateQuantity(quantity)
+		quantity = s.hedgeMarket.TruncateQuantity(quantity)
 	}
 
-	if s.sourceMarket.IsDustQuantity(quantity, price) {
+	if s.hedgeMarket.IsDustQuantity(quantity, price) {
 		s.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
 		return nil, nil
 	}
@@ -1860,7 +1856,7 @@ func (s *Strategy) directHedge(
 
 	submitOrders := []types.SubmitOrder{
 		{
-			Market:           s.sourceMarket,
+			Market:           s.hedgeMarket,
 			Symbol:           s.Symbol,
 			Type:             types.OrderTypeMarket,
 			Side:             side,
@@ -1869,7 +1865,7 @@ func (s *Strategy) directHedge(
 		},
 	}
 
-	formattedOrders, err := s.sourceSession.FormatOrders(submitOrders)
+	formattedOrders, err := s.hedgeSession.FormatOrders(submitOrders)
 	if err != nil {
 		return nil, fmt.Errorf("unable to format hedge orders: %w", err)
 	}
@@ -1884,7 +1880,7 @@ func (s *Strategy) directHedge(
 	s.positionExposure.Cover(coverDelta)
 
 	createdOrders, _, err := bbgo.BatchPlaceOrder(
-		ctx, s.sourceSession.Exchange, orderCreateCallback, formattedOrders...,
+		ctx, s.hedgeSession.Exchange, orderCreateCallback, formattedOrders...,
 	)
 
 	if err != nil {
@@ -1933,7 +1929,7 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 				// recover trades only when in simple hedge mode
 				if s.simpleHedgeMode {
 					if err := s.tradeCollector.Recover(
-						ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.SourceSymbol, startTime,
+						ctx, s.hedgeSession.Exchange.(types.ExchangeTradeHistoryService), s.SourceSymbol, startTime,
 					); err != nil {
 						s.logger.WithError(err).Errorf("query trades error")
 					}
@@ -2172,7 +2168,7 @@ func (s *Strategy) accountUpdater(ctx context.Context) {
 			return
 
 		case <-ticker.C:
-			if _, err := s.sourceSession.UpdateAccount(ctx); err != nil {
+			if _, err := s.hedgeSession.UpdateAccount(ctx); err != nil {
 				s.logger.WithError(err).Errorf("unable to update account")
 			}
 
@@ -2306,7 +2302,7 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("source exchange session %s is not defined", s.SourceExchange)
 	}
 
-	s.sourceSession = sourceSession
+	s.hedgeSession = sourceSession
 
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
@@ -2315,7 +2311,7 @@ func (s *Strategy) CrossRun(
 
 	s.makerSession = makerSession
 
-	s.sourceMarket, ok = s.sourceSession.Market(s.SourceSymbol)
+	s.hedgeMarket, ok = s.hedgeSession.Market(s.SourceSymbol)
 	if !ok {
 		return fmt.Errorf("source session market %s is not defined", s.SourceSymbol)
 	}
@@ -2329,8 +2325,8 @@ func (s *Strategy) CrossRun(
 
 	if s.UseSandbox {
 		balances := types.BalanceMap{
-			s.sourceMarket.BaseCurrency:  types.NewBalance(s.sourceMarket.BaseCurrency, fixedpoint.NewFromFloat(50.0)),
-			s.sourceMarket.QuoteCurrency: types.NewBalance(s.sourceMarket.QuoteCurrency, fixedpoint.NewFromFloat(10_000.0)),
+			s.hedgeMarket.BaseCurrency:  types.NewBalance(s.hedgeMarket.BaseCurrency, fixedpoint.NewFromFloat(50.0)),
+			s.hedgeMarket.QuoteCurrency: types.NewBalance(s.hedgeMarket.QuoteCurrency, fixedpoint.NewFromFloat(10_000.0)),
 		}
 
 		customBalances := s.SandboxExchangeBalances
@@ -2343,7 +2339,7 @@ func (s *Strategy) CrossRun(
 
 		s.logger.Warnf("using sandbox exchange to simulate hedge with balances: %+v", balances)
 
-		sandboxEx := sandbox.New(s.sourceSession.Exchange, s.sourceSession.MarketDataStream, s.SourceSymbol, balances)
+		sandboxEx := sandbox.New(s.hedgeSession.Exchange, s.hedgeSession.MarketDataStream, s.SourceSymbol, balances)
 
 		if err := sandboxEx.Initialize(ctx); err != nil {
 			return err
@@ -2351,26 +2347,20 @@ func (s *Strategy) CrossRun(
 
 		// replace the user data stream created in the exchange session
 		userDataStream := sandboxEx.GetUserDataStream()
-		s.sourceSession.Exchange = sandboxEx
-		s.sourceSession.UserDataStream = userDataStream
+		s.hedgeSession.Exchange = sandboxEx
+		s.hedgeSession.UserDataStream = userDataStream
 
 		// rebind user data connectivity
 		userDataConnectivity := types.NewConnectivity()
 		userDataConnectivity.Bind(userDataStream)
-		s.sourceSession.UserDataConnectivity = userDataConnectivity
+		s.hedgeSession.UserDataConnectivity = userDataConnectivity
 
 		// rebuild the connectivity group
-		s.sourceSession.Connectivity = types.NewConnectivityGroup(s.sourceSession.MarketDataConnectivity, s.sourceSession.UserDataConnectivity)
+		s.hedgeSession.Connectivity = types.NewConnectivityGroup(s.hedgeSession.MarketDataConnectivity, s.hedgeSession.UserDataConnectivity)
 	}
 
-	indicators := s.sourceSession.Indicators(s.SourceSymbol)
-
-	s.boll = indicators.BOLL(
-		types.IntervalWindow{
-			Interval: s.BollBandInterval,
-			Window:   21,
-		}, 1.0,
-	)
+	indicators := s.hedgeSession.Indicators(s.SourceSymbol)
+	_ = indicators
 
 	// restore state
 	s.groupID = util.FNV32(instanceID)
@@ -2392,11 +2382,11 @@ func (s *Strategy) CrossRun(
 		)
 	}
 
-	if s.sourceSession.MakerFeeRate.Sign() > 0 || s.sourceSession.TakerFeeRate.Sign() > 0 {
+	if s.hedgeSession.MakerFeeRate.Sign() > 0 || s.hedgeSession.TakerFeeRate.Sign() > 0 {
 		s.Position.SetExchangeFeeRate(
 			types.ExchangeName(s.SourceExchange), types.ExchangeFee{
-				MakerFeeRate: s.sourceSession.MakerFeeRate,
-				TakerFeeRate: s.sourceSession.TakerFeeRate,
+				MakerFeeRate: s.hedgeSession.MakerFeeRate,
+				TakerFeeRate: s.hedgeSession.TakerFeeRate,
 			},
 		)
 	}
@@ -2421,7 +2411,7 @@ func (s *Strategy) CrossRun(
 
 	// initialize the price resolver
 	makerMarkets := s.makerSession.Markets()
-	sourceMarkets := s.sourceSession.Markets()
+	sourceMarkets := s.hedgeSession.Markets()
 	if len(sourceMarkets) == 0 {
 		return fmt.Errorf("source exchange %s has no markets", s.SourceExchange)
 	}
@@ -2429,19 +2419,19 @@ func (s *Strategy) CrossRun(
 
 	// TODO: we can share this priceSolver across different instances
 	s.priceSolver = pricesolver.NewSimplePriceResolver(allMarkets)
-	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
+	s.priceSolver.BindStream(s.hedgeSession.MarketDataStream)
 
-	s.sourceSession.UserDataStream.OnTradeUpdate(s.priceSolver.UpdateFromTrade)
+	s.hedgeSession.UserDataStream.OnTradeUpdate(s.priceSolver.UpdateFromTrade)
 
-	s.accountValueCalculator = s.sourceSession.GetAccountValueCalculator()
+	s.accountValueCalculator = s.hedgeSession.GetAccountValueCalculator()
 	if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
 		return err
 	}
 
-	s.sourceSession.MarketDataStream.OnKLineClosed(
+	s.hedgeSession.MarketDataStream.OnKLineClosed(
 		types.KLineWith(
 			s.SourceSymbol, types.Interval1m, func(k types.KLine) {
-				feeToken := s.sourceSession.Exchange.PlatformFeeCurrency()
+				feeToken := s.hedgeSession.Exchange.PlatformFeeCurrency()
 				if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuoteCurrency); ok {
 					s.Position.SetFeeAverageCost(feeToken, feePrice)
 				}
@@ -2515,7 +2505,7 @@ func (s *Strategy) CrossRun(
 
 	// allocate required isolated streams to the connectors
 	if (s.FastCancel != nil && s.FastCancel.Enabled) || (s.EnableSignalMargin && s.SignalConfigList != nil && len(s.SignalConfigList.Signals) > 0) {
-		s.marketTradeStream = bbgo.NewMarketTradeStream(s.sourceSession, s.SourceSymbol)
+		s.marketTradeStream = bbgo.NewMarketTradeStream(s.hedgeSession, s.SourceSymbol)
 		s.marketTradeStream.OnMarketTrade(func(trade types.Trade) {
 			s.lastPrice.Set(trade.Price)
 		})
@@ -2529,20 +2519,20 @@ func (s *Strategy) CrossRun(
 	}
 
 	if s.EnableArbitrage {
-		s.makerBookStream = bbgo.NewBookStream(s.sourceSession, s.SourceSymbol)
+		s.makerBookStream = bbgo.NewBookStream(s.hedgeSession, s.SourceSymbol)
 		s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
 		s.makerBook.BindStream(s.makerBookStream)
 		s.addConnector(s.makerBookStream)
 	}
 
 	// TODO: replace the following stream book with HedgeMarket integration
-	s.sourceBookStream = bbgo.NewBookStream(s.sourceSession, s.SourceSymbol, types.SubscribeOptions{
+	s.sourceBookStream = bbgo.NewBookStream(s.hedgeSession, s.SourceSymbol, types.SubscribeOptions{
 		Depth: types.DepthLevelFull,
 		Speed: types.SpeedLow,
 	})
 	s.addConnector(s.sourceBookStream)
 
-	s.sourceBook = types.NewStreamBook(s.SourceSymbol, s.sourceSession.ExchangeName)
+	s.sourceBook = types.NewStreamBook(s.SourceSymbol, s.hedgeSession.ExchangeName)
 	s.sourceBook.BindStream(s.sourceBookStream)
 	s.depthSourceBook = types.NewDepthBook(s.sourceBook)
 
@@ -2601,7 +2591,7 @@ func (s *Strategy) CrossRun(
 
 		if binder, ok := sigProvider.(SessionBinder); ok {
 			s.logger.Infof("binding session on signal %T", sigProvider)
-			if err := binder.Bind(s.tradingCtx, s.sourceSession, s.SourceSymbol); err != nil {
+			if err := binder.Bind(s.tradingCtx, s.hedgeSession, s.SourceSymbol); err != nil {
 				return err
 			}
 		}
@@ -2631,7 +2621,7 @@ func (s *Strategy) CrossRun(
 			// for direct hedge: trades from source session are always hedge trades
 			if s.simpleHedgeMode {
 				switch trade.Exchange {
-				case s.sourceSession.ExchangeName:
+				case s.hedgeSession.ExchangeName:
 					s.positionExposure.Close(delta)
 				case s.makerSession.ExchangeName:
 					s.positionExposure.Open(delta)
@@ -2728,15 +2718,15 @@ func (s *Strategy) CrossRun(
 			return err
 		}
 	} else {
-		s.orderStore.BindStream(s.sourceSession.UserDataStream)
-		s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
+		s.orderStore.BindStream(s.hedgeSession.UserDataStream)
+		s.tradeCollector.BindStream(s.hedgeSession.UserDataStream)
 	}
 
-	s.sourceUserDataConnectivity = s.sourceSession.UserDataConnectivity
-	s.sourceMarketDataConnectivity = s.sourceSession.MarketDataConnectivity
+	s.sourceUserDataConnectivity = s.hedgeSession.UserDataConnectivity
+	s.sourceMarketDataConnectivity = s.hedgeSession.MarketDataConnectivity
 
 	s.connectivityGroup = types.NewConnectivityGroup(
-		s.sourceSession.UserDataConnectivity, s.makerSession.UserDataConnectivity,
+		s.hedgeSession.UserDataConnectivity, s.makerSession.UserDataConnectivity,
 	)
 
 	// TODO: use connectivity group to ensure all connections are ready
