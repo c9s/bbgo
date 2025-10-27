@@ -792,12 +792,24 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 		return nil, err
 	}
 
-	var balances = map[string]types.Balance{}
+	balances := make(map[string]types.Balance, len(account.Balances))
 	for _, b := range account.Balances {
+		free := fixedpoint.MustNewFromString(b.Free)
+		locked := fixedpoint.MustNewFromString(b.Locked)
+		if free.IsZero() && locked.IsZero() {
+			continue
+		}
+
 		balances[b.Asset] = types.Balance{
-			Currency:  b.Asset,
-			Available: fixedpoint.MustNewFromString(b.Free),
-			Locked:    fixedpoint.MustNewFromString(b.Locked),
+			Currency:             b.Asset,
+			Available:            free,
+			Locked:               locked,
+			Borrowed:             fixedpoint.Zero,
+			Interest:             fixedpoint.Zero,
+			LongAvailableCredit:  fixedpoint.Zero,
+			ShortAvailableCredit: fixedpoint.Zero,
+			NetAsset:             fixedpoint.Zero,
+			MaxWithdrawAmount:    fixedpoint.Zero,
 		}
 	}
 
@@ -807,6 +819,7 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 		CanTrade:    account.CanTrade,    // if can trade
 		CanWithdraw: account.CanWithdraw, // if can transfer out asset
 	}
+
 	a.UpdateBalances(balances)
 	return a, nil
 }

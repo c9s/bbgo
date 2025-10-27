@@ -9,13 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/c9s/requestgen"
+	"github.com/sirupsen/logrus"
+
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/tradingutil"
-	"github.com/c9s/requestgen"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -127,11 +128,17 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	if err != nil {
 		return nil, err
 	}
-	balances := make(types.BalanceMap)
+
+	balances := make(types.BalanceMap, len(accounts))
 	for _, cbBalance := range accounts {
+		if cbBalance.Balance.IsZero() && cbBalance.Available.IsZero() && cbBalance.Hold.IsZero() {
+			continue
+		}
+
 		cur := strings.ToUpper(cbBalance.Currency)
 		balances[cur] = toGlobalBalance(cur, &cbBalance)
 	}
+
 	return balances, nil
 }
 
@@ -312,7 +319,9 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.
 }
 
 // if symbol is empty string, it will return all orders
-func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, startTime, endTime *time.Time, status []string) ([]api.Order, error) {
+func (e *Exchange) queryOrdersByPagination(
+	ctx context.Context, symbol string, startTime, endTime *time.Time, status []string,
+) ([]api.Order, error) {
 	sortedBy := "created_at"
 	sorting := "desc"
 	localSymbol := toLocalSymbol(symbol)
@@ -458,7 +467,9 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 	return tickers, nil
 }
 
-func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryKLines(
+	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
+) ([]types.KLine, error) {
 	if !e.IsSupportedInterval(interval) {
 		return nil, fmt.Errorf("unsupported interval: %v", interval)
 	}
@@ -623,7 +634,9 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 // ExchangeTradeHistoryService
 // QueryClosedOrders queries closed orders for the given symbol and time range.
 // startTime and endTime are inclusive.
-func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, startTime, endTime time.Time, lastOrderID uint64) ([]types.Order, error) {
+func (e *Exchange) QueryClosedOrders(
+	ctx context.Context, symbol string, startTime, endTime time.Time, lastOrderID uint64,
+) ([]types.Order, error) {
 	if lastOrderID > 0 {
 		logger.Warning("lastOrderID is not supported for Coinbase, it will be ignored")
 	}
@@ -639,7 +652,9 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, startTi
 	return orders, nil
 }
 
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
+func (e *Exchange) QueryTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) ([]types.Trade, error) {
 	cbTrades, err := e.queryProductTradesByPagination(
 		ctx, symbol, options,
 	)
@@ -706,7 +721,9 @@ func (e *Exchange) queryProductTradesByPagination(
 }
 
 // ExchangeTransferHistoryService
-func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) ([]types.Deposit, error) {
+func (e *Exchange) QueryDepositHistory(
+	ctx context.Context, asset string, since, until time.Time,
+) ([]types.Deposit, error) {
 	transfers, err := e.queryTransferHistoryByPagination(ctx, asset, since, until, api.TransferTypeDeposit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query deposit history for asset %s(%s ~ %s): %w", asset, since, until, err)
@@ -718,7 +735,9 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 	return deposits, nil
 }
 
-func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) ([]types.Withdraw, error) {
+func (e *Exchange) QueryWithdrawHistory(
+	ctx context.Context, asset string, since, until time.Time,
+) ([]types.Withdraw, error) {
 	transfers, err := e.queryTransferHistoryByPagination(ctx, asset, since, until, api.TransferTypeWithdraw)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query withdraw history for asset %s(%s ~ %s): %w", asset, since, until, err)
@@ -730,7 +749,9 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 	return withdraws, nil
 }
 
-func (e *Exchange) queryTransferHistoryByPagination(ctx context.Context, asset string, since, until time.Time, transferType api.TransferType) ([]api.Transfer, error) {
+func (e *Exchange) queryTransferHistoryByPagination(
+	ctx context.Context, asset string, since, until time.Time, transferType api.TransferType,
+) ([]api.Transfer, error) {
 	req := e.client.NewGetTransfersRequest().
 		TransferType(transferType).
 		Limit(PaginationLimit)
