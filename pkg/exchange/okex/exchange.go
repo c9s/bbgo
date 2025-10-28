@@ -280,11 +280,9 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	// When the maintenance margin ratio is ≤ 300%, the system will send a warning to reduce the positions and the user should be aware of the liquidation risk. 300% is the warning parameter.
 	// OKX reserves the right to adjust this parameter according to the actual situation.
 	// When the maintenance margin ratio is ≤ 100%, the system will cancel orders according to the following rules, known as order cancellation by pre-liquidation:
-	if e.MarginSettings.IsMargin {
-		account.AccountType = types.AccountTypeMargin
-
-		account.BorrowEnabled = types.BoolPtr(accountConfigs[0].EnableSpotBorrow)
-
+	account.BorrowEnabled = types.BoolPtr(accountConfigs[0].EnableSpotBorrow)
+	account.AccountType = types.AccountTypeSpot
+	if *account.BorrowEnabled {
 		// Spot mode could have margin ratio as well
 		account.MarginRatio = fixedpoint.NewFromFloat(1.0) // 100%
 
@@ -368,7 +366,11 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		// okx market order with trade mode cross will be rejected:
 		//   "The corresponding product of this BTC-USDT doesn't support the tgtCcy parameter"
 		// See: https://www.okx.com/docs-v5/trick_en/#order-management-trade-mode
-		req.TradeMode(okexapi.TradeModeCash)
+		if e.MarginSettings.IsIsolatedMargin {
+			req.TradeMode(okexapi.TradeModeIsolated)
+		} else {
+			req.TradeMode(okexapi.TradeModeCross)
+		}
 	} else if e.IsFutures {
 		if e.FuturesSettings.IsIsolatedFutures {
 			req.TradeMode(okexapi.TradeModeIsolated)
