@@ -108,19 +108,6 @@ var halfpow10 = [...]uint64{
 	500000000000000000,
 	5000000000000000000}
 
-func min(a int, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a int, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
 
 func (v Value) Value() (driver.Value, error) {
 	return v.Float64(), nil

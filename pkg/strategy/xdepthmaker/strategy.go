@@ -1336,11 +1336,3 @@ func selectSessions2(
 	s2 = sessions[n2]
 	return s1, s2, nil
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-
-	return b
-}
