@@ -282,7 +282,9 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	// When the maintenance margin ratio is ≤ 100%, the system will cancel orders according to the following rules, known as order cancellation by pre-liquidation:
 	account.BorrowEnabled = types.BoolPtr(accountConfigs[0].EnableSpotBorrow)
 	account.AccountType = types.AccountTypeSpot
-	if *account.BorrowEnabled {
+
+	// if spot borrow is enabled, we need to calculate margin level
+	if accountConfigs[0].EnableSpotBorrow {
 		// Spot mode could have margin ratio as well
 		account.MarginRatio = fixedpoint.NewFromFloat(1.0) // 100%
 
@@ -299,10 +301,9 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		if account.MarginLevel.Sign() > 0 {
 			account.MarginTolerance = util.CalculateMarginTolerance(account.MarginLevel)
 		}
-
-		if !accountConfigs[0].EnableSpotBorrow {
-			log.Warnf("margin is enabled, but okx enableSpotBorrow field is false, please turn on auto-borrow from the okx UI, this is the only way to enable spot margin auto-borrow")
-		}
+	
+	} else {
+		log.Warnf("enableSpotBorrow field is false, if you need to auto-borrow, please turn on auto-borrow from the okx UI, this is the only way to enable spot margin auto-borrow")
 	}
 
 	return account, nil
