@@ -1041,24 +1041,25 @@ func (e *Exchange) QueryTrades(
 	if err := e.queryTradeLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
-
-	market := toLocalSymbol(symbol)
-	walletType := maxapi.WalletTypeSpot
-	if e.MarginSettings.IsMargin {
-		walletType = maxapi.WalletTypeMargin
+	var req *v3.GetWalletTradesRequest
+	if options.LastTradeID == 0 {
+		req = e.buildTimeRangeOnlyTradesRequest(symbol, options)
+	} else {
+		var lastTrade *types.Trade
+		trades, err := e.queryTradesByID(ctx, symbol, options.LastTradeID)
+		if err != nil {
+			log.WithError(err).Warnf("failed to query last trade by id %d", options.LastTradeID)
+		} else {
+			lastTrade = &trades[0]
+		}
+		req = e.buildFromIdTradesRequest(symbol, options, lastTrade)
 	}
-
-	req := e.v3client.NewGetWalletTradesRequest(walletType)
-	req.Market(market)
 
 	if options.Limit > 0 {
 		req.Limit(uint64(options.Limit))
 	} else {
 		req.Limit(1000)
 	}
-
-	// prepare the query parameters
-	e.prepareQueryTradesRequest(ctx, symbol, options, req)
 
 	maxTrades, err := req.Do(ctx)
 	if err != nil {
@@ -1075,7 +1076,7 @@ func (e *Exchange) QueryTrades(
 		}
 
 		// querying by last trade ID on max is inclusive
-		if t.ID < options.LastTradeID {
+		if options.LastTradeID != 0 && t.ID < options.LastTradeID {
 			continue
 		}
 
@@ -1084,7 +1085,6 @@ func (e *Exchange) QueryTrades(
 			log.WithError(err).Errorf("can not convert trade: %+v", t)
 			continue
 		}
-
 		trades = append(trades, localTrades...)
 	}
 
@@ -1094,37 +1094,29 @@ func (e *Exchange) QueryTrades(
 	return trades, nil
 }
 
-// prepareQueryTradesRequest helps to prepare the query parameters for trades request.
-// If we use timestamp as parameter, MAX will ignore from_id.
-func (e *Exchange) prepareQueryTradesRequest(
-	ctx context.Context, symbol string, options *types.TradeQueryOptions,
-	req *v3.GetWalletTradesRequest,
-) {
-	if options.LastTradeID != 0 {
-		// the caller try to query trades that are after the given trade ID
-		lastTrade, err := e.queryTradeByID(ctx, symbol, options.LastTradeID)
-		if err != nil {
-			log.WithError(err).Infof("failed to query last trade with id %d, fallback to time range query", options.LastTradeID)
-			// last trade not found, just use time range for query
-			if options.StartTime != nil {
-				req.Timestamp(*options.StartTime)
-				req.Order("asc")
-			} else if options.EndTime != nil {
-				req.Timestamp(*options.EndTime)
-				req.Order("desc")
-			}
-			return
-		}
-		if options.StartTime != nil && lastTrade.Time.After(*options.StartTime) {
-			// the last trade is after the given start time -> use from_id instead
-			log.Infof("the last trade %d time %s is after %s, use from_id for query", options.LastTradeID, lastTrade.Time, options.StartTime)
-			req.FromID(options.LastTradeID)
+func (e *Exchange) buildFromIdTradesRequest(
+	symbol string, options *types.TradeQueryOptions, lastTrade *types.Trade,
+) *v3.GetWalletTradesRequest {
+	market := toLocalSymbol(symbol)
+	walletType := maxapi.WalletTypeSpot
+	if e.MarginSettings.IsMargin {
+		walletType = maxapi.WalletTypeMargin
+	}
+
+	req := e.v3client.NewGetWalletTradesRequest(walletType)
+	req.Market(market)
+
+	// last trade found and its time is after the given start time -> use from_id instead
+	if lastTrade != nil {
+		if options.StartTime == nil || lastTrade.Time.After(*options.StartTime) {
+			log.Infof("querying trades by last trade id: %+v", options)
+			req.FromID(lastTrade.ID)
 			req.Order("asc")
-			return
+			return req
 		}
 	}
-	// we can only use time range for query from here
-	log.Infof("query trades by time range: %+v", options)
+
+	log.Infof("querying trades by last trade id is not applicable, fall back to time range query: %+v", options)
 	if options.StartTime != nil {
 		req.Timestamp(*options.StartTime)
 		req.Order("asc")
@@ -1132,9 +1124,33 @@ func (e *Exchange) prepareQueryTradesRequest(
 		req.Timestamp(*options.EndTime)
 		req.Order("desc")
 	}
+	return req
 }
 
-func (e *Exchange) queryTradeByID(ctx context.Context, symbol string, tradeID uint64) (*types.Trade, error) {
+func (e *Exchange) buildTimeRangeOnlyTradesRequest(
+	symbol string, options *types.TradeQueryOptions,
+) *v3.GetWalletTradesRequest {
+	market := toLocalSymbol(symbol)
+	walletType := maxapi.WalletTypeSpot
+	if e.MarginSettings.IsMargin {
+		walletType = maxapi.WalletTypeMargin
+	}
+
+	req := e.v3client.NewGetWalletTradesRequest(walletType)
+	req.Market(market)
+
+	log.Infof("querying trades by time range: %+v", options)
+	if options.StartTime != nil {
+		req.Timestamp(*options.StartTime)
+		req.Order("asc")
+	} else if options.EndTime != nil {
+		req.Timestamp(*options.EndTime)
+		req.Order("desc")
+	}
+	return req
+}
+
+func (e *Exchange) queryTradesByID(ctx context.Context, symbol string, tradeID uint64) ([]types.Trade, error) {
 	if err := e.queryTradeLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
@@ -1153,16 +1169,14 @@ func (e *Exchange) queryTradeByID(ctx context.Context, symbol string, tradeID ui
 	}
 
 	if len(maxTrades) == 0 {
-		return nil, fmt.Errorf("trade %d not found", tradeID)
+		return nil, err
 	}
+	// there could be two trades due to self-trade
 	trades, err := toGlobalTradeV3(maxTrades[0])
 	if err != nil {
 		return nil, err
 	}
-	if len(trades) == 0 {
-		return nil, fmt.Errorf("failed to convert trade: %d", tradeID)
-	}
-	return &trades[0], nil
+	return trades, nil
 }
 
 func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]types.Reward, error) {
