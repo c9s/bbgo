@@ -237,10 +237,11 @@ func (s *Strategy) checkDeposits(ctx context.Context, firstTime bool) {
 				bal, ok := account.Balance(d.Asset)
 				if ok {
 					logger.Infof("spot account balance %s: %+v", d.Asset, bal)
-					amount = fixedpoint.Min(bal.Available, amount)
 				} else {
 					logger.Errorf("unexpected error: %s balance not found", d.Asset)
 				}
+				// the spot account is found or it's zero balance
+				amount = fixedpoint.Min(bal.Available, amount)
 
 				if amount.IsZero() || amount.Sign() < 0 {
 					bbgo.Notify("🔍 Found succeeded deposit %s %s on %s, but the balance %s %s is insufficient, skip transferring",
