@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testing/httptesting"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
@@ -212,4 +213,219 @@ func TestExchange_submitOrderAndCancel(t *testing.T) {
 			assert.True(t, trade.Quantity.Sign() > 0)
 		}
 	}
+}
+
+func TestExchange_buildTimeRangeOnlyTradesRequest(t *testing.T) {
+	ex := New("key", "secret", "")
+
+	t.Run("spotWalletWithStartTime", func(t *testing.T) {
+		startTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+		options := &types.TradeQueryOptions{
+			StartTime: &startTime,
+		}
+
+		req := ex.buildTimeRangeOnlyTradesRequest("BTCUSDT", options)
+
+		// Check query parameters
+		params, err := req.GetParametersQuery()
+		assert.NoError(t, err)
+		assert.Equal(t, "btcusdt", params.Get("market"))
+		assert.Equal(t, "asc", params.Get("order"))
+		// Timestamp is in milliseconds
+		assert.Equal(t, strconv.FormatInt(startTime.UnixMilli(), 10), params.Get("timestamp"))
+	})
+
+	t.Run("spotWalletWithEndTime", func(t *testing.T) {
+		endTime := time.Date(2024, 1, 31, 23, 59, 59, 0, time.UTC)
+		options := &types.TradeQueryOptions{
+			EndTime: &endTime,
+		}
+
+		req := ex.buildTimeRangeOnlyTradesRequest("BTCUSDT", options)
+
+		// Check query parameters
+		params, err := req.GetParametersQuery()
+		assert.NoError(t, err)
+		assert.Equal(t, "btcusdt", params.Get("market"))
+		assert.Equal(t, "desc", params.Get("order"))
+		// Timestamp is in milliseconds
+		assert.Equal(t, strconv.FormatInt(endTime.UnixMilli(), 10), params.Get("timestamp"))
+	})
+
+	t.Run("marginWalletWithStartTime", func(t *testing.T) {
+		ex.MarginSettings.IsMargin = true
+		defer func() { ex.MarginSettings.IsMargin = false }()
+
+		startTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+		options := &types.TradeQueryOptions{
+			StartTime: &startTime,
+		}
+
+		req := ex.buildTimeRangeOnlyTradesRequest("BTCUSDT", options)
+
+		// Check slug parameters (wallet type)
+		slugParams, err := req.GetSlugParameters()
+		assert.NoError(t, err)
+		// WalletType is a custom type, so compare as string
+		assert.Equal(t, "m", string(slugParams["walletType"].(maxapi.WalletType)))
+
+		// Check query parameters
+		params, err := req.GetParametersQuery()
+		assert.NoError(t, err)
+		assert.Equal(t, "btcusdt", params.Get("market"))
+		assert.Equal(t, "asc", params.Get("order"))
+	})
+
+	t.Run("noTimeRangeSpecified", func(t *testing.T) {
+		options := &types.TradeQueryOptions{}
+
+		req := ex.buildTimeRangeOnlyTradesRequest("BTCUSDT", options)
+
+		// Check query parameters
+		params, err := req.GetParametersQuery()
+		assert.NoError(t, err)
+		assert.Equal(t, "btcusdt", params.Get("market"))
+		// When no time is specified, neither timestamp nor order should be set
+		assert.Empty(t, params.Get("timestamp"))
+		assert.Empty(t, params.Get("order"))
+	})
+}
+
+func TestExchange_buildFromIdTradesRequest(t *testing.T) {
+	ex := New("key", "secret", "")
+
+	t.Run("lastTradeIsAfterStartTime_UseFromId", func(t *testing.T) {
+		startTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+		lastTradeTime := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+
+		lastTrade := &types.Trade{
+			ID:   12345,
+			Time: types.Time(lastTradeTime),
+		}
+
+		options := &types.TradeQueryOptions{
+			LastTradeID: 12345,
+			StartTime:   &startTime,
+		}
+
+		req := ex.buildFromIdTradesRequest("BTCUSDT", options, lastTrade)
+
+		// Check query parameters
+		params, err := req.GetParametersQuery()
+		assert.NoError(t, err)
+		assert.Equal(t, "btcusdt", params.Get("market"))
+		assert.Equal(t, "asc", params.Get("order"))
+		assert.Equal(t, "12345", params.Get("from_id"))
+		// Timestamp should not be set when using from_id
+		assert.Empty(t, params.Get("timestamp"))
+	})
+
+	t.Run("lastTradeIsBeforeStartTime_FallbackToTimeRange", func(t *testing.T) {
+		startTime := time.Date(2024, 1, 5, 0, 0, 0, 0, time.UTC)
+		lastTradeTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+		lastTrade := &types.Trade{
+			ID:   12345,
+			Time: types.Time(lastTradeTime),
+		}
+
+		options := &types.TradeQueryOptions{
+			LastTradeID: 12345,
+			StartTime:   &startTime,
+		}
+
+		req := ex.buildFromIdTradesRequest("BTCUSDT", options, lastTrade)
+
+		// Check query parameters
+		params, err := req.GetParametersQuery()
+		assert.NoError(t, err)
+		assert.Equal(t, "btcusdt", params.Get("market"))
+		assert.Equal(t, "asc", params.Get("order"))
+		// Timestamp is in milliseconds
+		assert.Equal(t, strconv.FormatInt(startTime.UnixMilli(), 10), params.Get("timestamp"))
+		// from_id should not be set when falling back to time range
+		assert.Empty(t, params.Get("from_id"))
+	})
+
+	t.Run("lastTradeIsNilWithStartTime_UseStartTime", func(t *testing.T) {
+		startTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+		options := &types.TradeQueryOptions{
+			LastTradeID: 12345,
+			StartTime:   &startTime,
+		}
+
+		req := ex.buildFromIdTradesRequest("BTCUSDT", options, nil)
+
+		// Check query parameters
+		params, err := req.GetParametersQuery()
+		assert.NoError(t, err)
+		assert.Equal(t, "btcusdt", params.Get("market"))
+		assert.Equal(t, "asc", params.Get("order"))
+		// Timestamp is in milliseconds
+		assert.Equal(t, strconv.FormatInt(startTime.UnixMilli(), 10), params.Get("timestamp"))
+		assert.Empty(t, params.Get("from_id"))
+	})
+
+	t.Run("lastTradeIsNilWithEndTime_UseEndTimeDesc", func(t *testing.T) {
+		endTime := time.Date(2024, 1, 31, 23, 59, 59, 0, time.UTC)
+
+		options := &types.TradeQueryOptions{
+			LastTradeID: 12345,
+			EndTime:     &endTime,
+		}
+
+		req := ex.buildFromIdTradesRequest("BTCUSDT", options, nil)
+
+		// Check query parameters
+		params, err := req.GetParametersQuery()
+		assert.NoError(t, err)
+		assert.Equal(t, "btcusdt", params.Get("market"))
+		assert.Equal(t, "desc", params.Get("order"))
+		// Timestamp is in milliseconds
+		assert.Equal(t, strconv.FormatInt(endTime.UnixMilli(), 10), params.Get("timestamp"))
+		assert.Empty(t, params.Get("from_id"))
+	})
+
+	t.Run("lastTradeIsNilAndNoTimeSpecified", func(t *testing.T) {
+		options := &types.TradeQueryOptions{
+			LastTradeID: 12345,
+		}
+
+		req := ex.buildFromIdTradesRequest("BTCUSDT", options, nil)
+
+		// Check query parameters
+		params, err := req.GetParametersQuery()
+		assert.NoError(t, err)
+		assert.Equal(t, "btcusdt", params.Get("market"))
+		assert.Empty(t, params.Get("timestamp"))
+		assert.Empty(t, params.Get("from_id"))
+		assert.Empty(t, params.Get("order"))
+	})
+
+	t.Run("marginWalletCheckWalletType", func(t *testing.T) {
+		ex.MarginSettings.IsMargin = true
+		defer func() { ex.MarginSettings.IsMargin = false }()
+
+		startTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+		lastTradeTime := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+
+		lastTrade := &types.Trade{
+			ID:   12345,
+			Time: types.Time(lastTradeTime),
+		}
+
+		options := &types.TradeQueryOptions{
+			LastTradeID: 12345,
+			StartTime:   &startTime,
+		}
+
+		req := ex.buildFromIdTradesRequest("BTCUSDT", options, lastTrade)
+
+		// Check slug parameters (wallet type)
+		slugParams, err := req.GetSlugParameters()
+		assert.NoError(t, err)
+		// WalletType is a custom type, so compare as string
+		assert.Equal(t, "m", string(slugParams["walletType"].(maxapi.WalletType)))
+	})
 }
