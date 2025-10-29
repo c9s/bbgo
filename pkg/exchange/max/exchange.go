@@ -1104,6 +1104,7 @@ func (e *Exchange) prepareQueryTradesRequest(
 		// the caller try to query trades that are after the given trade ID
 		lastTrade, err := e.queryTradeByID(ctx, symbol, options.LastTradeID)
 		if err != nil {
+			log.WithError(err).Infof("failed to query last trade with id %d, fallback to time range query", options.LastTradeID)
 			// last trade not found, just use time range for query
 			if options.StartTime != nil {
 				req.Timestamp(*options.StartTime)
@@ -1116,12 +1117,14 @@ func (e *Exchange) prepareQueryTradesRequest(
 		}
 		if options.StartTime != nil && lastTrade.Time.After(*options.StartTime) {
 			// the last trade is after the given start time -> use from_id instead
+			log.Infof("the last trade %d time %s is after %s, use from_id for query", options.LastTradeID, lastTrade.Time, options.StartTime)
 			req.FromID(options.LastTradeID)
 			req.Order("asc")
 			return
 		}
 	}
 	// we can only use time range for query from here
+	log.Infof("query trades by time range: %+v", options)
 	if options.StartTime != nil {
 		req.Timestamp(*options.StartTime)
 		req.Order("asc")
