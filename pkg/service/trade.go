@@ -90,7 +90,7 @@ func (s *TradeService) Sync(
 		return nil
 	}
 
-	lastTradeID := uint64(1)
+	var lastTradeID *uint64
 	tasks := []SyncTask{
 		{
 			Type:   types.Trade{},
@@ -101,7 +101,7 @@ func (s *TradeService) Sync(
 				if len(trades) > 0 {
 					end := len(trades) - 1
 					last := trades[end]
-					lastTradeID = last.ID
+					lastTradeID = &last.ID
 				}
 				logger.Infof("on load: last trade ID: %d", lastTradeID)
 			},
@@ -109,12 +109,17 @@ func (s *TradeService) Sync(
 				query := &batch.TradeBatchQuery{
 					ExchangeTradeHistoryService: api,
 				}
-				logger.Infof("sync trades from %s to %s, lastTradeID: %d", startTime, endTime, lastTradeID)
-				return query.Query(ctx, symbol, &types.TradeQueryOptions{
-					StartTime:   &startTime,
-					EndTime:     &endTime,
-					LastTradeID: lastTradeID,
-				})
+				opts := types.TradeQueryOptions{
+					StartTime: &startTime,
+					EndTime:   &endTime,
+				}
+				if lastTradeID != nil {
+					opts.LastTradeID = *lastTradeID
+					logger.Infof("sync trades from %s to %s, lastTradeID: %d", startTime, endTime, opts.LastTradeID)
+				} else {
+					logger.Infof("sync trades from %s to %s", startTime, endTime)
+				}
+				return query.Query(ctx, symbol, &opts)
 			},
 			Time: func(obj interface{}) time.Time {
 				return obj.(types.Trade).Time.Time()
