@@ -303,24 +303,26 @@ func (e *Exchange) queryFuturesTrades(
 		req.Limit(1000)
 	}
 
-	// BINANCE uses inclusive last trade ID
-	if options.LastTradeID > 0 {
-		req.FromID(int64(options.LastTradeID))
-	}
-
 	// The parameter fromId cannot be sent with startTime or endTime.
 	// Mentioned in binance futures docs
-	if options.LastTradeID <= 0 {
-		if options.StartTime != nil && options.EndTime != nil {
-			if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
-				req.StartTime(options.StartTime.UnixMilli())
-				req.EndTime(options.EndTime.UnixMilli())
-			} else {
-				req.StartTime(options.StartTime.UnixMilli())
-			}
-		} else if options.EndTime != nil {
+	// According to the guideline of types.TradeQueryOptions, we prioritize startTime/endTime over LastTradeID
+	if options.StartTime != nil && options.EndTime != nil {
+		if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
+			req.StartTime(options.StartTime.UnixMilli())
 			req.EndTime(options.EndTime.UnixMilli())
+		} else {
+			req.StartTime(options.StartTime.UnixMilli())
 		}
+	} else if options.StartTime != nil {
+		req.StartTime(options.StartTime.UnixMilli())
+	} else if options.EndTime != nil {
+		req.EndTime(options.EndTime.UnixMilli())
+	} else if options.LastTradeID > 0 {
+		// BINANCE uses inclusive last trade ID
+		req.FromID(int64(options.LastTradeID))
+	}
+	if (options.StartTime != nil || options.EndTime != nil) && options.LastTradeID > 0 {
+		log.Warnf("both startTime/endTime and lastTradeID are set in TradeQueryOptions, lastTradeID will be ignored")
 	}
 
 	remoteTrades, err = req.Do(ctx)

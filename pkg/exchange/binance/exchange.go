@@ -1417,25 +1417,26 @@ func (e *Exchange) queryMarginTrades(
 		req.Limit(1000)
 	}
 
-	// BINANCE seems to have an API bug, we can't use both fromId and the start time/end time
 	// BINANCE uses inclusive last trade ID
-	if options.LastTradeID > 0 {
-		req.FromID(int64(options.LastTradeID))
-	} else {
-		if options.StartTime != nil && options.EndTime != nil {
-			if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
-				req.StartTime(options.StartTime.UnixMilli())
-				req.EndTime(options.EndTime.UnixMilli())
-			} else {
-				req.StartTime(options.StartTime.UnixMilli())
-			}
-		} else if options.StartTime != nil {
+	// BINANCE does not support setting both startTime/endTime and fromId simultaneously
+	// According to the guideline of types.TradeQueryOptions, we prioritize startTime/endTime over LastTradeID
+	if options.StartTime != nil && options.EndTime != nil {
+		if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
 			req.StartTime(options.StartTime.UnixMilli())
-		} else if options.EndTime != nil {
 			req.EndTime(options.EndTime.UnixMilli())
+		} else {
+			req.StartTime(options.StartTime.UnixMilli())
 		}
+	} else if options.StartTime != nil {
+		req.StartTime(options.StartTime.UnixMilli())
+	} else if options.EndTime != nil {
+		req.EndTime(options.EndTime.UnixMilli())
+	} else if options.LastTradeID > 0 {
+		req.FromID(int64(options.LastTradeID))
 	}
-
+	if (options.StartTime != nil || options.EndTime != nil) && options.LastTradeID > 0 {
+		log.Warnf("both startTime/endTime and lastTradeID are set in TradeQueryOptions, lastTradeID will be ignored")
+	}
 	remoteTrades, err = req.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -1460,22 +1461,27 @@ func (e *Exchange) querySpotTrades(
 	req := e.client2.NewGetMyTradesRequest()
 	req.Symbol(symbol)
 
-	// BINANCE uses inclusive last trade ID
-	if options.LastTradeID > 0 {
-		req.FromID(options.LastTradeID)
-	} else {
-		if options.StartTime != nil && options.EndTime != nil {
-			if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
-				req.StartTime(*options.StartTime)
-				req.EndTime(*options.EndTime)
-			} else {
-				req.StartTime(*options.StartTime)
-			}
-		} else if options.StartTime != nil {
+	// BINANCE does not support setting both startTime/endTime and fromId simultaneously
+	// startTime + endTime + fromId is not listed as supported parameter combination in the API doc.
+	// See: https://developers.binance.com/docs/binance-spot-api-docs/rest-api/account-endpoints#account-trade-list-user_data
+	// According to the guideline of types.TradeQueryOptions, we prioritize startTime/endTime over LastTradeID
+	if options.StartTime != nil && options.EndTime != nil {
+		if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
 			req.StartTime(*options.StartTime)
-		} else if options.EndTime != nil {
 			req.EndTime(*options.EndTime)
+		} else {
+			req.StartTime(*options.StartTime)
 		}
+	} else if options.StartTime != nil {
+		req.StartTime(*options.StartTime)
+	} else if options.EndTime != nil {
+		req.EndTime(*options.EndTime)
+	} else if options.LastTradeID > 0 {
+		// BINANCE uses inclusive last trade ID
+		req.FromID(options.LastTradeID)
+	}
+	if (options.StartTime != nil || options.EndTime != nil) && options.LastTradeID > 0 {
+		log.Warnf("both startTime/endTime and lastTradeID are set in TradeQueryOptions, lastTradeID will be ignored")
 	}
 
 	if options.Limit > 0 {
