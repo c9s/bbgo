@@ -26,6 +26,7 @@ type RiskController struct {
 type Strategy struct {
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
+	TradeStats  *types.TradeStats  `json:"tradeStats,omitempty" persistence:"trade_stats"`
 
 	parent, ctx context.Context
 	cancel      context.CancelFunc
@@ -54,6 +55,10 @@ func (s *Strategy) Initialize(
 		s.Position = types.NewPositionFromMarket(market)
 	}
 
+	if s.TradeStats == nil {
+		s.TradeStats = types.NewTradeStats(market.Symbol)
+	}
+
 	// Always update the position fields
 	s.Position.Strategy = strategyID
 	s.Position.StrategyInstanceID = instanceID
@@ -70,6 +75,7 @@ func (s *Strategy) Initialize(
 	s.OrderExecutor = bbgo.NewGeneralOrderExecutor(session, market.Symbol, strategyID, instanceID, s.Position)
 	s.OrderExecutor.BindEnvironment(environ)
 	s.OrderExecutor.BindProfitStats(s.ProfitStats)
+	s.OrderExecutor.BindTradeStats(s.TradeStats)
 	s.OrderExecutor.Bind()
 
 	if !s.PositionHardLimit.IsZero() && !s.MaxPositionQuantity.IsZero() {
