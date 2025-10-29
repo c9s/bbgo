@@ -1162,7 +1162,7 @@ func (e *Exchange) queryTradesByID(ctx context.Context, symbol string, tradeID u
 	}
 	req := e.v3client.NewGetWalletTradesRequest(walletType)
 	req.Market(market).Limit(1)
-	req.FromID(tradeID)
+	req.FromID(tradeID).Order("asc")
 	maxTrades, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
