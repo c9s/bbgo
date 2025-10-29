@@ -1057,20 +1057,18 @@ func (e *Exchange) QueryTrades(
 		req.Limit(1000)
 	}
 
-	// If we use start_time as parameter, MAX will ignore from_id.
-	// However, we want to use from_id as main parameter for batch.TradeBatchQuery
-	if options.LastTradeID > 0 {
+	// If we use timestamp as parameter, MAX will ignore from_id.
+	// And it also aligns with the guideline of types.TradeQueryOptions.
+	if options.StartTime != nil {
+		req.Timestamp(*options.StartTime)
+		req.Order("asc")
+	} else if options.EndTime != nil {
+		req.Timestamp(*options.EndTime)
+		req.Order("desc")
+	} else if options.LastTradeID > 0 {
 		// MAX uses inclusive last trade ID
 		req.FromID(options.LastTradeID)
 		req.Order("asc")
-	} else {
-		if options.StartTime != nil {
-			req.Timestamp(*options.StartTime)
-			req.Order("asc")
-		} else if options.EndTime != nil {
-			req.Timestamp(*options.EndTime)
-			req.Order("desc")
-		}
 	}
 
 	maxTrades, err := req.Do(ctx)
