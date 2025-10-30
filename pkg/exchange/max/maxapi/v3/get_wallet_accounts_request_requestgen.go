@@ -6,18 +6,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
+/*
+ * Currency sets
+ */
 func (g *GetWalletAccountsRequest) Currency(currency string) *GetWalletAccountsRequest {
 	g.currency = &currency
 	return g
 }
 
-func (g *GetWalletAccountsRequest) WalletType(walletType maxapi.WalletType) *GetWalletAccountsRequest {
+/*
+ * WalletType sets
+ */
+func (g *GetWalletAccountsRequest) WalletType(walletType WalletType) *GetWalletAccountsRequest {
 	g.walletType = walletType
 	return g
 }
@@ -29,6 +35,11 @@ func (g *GetWalletAccountsRequest) GetQueryParameters() (url.Values, error) {
 	if g.currency != nil {
 		currency := *g.currency
 
+		// TEMPLATE check-required
+		if len(currency) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of currency
 		params["currency"] = currency
 	} else {
@@ -36,7 +47,13 @@ func (g *GetWalletAccountsRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -88,9 +105,6 @@ func (g *GetWalletAccountsRequest) GetSlugParameters() (map[string]interface{}, 
 	walletType := g.walletType
 
 	// TEMPLATE check-required
-	if len(walletType) == 0 {
-		return nil, fmt.Errorf("walletType is required, empty string given")
-	}
 	// END TEMPLATE check-required
 
 	// assign parameter of walletType
@@ -99,9 +113,19 @@ func (g *GetWalletAccountsRequest) GetSlugParameters() (map[string]interface{}, 
 	return params, nil
 }
 
+var GetWalletAccountsRequestSlugReCache sync.Map
+
 func (g *GetWalletAccountsRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetWalletAccountsRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetWalletAccountsRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
@@ -145,7 +169,7 @@ func (g *GetWalletAccountsRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (g *GetWalletAccountsRequest) Do(ctx context.Context) ([]maxapi.Account, error) {
+func (g *GetWalletAccountsRequest) Do(ctx context.Context) ([]Account, error) {
 
 	// no body params
 	var params interface{}
@@ -174,7 +198,7 @@ func (g *GetWalletAccountsRequest) Do(ctx context.Context) ([]maxapi.Account, er
 		return nil, err
 	}
 
-	var apiResponse []maxapi.Account
+	var apiResponse []Account
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error
