@@ -208,6 +208,7 @@ func (s *StateMachine) processStateTransition(ctx context.Context, nextState Sta
 
 	if transitionMap, ok := s.stateTransitionFunc[s.state]; ok {
 		if transitionFunc, ok := transitionMap[nextState]; ok && transitionFunc != nil {
+			s.logger.Infof("executing transition function from state %d to %d", s.state, nextState)
 			if err, logLevel := transitionFunc(ctx); err != nil {
 				switch logLevel {
 				case LogLevelInfo:
@@ -226,6 +227,7 @@ func (s *StateMachine) processStateTransition(ctx context.Context, nextState Sta
 
 				return
 			} else {
+				s.logger.Info("state transition successful")
 				s.state = nextState
 			}
 		} else {
