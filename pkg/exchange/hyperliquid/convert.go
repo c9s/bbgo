@@ -67,7 +67,7 @@ func toLocalFuturesAsset(symbol string) string {
 			return localSymbol[at+1:]
 		}
 
-		log.Errorf("failed to convert symbol %s to local asset, but found in spotSymbolSyncMap", symbol)
+		log.Errorf("failed to convert symbol %s to local asset, but found in futuresSymbolSyncMaps", symbol)
 	}
 
 	log.Errorf("failed to look up local asset from %s", symbol)

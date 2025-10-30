@@ -3,6 +3,7 @@ package hyperliquid
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/hyperliquid/hyperapi"
@@ -54,6 +55,14 @@ func (e *Exchange) Name() types.ExchangeName {
 
 func (e *Exchange) PlatformFeeCurrency() string {
 	return HYPE
+}
+
+func (e *Exchange) Initialize(ctx context.Context) error {
+	if err := e.syncSymbolsToMap(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
@@ -145,4 +154,37 @@ func (e *Exchange) SupportedInterval() map[types.Interval]int {
 func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
 	_, ok := SupportedIntervals[interval]
 	return ok
+}
+
+func (e *Exchange) syncSymbolsToMap(ctx context.Context) error {
+	markets, err := e.QueryMarkets(ctx)
+	if err != nil {
+		return err
+	}
+
+	symbolMap := func() *sync.Map {
+		if e.IsFutures {
+			return &futuresSymbolSyncMap
+		}
+		return &spotSymbolSyncMap
+	}()
+
+	// Mark all valid symbols
+	existing := make(map[string]struct{}, len(markets))
+	for symbol, market := range markets {
+		symbolMap.Store(symbol, market.LocalSymbol)
+		existing[symbol] = struct{}{}
+	}
+
+	// Remove outdated symbols
+	symbolMap.Range(func(key, _ interface{}) bool {
+		if symbol, ok := key.(string); !ok || existing[symbol] == struct{}{} {
+			return true
+		} else if _, found := existing[symbol]; !found {
+			symbolMap.Delete(symbol)
+		}
+		return true
+	})
+
+	return nil
 }
