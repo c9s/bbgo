@@ -142,14 +142,17 @@ func (s *Strategy) cancelOpenPositionOrders(ctx context.Context) (error, LogLeve
 		}
 	}
 
+	s.logger.Infof("[DEBUG] active open-position orders: %+v", activeOpenPositionOrders)
 	if len(activeOpenPositionOrders) == 0 {
 		s.logger.Warn("no active open-position orders to update, nothing to do")
 		return nil, LogLevelNone
 	}
 
+	s.logger.Info("cancel active open-position orders")
 	if err := s.OrderExecutor.GracefulCancel(ctx, activeOpenPositionOrders...); err != nil {
 		return fmt.Errorf("failed to cancel active open-position orders: %w", err), LogLevelError
 	}
 
+	s.logger.Info("all active open-position orders canceled")
 	return nil, LogLevelNone
 }

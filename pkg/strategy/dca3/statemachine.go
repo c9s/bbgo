@@ -104,12 +104,23 @@ func (s *StateMachine) EmitNextState(state State) {
 func (s *StateMachine) GetState() State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	s.logger.Info("[DEBUG] lock on GetState")
+	defer func() {
+		s.logger.Info("[DEBUG] unlock on GetState")
+	}()
+
 	return s.state
 }
 
 func (s *StateMachine) UpdateState(state State) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	s.logger.Info("[DEBUG] lock on UpdateState")
+	defer func() {
+		s.logger.Info("[DEBUG] unlock on UpdateState")
+	}()
 
 	s.logger.Infof("update state from %d to %d", s.state, state)
 	s.state = state
@@ -147,6 +158,11 @@ func (s *StateMachine) RegisterTransitionHandler(from State, to State, fn Transi
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.logger.Info("[DEBUG] lock on RegisterTransitionHandler")
+	defer func() {
+		s.logger.Info("[DEBUG] unlock on RegisterTransitionHandler")
+	}()
+
 	if s.stateTransitionFunc == nil {
 		s.stateTransitionFunc = make(map[State]map[State]TransitionHandler)
 	}
@@ -159,6 +175,11 @@ func (s *StateMachine) RegisterTransitionHandler(from State, to State, fn Transi
 func (s *StateMachine) RegisterWarnFirstLoggers(from State, to State, logger *util.WarnFirstLogger) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	s.logger.Info("[DEBUG] lock on RegisterWarnFirstLoggers")
+	defer func() {
+		s.logger.Info("[DEBUG] unlock on RegisterWarnFirstLoggers")
+	}()
 
 	if s.warnFirstLoggers == nil {
 		s.warnFirstLoggers = make(map[State]map[State]*util.WarnFirstLogger)
@@ -206,8 +227,14 @@ func (s *StateMachine) processStateTransition(ctx context.Context, nextState Sta
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.logger.Info("[DEBUG] lock on processStateTransition")
+	defer func() {
+		s.logger.Info("[DEBUG] unlock on processStateTransition")
+	}()
+
 	if transitionMap, ok := s.stateTransitionFunc[s.state]; ok {
 		if transitionFunc, ok := transitionMap[nextState]; ok && transitionFunc != nil {
+			s.logger.Infof("[DEBUG] executing transition function from state %d to %d", s.state, nextState)
 			if err, logLevel := transitionFunc(ctx); err != nil {
 				switch logLevel {
 				case LogLevelInfo:
@@ -215,23 +242,24 @@ func (s *StateMachine) processStateTransition(ctx context.Context, nextState Sta
 				case LogLevelWarn:
 					s.logger.WithError(err).Warnf("failed to transition from state %d to %d", s.state, nextState)
 				case LogLevelWarnFirst:
-					if warnFirstLogger, ok := s.warnFirstLoggers[s.state][nextState]; ok {
-						warnFirstLogger.WarnOrError(err, "failed to transition from state %d to %d", s.state, nextState)
-					} else {
-						s.logger.WithError(err).Warnf("failed to transition from state %d to %d", s.state, nextState)
-					}
+					s.logger.WithError(err).Warnf("failed to transition from state %d to %d", s.state, nextState)
 				case LogLevelError:
 					s.logger.WithError(err).Errorf("failed to transition from state %d to %d", s.state, nextState)
+				default:
+					s.logger.WithError(err).Warnf("[DEBUG] failed to transition from state %d to %d", s.state, nextState)
 				}
 
 				return
-			} else {
-				s.state = nextState
 			}
-		} else {
-			s.logger.Warnf("no transition function defined from state %d to %d", s.state, nextState)
+
+			s.logger.Info("[DEBUG] state transition successful")
+			s.state = nextState
+			return
 		}
-	} else {
-		s.logger.Warnf("no transition functions defined for current state %d", s.state)
+
+		s.logger.Warnf("no transition function defined from state %d to %d", s.state, nextState)
+		return
 	}
+
+	s.logger.Warnf("no transition functions defined for current state %d", s.state)
 }
