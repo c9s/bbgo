@@ -444,7 +444,11 @@ func convertWsUserTrade(ut *bfxapi.TradeUpdateEvent) *types.Trade {
 		Symbol:   toGlobalSymbol(ut.Symbol),
 		Price:    ut.ExecPrice,
 		Quantity: ut.ExecAmount.Abs(),
-		Side:     toGlobalSide(ut.ExecAmount),
+
+		QuoteQuantity: ut.ExecAmount.Abs().Mul(ut.ExecPrice),
+
+		Side: toGlobalSide(ut.ExecAmount),
+
 		Fee: func() fixedpoint.Value {
 			if ut.Fee != nil {
 				return *ut.Fee
