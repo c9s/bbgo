@@ -6,17 +6,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
+/*
+ * Id sets
+ */
 func (c *CancelOrderRequest) Id(id uint64) *CancelOrderRequest {
 	c.id = &id
 	return c
 }
 
+/*
+ * ClientOrderID sets
+ */
 func (c *CancelOrderRequest) ClientOrderID(clientOrderID string) *CancelOrderRequest {
 	c.clientOrderID = &clientOrderID
 	return c
@@ -28,7 +34,13 @@ func (c *CancelOrderRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if c.isVarSlice(_v) {
+			c.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -41,6 +53,20 @@ func (c *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if c.id != nil {
 		id := *c.id
 
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
+
+		// TEMPLATE check-valid-values
+		switch id {
+		case reqCount:
+			params["id"] = id
+
+		default:
+			return nil, fmt.Errorf("id value %v is invalid", id)
+
+		}
+		// END TEMPLATE check-valid-values
+
 		// assign parameter of id
 		params["id"] = id
 	} else {
@@ -48,6 +74,11 @@ func (c *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check clientOrderID field -> json key client_oid
 	if c.clientOrderID != nil {
 		clientOrderID := *c.clientOrderID
+
+		// TEMPLATE check-required
+		if len(clientOrderID) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of clientOrderID
 		params["client_oid"] = clientOrderID
@@ -96,9 +127,19 @@ func (c *CancelOrderRequest) GetSlugParameters() (map[string]interface{}, error)
 	return params, nil
 }
 
+var CancelOrderRequestSlugReCache sync.Map
+
 func (c *CancelOrderRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := CancelOrderRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			CancelOrderRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
@@ -142,7 +183,7 @@ func (c *CancelOrderRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (c *CancelOrderRequest) Do(ctx context.Context) (*maxapi.Order, error) {
+func (c *CancelOrderRequest) Do(ctx context.Context) (*Order, error) {
 
 	params, err := c.GetParameters()
 	if err != nil {
@@ -164,7 +205,7 @@ func (c *CancelOrderRequest) Do(ctx context.Context) (*maxapi.Order, error) {
 		return nil, err
 	}
 
-	var apiResponse maxapi.Order
+	var apiResponse Order
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error

@@ -6,53 +6,80 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
+/*
+ * Market sets
+ */
 func (c *CreateWalletOrderRequest) Market(market string) *CreateWalletOrderRequest {
 	c.market = market
 	return c
 }
 
+/*
+ * Side sets
+ */
 func (c *CreateWalletOrderRequest) Side(side string) *CreateWalletOrderRequest {
 	c.side = side
 	return c
 }
 
+/*
+ * Volume sets
+ */
 func (c *CreateWalletOrderRequest) Volume(volume string) *CreateWalletOrderRequest {
 	c.volume = volume
 	return c
 }
 
-func (c *CreateWalletOrderRequest) OrderType(orderType maxapi.OrderType) *CreateWalletOrderRequest {
+/*
+ * OrderType sets
+ */
+func (c *CreateWalletOrderRequest) OrderType(orderType OrderType) *CreateWalletOrderRequest {
 	c.orderType = orderType
 	return c
 }
 
+/*
+ * Price sets
+ */
 func (c *CreateWalletOrderRequest) Price(price string) *CreateWalletOrderRequest {
 	c.price = &price
 	return c
 }
 
+/*
+ * StopPrice sets
+ */
 func (c *CreateWalletOrderRequest) StopPrice(stopPrice string) *CreateWalletOrderRequest {
 	c.stopPrice = &stopPrice
 	return c
 }
 
+/*
+ * ClientOrderID sets
+ */
 func (c *CreateWalletOrderRequest) ClientOrderID(clientOrderID string) *CreateWalletOrderRequest {
 	c.clientOrderID = &clientOrderID
 	return c
 }
 
+/*
+ * GroupID sets
+ */
 func (c *CreateWalletOrderRequest) GroupID(groupID string) *CreateWalletOrderRequest {
 	c.groupID = &groupID
 	return c
 }
 
-func (c *CreateWalletOrderRequest) WalletType(walletType maxapi.WalletType) *CreateWalletOrderRequest {
+/*
+ * WalletType sets
+ */
+func (c *CreateWalletOrderRequest) WalletType(walletType WalletType) *CreateWalletOrderRequest {
 	c.walletType = walletType
 	return c
 }
@@ -63,7 +90,13 @@ func (c *CreateWalletOrderRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if c.isVarSlice(_v) {
+			c.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -108,11 +141,19 @@ func (c *CreateWalletOrderRequest) GetParameters() (map[string]interface{}, erro
 	// check orderType field -> json key ord_type
 	orderType := c.orderType
 
+	// TEMPLATE check-required
+	// END TEMPLATE check-required
+
 	// assign parameter of orderType
 	params["ord_type"] = orderType
 	// check price field -> json key price
 	if c.price != nil {
 		price := *c.price
+
+		// TEMPLATE check-required
+		if len(price) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of price
 		params["price"] = price
@@ -122,6 +163,11 @@ func (c *CreateWalletOrderRequest) GetParameters() (map[string]interface{}, erro
 	if c.stopPrice != nil {
 		stopPrice := *c.stopPrice
 
+		// TEMPLATE check-required
+		if len(stopPrice) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of stopPrice
 		params["stop_price"] = stopPrice
 	} else {
@@ -130,6 +176,11 @@ func (c *CreateWalletOrderRequest) GetParameters() (map[string]interface{}, erro
 	if c.clientOrderID != nil {
 		clientOrderID := *c.clientOrderID
 
+		// TEMPLATE check-required
+		if len(clientOrderID) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of clientOrderID
 		params["client_oid"] = clientOrderID
 	} else {
@@ -137,6 +188,11 @@ func (c *CreateWalletOrderRequest) GetParameters() (map[string]interface{}, erro
 	// check groupID field -> json key group_id
 	if c.groupID != nil {
 		groupID := *c.groupID
+
+		// TEMPLATE check-required
+		if len(groupID) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of groupID
 		params["group_id"] = groupID
@@ -185,9 +241,6 @@ func (c *CreateWalletOrderRequest) GetSlugParameters() (map[string]interface{}, 
 	walletType := c.walletType
 
 	// TEMPLATE check-required
-	if len(walletType) == 0 {
-		return nil, fmt.Errorf("walletType is required, empty string given")
-	}
 	// END TEMPLATE check-required
 
 	// assign parameter of walletType
@@ -196,9 +249,19 @@ func (c *CreateWalletOrderRequest) GetSlugParameters() (map[string]interface{}, 
 	return params, nil
 }
 
+var CreateWalletOrderRequestSlugReCache sync.Map
+
 func (c *CreateWalletOrderRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := CreateWalletOrderRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			CreateWalletOrderRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
@@ -242,7 +305,7 @@ func (c *CreateWalletOrderRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (c *CreateWalletOrderRequest) Do(ctx context.Context) (*maxapi.Order, error) {
+func (c *CreateWalletOrderRequest) Do(ctx context.Context) (*Order, error) {
 
 	params, err := c.GetParameters()
 	if err != nil {
@@ -270,7 +333,7 @@ func (c *CreateWalletOrderRequest) Do(ctx context.Context) (*maxapi.Order, error
 		return nil, err
 	}
 
-	var apiResponse maxapi.Order
+	var apiResponse Order
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error

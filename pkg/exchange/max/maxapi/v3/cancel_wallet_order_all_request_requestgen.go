@@ -6,28 +6,40 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
+/*
+ * Side sets
+ */
 func (c *CancelWalletOrderAllRequest) Side(side string) *CancelWalletOrderAllRequest {
 	c.side = &side
 	return c
 }
 
+/*
+ * Market sets
+ */
 func (c *CancelWalletOrderAllRequest) Market(market string) *CancelWalletOrderAllRequest {
 	c.market = &market
 	return c
 }
 
+/*
+ * GroupID sets
+ */
 func (c *CancelWalletOrderAllRequest) GroupID(groupID uint32) *CancelWalletOrderAllRequest {
 	c.groupID = &groupID
 	return c
 }
 
-func (c *CancelWalletOrderAllRequest) WalletType(walletType maxapi.WalletType) *CancelWalletOrderAllRequest {
+/*
+ * WalletType sets
+ */
+func (c *CancelWalletOrderAllRequest) WalletType(walletType WalletType) *CancelWalletOrderAllRequest {
 	c.walletType = walletType
 	return c
 }
@@ -38,7 +50,13 @@ func (c *CancelWalletOrderAllRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if c.isVarSlice(_v) {
+			c.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -51,6 +69,11 @@ func (c *CancelWalletOrderAllRequest) GetParameters() (map[string]interface{}, e
 	if c.side != nil {
 		side := *c.side
 
+		// TEMPLATE check-required
+		if len(side) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of side
 		params["side"] = side
 	} else {
@@ -59,6 +82,11 @@ func (c *CancelWalletOrderAllRequest) GetParameters() (map[string]interface{}, e
 	if c.market != nil {
 		market := *c.market
 
+		// TEMPLATE check-required
+		if len(market) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of market
 		params["market"] = market
 	} else {
@@ -66,6 +94,9 @@ func (c *CancelWalletOrderAllRequest) GetParameters() (map[string]interface{}, e
 	// check groupID field -> json key group_id
 	if c.groupID != nil {
 		groupID := *c.groupID
+
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
 
 		// assign parameter of groupID
 		params["group_id"] = groupID
@@ -114,9 +145,6 @@ func (c *CancelWalletOrderAllRequest) GetSlugParameters() (map[string]interface{
 	walletType := c.walletType
 
 	// TEMPLATE check-required
-	if len(walletType) == 0 {
-		return nil, fmt.Errorf("walletType is required, empty string given")
-	}
 	// END TEMPLATE check-required
 
 	// assign parameter of walletType
@@ -125,9 +153,19 @@ func (c *CancelWalletOrderAllRequest) GetSlugParameters() (map[string]interface{
 	return params, nil
 }
 
+var CancelWalletOrderAllRequestSlugReCache sync.Map
+
 func (c *CancelWalletOrderAllRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := CancelWalletOrderAllRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			CancelWalletOrderAllRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
