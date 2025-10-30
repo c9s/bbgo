@@ -13,10 +13,11 @@ type SignatureResult struct {
 type ReqTypeInfo string
 
 const (
-	ReqMeta        ReqTypeInfo = "meta"
-	ReqSpotMeta    ReqTypeInfo = "spotMeta"
-	ReqSubmitOrder ReqTypeInfo = "order"
-	ReqCancelOrder ReqTypeInfo = "cancel"
+	ReqMeta           ReqTypeInfo = "meta"
+	ReqSpotMeta       ReqTypeInfo = "spotMeta"
+	ReqSubmitOrder    ReqTypeInfo = "order"
+	ReqCancelOrder    ReqTypeInfo = "cancel"
+	ReqCandleSnapshot ReqTypeInfo = "candleSnapshot"
 )
 
 type TimeInForce string
