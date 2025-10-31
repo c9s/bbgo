@@ -161,6 +161,11 @@ func (c *Client) PhantomAgent(hash []byte) map[string]any {
 	}
 }
 
+func (c *Client) UserAddress() string {
+	address := crypto.PubkeyToAddress(c.privateKey.PublicKey)
+	return address.Hex()
+}
+
 func (c *Client) sign(typedData apitypes.TypedData, privateKey *ecdsa.PrivateKey) (SignatureResult, error) {
 	// Create EIP-712 hash
 	domainSeparator, err := typedData.HashStruct("EIP712Domain", typedData.Domain.Map())
