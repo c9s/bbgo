@@ -47,6 +47,8 @@ type Strategy struct {
 	logger        logrus.FieldLogger
 	metricsLabels prometheus.Labels
 
+	premiumSession, baseSession, tradingSession *bbgo.ExchangeSession
+
 	// runtime fields
 	premiumBook *types.StreamOrderBook
 	baseBook    *types.StreamOrderBook
@@ -145,32 +147,35 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
 	// Defaults() and Validate() should have been called prior to CrossRun,
 	// so we assume required fields are populated here.
-	premiumSession, ok := sessions[s.PremiumSession]
+	ok := false
+	s.premiumSession, ok = sessions[s.PremiumSession]
 	if !ok {
 		return fmt.Errorf("premium session %s not found", s.PremiumSession)
 	}
-	baseSession, ok := sessions[s.BaseSession]
+
+	s.baseSession, ok = sessions[s.BaseSession]
 	if !ok {
 		return fmt.Errorf("base session %s not found", s.BaseSession)
 	}
-	tradingSession, ok := sessions[s.TradingSession]
+
+	s.tradingSession, ok = sessions[s.TradingSession]
 	if !ok {
 		return fmt.Errorf("trading session %s not found", s.TradingSession)
 	}
 	tradingSymbol := s.TradingSymbol
 
 	// initialize common.Strategy with trading session and market to use Position, ProfitStats and GeneralOrderExecutor
-	tradingMarket, ok := tradingSession.Market(tradingSymbol)
+	tradingMarket, ok := s.tradingSession.Market(tradingSymbol)
 	if !ok {
 		return fmt.Errorf("trading session market %s is not defined", tradingSymbol)
 	}
 
 	// Initialize the core strategy components (Position, ProfitStats, GeneralOrderExecutor)
-	s.Strategy.Initialize(ctx, s.Environment, tradingSession, tradingMarket, ID, s.InstanceID())
+	s.Strategy.Initialize(ctx, s.Environment, s.tradingSession, tradingMarket, ID, s.InstanceID())
 
 	// set leverage if configured and supported
 	if s.Leverage > 0 {
-		if riskSvc, ok := tradingSession.Exchange.(types.ExchangeRiskService); ok {
+		if riskSvc, ok := s.tradingSession.Exchange.(types.ExchangeRiskService); ok {
 			if err := riskSvc.SetLeverage(ctx, tradingSymbol, s.Leverage); err != nil {
 				s.logger.WithError(err).Warnf("failed to set leverage to %d on %s", s.Leverage, tradingSymbol)
 			} else {
@@ -182,12 +187,12 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 
 	// allocate isolated public streams for books and bind StreamBooks
-	premiumStream := bbgo.NewBookStream(premiumSession, s.PremiumSymbol)
-	baseStream := bbgo.NewBookStream(baseSession, s.BaseSymbol)
+	premiumStream := bbgo.NewBookStream(s.premiumSession, s.PremiumSymbol)
+	baseStream := bbgo.NewBookStream(s.baseSession, s.BaseSymbol)
 	s.premiumStream, s.baseStream = premiumStream, baseStream
 
-	s.premiumBook = types.NewStreamBook(s.PremiumSymbol, premiumSession.ExchangeName)
-	s.baseBook = types.NewStreamBook(s.BaseSymbol, baseSession.ExchangeName)
+	s.premiumBook = types.NewStreamBook(s.PremiumSymbol, s.premiumSession.ExchangeName)
+	s.baseBook = types.NewStreamBook(s.BaseSymbol, s.baseSession.ExchangeName)
 	s.premiumBook.BindStream(premiumStream)
 	s.baseBook.BindStream(baseStream)
 
@@ -202,9 +207,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	// wait for both sessions' user data streams to be authenticated before starting the premium worker
 	group := types.NewConnectivityGroup(
-		premiumSession.UserDataConnectivity,
-		baseSession.UserDataConnectivity,
+		s.premiumSession.UserDataConnectivity,
+		s.baseSession.UserDataConnectivity,
 	)
+
 	go func() {
 		s.logger.Infof("waiting for authentication of premium and base sessions...")
 		select {
@@ -212,6 +218,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 			return
 		case <-group.AllAuthedC(ctx):
 		}
+
 		s.logger.Infof("both premium and base sessions authenticated, starting premium worker")
 
 		s.premiumWorker(ctx)
@@ -280,4 +287,21 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 			}).Debug("premium update")
 		}
 	}
+}
+
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	session.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: "1m"})
+}
+
+// Run is only used for back-testing with single session
+func (s *Strategy) Run(ctx context.Context, session *bbgo.ExchangeSession) error {
+	s.premiumSession = session
+	s.baseSession = session
+	s.tradingSession = session
+
+	session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
+
+	})
+
+	return nil
 }
