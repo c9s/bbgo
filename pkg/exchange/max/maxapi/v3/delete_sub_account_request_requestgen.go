@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
 /*
@@ -94,9 +95,19 @@ func (d *DeleteSubAccountRequest) GetSlugParameters() (map[string]interface{}, e
 	return params, nil
 }
 
+var DeleteSubAccountRequestSlugReCache sync.Map
+
 func (d *DeleteSubAccountRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := DeleteSubAccountRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			DeleteSubAccountRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 

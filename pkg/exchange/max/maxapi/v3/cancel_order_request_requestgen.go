@@ -56,17 +56,6 @@ func (c *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// TEMPLATE check-required
 		// END TEMPLATE check-required
 
-		// TEMPLATE check-valid-values
-		switch id {
-		case reqCount:
-			params["id"] = id
-
-		default:
-			return nil, fmt.Errorf("id value %v is invalid", id)
-
-		}
-		// END TEMPLATE check-valid-values
-
 		// assign parameter of id
 		params["id"] = id
 	} else {

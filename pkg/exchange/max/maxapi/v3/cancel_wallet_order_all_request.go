@@ -6,7 +6,7 @@ import "github.com/c9s/requestgen"
 //go:generate -command PostRequest requestgen -method POST
 //go:generate -command DeleteRequest requestgen -method DELETE
 
-//go:generate DeleteRequest -url "/api/v3/wallet/:walletType/orders" -type CancelWalletOrderAllRequest -responseType []OrderCancelResponse
+//go:generate DeleteRequest -url "/api/v3/wallet/:walletType/orders" -type CancelWalletOrderAllRequest -responseType []OrderCancelResponse -debug
 type CancelWalletOrderAllRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
