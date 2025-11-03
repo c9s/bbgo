@@ -179,10 +179,14 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	assert.NoError(t, err)
 
 	// the connectivity waiting is blocking, so we need to run it in a goroutine
+
 	go func() {
 		err := syn.Start(ctx)
 		assert.NoError(t, err)
 	}()
+
+	syn.fiatMarket.connectivity.EmitConnect()
+	syn.sourceMarket.connectivity.EmitConnect()
 
 	submitOrder := types.SubmitOrder{
 		Market:           sourceMarket,
