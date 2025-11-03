@@ -439,9 +439,6 @@ func (s *Strategy) decideSignal(premium, discount float64) types.SideType {
 // - LONG: use previous low
 // - SHORT: use previous high
 func (s *Strategy) findStopPrice(ctx context.Context, side types.SideType, now time.Time) (fixedpoint.Value, error) {
-	interval := types.Interval15m
-	end := now
-
 	safetyDown := fixedpoint.One.Sub(s.StopLossSafetyRatio) // e.g., 1 - r
 	safetyUp := fixedpoint.One.Add(s.StopLossSafetyRatio)   // e.g., 1 + r
 
@@ -457,27 +454,21 @@ func (s *Strategy) findStopPrice(ctx context.Context, side types.SideType, now t
 		}
 	}
 
-	// request recent klines; many exchanges honor Limit
-	klines, err := s.tradingSession.Exchange.QueryKLines(ctx, s.TradingSymbol, interval, types.KLineQueryOptions{
-		EndTime: &end,
-		Limit:   15,
-	})
-
-	if err != nil || len(klines) == 0 {
-		return fixedpoint.Zero, fmt.Errorf("query 15m klines error: %w", err)
+	if s.kLines.Length() == 0 {
+		return fixedpoint.Zero, fmt.Errorf("no 15m klines available for stop loss calculation")
 	}
 
-	if klines[0].EndTime.Time().Compare(now) > 0 {
-		return fixedpoint.Zero, fmt.Errorf("the first kline closed after now %s > %s", klines[0].EndTime.Time(), now)
-	}
+	lastK := s.kLines.Last(0)
 
-	kw := types.KLineWindow(klines)
+	if lastK.EndTime.Time().Compare(now) > 0 {
+		return fixedpoint.Zero, fmt.Errorf("the first kline closed after now %s > %s", lastK.EndTime.Time(), now)
+	}
 
 	if side == types.SideTypeBuy {
-		return kw.GetLow().Mul(safetyDown), nil
+		return lastK.Low.Mul(safetyDown), nil
 	}
 
-	return kw.GetHigh().Mul(safetyUp), nil
+	return lastK.High.Mul(safetyUp), nil
 }
 
 // calculatePositionSize sizes order using MaxLossLimit and stop loss like tradingdesk
