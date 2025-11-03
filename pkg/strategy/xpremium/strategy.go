@@ -46,6 +46,13 @@ type EngulfingTakeProfitConfig struct {
 	BottomShadowMaxRatio fixedpoint.Value `json:"bottomShadowMaxRatio"`
 }
 
+type PivotStopConfig struct {
+	Enabled  bool           `json:"enabled"`
+	Interval types.Interval `json:"interval"`
+	Left     int            `json:"left"`
+	Right    int            `json:"right"`
+}
+
 type Strategy struct {
 	*common.Strategy
 
@@ -89,6 +96,8 @@ type Strategy struct {
 
 	// EngulfingTakeProfit is an optional take-profit rule triggered by 1h Engulfing pattern
 	EngulfingTakeProfit *EngulfingTakeProfitConfig `json:"engulfingTakeProfit,omitempty"`
+
+	PivotStop *PivotStopConfig `json:"pivotStop,omitempty"`
 
 	BacktestConfig *BacktestConfig `json:"backtest,omitempty"`
 
@@ -186,6 +195,26 @@ func (s *Strategy) Defaults() error {
 	// default stop loss safety ratio to 1%
 	if s.StopLossSafetyRatio.IsZero() {
 		s.StopLossSafetyRatio = fixedpoint.NewFromFloat(0.01)
+	}
+
+	if s.PivotStop == nil {
+		s.PivotStop = &PivotStopConfig{
+			Enabled:  false,
+			Interval: types.Interval15m,
+			Left:     10,
+			Right:    10,
+		}
+	} else if s.PivotStop.Enabled {
+		if s.PivotStop.Interval == "" {
+			s.PivotStop.Interval = types.Interval15m
+		}
+		if s.PivotStop.Left == 0 {
+			s.PivotStop.Left = 10
+		}
+
+		if s.PivotStop.Right == 0 {
+			s.PivotStop.Right = 10
+		}
 	}
 
 	// defaults for engulfing take profit
@@ -307,9 +336,9 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	// Initialize the core strategy components (Position, ProfitStats, GeneralOrderExecutor)
 	s.Strategy.Initialize(ctx, s.Environment, s.tradingSession, tradingMarket, ID, s.InstanceID())
 
-	s.pvLow = indicatorv2.PivotLow(s.tradingSession.Indicators(s.TradingSymbol).LOW(types.Interval15m), 10, 10)
-	s.pvHigh = indicatorv2.PivotHigh(s.tradingSession.Indicators(s.TradingSymbol).HIGH(types.Interval15m), 10, 10)
-	s.kLines = s.premiumSession.Indicators(s.PremiumSymbol).KLines(types.Interval15m)
+	s.pvLow = indicatorv2.PivotLow(s.tradingSession.Indicators(s.TradingSymbol).LOW(s.PivotStop.Interval), s.PivotStop.Left, s.PivotStop.Right)
+	s.pvHigh = indicatorv2.PivotHigh(s.tradingSession.Indicators(s.TradingSymbol).HIGH(s.PivotStop.Interval), s.PivotStop.Left, s.PivotStop.Right)
+	s.kLines = s.tradingSession.Indicators(s.TradingSymbol).KLines(s.PivotStop.Interval)
 
 	// set leverage if configured and supported
 	if s.MaxLeverage > 0 {
@@ -1028,9 +1057,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.tradingMarket = market
 	s.Strategy.Initialize(ctx, s.Environment, session, market, ID, s.InstanceID())
 
-	s.pvLow = indicatorv2.PivotLow(s.premiumSession.Indicators(s.PremiumSymbol).LOW(types.Interval15m), 10, 10)
-	s.pvHigh = indicatorv2.PivotHigh(s.premiumSession.Indicators(s.PremiumSymbol).HIGH(types.Interval15m), 10, 10)
-	s.kLines = s.premiumSession.Indicators(s.PremiumSymbol).KLines(types.Interval15m)
+	s.pvLow = indicatorv2.PivotLow(s.premiumSession.Indicators(s.PremiumSymbol).LOW(s.PivotStop.Interval), s.PivotStop.Left, s.PivotStop.Right)
+	s.pvHigh = indicatorv2.PivotHigh(s.premiumSession.Indicators(s.PremiumSymbol).HIGH(s.PivotStop.Interval), s.PivotStop.Left, s.PivotStop.Right)
+	s.kLines = s.premiumSession.Indicators(s.PremiumSymbol).KLines(s.PivotStop.Interval)
 
 	// load csv if configured
 	if s.BacktestConfig == nil || s.BacktestConfig.BidAskPriceCsv == "" {
