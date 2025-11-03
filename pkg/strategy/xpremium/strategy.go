@@ -39,6 +39,13 @@ type backtestBidAsk struct {
 	premiumAsk, premiumBid fixedpoint.Value
 }
 
+type EngulfingTakeProfitConfig struct {
+	Enabled              bool             `json:"enabled"`
+	Interval             types.Interval   `json:"interval"`
+	BodyMultiple         fixedpoint.Value `json:"bodyMultiple"`
+	BottomShadowMaxRatio fixedpoint.Value `json:"bottomShadowMaxRatio"`
+}
+
 type Strategy struct {
 	*common.Strategy
 
@@ -79,6 +86,9 @@ type Strategy struct {
 	// StopLossSafetyRatio is the adjustment ratio applied to previous pivot for stop loss
 	// For long: stop = prevLow * (1 - ratio); for short: stop = prevHigh * (1 + ratio)
 	StopLossSafetyRatio fixedpoint.Value `json:"stopLossSafetyRatio"`
+
+	// EngulfingTakeProfit is an optional take-profit rule triggered by 1h Engulfing pattern
+	EngulfingTakeProfit *EngulfingTakeProfitConfig `json:"engulfingTakeProfit,omitempty"`
 
 	BacktestConfig *BacktestConfig `json:"backtest,omitempty"`
 
@@ -177,6 +187,31 @@ func (s *Strategy) Defaults() error {
 		s.StopLossSafetyRatio = fixedpoint.NewFromFloat(0.01)
 	}
 
+	// defaults for engulfing take profit
+	if s.EngulfingTakeProfit == nil {
+		// initialize with sensible defaults; remains disabled unless explicitly enabled
+		s.EngulfingTakeProfit = &EngulfingTakeProfitConfig{
+			Enabled:              false,
+			Interval:             types.Interval1h,
+			BodyMultiple:         fixedpoint.NewFromFloat(1.0),
+			BottomShadowMaxRatio: fixedpoint.Zero, // disabled by default
+		}
+	} else {
+		if s.EngulfingTakeProfit.Interval == "" {
+			s.EngulfingTakeProfit.Interval = types.Interval1h
+		}
+
+		if s.EngulfingTakeProfit.BodyMultiple.IsZero() {
+			// default: at least the same size as previous body
+			s.EngulfingTakeProfit.BodyMultiple = fixedpoint.NewFromFloat(1.0)
+		}
+
+		// default bottom shadow max ratio to 0 (disabled) if not provided or negative
+		if s.EngulfingTakeProfit.BottomShadowMaxRatio.Sign() < 0 {
+			s.EngulfingTakeProfit.BottomShadowMaxRatio = fixedpoint.Zero
+		}
+	}
+
 	return nil
 }
 
@@ -211,11 +246,30 @@ func (s *Strategy) Validate() error {
 	if s.StopLossSafetyRatio.Sign() < 0 {
 		return fmt.Errorf("stopLossSafetyRatio must be >= 0")
 	}
+
+	if s.EngulfingTakeProfit != nil {
+		if s.EngulfingTakeProfit.BodyMultiple.Sign() < 0 {
+			return fmt.Errorf("engulfingTakeProfit.bodyMultiple must be >= 0")
+		}
+		if s.EngulfingTakeProfit.BottomShadowMaxRatio.Sign() < 0 {
+			return fmt.Errorf("engulfingTakeProfit.bottomShadowMaxRatio must be >= 0")
+		}
+	}
 	return nil
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
+	// subscribe klines for engulfing take-profit detection if enabled
+	if s.EngulfingTakeProfit != nil && s.EngulfingTakeProfit.Enabled {
+		interval := s.EngulfingTakeProfit.Interval
+		if interval == "" {
+			interval = types.Interval1h
+		}
 
+		if session, ok := sessions[s.PremiumSession]; ok {
+			session.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: interval})
+		}
+	}
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
@@ -263,6 +317,14 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		} else {
 			s.logger.Infof("exchange of trading session %s does not support leverage API", s.TradingSession)
 		}
+	}
+
+	// register engulfing take-profit handler on kline close
+	if s.EngulfingTakeProfit != nil && s.EngulfingTakeProfit.Enabled {
+		interval := s.EngulfingTakeProfit.Interval
+		s.premiumSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.PremiumSymbol, interval, func(k types.KLine) {
+			s.maybeEngulfingTakeProfit(ctx, k)
+		}))
 	}
 
 	// allocate isolated public streams for books and bind StreamBooks
@@ -578,8 +640,8 @@ func (s *Strategy) executeSignal(ctx context.Context, side types.SideType, now t
 	return nil
 }
 
-// maybeTakeProfit checks if the current position ROI reaches 3% and closes the position
-func (s *Strategy) maybeTakeProfit(ctx context.Context, latestPrice fixedpoint.Value) (bool, error) {
+// maybeRoiTakeProfit checks if the current position ROI reaches 3% and closes the position
+func (s *Strategy) maybeRoiTakeProfit(ctx context.Context, latestPrice fixedpoint.Value) (bool, error) {
 	if s.Position == nil || s.OrderExecutor == nil {
 		return false, nil
 	}
@@ -614,6 +676,157 @@ func (s *Strategy) maybeTakeProfit(ctx context.Context, latestPrice fixedpoint.V
 	return false, nil
 }
 
+// isBearishEngulfing checks if current (c) kline forms a bearish engulfing over previous (p)
+// Conditions:
+// 1) c is bearish (c.Close < c.Open)
+// 2) Body(c) >= Body(p) * cfg.BodyMultiple (if BodyMultiple == 0, skip this check)
+// 3) c.Close < p.Low (close below previous low)
+// 4) bottom shadow ratio of c <= cfg.BottomShadowMaxRatio (if > 0)
+func (s *Strategy) isBearishEngulfing(p, c types.KLine, cfg *EngulfingTakeProfitConfig) bool {
+	if cfg == nil || !cfg.Enabled {
+		return false
+	}
+	// ensure interval match if provided
+	if cfg.Interval != "" && c.Interval != cfg.Interval {
+		return false
+	}
+
+	if !(c.GetClose().Compare(c.GetOpen()) < 0) {
+		return false
+	}
+
+	bodyPrev := p.GetClose().Sub(p.GetOpen()).Abs()
+	bodyCurr := c.GetOpen().Sub(c.GetClose()).Abs()
+	if cfg.BodyMultiple.Sign() > 0 {
+		if bodyPrev.Sign() == 0 {
+			return false
+		}
+		req := bodyPrev.Mul(cfg.BodyMultiple)
+		if bodyCurr.Compare(req) < 0 {
+			return false
+		}
+	}
+	if !(c.GetClose().Compare(p.GetLow()) < 0) {
+		return false
+	}
+
+	if cfg.BottomShadowMaxRatio.Sign() > 0 {
+		// bottom shadow ratio ~ (close - low) / close for bearish bar
+		den := c.GetClose()
+		if den.Sign() == 0 {
+			return false
+		}
+		shadow := c.GetClose().Sub(c.GetLow()).Div(den)
+		if shadow.Compare(cfg.BottomShadowMaxRatio) > 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isBullishEngulfing checks if current (c) kline forms a bullish engulfing over previous (p)
+// Conditions:
+// 1) c is bullish (c.Close > c.Open)
+// 2) Body(c) >= Body(p) * cfg.BodyMultiple (if BodyMultiple == 0, skip this check)
+// 3) c.Close > p.High (close above previous high)
+// 4) optional upper shadow ratio check using cfg.BottomShadowMaxRatio as cap (if > 0)
+func (s *Strategy) isBullishEngulfing(p, c types.KLine, cfg *EngulfingTakeProfitConfig) bool {
+	if cfg == nil || !cfg.Enabled {
+		return false
+	}
+	if cfg.Interval != "" && c.Interval != cfg.Interval {
+		return false
+	}
+
+	if !(c.GetClose().Compare(c.GetOpen()) > 0) {
+		return false
+	}
+
+	bodyPrev := p.GetClose().Sub(p.GetOpen()).Abs()
+	bodyCurr := c.GetClose().Sub(c.GetOpen()).Abs()
+	if cfg.BodyMultiple.Sign() > 0 {
+		if bodyPrev.Sign() == 0 {
+			return false
+		}
+		req := bodyPrev.Mul(cfg.BodyMultiple)
+		if bodyCurr.Compare(req) < 0 {
+			return false
+		}
+	}
+	if !(c.GetClose().Compare(p.GetHigh()) > 0) {
+		return false
+	}
+
+	if cfg.BottomShadowMaxRatio.Sign() > 0 {
+		// use it as an upper shadow cap for bullish bar: (high - close) / close
+		den := c.GetClose()
+		if den.Sign() == 0 {
+			return false
+		}
+		shadow := c.GetHigh().Sub(c.GetClose()).Div(den)
+		if shadow.Compare(cfg.BottomShadowMaxRatio) > 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
+// maybeEngulfingTakeProfit evaluates the last two klines and closes position if profitable
+func (s *Strategy) maybeEngulfingTakeProfit(ctx context.Context, k types.KLine) {
+	if s.EngulfingTakeProfit == nil || !s.EngulfingTakeProfit.Enabled {
+		return
+	}
+
+	if s.Position == nil || s.OrderExecutor == nil || s.Position.GetBase().IsZero() {
+		return
+	}
+
+	// Only evaluate on configured interval's close
+	interval := s.EngulfingTakeProfit.Interval
+	if k.Interval != interval || !k.Closed {
+		return
+	}
+
+	// query last two klines ending at k.EndTime
+	end := k.EndTime.Time()
+	kLines, err := s.premiumSession.Exchange.QueryKLines(ctx, s.PremiumSymbol, interval, types.KLineQueryOptions{EndTime: &end, Limit: 2})
+	if err != nil || len(kLines) < 2 {
+		return
+	}
+
+	prev := kLines[0]
+	curr := kLines[1]
+	if !curr.Closed {
+		return
+	}
+
+	matched := false
+	pattern := ""
+	if s.Position.IsLong() {
+		matched = s.isBearishEngulfing(prev, curr, s.EngulfingTakeProfit)
+		pattern = "bearish engulfing"
+	} else if s.Position.IsShort() {
+		matched = s.isBullishEngulfing(prev, curr, s.EngulfingTakeProfit)
+		pattern = "bullish engulfing"
+	}
+
+	if matched {
+		latest := curr.GetClose()
+		if latest.IsZero() {
+			return
+		}
+
+		roi := s.Position.ROI(latest)
+		if roi.Sign() > 0 {
+			s.logger.Infof("%s (%s) detected, ROI %s > 0, closing position to take profit", pattern, interval, roi.FormatPercentage(2))
+			_ = s.OrderExecutor.GracefulCancel(ctx)
+			_ = s.OrderExecutor.ClosePosition(ctx, fixedpoint.One, pattern)
+		}
+	}
+}
+
 func (s *Strategy) premiumWorker(ctx context.Context) {
 	log := s.logger.WithField("worker", "premium")
 	var lastLog time.Time
@@ -642,7 +855,7 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 			s.lastTPCheck = time.Now()
 			if ticker, err := s.tradingSession.Exchange.QueryTicker(ctx, s.TradingSymbol); err == nil {
 				price := ticker.GetValidPrice()
-				if taken, err := s.maybeTakeProfit(ctx, price); err != nil {
+				if taken, err := s.maybeRoiTakeProfit(ctx, price); err != nil {
 					log.WithError(err).Warn("take-profit check error")
 				} else if taken {
 					// position closed; skip further processing this tick
@@ -785,6 +998,16 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: "15m"})
 	session.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: "1h"})
 	session.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: "1d"})
+
+	// subscribe klines for engulfing take-profit detection if enabled
+	if s.EngulfingTakeProfit != nil && s.EngulfingTakeProfit.Enabled {
+		interval := s.EngulfingTakeProfit.Interval
+		if interval == "" {
+			interval = types.Interval1h
+		}
+
+		session.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: interval})
+	}
 }
 
 // Run is only used for back-testing with single session
@@ -829,13 +1052,19 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		tradingInterval = s.BacktestConfig.TradingInterval
 	}
 
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.PremiumSymbol, s.EngulfingTakeProfit.Interval, func(k types.KLine) {
+		// engulfing take-profit check triggered by kline close events as well
+		s.maybeEngulfingTakeProfit(ctx, k)
+	}))
+
 	// subscribe to klines for time alignment; assume 1m unless different backtest interval
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.TradingSymbol, tradingInterval, func(k types.KLine) {
+
 		// match kline time with csv time; prefer k.EndTime
 		if rec, ok := s.lookupBacktestAt(k.EndTime.Time().Add(time.Millisecond)); ok {
-			// backtest take-profit using kline close
+			// backtest ROI take-profit using kline close
 			if s.Position != nil && !s.Position.GetBase().IsZero() {
-				if taken, err := s.maybeTakeProfit(ctx, k.GetClose()); err != nil {
+				if taken, err := s.maybeRoiTakeProfit(ctx, k.GetClose()); err != nil {
 					s.logger.WithError(err).Warn("backtest take-profit error")
 				} else if taken {
 					return
