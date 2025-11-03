@@ -322,7 +322,7 @@ func (e *Exchange) queryFuturesTrades(
 		req.FromID(int64(options.LastTradeID))
 	}
 	if (options.StartTime != nil || options.EndTime != nil) && options.LastTradeID > 0 {
-		log.Warnf("both startTime/endTime and lastTradeID are set in TradeQueryOptions, lastTradeID will be ignored")
+		log.Debugf("both startTime/endTime and lastTradeID are set in TradeQueryOptions, lastTradeID will be ignored")
 	}
 
 	remoteTrades, err = req.Do(ctx)
