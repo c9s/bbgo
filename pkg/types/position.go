@@ -574,6 +574,7 @@ func (p *Position) AddTrades(trades []Trade) (fixedpoint.Value, fixedpoint.Value
 }
 
 func (p *Position) calculateFeeInQuote(td Trade) fixedpoint.Value {
+	// assume the fee is not charged either in base currency or quote currency
 	var quoteQuantity = td.QuoteQuantity
 
 	if cost, ok := p.FeeAverageCosts[td.FeeCurrency]; ok {
@@ -757,4 +758,13 @@ func (p *Position) updateMetrics() {
 	positionAverageCostMetrics.With(labels).Set(p.AverageCost.Float64())
 	positionBaseQuantityMetrics.With(labels).Set(p.Base.Float64())
 	positionQuoteQuantityMetrics.With(labels).Set(p.Quote.Float64())
+}
+
+func (p *Position) UpdateQuteUsdPrice(kline KLine) {
+	// assume the symbol of the kline is the quote to USD price (ex: USDTUSD)
+	p.Lock()
+	defer p.Unlock()
+
+	cost := fixedpoint.One.Div(kline.Close)
+	p.FeeAverageCosts["USD"] = cost
 }
