@@ -113,6 +113,7 @@ type Strategy struct {
 
 	pvHigh *indicatorv2.PivotHighStream
 	pvLow  *indicatorv2.PivotLowStream
+	kLines *indicatorv2.KLineStream
 
 	lastTPCheck time.Time
 }
@@ -308,6 +309,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	s.pvLow = indicatorv2.PivotLow(s.tradingSession.Indicators(s.TradingSymbol).LOW(types.Interval15m), 10, 10)
 	s.pvHigh = indicatorv2.PivotHigh(s.tradingSession.Indicators(s.TradingSymbol).HIGH(types.Interval15m), 10, 10)
+	s.kLines = s.premiumSession.Indicators(s.PremiumSymbol).KLines(types.Interval15m)
 
 	// set leverage if configured and supported
 	if s.MaxLeverage > 0 {
@@ -1037,6 +1039,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	s.pvLow = indicatorv2.PivotLow(s.premiumSession.Indicators(s.PremiumSymbol).LOW(types.Interval15m), 10, 10)
 	s.pvHigh = indicatorv2.PivotHigh(s.premiumSession.Indicators(s.PremiumSymbol).HIGH(types.Interval15m), 10, 10)
+	s.kLines = s.premiumSession.Indicators(s.PremiumSymbol).KLines(types.Interval15m)
 
 	// load csv if configured
 	if s.BacktestConfig == nil || s.BacktestConfig.BidAskPriceCsv == "" {
