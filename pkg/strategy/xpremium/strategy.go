@@ -12,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -871,6 +872,8 @@ func (s *Strategy) maybeEngulfingTakeProfit(ctx context.Context, k types.KLine) 
 }
 
 func (s *Strategy) premiumWorker(ctx context.Context) {
+
+	var logLimiter = rate.NewLimiter(rate.Every(1*time.Second), 1)
 	for {
 		select {
 		case <-ctx.Done():
@@ -896,15 +899,21 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 			continue
 		}
 
+		if logLimiter.Allow() {
+			s.logger.Infof("comparing books: premium bid=%s ask=%s | base bid=%s ask=%s => premium=%.4f%% discount=%.4f%%",
+				bidA.Price.String(), askA.Price.String(), bidB.Price.String(), askB.Price.String(),
+				premium*100, discount*100)
+		}
+
 		side := s.decideSignal(premium, discount)
 		if side == "" {
-			return
+			continue
 		}
 
 		s.logger.Infof(
-			"xpremium signal: premium=%.4f%% discount=%.4f%% minSpread=%.4f%% pBid=%s pAsk=%s bBid=%s bAsk=%s signal=%s",
-			premium*100, discount*100, s.MinSpread.Float64()*100,
-			bidA.Price.String(), askA.Price.String(), bidB.Price.String(), askB.Price.String(), side.String(),
+			"xpremium signal: %s premium=%.4f%% discount=%.4f%% minSpread=%.4f%% pBid=%s pAsk=%s bBid=%s bAsk=%s",
+			side.String(), premium*100, discount*100, s.MinSpread.Float64()*100,
+			bidA.Price.String(), askA.Price.String(), bidB.Price.String(), askB.Price.String(),
 		)
 
 		// simple position alignment: avoid re-entering same direction immediately
