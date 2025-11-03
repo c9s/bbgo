@@ -366,18 +366,18 @@ func (m *SimplePriceMatching) buyToPrice(price fixedpoint.Value) (closedOrders [
 		switch o.Type {
 
 		case types.OrderTypeStopMarket:
-			// the price is still lower than the stop price, we will put the order back to the list
-			if price.Compare(o.StopPrice) < 0 {
+			// if the stop price is higher than last price, and the current price is higher than stop price
+			if o.StopPrice.Compare(m.lastPrice) > 0 && o.StopPrice.Compare(price) <= 0 {
+				o.Type = types.OrderTypeMarket
+				o.ExecutedQuantity = o.Quantity
+				o.Price = price
+				o.Status = types.OrderStatusFilled
+				closedOrders = append(closedOrders, o)
+			} else {
 				// not triggering it, put it back
 				bidOrders = append(bidOrders, o)
 				break
 			}
-
-			o.Type = types.OrderTypeMarket
-			o.ExecutedQuantity = o.Quantity
-			o.Price = price
-			o.Status = types.OrderStatusFilled
-			closedOrders = append(closedOrders, o)
 
 		case types.OrderTypeStopLimit:
 			// the price is still lower than the stop price, we will put the order back to the list
@@ -414,41 +414,41 @@ func (m *SimplePriceMatching) buyToPrice(price fixedpoint.Value) (closedOrders [
 		switch o.Type {
 
 		case types.OrderTypeStopMarket:
-			// should we trigger the order
-			if price.Compare(o.StopPrice) < 0 {
+			// if the stop price is higher than last price, and the current price is higher than stop price
+			if o.StopPrice.Compare(m.lastPrice) > 0 && o.StopPrice.Compare(price) <= 0 {
+				o.Type = types.OrderTypeMarket
+				o.ExecutedQuantity = o.Quantity
+				o.Price = price
+				o.Status = types.OrderStatusFilled
+				closedOrders = append(closedOrders, o)
+			} else {
 				// not triggering it, put it back
 				askOrders = append(askOrders, o)
 				break
 			}
 
-			o.Type = types.OrderTypeMarket
-			o.ExecutedQuantity = o.Quantity
-			o.Price = price
-			o.Status = types.OrderStatusFilled
-			closedOrders = append(closedOrders, o)
-
 		case types.OrderTypeStopLimit:
 			// should we trigger the order?
-			if price.Compare(o.StopPrice) < 0 {
+			if o.StopPrice.Compare(m.lastPrice) > 0 && o.StopPrice.Compare(price) <= 0 {
+				o.Type = types.OrderTypeLimit
+
+				// is it a taker order?
+				// higher than the current price, then it's a taker order
+				if o.Price.Compare(price) <= 0 {
+					// limit sell order as taker, move it to the closed order
+					// we assume that we have no price slippage here, so the latest price will be the executed price
+					// TODO: simulate slippage here
+					o.AveragePrice = price
+					o.ExecutedQuantity = o.Quantity
+					o.Status = types.OrderStatusFilled
+					closedOrders = append(closedOrders, o)
+				} else {
+					// maker order
+					askOrders = append(askOrders, o)
+				}
+			} else {
 				askOrders = append(askOrders, o)
 				break
-			}
-
-			o.Type = types.OrderTypeLimit
-
-			// is it a taker order?
-			// higher than the current price, then it's a taker order
-			if o.Price.Compare(price) <= 0 {
-				// limit sell order as taker, move it to the closed order
-				// we assume that we have no price slippage here, so the latest price will be the executed price
-				// TODO: simulate slippage here
-				o.AveragePrice = price
-				o.ExecutedQuantity = o.Quantity
-				o.Status = types.OrderStatusFilled
-				closedOrders = append(closedOrders, o)
-			} else {
-				// maker order
-				askOrders = append(askOrders, o)
 			}
 
 		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
@@ -501,38 +501,37 @@ func (m *SimplePriceMatching) sellToPrice(price fixedpoint.Value) (closedOrders 
 		switch o.Type {
 
 		case types.OrderTypeStopMarket:
-			// should we trigger the order
-			if price.Compare(o.StopPrice) > 0 {
-				askOrders = append(askOrders, o)
-				break
-			}
-
-			o.Type = types.OrderTypeMarket
-			o.ExecutedQuantity = o.Quantity
-			o.Price = price
-			o.Status = types.OrderStatusFilled
-			closedOrders = append(closedOrders, o)
-
-		case types.OrderTypeStopLimit:
-			// if the price is lower than the stop price
-			// we should trigger the stop sell order
-			if price.Compare(o.StopPrice) > 0 {
-				askOrders = append(askOrders, o)
-				break
-			}
-
-			o.Type = types.OrderTypeLimit
-
-			// handle TAKER SELL
-			// if the order price is lower than the current price
-			// it's a taker order
-			if o.Price.Compare(price) <= 0 {
-				o.AveragePrice = price
+			if o.StopPrice.Compare(m.lastPrice) < 0 && o.StopPrice.Compare(price) >= 0 {
+				o.Type = types.OrderTypeMarket
 				o.ExecutedQuantity = o.Quantity
+				o.Price = price
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
 			} else {
 				askOrders = append(askOrders, o)
+				break
+			}
+
+		case types.OrderTypeStopLimit:
+			// if the price is lower than the stop price
+			// we should trigger the stop sell order
+			if o.StopPrice.Compare(m.lastPrice) < 0 && o.StopPrice.Compare(price) >= 0 {
+				o.Type = types.OrderTypeLimit
+
+				// handle TAKER SELL
+				// if the order price is lower than the current price
+				// it's a taker order
+				if o.Price.Compare(price) <= 0 {
+					o.AveragePrice = price
+					o.ExecutedQuantity = o.Quantity
+					o.Status = types.OrderStatusFilled
+					closedOrders = append(closedOrders, o)
+				} else {
+					askOrders = append(askOrders, o)
+				}
+			} else {
+				askOrders = append(askOrders, o)
+				break
 			}
 
 		default:
@@ -549,36 +548,36 @@ func (m *SimplePriceMatching) sellToPrice(price fixedpoint.Value) (closedOrders 
 			// price goes down and if the stop price is still lower than the current price
 			// or the stop price is not touched
 			// then we should skip this order
-			if price.Compare(o.StopPrice) > 0 {
+			if o.StopPrice.Compare(m.lastPrice) < 0 && o.StopPrice.Compare(price) >= 0 {
+				o.Type = types.OrderTypeMarket
+				o.ExecutedQuantity = o.Quantity
+				o.Price = price
+				o.Status = types.OrderStatusFilled
+				closedOrders = append(closedOrders, o)
+			} else {
 				bidOrders = append(bidOrders, o)
 				break
 			}
-
-			o.Type = types.OrderTypeMarket
-			o.ExecutedQuantity = o.Quantity
-			o.Price = price
-			o.Status = types.OrderStatusFilled
-			closedOrders = append(closedOrders, o)
 
 		case types.OrderTypeStopLimit:
 			// price goes down and if the stop price is still lower than the current price
 			// or the stop price is not touched
 			// then we should skip this order
-			if price.Compare(o.StopPrice) > 0 {
-				bidOrders = append(bidOrders, o)
-				break
-			}
+			if o.StopPrice.Compare(m.lastPrice) < 0 && o.StopPrice.Compare(price) >= 0 {
+				o.Type = types.OrderTypeLimit
 
-			o.Type = types.OrderTypeLimit
-
-			// handle TAKER order
-			if o.Price.Compare(price) >= 0 {
-				o.AveragePrice = price
-				o.ExecutedQuantity = o.Quantity
-				o.Status = types.OrderStatusFilled
-				closedOrders = append(closedOrders, o)
+				// handle TAKER order
+				if o.Price.Compare(price) >= 0 {
+					o.AveragePrice = price
+					o.ExecutedQuantity = o.Quantity
+					o.Status = types.OrderStatusFilled
+					closedOrders = append(closedOrders, o)
+				} else {
+					bidOrders = append(bidOrders, o)
+				}
 			} else {
 				bidOrders = append(bidOrders, o)
+				break
 			}
 
 		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
