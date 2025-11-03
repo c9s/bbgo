@@ -1,8 +1,14 @@
 package types
 
 import (
+	"context"
+	"fmt"
 	"sync"
 )
+
+type Connector interface {
+	Connect(ctx context.Context) error
+}
 
 func allTrue(bools []bool) bool {
 	for _, b := range bools {
@@ -124,4 +130,28 @@ func (c *Connectivity) Bind(stream Stream) {
 	stream.OnDisconnect(c.setDisconnect)
 	stream.OnAuth(c.setAuthed)
 	c.stream = stream
+}
+
+type ConnectorManager struct {
+	connectors map[Connector]Connector
+}
+
+func NewConnectorManager() *ConnectorManager {
+	return &ConnectorManager{
+		connectors: make(map[Connector]Connector),
+	}
+}
+
+func (cm *ConnectorManager) Add(connector Connector) {
+	cm.connectors[connector] = connector
+}
+
+func (cm *ConnectorManager) Connect(ctx context.Context) error {
+	for _, connector := range cm.connectors {
+		if err := connector.Connect(ctx); err != nil {
+			return fmt.Errorf("connector %T connect error: %w", connector, err)
+		}
+	}
+
+	return nil
 }

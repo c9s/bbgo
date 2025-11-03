@@ -50,10 +50,6 @@ var raiseWarningLevelLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 
 func nopCover(v fixedpoint.Value) {}
 
-type connector interface {
-	Connect(ctx context.Context) error
-}
-
 type cancelOrdersBySymbolSide interface {
 	CancelOrdersBySymbolSide(
 		ctx context.Context, symbol string, side types.SideType,
@@ -299,7 +295,7 @@ type Strategy struct {
 
 	simpleHedgeMode bool
 
-	connectors []connector
+	connectorManager *types.ConnectorManager
 
 	profitChanged int64
 }
@@ -435,6 +431,9 @@ func (s *Strategy) Initialize() error {
 	for _, sig := range s.SignalConfigList.Signals {
 		s.logger.Infof("using signal provider: %s", sig)
 	}
+
+	// initialize connector manager
+	s.connectorManager = types.NewConnectorManager()
 	return nil
 }
 
@@ -2509,7 +2508,7 @@ func (s *Strategy) CrossRun(
 		s.marketTradeStream.OnMarketTrade(func(trade types.Trade) {
 			s.lastPrice.Set(trade.Price)
 		})
-		s.addConnector(s.marketTradeStream)
+		s.connectorManager.Add(s.marketTradeStream)
 	}
 
 	if s.FastCancel != nil && s.FastCancel.Enabled {
@@ -2522,7 +2521,7 @@ func (s *Strategy) CrossRun(
 		s.makerBookStream = bbgo.NewBookStream(s.hedgeSession, s.SourceSymbol)
 		s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
 		s.makerBook.BindStream(s.makerBookStream)
-		s.addConnector(s.makerBookStream)
+		s.connectorManager.Add(s.makerBookStream)
 	}
 
 	// TODO: replace the following stream book with HedgeMarket integration
@@ -2530,7 +2529,7 @@ func (s *Strategy) CrossRun(
 		Depth: types.DepthLevelFull,
 		Speed: types.SpeedLow,
 	})
-	s.addConnector(s.sourceBookStream)
+	s.connectorManager.Add(s.sourceBookStream)
 
 	s.sourceBook = types.NewStreamBook(s.SourceSymbol, s.hedgeSession.ExchangeName)
 	s.sourceBook.BindStream(s.sourceBookStream)
@@ -2730,8 +2729,13 @@ func (s *Strategy) CrossRun(
 	)
 
 	// TODO: use connectivity group to ensure all connections are ready
-	for _, ctr := range s.connectors {
-		if err := ctr.Connect(s.tradingCtx); err != nil {
+	// for _, ctr := range s.connectors {
+	// 	if err := ctr.Connect(s.tradingCtx); err != nil {
+	// 		return err
+	// 	}
+	// }
+	if s.connectorManager != nil {
+		if err := s.connectorManager.Connect(s.tradingCtx); err != nil {
 			return err
 		}
 	}
@@ -2900,8 +2904,4 @@ func parseSymbolSelector(
 		return nil, types.Market{}, fmt.Errorf("market %s not found in session %s", symbol, sessionName)
 	}
 	return session, market, nil
-}
-
-func (s *Strategy) addConnector(ctr connector) {
-	s.connectors = append(s.connectors, ctr)
 }

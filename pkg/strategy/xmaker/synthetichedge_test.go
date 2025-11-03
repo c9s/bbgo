@@ -179,10 +179,14 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	assert.NoError(t, err)
 
 	// the connectivity waiting is blocking, so we need to run it in a goroutine
+
 	go func() {
 		err := syn.Start(ctx)
 		assert.NoError(t, err)
 	}()
+
+	sourceMarketDataStream.EmitConnect()
+	fiatMarketDataStream.EmitConnect()
 
 	submitOrder := types.SubmitOrder{
 		Market:           sourceMarket,
@@ -215,9 +219,6 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		Status:           types.OrderStatusFilled,
 	}
 	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().SubmitOrder(gomock.Any(), submitOrder2).Return(&createdOrder2, nil)
-
-	sourceMarketDataStream.EmitConnect()
-	fiatMarketDataStream.EmitConnect()
 
 	// add position to delta
 	makerPosition.AddTrade(types.Trade{
