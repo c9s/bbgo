@@ -186,7 +186,12 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	}()
 
 	sourceMarketDataStream.EmitConnect()
+	sourceUserDataStream.EmitConnect()
+	sourceUserDataStream.EmitAuth()
+
 	fiatMarketDataStream.EmitConnect()
+	fiatUserDataStream.EmitConnect()
+	fiatUserDataStream.EmitAuth()
 
 	submitOrder := types.SubmitOrder{
 		Market:           sourceMarket,
@@ -391,7 +396,12 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 	}()
 
 	sourceMarketDataStream.EmitConnect()
+	sourceUserDataStream.EmitConnect()
+	sourceUserDataStream.EmitAuth()
+
 	fiatMarketDataStream.EmitConnect()
+	fiatUserDataStream.EmitConnect()
+	fiatUserDataStream.EmitAuth()
 
 	// add position to delta
 	makerPosition.AddTrade(types.Trade{
