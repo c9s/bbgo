@@ -142,8 +142,10 @@ func NewConnectorManager() *ConnectorManager {
 	}
 }
 
-func (cm *ConnectorManager) Add(connector Connector) {
-	cm.connectors[connector] = connector
+func (cm *ConnectorManager) Add(connectors ...Connector) {
+	for _, connector := range connectors {
+		cm.connectors[connector] = connector
+	}
 }
 
 func (cm *ConnectorManager) Connect(ctx context.Context) error {

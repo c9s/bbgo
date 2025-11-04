@@ -1,0 +1,126 @@
+---
+# xpremium strategy config example
+# This strategy compares the best bid/ask across two exchanges (premium vs base)
+# and emits LONG/SHORT when the percentage spread exceeds minSpread.
+#
+# Spread algorithm (percentage):
+#   premium  = (premiumBid - baseAsk) / baseAsk    # LONG when premium >= minSpread
+#   discount = (premiumAsk - baseBid) / premiumAsk # SHORT when discount <= -minSpread
+#
+# Usage:
+#   - Configure your exchange API keys via environment variables (see sessions section envVarPrefix)
+#   - Run: bbgo run --config config/xpremium.yaml
+#
+# Notes:
+#   - tradingSession is where orders are executed. It can be the premium session (default)
+#     or another session that supports derivatives/leverage.
+#   - Set leverage only if your trading session supports it (e.g., Binance Futures).
+#   - minSpread is a percentage threshold. You can specify as a decimal (e.g., 0.002)
+#     or as a percent string (e.g., "0.20%").
+#   - On signal reversal (e.g. LONG while holding SHORT), the strategy closes the opposite
+#     position first, then opens the new position.
+#   - After entry, a stop-market order is placed using the previous 15m pivot (low for long,
+#     high for short) adjusted by stopLossSafetyRatio.
+#   - A ROI-based take-profit can be enabled via takeProfitROI (default 3%).
+
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
+  switches:
+    trade: true
+    orderUpdate: false
+    submitOrder: false
+
+persistence:
+  json:
+    directory: var/data
+
+logging:
+  trade: true
+  order: true
+  fields:
+    env: local
+
+sessions:
+  # Provide credentials via ENV using the given prefixes.
+  # For example, for binance: BINANCE_API_KEY, BINANCE_API_SECRET
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+  max:
+    exchange: max
+    envVarPrefix: max
+
+  binance_futures:
+    exchange: binance
+    envVarPrefix: binance
+    futures: true
+
+crossExchangeStrategies:
+- xpremium:
+    # Symbols to compare between exchanges
+    premiumSession: binance
+    premiumSymbol: BTCUSDT
+
+    baseSession: max
+    baseSymbol: BTCUSDT
+
+    # Orders will be executed on this session/symbol
+    # If not set, tradingSession defaults to premiumSession
+    tradingSession: binance_futures
+    tradingSymbol: BTCUSDT
+
+    # Optional leverage for the trading session (if supported)
+    # Set to 0 to skip changing leverage
+    leverage: 10
+
+    # Minimum percentage spread to trigger LONG/SHORT
+    # LONG when (premiumBid - baseAsk)/baseAsk >= minSpread
+    # SHORT when (premiumAsk - baseBid)/premiumAsk <= -minSpread
+    # Example: 0.002 = 0.2% or "0.20%"
+    minSpread: "0.20%"
+
+    # Optional explicit sizing and risk parameters
+    # quantity: 0.001              # fixed base quantity to trade; if omitted, size is risk-based
+    # priceType: maker             # maker|taker, used to choose price for sizing
+    maxLossLimit: 100            # quote currency risk per trade used for position sizing
+
+    # Optional risk controls (from common.Strategy). Uncomment to enable.
+    # positionHardLimit: 0           # maximum absolute position value (quote)
+    # maxPositionQuantity: 0         # maximum base quantity
+    # circuitBreakLossThreshold: 0   # maximum cumulative loss before halt (quote)
+
+    # Optional exits & risk params for xpremium
+    takeProfitROI: 3%             # ROI threshold to take profit (default 3%)
+    stopLossSafetyRatio: 1%       # pivot-based stop safety adjustment (1% => 0.01)
+
+    # Pivot-based stop-loss. When enabled, we derive stop loss from the most recent closed pivot on the configured interval:
+    # - For LONG: previous Pivot Low, adjusted by stopLossSafetyRatio (stop = pivotLow * (1 - ratio))
+    # - For SHORT: previous Pivot High, adjusted by stopLossSafetyRatio (stop = pivotHigh * (1 + ratio))
+    # Pivots are detected using left/right bars (look-back/look-forward confirmation).
+    # Larger left/right make pivots rarer and more significant; smaller values react faster.
+    # If disabled or no pivot yet, falls back to last closed kline high/low of the interval.
+    pivotStop:
+      enabled: true               # set true to use pivot-derived stop-loss (defaults to false)
+      interval: 15m               # kline interval used for pivot detection (e.g., 5m/15m/1h)
+      left: 10                    # number of bars to the left required to confirm a pivot
+      right: 10                   # number of bars to the right required to confirm a pivot
+
+    # Optional Engulfing pattern take-profit:
+    # - LONG positions react to bearish engulfing
+    # - SHORT positions react to bullish engulfing
+    engulfingTakeProfit:
+      enabled: true
+      interval: 1h                 # check on kline close of this interval
+      bodyMultiple: 3.0            # current engulfing body must be >= 3.0x previous body
+      bottomShadowMaxRatio: "0.1%" # for bearish: max lower shadow; for bullish: max upper shadow
+
+    ## Backtest settings (optional). In backtest mode, premium=base=trading session.
+    ## You need to provide a CSV file with bid/ask prices for both premium and base.
+    ## This only works under the single exchange strategy settings in backtest mode.
+    # backtest:
+    #   bidAskPriceCsv: bid_ask_price.csv  # CSV columns: Time, base ask, base bid, premium ask, premium bid
+    #   tradingInterval: 1m                # kline interval to align with CSV times

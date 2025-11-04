@@ -96,6 +96,14 @@ func NewGeneralOrderExecutor(
 		tradeCollector:     core.NewTradeCollector(symbol, position, orderStore),
 	}
 
+	// When it's futures trading, we disable the order filter in trade collector
+	// because in futures trading, there could be trades not from bot submitted orders,
+	// e.g., liquidation trades, trades from the mobile apps
+	// so we need to process all trades directly
+	if session.Futures {
+		executor.tradeCollector.DisableOrderFilter(true)
+	}
+
 	if executor.position != nil && session.Margin {
 		market := executor.position.Market
 		marginInfoUpdater := session.GetMarginInfoUpdater()

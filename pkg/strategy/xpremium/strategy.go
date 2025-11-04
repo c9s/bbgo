@@ -12,6 +12,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -44,6 +46,13 @@ type EngulfingTakeProfitConfig struct {
 	Interval             types.Interval   `json:"interval"`
 	BodyMultiple         fixedpoint.Value `json:"bodyMultiple"`
 	BottomShadowMaxRatio fixedpoint.Value `json:"bottomShadowMaxRatio"`
+}
+
+type PivotStopConfig struct {
+	Enabled  bool           `json:"enabled"`
+	Interval types.Interval `json:"interval"`
+	Left     int            `json:"left"`
+	Right    int            `json:"right"`
 }
 
 type Strategy struct {
@@ -90,6 +99,8 @@ type Strategy struct {
 	// EngulfingTakeProfit is an optional take-profit rule triggered by 1h Engulfing pattern
 	EngulfingTakeProfit *EngulfingTakeProfitConfig `json:"engulfingTakeProfit,omitempty"`
 
+	PivotStop *PivotStopConfig `json:"pivotStop,omitempty"`
+
 	BacktestConfig *BacktestConfig `json:"backtest,omitempty"`
 
 	logger        logrus.FieldLogger
@@ -113,8 +124,65 @@ type Strategy struct {
 
 	pvHigh *indicatorv2.PivotHighStream
 	pvLow  *indicatorv2.PivotLowStream
+	kLines *indicatorv2.KLineStream
 
 	lastTPCheck time.Time
+}
+
+type Signal struct {
+	Side       types.SideType
+	Premium    fixedpoint.Value
+	Discount   fixedpoint.Value
+	MinSpread  fixedpoint.Value
+	PremiumBid fixedpoint.Value
+	PremiumAsk fixedpoint.Value
+	BaseBid    fixedpoint.Value
+	BaseAsk    fixedpoint.Value
+	Symbol     string
+}
+
+func (s *Signal) SlackAttachment() slack.Attachment {
+	color := "good"
+	if s.Side == types.SideTypeSell {
+		color = "danger"
+	}
+
+	return slack.Attachment{
+		Title: fmt.Sprintf("XPremium %s Signal", s.Side.String()),
+		Color: color,
+		Fields: []slack.AttachmentField{
+			{
+				Title: "Symbol",
+				Value: s.Symbol,
+				Short: true,
+			},
+			{
+				Title: "Premium",
+				Value: fmt.Sprintf("%.4f%%", s.Premium.Float64()*100),
+				Short: true,
+			},
+			{
+				Title: "Discount",
+				Value: fmt.Sprintf("%.4f%%", s.Discount.Float64()*100),
+				Short: true,
+			},
+			{
+				Title: "Min Spread",
+				Value: fmt.Sprintf("%.4f%%", s.MinSpread.Float64()*100),
+				Short: true,
+			},
+			{
+				Title: "Premium Bid/Ask",
+				Value: fmt.Sprintf("%s / %s", s.PremiumBid.String(), s.PremiumAsk.String()),
+				Short: false,
+			},
+			{
+				Title: "Base Bid/Ask",
+				Value: fmt.Sprintf("%s / %s", s.BaseBid.String(), s.BaseAsk.String()),
+				Short: false,
+			},
+		},
+	}
 }
 
 func (s *Strategy) ID() string { return ID }
@@ -185,6 +253,26 @@ func (s *Strategy) Defaults() error {
 	// default stop loss safety ratio to 1%
 	if s.StopLossSafetyRatio.IsZero() {
 		s.StopLossSafetyRatio = fixedpoint.NewFromFloat(0.01)
+	}
+
+	if s.PivotStop == nil {
+		s.PivotStop = &PivotStopConfig{
+			Enabled:  false,
+			Interval: types.Interval15m,
+			Left:     10,
+			Right:    10,
+		}
+	} else if s.PivotStop.Enabled {
+		if s.PivotStop.Interval == "" {
+			s.PivotStop.Interval = types.Interval15m
+		}
+		if s.PivotStop.Left == 0 {
+			s.PivotStop.Left = 10
+		}
+
+		if s.PivotStop.Right == 0 {
+			s.PivotStop.Right = 10
+		}
 	}
 
 	// defaults for engulfing take profit
@@ -259,15 +347,25 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
-	// subscribe klines for engulfing take-profit detection if enabled
-	if s.EngulfingTakeProfit != nil && s.EngulfingTakeProfit.Enabled {
-		interval := s.EngulfingTakeProfit.Interval
-		if interval == "" {
-			interval = types.Interval1h
+	tradingSession := sessions[s.TradingSession]
+
+	if premiumSession, ok := sessions[s.PremiumSession]; ok {
+		premiumSession.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: types.Interval1m})
+		tradingSession.Subscribe(types.KLineChannel, s.TradingSymbol, types.SubscribeOptions{Interval: types.Interval1m})
+
+		premiumSession.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: types.Interval15m})
+		tradingSession.Subscribe(types.KLineChannel, s.TradingSymbol, types.SubscribeOptions{Interval: types.Interval15m})
+
+		if s.EngulfingTakeProfit != nil && s.EngulfingTakeProfit.Enabled {
+			interval := s.EngulfingTakeProfit.Interval
+			premiumSession.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: interval})
+			tradingSession.Subscribe(types.KLineChannel, s.TradingSymbol, types.SubscribeOptions{Interval: interval})
 		}
 
-		if session, ok := sessions[s.PremiumSession]; ok {
-			session.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: interval})
+		if s.PivotStop != nil && s.PivotStop.Enabled {
+			interval := s.PivotStop.Interval
+			premiumSession.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: interval})
+			tradingSession.Subscribe(types.KLineChannel, s.TradingSymbol, types.SubscribeOptions{Interval: interval})
 		}
 	}
 }
@@ -303,19 +401,23 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	// Initialize the core strategy components (Position, ProfitStats, GeneralOrderExecutor)
 	s.Strategy.Initialize(ctx, s.Environment, s.tradingSession, tradingMarket, ID, s.InstanceID())
 
-	s.pvLow = indicatorv2.PivotLow(s.tradingSession.Indicators(s.TradingSymbol).LOW(types.Interval15m), 10, 10)
-	s.pvHigh = indicatorv2.PivotHigh(s.tradingSession.Indicators(s.TradingSymbol).HIGH(types.Interval15m), 10, 10)
+	s.pvLow = indicatorv2.PivotLow(s.tradingSession.Indicators(s.TradingSymbol).LOW(s.PivotStop.Interval), s.PivotStop.Left, s.PivotStop.Right)
+	s.pvHigh = indicatorv2.PivotHigh(s.tradingSession.Indicators(s.TradingSymbol).HIGH(s.PivotStop.Interval), s.PivotStop.Left, s.PivotStop.Right)
+	s.kLines = s.tradingSession.Indicators(s.TradingSymbol).KLines(s.PivotStop.Interval)
 
 	// set leverage if configured and supported
-	if s.MaxLeverage > 0 {
-		if riskSvc, ok := s.tradingSession.Exchange.(types.ExchangeRiskService); ok {
+
+	if riskSvc, ok := s.tradingSession.Exchange.(types.ExchangeRiskService); ok {
+		if s.MaxLeverage > 0 {
 			if err := riskSvc.SetLeverage(ctx, tradingSymbol, s.MaxLeverage); err != nil {
-				s.logger.WithError(err).Warnf("failed to set leverage to %d on %s", s.MaxLeverage, tradingSymbol)
+				s.logger.WithError(err).Errorf("failed to set leverage to %d on %s", s.MaxLeverage, tradingSymbol)
 			} else {
 				s.logger.Infof("leverage set to %d on %s", s.MaxLeverage, tradingSymbol)
 			}
-		} else {
-			s.logger.Infof("exchange of trading session %s does not support leverage API", s.TradingSession)
+		}
+
+		if err := s.syncPositionRisks(ctx, riskSvc, tradingSymbol); err != nil {
+			s.logger.WithError(err).Errorf("failed to sync position risks on startup")
 		}
 	}
 
@@ -327,19 +429,27 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		}))
 	}
 
+	s.premiumSession.MarketDataStream.OnKLine(types.KLineWith(s.PremiumSymbol, types.Interval1m, func(k types.KLine) {
+		// backtest ROI take-profit using kline close
+		if _, err := s.maybeRoiTakeProfit(ctx, k.GetClose()); err != nil {
+			s.logger.WithError(err).Warn("take-profit error")
+		}
+	}))
+
 	// allocate isolated public streams for books and bind StreamBooks
 	premiumStream := bbgo.NewBookStream(s.premiumSession, s.PremiumSymbol)
 	baseStream := bbgo.NewBookStream(s.baseSession, s.BaseSymbol)
+
 	s.premiumStream, s.baseStream = premiumStream, baseStream
 
 	s.premiumBook = types.NewStreamBook(s.PremiumSymbol, s.premiumSession.ExchangeName)
-	s.baseBook = types.NewStreamBook(s.BaseSymbol, s.baseSession.ExchangeName)
 	s.premiumBook.BindStream(premiumStream)
+
+	s.baseBook = types.NewStreamBook(s.BaseSymbol, s.baseSession.ExchangeName)
 	s.baseBook.BindStream(baseStream)
 
-	// register streams into connector manager and connect them via connector manager
-	s.connectorManager.Add(premiumStream)
-	s.connectorManager.Add(baseStream)
+	// register streams into the connector manager and connect them via connector manager
+	s.connectorManager.Add(premiumStream, baseStream)
 
 	if err := s.connectorManager.Connect(ctx); err != nil {
 		s.logger.WithError(err).Error("connector manager connect error")
@@ -356,6 +466,8 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		defer wg.Done()
 
 		_ = s.OrderExecutor.GracefulCancel(ctx)
+
+		bbgo.Sync(ctx, s)
 
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
 	})
@@ -384,9 +496,11 @@ func (s *Strategy) computeSpreads(pBid, pAsk, bBid, bAsk types.PriceVolume) (pre
 	if !bAsk.Price.IsZero() {
 		premium = pBid.Price.Sub(bAsk.Price).Div(bAsk.Price).Float64()
 	}
+
 	if !pAsk.Price.IsZero() {
 		discount = pAsk.Price.Sub(bBid.Price).Div(pAsk.Price).Float64()
 	}
+
 	return premium, discount
 }
 
@@ -395,8 +509,9 @@ func (s *Strategy) compareBooks() (premium, discount float64, pBid, pAsk, bBid, 
 	bidA, askA, okA := s.premiumBook.BestBidAndAsk()
 	bidB, askB, okB := s.baseBook.BestBidAndAsk()
 	if !okA || !okB {
-		return 0, 0, types.PriceVolume{}, types.PriceVolume{}, types.PriceVolume{}, types.PriceVolume{}, false
+		return 0.0, 0.0, types.PriceVolume{}, types.PriceVolume{}, types.PriceVolume{}, types.PriceVolume{}, false
 	}
+
 	prem, disc := s.computeSpreads(bidA, askA, bidB, askB)
 	return prem, disc, bidA, askA, bidB, askB, true
 }
@@ -421,9 +536,6 @@ func (s *Strategy) decideSignal(premium, discount float64) types.SideType {
 // - LONG: use previous low
 // - SHORT: use previous high
 func (s *Strategy) findStopPrice(ctx context.Context, side types.SideType, now time.Time) (fixedpoint.Value, error) {
-	interval := types.Interval15m
-	end := now
-
 	safetyDown := fixedpoint.One.Sub(s.StopLossSafetyRatio) // e.g., 1 - r
 	safetyUp := fixedpoint.One.Add(s.StopLossSafetyRatio)   // e.g., 1 + r
 
@@ -439,27 +551,21 @@ func (s *Strategy) findStopPrice(ctx context.Context, side types.SideType, now t
 		}
 	}
 
-	// request recent klines; many exchanges honor Limit
-	klines, err := s.tradingSession.Exchange.QueryKLines(ctx, s.TradingSymbol, interval, types.KLineQueryOptions{
-		EndTime: &end,
-		Limit:   15,
-	})
-
-	if err != nil || len(klines) == 0 {
-		return fixedpoint.Zero, fmt.Errorf("query 15m klines error: %w", err)
+	if s.kLines.Length() == 0 {
+		return fixedpoint.Zero, fmt.Errorf("no 15m klines available for stop loss calculation")
 	}
 
-	if klines[0].EndTime.Time().Compare(now) > 0 {
-		return fixedpoint.Zero, fmt.Errorf("the first kline closed after now %s > %s", klines[0].EndTime.Time(), now)
-	}
+	lastK := s.kLines.Last(0)
 
-	kw := types.KLineWindow(klines)
+	if lastK.EndTime.Time().Compare(now) > 0 {
+		return fixedpoint.Zero, fmt.Errorf("the first kline closed after now %s > %s", lastK.EndTime.Time(), now)
+	}
 
 	if side == types.SideTypeBuy {
-		return kw.GetLow().Mul(safetyDown), nil
+		return lastK.Low.Mul(safetyDown), nil
 	}
 
-	return kw.GetHigh().Mul(safetyUp), nil
+	return lastK.High.Mul(safetyUp), nil
 }
 
 // calculatePositionSize sizes order using MaxLossLimit and stop loss like tradingdesk
@@ -645,6 +751,11 @@ func (s *Strategy) maybeRoiTakeProfit(ctx context.Context, latestPrice fixedpoin
 	if s.Position == nil || s.OrderExecutor == nil {
 		return false, nil
 	}
+
+	if s.Position.GetBase().IsZero() {
+		return false, nil
+	}
+
 	base := s.Position.GetBase()
 	if base.IsZero() || latestPrice.IsZero() || s.Position.AverageCost.IsZero() {
 		return false, nil
@@ -828,12 +939,12 @@ func (s *Strategy) maybeEngulfingTakeProfit(ctx context.Context, k types.KLine) 
 }
 
 func (s *Strategy) premiumWorker(ctx context.Context) {
-	log := s.logger.WithField("worker", "premium")
-	var lastLog time.Time
+
+	var logLimiter = rate.NewLimiter(rate.Every(1*time.Second), 1)
 	for {
 		select {
 		case <-ctx.Done():
-			log.Info("context canceled, stop premium worker")
+			s.logger.Info("context canceled, stop premium worker")
 			return
 		case <-s.premiumBook.C:
 			// fallthrough to evaluate when either book updates
@@ -850,48 +961,48 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 			continue
 		}
 
-		// Take-profit check using latest ticker price, throttled
-		if s.Position != nil && !s.Position.GetBase().IsZero() && time.Since(s.lastTPCheck) > time.Second {
-			s.lastTPCheck = time.Now()
-			if ticker, err := s.tradingSession.Exchange.QueryTicker(ctx, s.TradingSymbol); err == nil {
-				price := ticker.GetValidPrice()
-				if taken, err := s.maybeRoiTakeProfit(ctx, price); err != nil {
-					log.WithError(err).Warn("take-profit check error")
-				} else if taken {
-					// position closed; skip further processing this tick
-					continue
-				}
-			}
-		}
-
 		premium, discount, bidA, askA, bidB, askB, ok := s.compareBooks()
 		if !ok {
 			continue
 		}
 
+		if logLimiter.Allow() {
+			s.logger.Infof("comparing books: premium bid=%s ask=%s | base bid=%s ask=%s => premium=%.4f%% discount=%.4f%%",
+				bidA.Price.String(), askA.Price.String(), bidB.Price.String(), askB.Price.String(),
+				premium*100, discount*100)
+		}
+
 		side := s.decideSignal(premium, discount)
-		if side != "" {
-			s.logger.Infof(
-				"xpremium signal: premium=%.4f%% discount=%.4f%% minSpread=%.4f%% pBid=%s pAsk=%s bBid=%s bAsk=%s signal=%s",
-				premium*100, discount*100, s.MinSpread.Float64()*100,
-				bidA.Price.String(), askA.Price.String(), bidB.Price.String(), askB.Price.String(), side.String(),
-			)
+		if side == "" {
+			continue
+		}
 
-			// simple position alignment: avoid re-entering same direction immediately
-			if (side == types.SideTypeBuy && s.Position != nil && s.Position.IsLong()) ||
-				(side == types.SideTypeSell && s.Position != nil && s.Position.IsShort()) {
-				continue
-			}
+		s.logger.Infof(
+			"xpremium signal: %s premium=%.4f%% discount=%.4f%% minSpread=%.4f%% pBid=%s pAsk=%s bBid=%s bAsk=%s",
+			side.String(), premium*100, discount*100, s.MinSpread.Float64()*100,
+			bidA.Price.String(), askA.Price.String(), bidB.Price.String(), askB.Price.String(),
+		)
 
-			if err := s.executeSignal(ctx, side, time.Now()); err != nil {
-				log.WithError(err).Error("executeSignal error")
-			}
-		} else if time.Since(lastLog) > 5*time.Second {
-			lastLog = time.Now()
-			s.logger.Debugf(
-				"premium update: premium=%.4f%% discount=%.4f%% minSpread=%.4f%%",
-				premium*100, discount*100, s.MinSpread.Float64()*100,
-			)
+		bbgo.Notify(&Signal{
+			Side:       side,
+			Premium:    fixedpoint.NewFromFloat(premium),
+			Discount:   fixedpoint.NewFromFloat(discount),
+			MinSpread:  s.MinSpread,
+			PremiumBid: bidA.Price,
+			PremiumAsk: askA.Price,
+			BaseBid:    bidB.Price,
+			BaseAsk:    askB.Price,
+			Symbol:     s.TradingSymbol,
+		})
+
+		// simple position alignment: avoid re-entering same direction immediately
+		if (side == types.SideTypeBuy && s.Position != nil && s.Position.IsLong()) ||
+			(side == types.SideTypeSell && s.Position != nil && s.Position.IsShort()) {
+			continue
+		}
+
+		if err := s.executeSignal(ctx, side, time.Now()); err != nil {
+			s.logger.WithError(err).Error("executeSignal error")
 		}
 	}
 }
@@ -976,7 +1087,6 @@ func (s *Strategy) loadBacktestCSV(path string) error {
 	}
 
 	s.logger.Infof("%d records loaded and parsed from backtest CSV", len(s.btData))
-
 	return nil
 }
 
@@ -1035,8 +1145,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.tradingMarket = market
 	s.Strategy.Initialize(ctx, s.Environment, session, market, ID, s.InstanceID())
 
-	s.pvLow = indicatorv2.PivotLow(s.tradingSession.Indicators(s.TradingSymbol).LOW(types.Interval15m), 10, 10)
-	s.pvHigh = indicatorv2.PivotHigh(s.tradingSession.Indicators(s.TradingSymbol).HIGH(types.Interval15m), 10, 10)
+	s.pvLow = indicatorv2.PivotLow(s.premiumSession.Indicators(s.PremiumSymbol).LOW(s.PivotStop.Interval), s.PivotStop.Left, s.PivotStop.Right)
+	s.pvHigh = indicatorv2.PivotHigh(s.premiumSession.Indicators(s.PremiumSymbol).HIGH(s.PivotStop.Interval), s.PivotStop.Left, s.PivotStop.Right)
+	s.kLines = s.premiumSession.Indicators(s.PremiumSymbol).KLines(s.PivotStop.Interval)
 
 	// load csv if configured
 	if s.BacktestConfig == nil || s.BacktestConfig.BidAskPriceCsv == "" {
@@ -1052,40 +1163,43 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		tradingInterval = s.BacktestConfig.TradingInterval
 	}
 
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.PremiumSymbol, s.EngulfingTakeProfit.Interval, func(k types.KLine) {
-		// engulfing take-profit check triggered by kline close events as well
-		s.maybeEngulfingTakeProfit(ctx, k)
+	if s.EngulfingTakeProfit != nil && s.EngulfingTakeProfit.Enabled {
+		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.PremiumSymbol, s.EngulfingTakeProfit.Interval, func(k types.KLine) {
+			// engulfing take-profit check triggered by kline close events as well
+			s.maybeEngulfingTakeProfit(ctx, k)
+		}))
+	}
+
+	session.MarketDataStream.OnKLine(types.KLineWith(s.PremiumSymbol, types.Interval1m, func(k types.KLine) {
+		// backtest ROI take-profit using kline close
+		if _, err := s.maybeRoiTakeProfit(ctx, k.GetClose()); err != nil {
+			s.logger.WithError(err).Warn("backtest take-profit error")
+		}
 	}))
 
 	// subscribe to klines for time alignment; assume 1m unless different backtest interval
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.TradingSymbol, tradingInterval, func(k types.KLine) {
-
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.PremiumSymbol, tradingInterval, func(k types.KLine) {
 		// match kline time with csv time; prefer k.EndTime
-		if rec, ok := s.lookupBacktestAt(k.EndTime.Time().Add(time.Millisecond)); ok {
-			// backtest ROI take-profit using kline close
-			if s.Position != nil && !s.Position.GetBase().IsZero() {
-				if taken, err := s.maybeRoiTakeProfit(ctx, k.GetClose()); err != nil {
-					s.logger.WithError(err).Warn("backtest take-profit error")
-				} else if taken {
-					return
-				}
-			}
-
-			// rebuild best bid/ask as PriceVolume
-			pBid := types.PriceVolume{Price: rec.premiumBid, Volume: fixedpoint.One}
-			pAsk := types.PriceVolume{Price: rec.premiumAsk, Volume: fixedpoint.One}
-			bBid := types.PriceVolume{Price: rec.baseBid, Volume: fixedpoint.One}
-			bAsk := types.PriceVolume{Price: rec.baseAsk, Volume: fixedpoint.One}
-
-			premium, discount := s.computeSpreads(pBid, pAsk, bBid, bAsk)
-			side := s.decideSignal(premium, discount)
-			if side != "" {
-				// synchronous execution in backtest
-				if err := s.executeSignal(ctx, side, k.EndTime.Time()); err != nil {
-					s.logger.WithError(err).Error("backtest executeSignal error")
-				}
-			}
+		rec, ok := s.lookupBacktestAt(k.EndTime.Time().Add(time.Millisecond))
+		if !ok {
 			return
+		}
+
+		// rebuild best bid/ask as PriceVolume
+		pBid := types.PriceVolume{Price: rec.premiumBid, Volume: fixedpoint.One}
+		pAsk := types.PriceVolume{Price: rec.premiumAsk, Volume: fixedpoint.One}
+		bBid := types.PriceVolume{Price: rec.baseBid, Volume: fixedpoint.One}
+		bAsk := types.PriceVolume{Price: rec.baseAsk, Volume: fixedpoint.One}
+
+		premium, discount := s.computeSpreads(pBid, pAsk, bBid, bAsk)
+		side := s.decideSignal(premium, discount)
+		if side == "" {
+			return
+		}
+
+		// synchronous execution in backtest
+		if err := s.executeSignal(ctx, side, k.EndTime.Time()); err != nil {
+			s.logger.WithError(err).Error("backtest executeSignal error")
 		}
 	}))
 
@@ -1101,6 +1215,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 }
 
 func parseNum(sv string) (fixedpoint.Value, error) {
+	sv = strings.TrimSpace(sv)
+
 	fv, err := fixedpoint.NewFromString(sv)
 	if err == nil {
 		return fv, nil
@@ -1112,4 +1228,37 @@ func parseNum(sv string) (fixedpoint.Value, error) {
 	}
 
 	return fixedpoint.NewFromFloat(f), nil
+}
+
+func (s *Strategy) syncPositionRisks(ctx context.Context, riskService types.ExchangeRiskService, symbol string) error {
+	positionRisks, err := riskService.QueryPositionRisk(ctx)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Infof("fetched futures position risks: %+v", positionRisks)
+
+	if len(positionRisks) == 0 {
+		s.Position.Reset()
+		return nil
+	}
+
+	for _, positionRisk := range positionRisks {
+		if positionRisk.Symbol != symbol {
+			continue
+		}
+
+		if positionRisk.PositionAmount.IsZero() || positionRisk.EntryPrice.IsZero() {
+			continue
+		}
+
+		s.Position.Base = positionRisk.PositionAmount
+		s.Position.AverageCost = positionRisk.EntryPrice
+		s.logger.Infof("restored futures position from positionRisk: base=%s, average_cost=%s, position_risk=%+v",
+			s.Position.Base.String(),
+			s.Position.AverageCost.String(),
+			positionRisk)
+	}
+
+	return nil
 }

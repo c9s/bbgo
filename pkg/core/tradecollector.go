@@ -123,6 +123,8 @@ type TradeCollector struct {
 
 	boundStream map[types.Stream]struct{}
 
+	disableOrderFilter bool
+
 	ConverterManager
 }
 
@@ -155,6 +157,14 @@ func (c *TradeCollector) Position() *types.Position {
 
 func (c *TradeCollector) TradeStore() *TradeStore {
 	return c.tradeStore
+}
+
+// DisableOrderFilter disables the order filter when processing trades
+// When disabled, all trades will be processed without checking the order store.
+// This is useful when the session is futures trading,
+// and we would like to process all trades in the same market.
+func (c *TradeCollector) DisableOrderFilter(v bool) {
+	c.disableOrderFilter = v
 }
 
 func (c *TradeCollector) SetPosition(position *types.Position) {
@@ -254,13 +264,15 @@ func (c *TradeCollector) Process() bool {
 		}
 
 		// if it's the trade we're looking for, add it to the list and mark it as done
-		if trade.OrderID == 0 {
-			logrus.Errorf("[tradecollector] process trade %+v has no OrderID", trade)
-		}
-		if c.orderStore.Exists(trade.OrderID) {
-			trades = append(trades, trade)
-			c.doneTrades[key] = struct{}{}
-			return true
+		if !c.disableOrderFilter {
+			if trade.OrderID == 0 {
+				logrus.Errorf("[tradecollector] process trade %+v has no OrderID", trade)
+			}
+			if c.orderStore.Exists(trade.OrderID) {
+				trades = append(trades, trade)
+				c.doneTrades[key] = struct{}{}
+				return true
+			}
 		}
 
 		return false
@@ -268,21 +280,13 @@ func (c *TradeCollector) Process() bool {
 	c.mu.Unlock()
 
 	for _, trade := range trades {
-		var p types.Profit
-		if c.position != nil {
-			profit, netProfit, madeProfit := c.position.AddTrade(trade)
-			if madeProfit {
-				p = c.position.NewProfit(trade, profit, netProfit)
-			}
+		p, changed := c.applyTrade(trade)
+		if changed {
 			positionChanged = true
-
-			c.EmitTrade(trade, profit, netProfit)
-		} else {
-			c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
 		}
 
 		if !p.Profit.IsZero() {
-			c.EmitProfit(trade, &p)
+			c.EmitProfit(trade, p)
 		}
 	}
 
@@ -293,11 +297,30 @@ func (c *TradeCollector) Process() bool {
 	return positionChanged
 }
 
+func (c *TradeCollector) applyTrade(trade types.Trade) (*types.Profit, bool) {
+	var p types.Profit
+	if c.position != nil {
+		profit, netProfit, madeProfit := c.position.AddTrade(trade)
+		if madeProfit {
+			p = c.position.NewProfit(trade, profit, netProfit)
+		}
+		c.EmitTrade(trade, profit, netProfit)
+		return &p, true
+	} else {
+		c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
+		return nil, false
+	}
+}
+
 // processTrade takes a trade and see if there is a matched order
 // if the order is found, then we add the trade to the position
 // return true when the given trade is added
 // return false when the given trade is not added
 func (c *TradeCollector) processTrade(trade types.Trade) bool {
+	if c.symbol != "" && trade.Symbol != c.symbol {
+		return false
+	}
+
 	key := trade.Key()
 
 	c.mu.Lock()
@@ -308,34 +331,27 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 		return false
 	}
 
-	if trade.OrderID == 0 {
-		logrus.Errorf("[tradecollector] process trade %+v has no OrderID", trade)
-	}
-
-	if !c.orderStore.Exists(trade.OrderID) {
-		// not done yet
-		// add this trade to the trade store for the later processing
-		c.tradeStore.Add(trade)
-		c.mu.Unlock()
-		return false
+	if !c.disableOrderFilter {
+		if trade.OrderID == 0 {
+			logrus.Errorf("[tradecollector] process trade %+v has no OrderID", trade)
+		}
+		if !c.orderStore.Exists(trade.OrderID) {
+			// not done yet
+			// add this trade to the trade store for the later processing
+			c.tradeStore.Add(trade)
+			c.mu.Unlock()
+			return false
+		}
 	}
 
 	c.doneTrades[key] = struct{}{}
 	c.mu.Unlock()
 
-	if c.position != nil {
-		profit, netProfit, madeProfit := c.position.AddTrade(trade)
-		if madeProfit {
-			p := c.position.NewProfit(trade, profit, netProfit)
-			c.EmitTrade(trade, profit, netProfit)
-			c.EmitProfit(trade, &p)
-		} else {
-			c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
-			c.EmitProfit(trade, nil)
-		}
+	p, positionChanged := c.applyTrade(trade)
+	c.EmitProfit(trade, p) // emit for both non-nil and nil
+
+	if positionChanged {
 		c.EmitPositionUpdate(c.position)
-	} else {
-		c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
 	}
 
 	return true
@@ -344,10 +360,6 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 // return true when the given trade is added
 // return false when the given trade is not added
 func (c *TradeCollector) ProcessTrade(trade types.Trade) bool {
-	if c.symbol != "" && trade.Symbol != c.symbol {
-		return false
-	}
-
 	return c.processTrade(c.ConvertTrade(trade))
 }
 
