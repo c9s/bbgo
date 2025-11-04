@@ -12,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -126,6 +127,62 @@ type Strategy struct {
 	kLines *indicatorv2.KLineStream
 
 	lastTPCheck time.Time
+}
+
+type Signal struct {
+	Side       types.SideType
+	Premium    fixedpoint.Value
+	Discount   fixedpoint.Value
+	MinSpread  fixedpoint.Value
+	PremiumBid fixedpoint.Value
+	PremiumAsk fixedpoint.Value
+	BaseBid    fixedpoint.Value
+	BaseAsk    fixedpoint.Value
+	Symbol     string
+}
+
+func (s *Signal) SlackAttachment() slack.Attachment {
+	color := "good"
+	if s.Side == types.SideTypeSell {
+		color = "danger"
+	}
+
+	return slack.Attachment{
+		Title: fmt.Sprintf("XPremium %s Signal", s.Side.String()),
+		Color: color,
+		Fields: []slack.AttachmentField{
+			{
+				Title: "Symbol",
+				Value: s.Symbol,
+				Short: true,
+			},
+			{
+				Title: "Premium",
+				Value: fmt.Sprintf("%.4f%%", s.Premium.Float64()*100),
+				Short: true,
+			},
+			{
+				Title: "Discount",
+				Value: fmt.Sprintf("%.4f%%", s.Discount.Float64()*100),
+				Short: true,
+			},
+			{
+				Title: "Min Spread",
+				Value: fmt.Sprintf("%.4f%%", s.MinSpread.Float64()*100),
+				Short: true,
+			},
+			{
+				Title: "Premium Bid/Ask",
+				Value: fmt.Sprintf("%s / %s", s.PremiumBid.String(), s.PremiumAsk.String()),
+				Short: false,
+			},
+			{
+				Title: "Base Bid/Ask",
+				Value: fmt.Sprintf("%s / %s", s.BaseBid.String(), s.BaseAsk.String()),
+				Short: false,
+			},
+		},
+	}
 }
 
 func (s *Strategy) ID() string { return ID }
@@ -922,6 +979,18 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 			side.String(), premium*100, discount*100, s.MinSpread.Float64()*100,
 			bidA.Price.String(), askA.Price.String(), bidB.Price.String(), askB.Price.String(),
 		)
+
+		bbgo.Notify(&Signal{
+			Side:       side,
+			Premium:    fixedpoint.NewFromFloat(premium),
+			Discount:   fixedpoint.NewFromFloat(discount),
+			MinSpread:  s.MinSpread,
+			PremiumBid: bidA.Price,
+			PremiumAsk: askA.Price,
+			BaseBid:    bidB.Price,
+			BaseAsk:    askB.Price,
+			Symbol:     s.TradingSymbol,
+		})
 
 		// simple position alignment: avoid re-entering same direction immediately
 		if (side == types.SideTypeBuy && s.Position != nil && s.Position.IsLong()) ||
