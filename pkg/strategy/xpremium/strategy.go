@@ -290,18 +290,25 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
-	// subscribe klines for engulfing take-profit detection if enabled
-	if session, ok := sessions[s.PremiumSession]; ok {
-		session.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: types.Interval1m})
-		session.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: types.Interval15m})
+	tradingSession := sessions[s.TradingSession]
+
+	if premiumSession, ok := sessions[s.PremiumSession]; ok {
+		premiumSession.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: types.Interval1m})
+		tradingSession.Subscribe(types.KLineChannel, s.TradingSymbol, types.SubscribeOptions{Interval: types.Interval1m})
+
+		premiumSession.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: types.Interval15m})
+		tradingSession.Subscribe(types.KLineChannel, s.TradingSymbol, types.SubscribeOptions{Interval: types.Interval15m})
 
 		if s.EngulfingTakeProfit != nil && s.EngulfingTakeProfit.Enabled {
 			interval := s.EngulfingTakeProfit.Interval
-			if interval == "" {
-				interval = types.Interval1h
-			}
+			premiumSession.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: interval})
+			tradingSession.Subscribe(types.KLineChannel, s.TradingSymbol, types.SubscribeOptions{Interval: interval})
+		}
 
-			session.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: interval})
+		if s.PivotStop != nil && s.PivotStop.Enabled {
+			interval := s.PivotStop.Interval
+			premiumSession.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: interval})
+			tradingSession.Subscribe(types.KLineChannel, s.TradingSymbol, types.SubscribeOptions{Interval: interval})
 		}
 	}
 }
