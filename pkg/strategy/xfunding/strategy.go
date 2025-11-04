@@ -331,7 +331,7 @@ func (s *Strategy) CrossRun(
 		since := s.ProfitFixerConfig.TradesSince.Time()
 		now := time.Now()
 
-		spotFixer := common.NewProfitFixer()
+		spotFixer := common.NewProfitFixer(s.Environment)
 		if ss, ok := s.spotSession.Exchange.(types.ExchangeTradeHistoryService); ok {
 			spotFixer.AddExchange(s.spotSession.Name, ss)
 		}
@@ -343,7 +343,7 @@ func (s *Strategy) CrossRun(
 			return err2
 		}
 
-		futuresFixer := common.NewProfitFixer()
+		futuresFixer := common.NewProfitFixer(s.Environment)
 		if ss, ok := s.futuresSession.Exchange.(types.ExchangeTradeHistoryService); ok {
 			futuresFixer.AddExchange(s.futuresSession.Name, ss)
 		}

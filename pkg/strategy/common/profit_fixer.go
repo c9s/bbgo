@@ -35,6 +35,7 @@ type ProfitFixer struct {
 	sessions map[string]types.ExchangeTradeHistoryService
 
 	core.ConverterManager
+	*bbgo.Environment
 }
 
 type tokenFeeKey struct {
@@ -43,9 +44,10 @@ type tokenFeeKey struct {
 	date         string
 }
 
-func NewProfitFixer() *ProfitFixer {
+func NewProfitFixer(environment *bbgo.Environment) *ProfitFixer {
 	return &ProfitFixer{
-		sessions: make(map[string]types.ExchangeTradeHistoryService),
+		sessions:    make(map[string]types.ExchangeTradeHistoryService),
+		Environment: environment,
 	}
 }
 
@@ -227,10 +229,12 @@ func (f *ProfitFixer) Fix(
 	if err != nil {
 		return err
 	}
-	return fixFromTrades(allTrades, &f.ConverterManager, fm, stats, position)
+	return fixFromTrades(allTrades, &f.ConverterManager, fm, stats, position, f.Environment)
 }
 
-func fixFromTrades(allTrades []types.Trade, converter *core.ConverterManager, tokenFeePrices map[tokenFeeKey]fixedpoint.Value, stats *types.ProfitStats, position *types.Position) error {
+func fixFromTrades(
+	allTrades []types.Trade, converter *core.ConverterManager, tokenFeePrices map[tokenFeeKey]fixedpoint.Value, stats *types.ProfitStats, position *types.Position, environ *bbgo.Environment,
+) error {
 	for _, trade := range allTrades {
 		if converter != nil {
 			trade = converter.ConvertTrade(trade)
@@ -256,6 +260,8 @@ func fixFromTrades(allTrades []types.Trade, converter *core.ConverterManager, to
 
 type ProfitFixerBundle struct {
 	ProfitFixerConfig *ProfitFixerConfig `json:"profitFixer,omitempty"`
+
+	*bbgo.Environment
 }
 
 func (f *ProfitFixerBundle) Fix(
@@ -265,6 +271,9 @@ func (f *ProfitFixerBundle) Fix(
 	profitStats *types.ProfitStats,
 	sessions ...*bbgo.ExchangeSession,
 ) error {
+	if f.Environment == nil {
+		return fmt.Errorf("environment is not set in ProfitFixerBundle")
+	}
 	bbgo.Notify("Fixing %s profitStats and position...", symbol)
 
 	log.Infof("profitFixer is enabled, checking checkpoint: %+v", f.ProfitFixerConfig.TradesSince)
@@ -273,7 +282,7 @@ func (f *ProfitFixerBundle) Fix(
 		return fmt.Errorf("tradesSince time can not be zero")
 	}
 
-	fixer := NewProfitFixer()
+	fixer := NewProfitFixer(f.Environment)
 	for _, session := range sessions {
 		if ss, ok := session.Exchange.(types.ExchangeTradeHistoryService); ok {
 			log.Infof("adding makerSession %s to profitFixer", session.Name)
@@ -290,16 +299,16 @@ func (f *ProfitFixerBundle) Fix(
 }
 
 type DatabaseProfitFixer struct {
-	tradeService *service.TradeService
-	sessions     map[string]types.ExchangeTradeHistoryService
+	sessions map[string]types.ExchangeTradeHistoryService
 
 	core.ConverterManager
+	*bbgo.Environment
 }
 
-func NewDBProfitFixer(tradeService *service.TradeService) *DatabaseProfitFixer {
+func NewDBProfitFixer(environment *bbgo.Environment) *DatabaseProfitFixer {
 	return &DatabaseProfitFixer{
-		tradeService: tradeService,
-		sessions:     make(map[string]types.ExchangeTradeHistoryService),
+		Environment: environment,
+		sessions:    make(map[string]types.ExchangeTradeHistoryService),
 	}
 }
 
@@ -323,10 +332,13 @@ func (f *DatabaseProfitFixer) Fix(
 	if err != nil {
 		return err
 	}
-	return fixFromTrades(allTrades, &f.ConverterManager, fm, stats, position)
+	return fixFromTrades(allTrades, &f.ConverterManager, fm, stats, position, f.Environment)
 }
 
 func (f *DatabaseProfitFixer) queryAllTrades(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
+	if f.Environment.TradeService == nil {
+		return nil, fmt.Errorf("trade service is not available in the environment: %s", symbol)
+	}
 	var trades []types.Trade
 	if symbol == "" {
 		return nil, fmt.Errorf("symbol can not be empty")
@@ -359,7 +371,7 @@ func (f *DatabaseProfitFixer) queryAllTrades(ctx context.Context, symbol string,
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
-			trades_, err := f.tradeService.Query(options)
+			trades_, err := f.Environment.TradeService.Query(options)
 			if err != nil {
 				return nil, err
 			}

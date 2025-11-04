@@ -209,7 +209,8 @@ func (s *Strategy) liquidityWorker(ctx context.Context, interval types.Interval)
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	if s.ProfitFixerBundle.ProfitFixerConfig != nil {
+	if s.ProfitFixerBundle.ProfitFixerConfig != nil && s.Environment != nil {
+		s.ProfitFixerBundle.Environment = s.Environment
 		market, _ := session.Market(s.Symbol)
 		s.Position = types.NewPositionFromMarket(market)
 		s.ProfitStats = types.NewProfitStats(market)
