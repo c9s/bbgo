@@ -406,15 +406,18 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	s.kLines = s.tradingSession.Indicators(s.TradingSymbol).KLines(s.PivotStop.Interval)
 
 	// set leverage if configured and supported
-	if s.MaxLeverage > 0 {
-		if riskSvc, ok := s.tradingSession.Exchange.(types.ExchangeRiskService); ok {
+
+	if riskSvc, ok := s.tradingSession.Exchange.(types.ExchangeRiskService); ok {
+		if s.MaxLeverage > 0 {
 			if err := riskSvc.SetLeverage(ctx, tradingSymbol, s.MaxLeverage); err != nil {
-				s.logger.WithError(err).Warnf("failed to set leverage to %d on %s", s.MaxLeverage, tradingSymbol)
+				s.logger.WithError(err).Errorf("failed to set leverage to %d on %s", s.MaxLeverage, tradingSymbol)
 			} else {
 				s.logger.Infof("leverage set to %d on %s", s.MaxLeverage, tradingSymbol)
 			}
-		} else {
-			s.logger.Infof("exchange of trading session %s does not support leverage API", s.TradingSession)
+		}
+
+		if err := s.syncPositionRisks(ctx, riskSvc, tradingSymbol); err != nil {
+			s.logger.WithError(err).Errorf("failed to sync position risks on startup")
 		}
 	}
 
@@ -1225,4 +1228,37 @@ func parseNum(sv string) (fixedpoint.Value, error) {
 	}
 
 	return fixedpoint.NewFromFloat(f), nil
+}
+
+func (s *Strategy) syncPositionRisks(ctx context.Context, riskService types.ExchangeRiskService, symbol string) error {
+	positionRisks, err := riskService.QueryPositionRisk(ctx)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Infof("fetched futures position risks: %+v", positionRisks)
+
+	if len(positionRisks) == 0 {
+		s.Position.Reset()
+		return nil
+	}
+
+	for _, positionRisk := range positionRisks {
+		if positionRisk.Symbol != symbol {
+			continue
+		}
+
+		if positionRisk.PositionAmount.IsZero() || positionRisk.EntryPrice.IsZero() {
+			continue
+		}
+
+		s.Position.Base = positionRisk.PositionAmount
+		s.Position.AverageCost = positionRisk.EntryPrice
+		s.logger.Infof("restored futures position from positionRisk: base=%s, average_cost=%s, position_risk=%+v",
+			s.Position.Base.String(),
+			s.Position.AverageCost.String(),
+			positionRisk)
+	}
+
+	return nil
 }
