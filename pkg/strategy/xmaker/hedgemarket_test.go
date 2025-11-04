@@ -30,8 +30,6 @@ func Test_NewHedgeMarket(t *testing.T) {
 	market := Market("BTCUSDT")
 	depth := Number(100.0)
 	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx, market.Symbol)
-	_ = marketDataStream
-	_ = userDataStream
 
 	hm := NewHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: "BTCUSDT",
@@ -45,8 +43,11 @@ func Test_NewHedgeMarket(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	time.Sleep(stepTime)
 	marketDataStream.EmitConnect()
+	userDataStream.EmitConnect()
+
+	time.Sleep(stepTime)
+
 	cancel()
 
 	hm.Stop(context.Background())
@@ -64,7 +65,9 @@ func TestHedgeMarket_Hedge(t *testing.T) {
 	market := Market("BTCUSDT")
 
 	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx, market.Symbol)
-	_ = userDataStream
+
+	userDataStream.EmitConnect()
+	userDataStream.EmitAuth()
 
 	mockExchange := session.Exchange.(*mocks.MockExchangeExtended)
 
@@ -218,6 +221,8 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	}()
 
 	userDataStream.EmitConnect()
+	userDataStream.EmitAuth()
+
 	marketDataStream.EmitConnect()
 
 	submitOrder := types.SubmitOrder{
