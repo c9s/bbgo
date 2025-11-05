@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -106,6 +107,14 @@ type Strategy struct {
 
 	logger        logrus.FieldLogger
 	metricsLabels prometheus.Labels
+
+	// cached metrics to avoid repeated With() lookups
+	premiumRatioObs   prometheus.Observer
+	discountRatioObs  prometheus.Observer
+	sigCounterBuy     prometheus.Counter
+	sigCounterSell    prometheus.Counter
+	sigRatioObsBuy    prometheus.Observer
+	sigRatioObsSell   prometheus.Observer
 
 	premiumSession, baseSession, tradingSession *bbgo.ExchangeSession
 	tradingMarket                               types.Market
@@ -213,6 +222,22 @@ func (s *Strategy) Initialize() error {
 
 	// initialize connector manager
 	s.connectorManager = types.NewConnectorManager()
+
+	// cache metrics objects to avoid repeated With() lookups
+	base := s.metricsLabels
+	if base != nil {
+		// histograms without side label
+		s.premiumRatioObs = premiumRatioHistogram.With(base)
+		s.discountRatioObs = discountRatioHistogram.With(base)
+
+		// signal metrics (with side)
+		curriedSigCounter := signalCounter.MustCurryWith(base)
+		curriedSigHist := signalRatioHistogram.MustCurryWith(base)
+		s.sigCounterBuy = curriedSigCounter.With(prometheus.Labels{"side": types.SideTypeBuy.String()})
+		s.sigCounterSell = curriedSigCounter.With(prometheus.Labels{"side": types.SideTypeSell.String()})
+		s.sigRatioObsBuy = curriedSigHist.With(prometheus.Labels{"side": types.SideTypeBuy.String()})
+		s.sigRatioObsSell = curriedSigHist.With(prometheus.Labels{"side": types.SideTypeSell.String()})
+	}
 	return nil
 }
 
@@ -1074,6 +1099,14 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 			continue
 		}
 
+		// observe comparison metrics (cached observers)
+		if s.premiumRatioObs != nil {
+			s.premiumRatioObs.Observe(math.Abs(premium))
+		}
+		if s.discountRatioObs != nil {
+			s.discountRatioObs.Observe(math.Abs(discount))
+		}
+
 		if logLimiter.Allow() {
 			s.logger.Infof("comparing books: premium bid=%s ask=%s | base bid=%s ask=%s => premium=%.4f%% discount=%.4f%%",
 				bidA.Price.String(), askA.Price.String(), bidB.Price.String(), askB.Price.String(),
@@ -1083,6 +1116,26 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 		side := s.decideSignal(premium, discount)
 		if side == "" {
 			continue
+		}
+
+		// signal metrics (cached)
+		var sigRatio float64
+		if side == types.SideTypeBuy {
+			sigRatio = math.Abs(premium)
+			if s.sigCounterBuy != nil {
+				s.sigCounterBuy.Inc()
+			}
+			if s.sigRatioObsBuy != nil {
+				s.sigRatioObsBuy.Observe(sigRatio)
+			}
+		} else {
+			sigRatio = math.Abs(discount)
+			if s.sigCounterSell != nil {
+				s.sigCounterSell.Inc()
+			}
+			if s.sigRatioObsSell != nil {
+				s.sigRatioObsSell.Observe(sigRatio)
+			}
 		}
 
 		s.logger.Infof(
@@ -1303,9 +1356,35 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		bAsk := types.PriceVolume{Price: rec.baseAsk, Volume: fixedpoint.One}
 
 		premium, discount := s.computeSpreads(pBid, pAsk, bBid, bAsk)
+
+		// observe comparison metrics in backtest (cached)
+		if s.premiumRatioObs != nil {
+			s.premiumRatioObs.Observe(math.Abs(premium))
+		}
+		if s.discountRatioObs != nil {
+			s.discountRatioObs.Observe(math.Abs(discount))
+		}
+
 		side := s.decideSignal(premium, discount)
 		if side == "" {
 			return
+		}
+
+		// signal metrics in backtest (cached)
+		if side == types.SideTypeBuy {
+			if s.sigCounterBuy != nil {
+				s.sigCounterBuy.Inc()
+			}
+			if s.sigRatioObsBuy != nil {
+				s.sigRatioObsBuy.Observe(math.Abs(premium))
+			}
+		} else {
+			if s.sigCounterSell != nil {
+				s.sigCounterSell.Inc()
+			}
+			if s.sigRatioObsSell != nil {
+				s.sigRatioObsSell.Observe(math.Abs(discount))
+			}
 		}
 
 		// synchronous execution in backtest
