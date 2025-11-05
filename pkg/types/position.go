@@ -378,6 +378,9 @@ func (p *Position) addTradeFee(trade Trade) {
 }
 
 func (p *Position) Reset() {
+	p.Lock()
+	defer p.Unlock()
+
 	p.Base = fixedpoint.Zero
 	p.Quote = fixedpoint.Zero
 	p.AverageCost = fixedpoint.Zero

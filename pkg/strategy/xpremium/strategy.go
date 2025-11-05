@@ -427,6 +427,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		}
 	}
 
+	if err := s.loadOpenOrders(ctx); err != nil {
+		return err
+	}
+
 	// register engulfing take-profit handler on kline close
 	if s.EngulfingTakeProfit != nil && s.EngulfingTakeProfit.Enabled {
 		interval := s.EngulfingTakeProfit.Interval
@@ -464,8 +468,6 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-
-		_ = s.OrderExecutor.GracefulCancel(ctx)
 
 		bbgo.Sync(ctx, s)
 
@@ -1337,6 +1339,20 @@ func parseNum(sv string) (fixedpoint.Value, error) {
 	}
 
 	return fixedpoint.NewFromFloat(f), nil
+}
+
+func (s *Strategy) loadOpenOrders(ctx context.Context) error {
+	openOrders, err := s.tradingSession.Exchange.QueryOpenOrders(ctx, s.TradingSymbol)
+	if err != nil {
+		return fmt.Errorf("unable to query open orders, error: %w", err)
+	}
+
+	activeBook := s.OrderExecutor.ActiveMakerOrders()
+	for _, order := range openOrders {
+		activeBook.Add(order)
+	}
+
+	return nil
 }
 
 func (s *Strategy) syncPositionRisks(ctx context.Context, riskService types.ExchangeRiskService, symbol string) error {
