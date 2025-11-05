@@ -652,7 +652,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	})
 
 	// session-wide max borrowable updating worker
-	if session.Margin {
+	if !session.PublicOnly && session.Margin {
 		if session.MarginInfoUpdaterInterval == 0 {
 			session.MarginInfoUpdaterInterval = defaultMarginInfoUpdaterInterval
 		}
