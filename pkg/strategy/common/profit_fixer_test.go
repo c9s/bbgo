@@ -4,11 +4,32 @@ import (
 	"testing"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
+
+// mockFixer implements the iFixer interface for testing
+type mockFixer struct {
+	core.ConverterManager
+	environment *bbgo.Environment
+}
+
+func (m *mockFixer) GetEnvironment() *bbgo.Environment {
+	return m.environment
+}
+
+func (m *mockFixer) GetConverter() *core.ConverterManager {
+	return &m.ConverterManager
+}
+
+func newMockFixer() *mockFixer {
+	return &mockFixer{
+		environment: &bbgo.Environment{},
+	}
+}
 
 func TestProfitFixerConfigEqual(t *testing.T) {
 	t.Run(
@@ -71,8 +92,9 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("empty trades", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
+		fixer := newMockFixer()
 
-		err := fixFromTrades([]types.Trade{}, nil, nil, stats, position)
+		err := fixFromTrades(fixer, []types.Trade{}, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -82,6 +104,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("single buy trade without profit", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
+		fixer := newMockFixer()
 
 		trades := []types.Trade{
 			{
@@ -98,7 +121,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(trades, nil, nil, stats, position)
+		err := fixFromTrades(fixer, trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.Equal(t, fixedpoint.NewFromInt(1).String(), position.Base.String())
@@ -108,6 +131,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("buy and sell trades with profit", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
+		fixer := newMockFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -137,7 +161,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(trades, nil, nil, stats, position)
+		err := fixFromTrades(fixer, trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -150,6 +174,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("multiple trades with partial closes", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
+		fixer := newMockFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -191,7 +216,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(trades, nil, nil, stats, position)
+		err := fixFromTrades(fixer, trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -205,6 +230,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("short position trades", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
+		fixer := newMockFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -234,7 +260,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(trades, nil, nil, stats, position)
+		err := fixFromTrades(fixer, trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -247,6 +273,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("with token fee prices", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
+		fixer := newMockFixer()
 
 		now := time.Now()
 		dateStr := now.Format(time.DateOnly)
@@ -286,7 +313,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(trades, nil, tokenFeePrices, stats, position)
+		err := fixFromTrades(fixer, trades, tokenFeePrices, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -299,6 +326,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("base currency fee", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
+		fixer := newMockFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -328,7 +356,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(trades, nil, nil, stats, position)
+		err := fixFromTrades(fixer, trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -339,6 +367,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("no profit made - only opening position", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
+		fixer := newMockFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -368,46 +397,17 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(trades, nil, nil, stats, position)
+		err := fixFromTrades(fixer, trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.Equal(t, fixedpoint.NewFromInt(2).String(), position.Base.String())
 		assert.True(t, stats.AccumulatedPnL.IsZero()) // No profit made, position still open
 	})
 
-	t.Run("with converter", func(t *testing.T) {
-		position := types.NewPositionFromMarket(market)
-		stats := types.NewProfitStats(market)
-
-		// Create a simple mock converter that doubles the price
-		converter := &core.ConverterManager{}
-
-		now := time.Now()
-		trades := []types.Trade{
-			{
-				ID:            1,
-				Exchange:      types.ExchangeBinance,
-				Symbol:        symbol,
-				Side:          types.SideTypeBuy,
-				Price:         fixedpoint.NewFromInt(10000),
-				Quantity:      fixedpoint.NewFromInt(1),
-				QuoteQuantity: fixedpoint.NewFromInt(10000),
-				Fee:           fixedpoint.Zero,
-				FeeCurrency:   "USDT",
-				Time:          types.Time(now),
-			},
-		}
-
-		err := fixFromTrades(trades, converter, nil, stats, position)
-
-		assert.NoError(t, err)
-		// Converter doesn't change anything in this case (it's empty)
-		assert.Equal(t, fixedpoint.NewFromInt(1).String(), position.Base.String())
-	})
-
 	t.Run("mixed fee currencies", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
+		fixer := newMockFixer()
 
 		now := time.Now()
 		dateStr := now.Format(time.DateOnly)
@@ -447,7 +447,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(trades, nil, tokenFeePrices, stats, position)
+		err := fixFromTrades(fixer, trades, tokenFeePrices, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -460,6 +460,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("position reversal - long to short", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
+		fixer := newMockFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -489,7 +490,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(trades, nil, nil, stats, position)
+		err := fixFromTrades(fixer, trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		// After reversal, position should be short 1 BTC
@@ -501,6 +502,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("position reversal - short to long", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
+		fixer := newMockFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -530,7 +532,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(trades, nil, nil, stats, position)
+		err := fixFromTrades(fixer, trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		// After reversal, position should be long 1 BTC

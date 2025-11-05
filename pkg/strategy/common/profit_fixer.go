@@ -51,6 +51,14 @@ func NewProfitFixer(environment *bbgo.Environment) *ProfitFixer {
 	}
 }
 
+func (f *ProfitFixer) GetConverter() *core.ConverterManager {
+	return &f.ConverterManager
+}
+
+func (f *ProfitFixer) GetEnvironment() *bbgo.Environment {
+	return f.Environment
+}
+
 func (f *ProfitFixer) AddExchange(sessionName string, service types.ExchangeTradeHistoryService) {
 	f.sessions[sessionName] = service
 }
@@ -142,10 +150,19 @@ func buildTokenFeeDatePrices(ctx context.Context, sessions map[string]types.Exch
 		return tokenFeePrices, nil
 	}
 
-	var quoteCurrency string // quote currency is assumed to be the same for all trades
+	// quote currency is assumed to be the same for all trades
+	var quoteCurrency string
+	// usdFeeExchanges is the set of exchanges that have USD fee currency
+	usdFeeExchanges := map[types.ExchangeName]struct{}{}
+	// populate tokens map and usdFeeExchanges
+	// tokens map should only include non-USD stablecoin tokens. ex: BNB
 	for _, trade := range trades {
-		// skip trade if fee currency is USD*
+		// skip trade if fee currency is USD* (ex: USD, USDT, USDC, ...)
 		if strings.HasPrefix(trade.FeeCurrency, "USD") {
+			// record exchanges that have USD fee currency
+			if trade.FeeCurrency == "USD" {
+				usdFeeExchanges[trade.Exchange] = struct{}{}
+			}
 			continue
 		}
 		// skip trade if we do not have market info
@@ -171,10 +188,11 @@ func buildTokenFeeDatePrices(ctx context.Context, sessions map[string]types.Exch
 		}] = struct{}{}
 	}
 	// no quote currency found if:
-	// - all fees are USD*, or
+	// - all fees are stablecoins (USDT, USDC, ...etc), or
 	// - all fees are base currency
+	// - no fee charged in USD
 	// no need to build token fee map in this case
-	if quoteCurrency == "" {
+	if len(tokens) == 0 && len(usdFeeExchanges) == 0 {
 		return tokenFeePrices, nil
 	}
 	startTime := since.Truncate(24 * time.Hour).Add(-24 * time.Hour)
@@ -185,32 +203,88 @@ func buildTokenFeeDatePrices(ctx context.Context, sessions map[string]types.Exch
 			log.Warnf("can not build token fee on exchange %s: %s", info.exchangeName, info.token)
 			continue
 		}
-		if err := func() error {
-			query := &batch.KLineBatchQuery{Exchange: ex}
-			kLineC, errC := query.Query(ctx, info.token+quoteCurrency, types.Interval1d, startTime, endTime)
-			for {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case kline, ok := <-kLineC:
-					if !ok {
-						err := <-errC
-						return err
-					}
-					// the date in tokenFeeKey is the next day of the kline date
-					// which means the token fee for the next day is calculated by the previous day's closing price
-					tokenFeePrices[tokenFeeKey{
-						token:        info.token,
-						exchangeName: info.exchangeName,
-						date:         kline.StartTime.Time().Add(24 * time.Hour).Format(time.DateOnly),
-					}] = kline.Close
-				}
+		markets, ok := markets[info.exchangeName]
+		if !ok {
+			log.Warnf("cant not find markets for exchange %s", info.exchangeName)
+		}
+		market, ok := markets.FindPair(info.token, quoteCurrency)
+		if !ok {
+			log.Warnf("can not find market for token for %s pair on %s: %s", info.token, quoteCurrency, info.exchangeName)
+			continue
+		}
+		if klines, err := queryKLines(
+			ctx, ex, market.Symbol, types.Interval1d, startTime, endTime,
+		); err == nil {
+			for _, kline := range klines {
+				// the date in tokenFeeKey is the next day of the kline date
+				// which means the token fee for the next day is calculated by the previous day's closing price
+				tokenFeePrices[tokenFeeKey{
+					token:        info.token,
+					exchangeName: info.exchangeName,
+					date:         kline.StartTime.Time().Add(24 * time.Hour).Format(time.DateOnly),
+				}] = kline.Close
 			}
-		}(); err != nil {
+		} else {
 			return nil, err
 		}
 	}
+	// USD prices
+	// only build USD prices if there are trades with USD* fee currency
+	// ex: USDT, USDC
+	for exName := range usdFeeExchanges {
+		ex, ok := exchanges[exName]
+		if !ok {
+			continue
+		}
+		markets, ok := markets[exName]
+		if !ok {
+			continue
+		}
+		quoteMarket, ok := markets.FindPair(quoteCurrency, "USD")
+		if !ok {
+			continue
+		}
+		if klines, err := queryKLines(
+			ctx, ex, quoteMarket.Symbol, types.Interval1d, startTime, endTime,
+		); err == nil {
+			for _, kline := range klines {
+				// we still use the last day's closing price to calculate the USD fee price.
+				// This is different from the actual fee calculation while trading which use the close price of the last minute.
+				// But assuming the price of USD stablecoins do not fluctuate much within a day,
+				// this should be acceptable.
+				tokenFeePrices[tokenFeeKey{
+					token:        "USD",
+					exchangeName: ex.Name(),
+					date:         kline.StartTime.Time().Add(24 * time.Hour).Format(time.DateOnly),
+				}] = fixedpoint.One.Div(kline.Close)
+			}
+		} else {
+			continue
+		}
+	}
 	return tokenFeePrices, nil
+}
+
+func queryKLines(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) ([]types.KLine, error) {
+	query := &batch.KLineBatchQuery{Exchange: ex}
+	kLineC, errC := query.Query(ctx, symbol, interval, startTime, endTime)
+
+	var kLines []types.KLine
+	var err error
+	done := false
+	for !done {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case kline, ok := <-kLineC:
+			if !ok {
+				err = <-errC
+				done = true
+			}
+			kLines = append(kLines, kline)
+		}
+	}
+	return kLines, err
 }
 
 func (f *ProfitFixer) Fix(
@@ -229,15 +303,25 @@ func (f *ProfitFixer) Fix(
 	if err != nil {
 		return err
 	}
-	return fixFromTrades(allTrades, &f.ConverterManager, fm, stats, position, f.Environment)
+	return fixFromTrades(f, allTrades, fm, stats, position)
+}
+
+type iFixer interface {
+	GetEnvironment() *bbgo.Environment
+	GetConverter() *core.ConverterManager
 }
 
 func fixFromTrades(
-	allTrades []types.Trade, converter *core.ConverterManager, tokenFeePrices map[tokenFeeKey]fixedpoint.Value, stats *types.ProfitStats, position *types.Position, environ *bbgo.Environment,
+	fixer iFixer,
+	allTrades []types.Trade, tokenFeePrices map[tokenFeeKey]fixedpoint.Value,
+	stats *types.ProfitStats, position *types.Position,
 ) error {
 	if len(allTrades) == 0 {
 		return nil
 	}
+	environ := fixer.GetEnvironment()
+	converter := fixer.GetConverter()
+
 	trades := types.SortTradesAscending(allTrades)
 	oldestTrade := trades[0]
 	lastTrade := trades[len(trades)-1]
@@ -278,9 +362,13 @@ func fixFromTrades(
 			position.SetFeeAverageCost(trade.FeeCurrency, feePrice)
 		}
 		profit, netProfit, madeProfit := position.AddTrade(trade)
+		stats.AddTrade(trade)
 		if madeProfit {
 			p := position.NewProfit(trade, profit, netProfit)
 			stats.AddProfit(p)
+			environ.RecordPosition(position, trade, &p)
+		} else {
+			environ.RecordPosition(position, trade, nil)
 		}
 	}
 
@@ -346,6 +434,14 @@ func (f *DatabaseProfitFixer) AddExchange(sessionName string, service types.Exch
 	f.sessions[sessionName] = service
 }
 
+func (f *DatabaseProfitFixer) GetConverter() *core.ConverterManager {
+	return &f.ConverterManager
+}
+
+func (f *DatabaseProfitFixer) GetEnvironment() *bbgo.Environment {
+	return f.Environment
+}
+
 func (f *DatabaseProfitFixer) Fix(
 	ctx context.Context, symbol string, since, until time.Time, stats *types.ProfitStats, position *types.Position,
 ) error {
@@ -362,7 +458,7 @@ func (f *DatabaseProfitFixer) Fix(
 	if err != nil {
 		return err
 	}
-	return fixFromTrades(allTrades, &f.ConverterManager, fm, stats, position, f.Environment)
+	return fixFromTrades(f, allTrades, fm, stats, position)
 }
 
 func (f *DatabaseProfitFixer) queryAllTrades(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
