@@ -7,7 +7,7 @@ var (
 		prometheus.HistogramOpts{
 			Name:    "xpremium_premium_ratio",
 			Help:    "premium ratio = (premiumBid - baseAsk)/baseAsk per comparison",
-			Buckets: prometheus.ExponentialBuckets(0.0001, 2.0, 12), // 0.01% .. ~20%
+			Buckets: append(prometheus.LinearBuckets(0.0001, 0.0001, 100), 0.012, 0.015, 0.02, 0.03, 0.05), // focus on 0.01%..1%, with tails up to 5%
 		}, []string{"strategy_type", "strategy_id", "base_session", "premium_session", "symbol"},
 	)
 
@@ -15,7 +15,7 @@ var (
 		prometheus.HistogramOpts{
 			Name:    "xpremium_discount_ratio",
 			Help:    "discount ratio = (premiumAsk - baseBid)/premiumAsk per comparison (abs value)",
-			Buckets: prometheus.ExponentialBuckets(0.0001, 2.0, 12),
+			Buckets: append(prometheus.LinearBuckets(0.0001, 0.0001, 100), 0.012, 0.015, 0.02, 0.03, 0.05),
 		}, []string{"strategy_type", "strategy_id", "base_session", "premium_session", "symbol"},
 	)
 
@@ -30,7 +30,7 @@ var (
 		prometheus.HistogramOpts{
 			Name:    "xpremium_signal_ratio",
 			Help:    "observed spread ratio at the time a LONG/SHORT signal is triggered (abs value)",
-			Buckets: prometheus.ExponentialBuckets(0.0001, 2.0, 12),
+			Buckets: append(prometheus.LinearBuckets(0.0001, 0.0001, 100), 0.012, 0.015, 0.02, 0.03, 0.05),
 		}, []string{"strategy_type", "strategy_id", "base_session", "premium_session", "symbol", "side"},
 	)
 )
