@@ -527,19 +527,19 @@ func (s *StandardStream) Close() error {
 
 	// get the connection object before call the context cancel function
 	s.ConnLock.Lock()
-	conn := s.Conn
-	connCancel := s.ConnCancel
-	s.ConnLock.Unlock()
+	defer s.ConnLock.Unlock()
 
 	// cancel the context so that the ticker loop and listen key updater will be stopped.
-	if connCancel != nil {
-		connCancel()
+	if s.ConnCancel != nil {
+		s.ConnCancel()
 	}
 
 	// gracefully write the close message to the connection
-	err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-	if err != nil {
-		return errors.Wrap(err, "websocket write close message error")
+	if s.Conn != nil {
+		err := s.Conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		if err != nil {
+			return errors.Wrap(err, "websocket write close message error")
+		}
 	}
 
 	log.Debugf("[websocket] stream closed")
