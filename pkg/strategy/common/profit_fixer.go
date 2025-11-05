@@ -235,7 +235,37 @@ func (f *ProfitFixer) Fix(
 func fixFromTrades(
 	allTrades []types.Trade, converter *core.ConverterManager, tokenFeePrices map[tokenFeeKey]fixedpoint.Value, stats *types.ProfitStats, position *types.Position, environ *bbgo.Environment,
 ) error {
-	for _, trade := range allTrades {
+	if len(allTrades) == 0 {
+		return nil
+	}
+	trades := types.SortTradesAscending(allTrades)
+	oldestTrade := trades[0]
+	lastTrade := trades[len(trades)-1]
+	// clear existing position and profit records
+	if environ.PositionService != nil {
+		// TODO: add strategy and strategy_instance_id filter
+		err := environ.PositionService.Delete(service.PositionQueryOptions{
+			Symbol:    position.Symbol,
+			StartTime: oldestTrade.Time.Time(),
+			EndTime:   lastTrade.Time.Time(),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to delete existing position records: %w", err)
+		}
+	}
+	if environ.ProfitService != nil {
+		// TODO: add strategy and strategy_instance_id filter
+		err := environ.ProfitService.Delete(service.ProfitQueryOptions{
+			Symbol:    position.Symbol,
+			StartTime: oldestTrade.Time.Time(),
+			EndTime:   lastTrade.Time.Time(),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to delete existing profit records: %w", err)
+		}
+	}
+	// do fixing from trades
+	for _, trade := range trades {
 		if converter != nil {
 			trade = converter.ConvertTrade(trade)
 		}

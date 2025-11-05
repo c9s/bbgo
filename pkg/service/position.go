@@ -2,12 +2,15 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+
+	sq "github.com/Masterminds/squirrel"
 )
 
 type PositionService struct {
@@ -104,5 +107,38 @@ func (s *PositionService) Insert(
 			"side":                 trade.Side,
 			"traded_at":            trade.Time,
 		})
+	return err
+}
+
+type PositionQueryOptions struct {
+	Strategy           string
+	StrategyInstanceID string
+	Symbol             string
+	StartTime          time.Time // inclusive
+	EndTime            time.Time // inclusive
+}
+
+func (s *PositionService) Delete(options PositionQueryOptions) error {
+	del := sq.Delete("positions")
+	if options.Strategy != "" {
+		del = del.Where(sq.Eq{"strategy": options.Strategy})
+	}
+	if options.StrategyInstanceID != "" {
+		del = del.Where(sq.Eq{"strategy_instance_id": options.StrategyInstanceID})
+	}
+	if options.Symbol != "" {
+		del = del.Where(sq.Eq{"symbol": options.Symbol})
+	}
+	if !options.StartTime.IsZero() {
+		del = del.Where(sq.GtOrEq{"traded_at": options.StartTime})
+	}
+	if !options.EndTime.IsZero() {
+		del = del.Where(sq.LtOrEq{"traded_at": options.EndTime})
+	}
+	sql, args, err := del.ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = s.DB.Exec(sql, args...)
 	return err
 }

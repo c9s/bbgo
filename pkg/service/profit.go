@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 
@@ -102,5 +104,38 @@ func (s *ProfitService) Insert(profit types.Profit) error {
 			:is_isolated
 	    )`,
 		profit)
+	return err
+}
+
+type ProfitQueryOptions struct {
+	Strategy           string
+	StrategyInstanceID string
+	Symbol             string
+	StartTime          time.Time // inclusive
+	EndTime            time.Time // inclusive
+}
+
+func (s *ProfitService) Delete(options ProfitQueryOptions) error {
+	del := sq.Delete("profits")
+	if options.Strategy != "" {
+		del = del.Where(sq.Eq{"strategy": options.Strategy})
+	}
+	if options.StrategyInstanceID != "" {
+		del = del.Where(sq.Eq{"strategy_instance_id": options.StrategyInstanceID})
+	}
+	if options.Symbol != "" {
+		del = del.Where(sq.Eq{"symbol": options.Symbol})
+	}
+	if !options.StartTime.IsZero() {
+		del = del.Where(sq.GtOrEq{"traded_at": options.StartTime})
+	}
+	if !options.EndTime.IsZero() {
+		del = del.Where(sq.LtOrEq{"traded_at": options.EndTime})
+	}
+	sql, args, err := del.ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = s.DB.Exec(sql, args...)
 	return err
 }
