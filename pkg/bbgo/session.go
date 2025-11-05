@@ -95,7 +95,7 @@ func (sessions ExchangeSessionMap) AggregateBalances(
 		if session.PublicOnly {
 			continue
 		}
-		
+
 		// update the account balances and the margin information
 		account := session.GetAccount()
 		if !skipUpdate {
@@ -1066,6 +1066,10 @@ func (session *ExchangeSession) FindPossibleAssetSymbols() (symbols []string, er
 		return []string{
 			session.IsolatedMarginSymbol,
 		}, nil
+	}
+
+	if session.PublicOnly {
+		return nil, nil
 	}
 
 	var balances = session.GetAccount().Balances()
