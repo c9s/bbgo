@@ -365,6 +365,12 @@ func fixFromTrades(
 		stats.AddTrade(trade)
 		if madeProfit {
 			p := position.NewProfit(trade, profit, netProfit)
+			if position.Strategy != "" {
+				p.Strategy = position.Strategy
+			}
+			if position.StrategyInstanceID != "" {
+				p.StrategyInstanceID = position.StrategyInstanceID
+			}
 			stats.AddProfit(p)
 			environ.RecordPosition(position, trade, &p)
 		} else {
