@@ -462,12 +462,6 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		return err
 	}
 
-	// wait for both sessions' user data streams to be authenticated before starting the premium worker
-	group := types.NewConnectivityGroup(
-		s.premiumSession.UserDataConnectivity,
-		s.baseSession.UserDataConnectivity,
-	)
-
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
@@ -483,7 +477,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		select {
 		case <-ctx.Done():
 			return
-		case <-group.AllAuthedC(ctx):
+		case <-s.premiumSession.UserDataConnectivity.AuthedC():
 		}
 
 		s.logger.Infof("both premium and base sessions authenticated, starting premium worker")
