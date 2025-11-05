@@ -16,6 +16,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
@@ -371,6 +372,10 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+	if bbgo.IsBackTesting {
+		return nil
+	}
+
 	// Defaults() and Validate() should have been called prior to CrossRun,
 	// so we assume required fields are populated here.
 	ok := false
@@ -535,22 +540,46 @@ func (s *Strategy) decideSignal(premium, discount float64) types.SideType {
 // findStopPrice determines stop loss from the previous closed 15m kline:
 // - LONG: use previous low
 // - SHORT: use previous high
-func (s *Strategy) findStopPrice(ctx context.Context, side types.SideType, now time.Time) (fixedpoint.Value, error) {
+func (s *Strategy) findStopPrice(ctx context.Context, ticker *types.Ticker, side types.SideType, now time.Time) (fixedpoint.Value, error) {
 	safetyDown := fixedpoint.One.Sub(s.StopLossSafetyRatio) // e.g., 1 - r
 	safetyUp := fixedpoint.One.Add(s.StopLossSafetyRatio)   // e.g., 1 + r
 
+	// check if we can use pivot stop
+	stopPrice := fixedpoint.Zero
 	switch side {
 	case types.SideTypeBuy:
 		if s.pvLow.Length() > 0 {
-			return fixedpoint.NewFromFloat(s.pvLow.Last(0)).Mul(safetyDown), nil
+			stopPrice = fixedpoint.NewFromFloat(s.pvLow.Last(0)).Mul(safetyDown)
 		}
 
 	case types.SideTypeSell:
 		if s.pvHigh.Length() > 0 {
-			return fixedpoint.NewFromFloat(s.pvHigh.Last(0)).Mul(safetyUp), nil
+			stopPrice = fixedpoint.NewFromFloat(s.pvHigh.Last(0)).Mul(safetyUp)
 		}
 	}
 
+	// if we have stopPrice setup, validate it
+	currentPrice := ticker.GetPrice(side, s.PriceType)
+	if currentPrice.IsZero() {
+		currentPrice = ticker.GetValidPrice()
+	}
+
+	if stopPrice.Sign() > 0 && !currentPrice.IsZero() {
+		switch side {
+		case types.SideTypeBuy:
+			// validate stop relative to price, if it's valid then we can return the stopPrice
+			if stopPrice.Compare(currentPrice) < 0 {
+				return stopPrice, nil
+			}
+		case types.SideTypeSell:
+			// validate stop relative to price, if it's valid then we can return the stopPrice
+			if stopPrice.Compare(currentPrice) > 0 {
+				return stopPrice, nil
+			}
+		}
+	}
+
+	// fallback to kline stops
 	if s.kLines.Length() == 0 {
 		return fixedpoint.Zero, fmt.Errorf("no 15m klines available for stop loss calculation")
 	}
@@ -699,8 +728,13 @@ func (s *Strategy) executeSignal(ctx context.Context, side types.SideType, now t
 		return nil
 	}
 
+	ticker, err := retry.QueryTickerUntilSuccessful(ctx, s.tradingSession.Exchange, s.TradingSymbol)
+	if err != nil {
+		return fmt.Errorf("query ticker with retry responds error: %w", err)
+	}
+
 	// derive stop loss from previous 15m kline
-	stopLossPrice, err := s.findStopPrice(ctx, side, now)
+	stopLossPrice, err := s.findStopPrice(ctx, ticker, side, now)
 	if err != nil {
 		s.logger.WithError(err).Warn("failed to get 15m stop, fallback to quantity only")
 	}
@@ -1123,6 +1157,9 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 // Run is only used for back-testing with single session
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	// in backtest, we run on a single session; use premium as trading session
+	if !bbgo.IsBackTesting {
+		return nil
+	}
 
 	// override the settings
 	s.BaseSession = s.PremiumSession
