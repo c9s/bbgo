@@ -16,6 +16,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
@@ -371,6 +372,11 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+	if bbgo.IsBackTesting {
+		s.logger.Warnf("backtesting mode detected, xpremium strategy is not supported in backtesting")
+		return nil
+	}
+
 	// Defaults() and Validate() should have been called prior to CrossRun,
 	// so we assume required fields are populated here.
 	ok := false
@@ -532,40 +538,147 @@ func (s *Strategy) decideSignal(premium, discount float64) types.SideType {
 	return ""
 }
 
-// findStopPrice determines stop loss from the previous closed 15m kline:
-// - LONG: use previous low
-// - SHORT: use previous high
-func (s *Strategy) findStopPrice(ctx context.Context, side types.SideType, now time.Time) (fixedpoint.Value, error) {
-	safetyDown := fixedpoint.One.Sub(s.StopLossSafetyRatio) // e.g., 1 - r
-	safetyUp := fixedpoint.One.Add(s.StopLossSafetyRatio)   // e.g., 1 + r
+// validateStopPrice ensures the stop price is on the correct side of the current price per side.
+// For long: stop < current. For short: stop > current.
+func (s *Strategy) validateStopPrice(side types.SideType, currentPrice, stopPrice fixedpoint.Value) (bool, error) {
+	if stopPrice.Sign() <= 0 || currentPrice.IsZero() {
+		return false, fmt.Errorf("invalid price: current=%s stop=%s", currentPrice.String(), stopPrice.String())
+	}
+	if side == types.SideTypeBuy {
+		if stopPrice.Compare(currentPrice) >= 0 {
+			return false, fmt.Errorf("stop loss must be below current price for long: stop=%s current=%s", stopPrice.String(), currentPrice.String())
+		}
+		return true, nil
+	}
+	if stopPrice.Compare(currentPrice) <= 0 {
+		return false, fmt.Errorf("stop loss must be above current price for short: stop=%s current=%s", stopPrice.String(), currentPrice.String())
+	}
+	return true, nil
+}
 
+// findPivotStop derives stop from last detected pivot low/high with safety ratio applied.
+// Returns zero if no pivot is available.
+func (s *Strategy) findPivotStop(side types.SideType) fixedpoint.Value {
+	safetyDown := fixedpoint.One.Sub(s.StopLossSafetyRatio)
+	safetyUp := fixedpoint.One.Add(s.StopLossSafetyRatio)
 	switch side {
 	case types.SideTypeBuy:
-		if s.pvLow.Length() > 0 {
-			return fixedpoint.NewFromFloat(s.pvLow.Last(0)).Mul(safetyDown), nil
+		if s.pvLow != nil && s.pvLow.Length() > 0 {
+			return fixedpoint.NewFromFloat(s.pvLow.Last(0)).Mul(safetyDown)
 		}
-
 	case types.SideTypeSell:
-		if s.pvHigh.Length() > 0 {
-			return fixedpoint.NewFromFloat(s.pvHigh.Last(0)).Mul(safetyUp), nil
+		if s.pvHigh != nil && s.pvHigh.Length() > 0 {
+			return fixedpoint.NewFromFloat(s.pvHigh.Last(0)).Mul(safetyUp)
+		}
+	}
+	return fixedpoint.Zero
+}
+
+// findNearestStop derives stop from the most recent closed kline high/low with safety ratio.
+func (s *Strategy) findNearestStop(ctx context.Context, side types.SideType, now time.Time, n int) (fixedpoint.Value, error) {
+	// helper to compute with kline window utilities
+	computeFromKLines := func(kw types.KLineWindow) (fixedpoint.Value, error) {
+		if kw.Len() == 0 {
+			return fixedpoint.Zero, fmt.Errorf("no klines to compute stop price")
+		}
+		// ensure last kline is not in the future relative to now
+		last := kw.Last()
+		if last.EndTime.Time().After(now) {
+			return fixedpoint.Zero, fmt.Errorf("latest kline ends after now %s > %s", last.EndTime.Time(), now)
+		}
+
+		safetyDown := fixedpoint.One.Sub(s.StopLossSafetyRatio)
+		safetyUp := fixedpoint.One.Add(s.StopLossSafetyRatio)
+		if side == types.SideTypeBuy {
+			low := kw.GetLow()
+			return low.Mul(safetyDown), nil
+		}
+		high := kw.GetHigh()
+		return high.Mul(safetyUp), nil
+	}
+
+	// Prefer in-memory kline stream if available
+	if s.kLines != nil && s.kLines.Length() > 0 {
+		kw := s.kLines.Tail(n)
+		if kw.Len() > 0 {
+			if sp, err := computeFromKLines(kw); err == nil && sp.Sign() > 0 {
+				return sp, nil
+			}
 		}
 	}
 
-	if s.kLines.Length() == 0 {
-		return fixedpoint.Zero, fmt.Errorf("no 15m klines available for stop loss calculation")
+	// Fallback to querying klines from the trading exchange
+	if s.tradingSession == nil || s.tradingSession.Exchange == nil {
+		return fixedpoint.Zero, fmt.Errorf("trading session not initialized for kline query")
 	}
 
-	lastK := s.kLines.Last(0)
-
-	if lastK.EndTime.Time().Compare(now) > 0 {
-		return fixedpoint.Zero, fmt.Errorf("the first kline closed after now %s > %s", lastK.EndTime.Time(), now)
+	interval := s.PivotStop.Interval
+	if interval == "" {
+		interval = types.Interval15m
 	}
 
+	end := now
+	kls, err := s.tradingSession.Exchange.QueryKLines(ctx,
+		s.TradingSymbol, interval,
+		types.KLineQueryOptions{EndTime: &end, Limit: n})
+
+	if err != nil {
+		return fixedpoint.Zero, err
+	}
+
+	if len(kls) == 0 {
+		return fixedpoint.Zero, fmt.Errorf("no klines returned from exchange for stop loss calculation")
+	}
+
+	return computeFromKLines(kls)
+}
+
+// getRatioStop derives stop directly from current price and safety ratio (1% default).
+// For long: price * (1 - r); for short: price * (1 + r)
+func (s *Strategy) getRatioStop(currentPrice fixedpoint.Value, side types.SideType) fixedpoint.Value {
+	if currentPrice.IsZero() {
+		return fixedpoint.Zero
+	}
 	if side == types.SideTypeBuy {
-		return lastK.Low.Mul(safetyDown), nil
+		return currentPrice.Mul(fixedpoint.One.Sub(s.StopLossSafetyRatio))
+	}
+	return currentPrice.Mul(fixedpoint.One.Add(s.StopLossSafetyRatio))
+}
+
+// findStopPrice tries multiple methods to determine a valid stop price:
+// 1) Pivot-based, 2) Nearest kline high/low, 3) Ratio from current price.
+func (s *Strategy) findStopPrice(ctx context.Context, ticker *types.Ticker, side types.SideType, now time.Time) (fixedpoint.Value, error) {
+	// resolve current price first
+	currentPrice := ticker.GetPrice(side, s.PriceType)
+	if currentPrice.IsZero() {
+		currentPrice = ticker.GetValidPrice()
+	}
+	if currentPrice.IsZero() {
+		return fixedpoint.Zero, fmt.Errorf("invalid current price")
 	}
 
-	return lastK.High.Mul(safetyUp), nil
+	// 1) Pivot-based
+	if sp := s.findPivotStop(side); sp.Sign() > 0 {
+		if ok, _ := s.validateStopPrice(side, currentPrice, sp); ok {
+			return sp, nil
+		}
+	}
+
+	// 2) Nearest kline high/low from the recent 3 bars
+	if sp, err := s.findNearestStop(ctx, side, now, 3); err == nil && sp.Sign() > 0 {
+		if ok, _ := s.validateStopPrice(side, currentPrice, sp); ok {
+			return sp, nil
+		}
+	}
+
+	// 3) Ratio fallback
+	if sp := s.getRatioStop(currentPrice, side); sp.Sign() > 0 {
+		if ok, _ := s.validateStopPrice(side, currentPrice, sp); ok {
+			return sp, nil
+		}
+	}
+
+	return fixedpoint.Zero, fmt.Errorf("unable to determine a valid stop price")
 }
 
 // calculatePositionSize sizes order using MaxLossLimit and stop loss like tradingdesk
@@ -590,15 +703,9 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, side types.SideTyp
 		return fixedpoint.Zero, fmt.Errorf("invalid current price")
 	}
 
-	// validate stop relative to price
-	if side == types.SideTypeBuy {
-		if stopLoss.Compare(currentPrice) >= 0 {
-			return fixedpoint.Zero, fmt.Errorf("stop loss must be below current price for long, given: %s (stop) >= %s (current price)", stopLoss, currentPrice)
-		}
-	} else if side == types.SideTypeSell {
-		if stopLoss.Compare(currentPrice) <= 0 {
-			return fixedpoint.Zero, fmt.Errorf("stop loss must be above current price for short, given: %s (stop) <= %s (current price)", stopLoss, currentPrice)
-		}
+	// validate stop relative to price using shared validator
+	if ok, err := s.validateStopPrice(side, currentPrice, stopLoss); !ok {
+		return fixedpoint.Zero, err
 	}
 
 	var riskPerUnit fixedpoint.Value
@@ -699,8 +806,13 @@ func (s *Strategy) executeSignal(ctx context.Context, side types.SideType, now t
 		return nil
 	}
 
+	ticker, err := retry.QueryTickerUntilSuccessful(ctx, s.tradingSession.Exchange, s.TradingSymbol)
+	if err != nil {
+		return fmt.Errorf("query ticker with retry responds error: %w", err)
+	}
+
 	// derive stop loss from previous 15m kline
-	stopLossPrice, err := s.findStopPrice(ctx, side, now)
+	stopLossPrice, err := s.findStopPrice(ctx, ticker, side, now)
 	if err != nil {
 		s.logger.WithError(err).Warn("failed to get 15m stop, fallback to quantity only")
 	}
@@ -1123,6 +1235,9 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 // Run is only used for back-testing with single session
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	// in backtest, we run on a single session; use premium as trading session
+	if !bbgo.IsBackTesting {
+		return nil
+	}
 
 	// override the settings
 	s.BaseSession = s.PremiumSession

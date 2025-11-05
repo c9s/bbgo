@@ -53,6 +53,7 @@ sessions:
   max:
     exchange: max
     envVarPrefix: max
+    publicOnly: true
 
   binance_futures:
     exchange: binance
@@ -60,6 +61,12 @@ sessions:
     futures: true
 
 crossExchangeStrategies:
+- xnav:
+    interval: 4h
+    reportOnStart: true
+    ignoreDusts: true
+    showBreakdown: true
+    showDebtDetails: true
 - xpremium:
     # Symbols to compare between exchanges
     premiumSession: binance

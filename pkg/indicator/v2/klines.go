@@ -1,9 +1,10 @@
 package indicatorv2
 
 import (
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 const MaxNumOfKLines = 5_000
@@ -49,6 +50,15 @@ func (s *KLineStream) Last(i int) *types.KLine {
 	}
 
 	return &s.kLines[l-1-i]
+}
+
+func (s *KLineStream) Tail(n int) types.KLineWindow {
+	l := len(s.kLines)
+	if n >= l {
+		return s.kLines
+	}
+
+	return s.kLines[l-n : l]
 }
 
 // AddSubscriber adds the subscriber function and push historical data to the subscriber

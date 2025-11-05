@@ -92,6 +92,10 @@ func (sessions ExchangeSessionMap) AggregateBalances(
 
 	// iterate the sessions and record them
 	for sessionName, session := range sessions {
+		if session.PublicOnly {
+			continue
+		}
+
 		// update the account balances and the margin information
 		account := session.GetAccount()
 		if !skipUpdate {
@@ -648,7 +652,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	})
 
 	// session-wide max borrowable updating worker
-	if session.Margin {
+	if !session.PublicOnly && session.Margin {
 		if session.MarginInfoUpdaterInterval == 0 {
 			session.MarginInfoUpdaterInterval = defaultMarginInfoUpdaterInterval
 		}
@@ -1062,6 +1066,10 @@ func (session *ExchangeSession) FindPossibleAssetSymbols() (symbols []string, er
 		return []string{
 			session.IsolatedMarginSymbol,
 		}, nil
+	}
+
+	if session.PublicOnly {
+		return nil, nil
 	}
 
 	var balances = session.GetAccount().Balances()
