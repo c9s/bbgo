@@ -373,6 +373,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
 	if bbgo.IsBackTesting {
+		s.logger.Warnf("backtesting mode detected, xpremium strategy is not supported in backtesting")
 		return nil
 	}
 
