@@ -92,6 +92,10 @@ func (sessions ExchangeSessionMap) AggregateBalances(
 
 	// iterate the sessions and record them
 	for sessionName, session := range sessions {
+		if session.PublicOnly {
+			continue
+		}
+		
 		// update the account balances and the margin information
 		account := session.GetAccount()
 		if !skipUpdate {
