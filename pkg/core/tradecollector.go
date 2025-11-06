@@ -285,7 +285,7 @@ func (c *TradeCollector) Process() bool {
 			positionChanged = true
 		}
 
-		if !p.Profit.IsZero() {
+		if p != nil {
 			c.EmitProfit(trade, p)
 		}
 	}
@@ -298,18 +298,18 @@ func (c *TradeCollector) Process() bool {
 }
 
 func (c *TradeCollector) applyTrade(trade types.Trade) (*types.Profit, bool) {
-	var p types.Profit
 	if c.position != nil {
 		profit, netProfit, madeProfit := c.position.AddTrade(trade)
-		if madeProfit {
-			p = c.position.NewProfit(trade, profit, netProfit)
-		}
 		c.EmitTrade(trade, profit, netProfit)
-		return &p, true
-	} else {
-		c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
-		return nil, false
+		if madeProfit {
+			p := c.position.NewProfit(trade, profit, netProfit)
+			return &p, true
+		}
+		return nil, true
 	}
+
+	c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
+	return nil, false
 }
 
 // processTrade takes a trade and see if there is a matched order
