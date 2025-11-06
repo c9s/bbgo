@@ -2466,7 +2466,7 @@ func (s *Strategy) CrossRun(
 
 		profitStats := types.NewProfitStats(s.makerMarket)
 
-		fixer := common.NewProfitFixer()
+		fixer := common.NewProfitFixer(*s.ProfitFixerConfig, s.Environment)
 		// fixer.ConverterManager = s.ConverterManager
 
 		if ss, ok := makerSession.Exchange.(types.ExchangeTradeHistoryService); ok {

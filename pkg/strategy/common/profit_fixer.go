@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -24,17 +23,38 @@ type ProfitFixerConfig struct {
 	TradesSince       types.Time `json:"tradesSince,omitempty"`
 	Patch             string     `json:"patch,omitempty"`
 	UseDatabaseTrades bool       `json:"useDatabaseTrades,omitempty"`
+	ProfitCurrency    string     `json:"profitCurrency,omitempty"` // the currency to calculate profit in
+	FeeCurrencies     []string   `json:"feeCurrencies,omitempty"`  // list of fee currencies to consider for fee price conversion
+}
+
+func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *ProfitFixer {
+	fixer := newProfitFixer(environment)
+	fixer.profitCurrency = config.ProfitCurrency
+	if config.UseDatabaseTrades {
+		fixer.queryTrades = fixer.queryTradesFromDB
+	} else {
+		fixer.queryTrades = fixer.queryTradesRestful
+	}
+	for _, feeCurrency := range config.FeeCurrencies {
+		fixer.addFeeCurrency(feeCurrency)
+	}
+	return fixer
 }
 
 func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
-	return c.TradesSince.Equal(other.TradesSince.Time()) && c.Patch == other.Patch && c.UseDatabaseTrades == other.UseDatabaseTrades
+	return c.TradesSince.Equal(other.TradesSince.Time()) && c.Patch == other.Patch && c.UseDatabaseTrades == other.UseDatabaseTrades && c.ProfitCurrency == other.ProfitCurrency
 }
 
 // ProfitFixer implements a trade-history-based profit fixer
 type ProfitFixer struct {
-	sessions map[string]types.ExchangeTradeHistoryService
+	sessions       map[string]types.ExchangeTradeHistoryService
+	profitCurrency string
+	feeCurrencies  map[string]struct{}
 
 	core.ConverterManager
+	*bbgo.Environment
+
+	queryTrades func(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error)
 }
 
 type tokenFeeKey struct {
@@ -43,10 +63,30 @@ type tokenFeeKey struct {
 	date         string
 }
 
-func NewProfitFixer() *ProfitFixer {
+func newProfitFixer(environment *bbgo.Environment) *ProfitFixer {
 	return &ProfitFixer{
-		sessions: make(map[string]types.ExchangeTradeHistoryService),
+		sessions:    make(map[string]types.ExchangeTradeHistoryService),
+		Environment: environment,
 	}
+}
+
+func (f *ProfitFixer) SetConverter(converter *core.ConverterManager) {
+	f.ConverterManager = *converter
+}
+
+func (f *ProfitFixer) addFeeCurrency(feeCurrency string) {
+	if f.feeCurrencies == nil {
+		f.feeCurrencies = make(map[string]struct{})
+	}
+	f.feeCurrencies[feeCurrency] = struct{}{}
+}
+
+func (f *ProfitFixer) getFeeCurrencies() []string {
+	var feeCurrencies []string
+	for feeCurrency := range f.feeCurrencies {
+		feeCurrencies = append(feeCurrencies, feeCurrency)
+	}
+	return feeCurrencies
 }
 
 func (f *ProfitFixer) AddExchange(sessionName string, service types.ExchangeTradeHistoryService) {
@@ -66,7 +106,7 @@ func (f *ProfitFixer) batchQueryTrades(
 	})
 }
 
-func (f *ProfitFixer) aggregateAllTrades(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
+func (f *ProfitFixer) queryTradesRestful(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
 	var mu sync.Mutex
 	var allTrades = make([]types.Trade, 0, 1000)
 
@@ -109,7 +149,7 @@ func (f *ProfitFixer) aggregateAllTrades(ctx context.Context, symbol string, sin
 	return allTrades, nil
 }
 
-func buildTokenFeeDatePrices(ctx context.Context, sessions map[string]types.ExchangeTradeHistoryService, trades []types.Trade, since, until time.Time) (map[tokenFeeKey]fixedpoint.Value, error) {
+func (f *ProfitFixer) buildTokenFeeDatePrices(ctx context.Context, trades []types.Trade, since, until time.Time) (map[tokenFeeKey]fixedpoint.Value, error) {
 	// initialize tokenFeePrices map
 	tokenFeePrices := make(map[tokenFeeKey]fixedpoint.Value)
 
@@ -117,13 +157,16 @@ func buildTokenFeeDatePrices(ctx context.Context, sessions map[string]types.Exch
 		return tokenFeePrices, nil
 	}
 
-	// token -> symbol, exchangeName
-	tokens := make(map[tokenFeeKey]struct{})
+	feeCurrencies := f.getFeeCurrencies()
+	if len(feeCurrencies) == 0 {
+		return tokenFeePrices, nil
+	}
+
 	// exchangeName -> markets
 	markets := make(map[types.ExchangeName]types.MarketMap)
 	// exchangeName -> ExchangePublic: query required data by trade.Exchange
 	exchanges := make(map[types.ExchangeName]types.Exchange)
-	for sessionName, service := range sessions {
+	for sessionName, service := range f.sessions {
 		if ex, ok := service.(types.Exchange); ok {
 			exchanges[ex.Name()] = ex
 			mm, err := ex.QueryMarkets(ctx)
@@ -140,82 +183,83 @@ func buildTokenFeeDatePrices(ctx context.Context, sessions map[string]types.Exch
 		return tokenFeePrices, nil
 	}
 
-	var quoteCurrency string // quote currency is assumed to be the same for all trades
-	for _, trade := range trades {
-		// skip trade if fee currency is USD*
-		if strings.HasPrefix(trade.FeeCurrency, "USD") {
-			continue
-		}
-		// skip trade if we do not have market info
-		if _, ok := markets[trade.Exchange]; !ok {
-			continue
-		}
-		market := markets[trade.Exchange][trade.Symbol]
-
-		// skip trade if fee currency is base currency
-		// since position.AddTrade already handle base currency fee
-		if trade.FeeCurrency == market.BaseCurrency {
-			continue
-		}
-		// sanity check: all quote currency should be the same
-		if quoteCurrency != "" && quoteCurrency != market.QuoteCurrency {
-			return nil, fmt.Errorf("quote currency mismatch: %s != %s", quoteCurrency, market.QuoteCurrency)
-		}
-		quoteCurrency = market.QuoteCurrency
-		tokens[tokenFeeKey{
-			token:        trade.FeeCurrency,
-			exchangeName: trade.Exchange,
-			date:         "", // date is a dummy here
-		}] = struct{}{}
-	}
-	// no quote currency found if:
-	// - all fees are USD*, or
-	// - all fees are base currency
-	// no need to build token fee map in this case
-	if quoteCurrency == "" {
-		return tokenFeePrices, nil
-	}
 	startTime := since.Truncate(24 * time.Hour).Add(-24 * time.Hour)
 	endTime := until.Truncate(24 * time.Hour)
-	for info := range tokens {
-		ex, ok := exchanges[info.exchangeName]
+	for exName, exchange := range exchanges {
+		markets, ok := markets[exName]
 		if !ok {
-			log.Warnf("can not build token fee on exchange %s: %s", info.exchangeName, info.token)
 			continue
 		}
-		if err := func() error {
-			query := &batch.KLineBatchQuery{Exchange: ex}
-			kLineC, errC := query.Query(ctx, info.token+quoteCurrency, types.Interval1d, startTime, endTime)
-			for {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case kline, ok := <-kLineC:
-					if !ok {
-						err := <-errC
-						return err
-					}
-					// the date in tokenFeeKey is the next day of the kline date
-					// which means the token fee for the next day is calculated by the previous day's closing price
-					tokenFeePrices[tokenFeeKey{
-						token:        info.token,
-						exchangeName: info.exchangeName,
-						date:         kline.StartTime.Time().Add(24 * time.Hour).Format(time.DateOnly),
-					}] = kline.Close
+		for _, token := range feeCurrencies {
+			var symbol string
+			var priceConvert func(fixedpoint.Value) fixedpoint.Value
+			if m, ok := markets.FindPair(token, f.profitCurrency); ok {
+				symbol = m.Symbol
+				priceConvert = func(p fixedpoint.Value) fixedpoint.Value {
+					return p
+				}
+			} else if m, ok := markets.FindPair(f.profitCurrency, token); ok {
+				symbol = m.Symbol
+				priceConvert = func(p fixedpoint.Value) fixedpoint.Value {
+					return fixedpoint.One.Div(p)
 				}
 			}
-		}(); err != nil {
-			return nil, err
+
+			if symbol == "" {
+				// 1. token == quoteCurrency
+				// 2. token is not tradable on this exchange
+				continue
+			}
+			if klines, err := queryKLines(
+				ctx, exchange, symbol, types.Interval1d, startTime, endTime,
+			); err == nil {
+				for _, kline := range klines {
+					// we still use the last day's closing price to calculate the USD fee price.
+					// This is different from the actual fee calculation while trading which use the close price of the last minute.
+					// But assuming the price of USD stablecoins do not fluctuate much within a day,
+					// this should be acceptable.
+					tokenFeePrices[tokenFeeKey{
+						token:        token,
+						exchangeName: exName,
+						date:         kline.StartTime.Time().Add(24 * time.Hour).Format(time.DateOnly),
+					}] = priceConvert(kline.Close)
+				}
+			}
 		}
 	}
 	return tokenFeePrices, nil
 }
 
+func queryKLines(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) ([]types.KLine, error) {
+	query := &batch.KLineBatchQuery{Exchange: ex}
+	kLineC, errC := query.Query(ctx, symbol, interval, startTime, endTime)
+
+	var kLines []types.KLine
+	var err error
+	done := false
+	for !done {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case kline, ok := <-kLineC:
+			if !ok {
+				err = <-errC
+				done = true
+			}
+			kLines = append(kLines, kline)
+		}
+	}
+	return kLines, err
+}
+
 func (f *ProfitFixer) Fix(
 	ctx context.Context, symbol string, since, until time.Time, stats *types.ProfitStats, position *types.Position,
 ) error {
-	log.Infof("starting profitFixer with time range %s <=> %s", since, until)
-	allTrades, err := f.aggregateAllTrades(ctx, symbol, since, until)
+	if f.profitCurrency == "" {
+		return fmt.Errorf("quote currency is empty for profit fixing")
+	}
+	log.Infof("start profit fixing with time range %s <=> %s", since, until)
+	allTrades, err := f.queryTrades(ctx, symbol, since, until)
 	if err != nil {
 		return err
 	}
@@ -223,18 +267,50 @@ func (f *ProfitFixer) Fix(
 		log.Warnf("[%s] no trades found between %s and %s, skip profit fixing", symbol, since.String(), until.String())
 		return nil
 	}
-	fm, err := buildTokenFeeDatePrices(ctx, f.sessions, allTrades, since, until)
+	fm, err := f.buildTokenFeeDatePrices(ctx, allTrades, since, until)
 	if err != nil {
 		return err
 	}
-	return fixFromTrades(allTrades, &f.ConverterManager, fm, stats, position)
+	return f.fixFromTrades(allTrades, fm, stats, position)
 }
 
-func fixFromTrades(allTrades []types.Trade, converter *core.ConverterManager, tokenFeePrices map[tokenFeeKey]fixedpoint.Value, stats *types.ProfitStats, position *types.Position) error {
-	for _, trade := range allTrades {
-		if converter != nil {
-			trade = converter.ConvertTrade(trade)
+func (f *ProfitFixer) fixFromTrades(
+	allTrades []types.Trade, tokenFeePrices map[tokenFeeKey]fixedpoint.Value,
+	stats *types.ProfitStats, position *types.Position,
+) error {
+	if len(allTrades) == 0 {
+		return nil
+	}
+
+	trades := types.SortTradesAscending(allTrades)
+	oldestTrade := trades[0]
+	lastTrade := trades[len(trades)-1]
+	// clear existing position and profit records
+	if f.Environment.PositionService != nil {
+		// TODO: add strategy and strategy_instance_id filter
+		err := f.Environment.PositionService.Delete(service.PositionQueryOptions{
+			Symbol:    position.Symbol,
+			StartTime: oldestTrade.Time.Time(),
+			EndTime:   lastTrade.Time.Time(),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to delete existing position records: %w", err)
 		}
+	}
+	if f.Environment.ProfitService != nil {
+		// TODO: add strategy and strategy_instance_id filter
+		err := f.Environment.ProfitService.Delete(service.ProfitQueryOptions{
+			Symbol:    position.Symbol,
+			StartTime: oldestTrade.Time.Time(),
+			EndTime:   lastTrade.Time.Time(),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to delete existing profit records: %w", err)
+		}
+	}
+	// do fixing from trades
+	for _, trade := range trades {
+		trade = f.ConverterManager.ConvertTrade(trade)
 		// set fee average cost
 		if feePrice, ok := tokenFeePrices[tokenFeeKey{
 			token:        trade.FeeCurrency,
@@ -244,9 +320,13 @@ func fixFromTrades(allTrades []types.Trade, converter *core.ConverterManager, to
 			position.SetFeeAverageCost(trade.FeeCurrency, feePrice)
 		}
 		profit, netProfit, madeProfit := position.AddTrade(trade)
+		stats.AddTrade(trade)
 		if madeProfit {
 			p := position.NewProfit(trade, profit, netProfit)
 			stats.AddProfit(p)
+			f.Environment.RecordPosition(position, trade, &p)
+		} else {
+			f.Environment.RecordPosition(position, trade, nil)
 		}
 	}
 
@@ -256,6 +336,8 @@ func fixFromTrades(allTrades []types.Trade, converter *core.ConverterManager, to
 
 type ProfitFixerBundle struct {
 	ProfitFixerConfig *ProfitFixerConfig `json:"profitFixer,omitempty"`
+
+	*bbgo.Environment
 }
 
 func (f *ProfitFixerBundle) Fix(
@@ -265,6 +347,9 @@ func (f *ProfitFixerBundle) Fix(
 	profitStats *types.ProfitStats,
 	sessions ...*bbgo.ExchangeSession,
 ) error {
+	if f.Environment == nil {
+		return fmt.Errorf("environment is not set in ProfitFixerBundle")
+	}
 	bbgo.Notify("Fixing %s profitStats and position...", symbol)
 
 	log.Infof("profitFixer is enabled, checking checkpoint: %+v", f.ProfitFixerConfig.TradesSince)
@@ -273,7 +358,7 @@ func (f *ProfitFixerBundle) Fix(
 		return fmt.Errorf("tradesSince time can not be zero")
 	}
 
-	fixer := NewProfitFixer()
+	fixer := NewProfitFixer(*f.ProfitFixerConfig, f.Environment)
 	for _, session := range sessions {
 		if ss, ok := session.Exchange.(types.ExchangeTradeHistoryService); ok {
 			log.Infof("adding makerSession %s to profitFixer", session.Name)
@@ -289,44 +374,10 @@ func (f *ProfitFixerBundle) Fix(
 		position)
 }
 
-type DatabaseProfitFixer struct {
-	tradeService *service.TradeService
-	sessions     map[string]types.ExchangeTradeHistoryService
-
-	core.ConverterManager
-}
-
-func NewDBProfitFixer(tradeService *service.TradeService) *DatabaseProfitFixer {
-	return &DatabaseProfitFixer{
-		tradeService: tradeService,
-		sessions:     make(map[string]types.ExchangeTradeHistoryService),
+func (f *ProfitFixer) queryTradesFromDB(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
+	if f.Environment.TradeService == nil {
+		return nil, fmt.Errorf("trade service is not available in the environment: %s", symbol)
 	}
-}
-
-func (f *DatabaseProfitFixer) AddExchange(sessionName string, service types.ExchangeTradeHistoryService) {
-	f.sessions[sessionName] = service
-}
-
-func (f *DatabaseProfitFixer) Fix(
-	ctx context.Context, symbol string, since, until time.Time, stats *types.ProfitStats, position *types.Position,
-) error {
-	log.Infof("starting profit fixer with time range %s <=> %s (from DB)", since, until)
-	allTrades, err := f.queryAllTrades(ctx, symbol, since, until)
-	if err != nil {
-		return err
-	}
-	if len(allTrades) == 0 {
-		log.Warnf("[%s] no trades found between %s and %s, skip profit fixing", symbol, since.String(), until.String())
-		return nil
-	}
-	fm, err := buildTokenFeeDatePrices(ctx, f.sessions, allTrades, since, until)
-	if err != nil {
-		return err
-	}
-	return fixFromTrades(allTrades, &f.ConverterManager, fm, stats, position)
-}
-
-func (f *DatabaseProfitFixer) queryAllTrades(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
 	var trades []types.Trade
 	if symbol == "" {
 		return nil, fmt.Errorf("symbol can not be empty")
@@ -359,7 +410,7 @@ func (f *DatabaseProfitFixer) queryAllTrades(ctx context.Context, symbol string,
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
-			trades_, err := f.tradeService.Query(options)
+			trades_, err := f.Environment.TradeService.Query(options)
 			if err != nil {
 				return nil, err
 			}

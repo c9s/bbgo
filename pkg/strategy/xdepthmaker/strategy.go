@@ -554,8 +554,10 @@ func (s *Strategy) CrossRun(
 		s.CrossExchangeMarketMakingStrategy.Position = types.NewPositionFromMarket(makerMarket)
 		s.CrossExchangeMarketMakingStrategy.ProfitStats = types.NewProfitStats(makerMarket)
 
-		fixer := common.NewProfitFixer()
-		fixer.ConverterManager = s.ConverterManager
+		fixer := common.NewProfitFixer(
+			*s.ProfitFixerConfig, s.Environment,
+		)
+		fixer.SetConverter(&s.ConverterManager)
 
 		if ss, ok := makerSession.Exchange.(types.ExchangeTradeHistoryService); ok {
 			log.Infof("adding makerSession %s to profitFixer", makerSession.Name)
