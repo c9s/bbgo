@@ -1,34 +1,26 @@
 package common
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
 // mockFixer implements the iFixer interface for testing
-type mockFixer struct {
-	core.ConverterManager
-	environment *bbgo.Environment
-}
 
-func (m *mockFixer) GetEnvironment() *bbgo.Environment {
-	return m.environment
-}
-
-func (m *mockFixer) GetConverter() *core.ConverterManager {
-	return &m.ConverterManager
-}
-
-func newMockFixer() *mockFixer {
-	return &mockFixer{
-		environment: &bbgo.Environment{},
+func newMockFixer() *ProfitFixer {
+	fixer := &ProfitFixer{
+		Environment: &bbgo.Environment{},
 	}
+	fixer.queryTrades = func(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
+		return []types.Trade{}, nil
+	}
+	return fixer
 }
 
 func TestProfitFixerConfigEqual(t *testing.T) {
@@ -94,7 +86,7 @@ func Test_fixFromTrades(t *testing.T) {
 		stats := types.NewProfitStats(market)
 		fixer := newMockFixer()
 
-		err := fixFromTrades(fixer, []types.Trade{}, nil, stats, position)
+		err := fixer.fixFromTrades([]types.Trade{}, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -121,7 +113,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(fixer, trades, nil, stats, position)
+		err := fixer.fixFromTrades(trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.Equal(t, fixedpoint.NewFromInt(1).String(), position.Base.String())
@@ -161,7 +153,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(fixer, trades, nil, stats, position)
+		err := fixer.fixFromTrades(trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -216,7 +208,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(fixer, trades, nil, stats, position)
+		err := fixer.fixFromTrades(trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -260,7 +252,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(fixer, trades, nil, stats, position)
+		err := fixer.fixFromTrades(trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -313,7 +305,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(fixer, trades, tokenFeePrices, stats, position)
+		err := fixer.fixFromTrades(trades, tokenFeePrices, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -356,7 +348,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(fixer, trades, nil, stats, position)
+		err := fixer.fixFromTrades(trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -397,7 +389,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(fixer, trades, nil, stats, position)
+		err := fixer.fixFromTrades(trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.Equal(t, fixedpoint.NewFromInt(2).String(), position.Base.String())
@@ -447,7 +439,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(fixer, trades, tokenFeePrices, stats, position)
+		err := fixer.fixFromTrades(trades, tokenFeePrices, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -490,7 +482,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(fixer, trades, nil, stats, position)
+		err := fixer.fixFromTrades(trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		// After reversal, position should be short 1 BTC
@@ -532,7 +524,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixFromTrades(fixer, trades, nil, stats, position)
+		err := fixer.fixFromTrades(trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		// After reversal, position should be long 1 BTC
