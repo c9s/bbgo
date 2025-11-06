@@ -73,3 +73,27 @@ func toLocalFuturesAsset(symbol string) string {
 	log.Errorf("failed to look up local asset from %s", symbol)
 	return symbol
 }
+
+func toGlobalBalance(account *hyperapi.Account) types.BalanceMap {
+	balances := make(types.BalanceMap)
+	for _, b := range account.Balances {
+		available := b.Total.Sub(b.Hold)
+		balances[b.Coin] = types.Balance{
+			Currency:          b.Coin,
+			Available:         available,
+			Locked:            b.Hold,
+			NetAsset:          b.Total,
+			MaxWithdrawAmount: available,
+		}
+	}
+	return balances
+}
+
+func toGlobalFuturesAccountInfo(account *hyperapi.FuturesAccount) *types.FuturesAccount {
+	futuresAccount := &types.FuturesAccount{
+		Assets:    make(types.FuturesAssetMap),
+		Positions: make(types.FuturesPositionMap),
+	}
+	// TODO implement the conversion
+	return futuresAccount
+}
