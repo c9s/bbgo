@@ -559,7 +559,7 @@ func (b *ActiveOrderBook) filterExistingOrders(orders []types.Order) types.Order
 			continue
 		}
 
-		if b.Exists(o.OrderID) {
+		if b.orders.Exists(o.OrderID) {
 			existingOrders.Add(o)
 		}
 	}
