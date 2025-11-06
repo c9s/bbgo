@@ -89,8 +89,20 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	//TODO implement
-	return nil, fmt.Errorf("not implemented")
+	if e.IsFutures {
+		return e.queryFuturesAccount(ctx)
+	}
+
+	spotAccount, err := e.client.NewGetAccountBalanceRequest().User(e.client.UserAddress()).Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	balances := toGlobalBalance(spotAccount)
+	account := types.NewAccount()
+	account.UpdateBalances(balances)
+
+	return account, nil
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {

@@ -40,3 +40,16 @@ func (e *Exchange) queryFuturesMarkets(ctx context.Context) (types.MarketMap, er
 
 	return markets, nil
 }
+
+func (e *Exchange) queryFuturesAccount(ctx context.Context) (*types.Account, error) {
+	futuresAccount, err := e.client.NewFuturesGetAccountBalanceRequest().User(e.client.UserAddress()).Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	account := types.NewAccount()
+	account.AccountType = types.AccountTypeFutures
+	account.FuturesInfo = toGlobalFuturesAccountInfo(futuresAccount)
+
+	return account, nil
+}
