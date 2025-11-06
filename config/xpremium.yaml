@@ -90,6 +90,12 @@ crossExchangeStrategies:
     # Example: 0.002 = 0.2% or "0.20%"
     minSpread: "0.20%"
 
+    # Depth quoting configuration:
+    # Instead of best bid/ask, xpremium compares prices derived from depth (averaged over quote amount).
+    # quoteDepth is the quote currency amount used to compute depth prices, default 300 (e.g., 300 USDT).
+    # Increase this if you want signals based on deeper liquidity; decrease for more sensitive signals.
+    quoteDepth: 300
+
     # Optional explicit sizing and risk parameters
     # quantity: 0.001              # fixed base quantity to trade; if omitted, size is risk-based
     # priceType: maker             # maker|taker, used to choose price for sizing
