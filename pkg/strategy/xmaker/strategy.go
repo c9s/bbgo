@@ -125,6 +125,12 @@ type Strategy struct {
 
 	EnableSignalMargin bool `json:"enableSignalMargin"`
 
+	// Direction-divergence (D2) control — optional risk widener driven by signal direction conflicts
+	EnableDirectionDivergence bool    `json:"enableDirectionDivergence"`
+	DivergenceTau             float64 `json:"divergenceTau,omitempty"`     // magnitude threshold to ignore weak signals (τ)
+	DivergenceEpsM            float64 `json:"divergenceEpsM,omitempty"`    // "no-consensus" threshold on |m|
+	DivergenceMarginK         float64 `json:"divergenceMarginK,omitempty"` // k used to widen margins: margin *= (1 + k*D2)
+
 	SignalSource string `json:"signalSource,omitempty"`
 
 	SignalConfigList *signal.DynamicConfig `json:"signals"`
@@ -278,6 +284,9 @@ type Strategy struct {
 	// lastAggregatedSignal stores the last aggregated signal with mutex
 	// TODO: use float64 series instead, so that we can store history signal values
 	lastAggregatedSignal MutexFloat64
+
+	// lastDirectionDivergence stores the latest D2 value
+	lastDirectionDivergence MutexFloat64
 
 	positionStartedAt      *time.Time
 	positionStartedAtMutex sync.Mutex
@@ -564,7 +573,151 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		quote.BidMargin,
 	)
 
+	// Optional: direction-divergence (D2) widener
+	if s.EnableDirectionDivergence {
+		signals, weights, derr := s.collectSignalsAndWeights(ctx)
+		if derr != nil {
+			s.logger.WithError(derr).Warnf("collectSignalsAndWeights error; skipping D2 widen")
+			return nil
+		}
+		m, pSign, D2 := DirectionDivergence(signals, weights, s.DivergenceTau, s.DivergenceEpsM)
+		s.lastDirectionDivergence.Set(D2)
+
+		// widen both sides proportionally to D2: margin *= (1 + k*D2)
+		k := s.DivergenceMarginK
+		if k <= 0 {
+			k = 1.5
+		}
+
+		scale := 1.0 + k*D2
+		if scale < 1.0 {
+			scale = 1.0
+		}
+
+		quote.AskMargin = quote.AskMargin.Mul(fixedpoint.NewFromFloat(scale))
+		quote.BidMargin = quote.BidMargin.Mul(fixedpoint.NewFromFloat(scale))
+
+		s.logger.Infof("D2 widen applied: m=%.4f p_sign=%.3f D2=%.3f scale=%.3f askMargin=%s bidMargin=%s",
+			m, pSign, D2, scale, quote.AskMargin, quote.BidMargin)
+
+		// If consensus is long (m>0) and D2 is high, you may choose to be more conservative on the short side.
+		// Here we only log the suggestion to keep behavior transparent; you can wire this to disable one side if desired.
+		if m > 0 && D2 >= 0.6 {
+			s.logger.Infof("high divergence against mean-long: consider single-sided quoting (disable ask) or set very wide protection spread")
+		} else if m < 0 && D2 >= 0.6 {
+			s.logger.Infof("high divergence against mean-short: consider single-sided quoting (disable bid) or set very wide protection spread")
+		}
+	}
+
 	return nil
+}
+
+// --- Direction divergence helpers (D2) ---
+
+// signf returns -1 for negative, 0 for zero, +1 for positive
+func signf(x float64) int {
+	switch {
+	case x > 0:
+		return +1
+	case x < 0:
+		return -1
+	default:
+		return 0
+	}
+}
+
+// normalizeWeightsFloat returns non-negative weights that sum to 1.
+// If all weights are non-positive or the slice is empty, it falls back to equal weights.
+func normalizeWeightsFloat(w []float64) []float64 {
+	n := len(w)
+	out := make([]float64, n)
+	if n == 0 {
+		return out
+	}
+	sum := 0.0
+	for _, v := range w {
+		if v > 0 {
+			sum += v
+		}
+	}
+	if sum <= 0 {
+		for i := range out {
+			out[i] = 1.0 / float64(n)
+		}
+		return out
+	}
+	for i, v := range w {
+		if v <= 0 {
+			out[i] = 0
+		} else {
+			out[i] = v / sum
+		}
+	}
+	return out
+}
+
+// collectSignalsAndWeights gathers the current normalized signal values and their raw weights from SignalConfigList.
+// Signals equal to 0.0 are ignored (treated as "no vote").
+func (s *Strategy) collectSignalsAndWeights(ctx context.Context) (signals []float64, weights []float64, err error) {
+	if s.SignalConfigList == nil {
+		return nil, nil, nil
+	}
+	for _, sw := range s.SignalConfigList.Signals {
+		val, e := sw.Signal.CalculateSignal(ctx)
+		if e != nil {
+			return nil, nil, e
+		}
+		if val == 0.0 {
+			continue
+		}
+		signals = append(signals, val)
+		if sw.Weight > 0 {
+			weights = append(weights, sw.Weight)
+		} else {
+			weights = append(weights, 1.0)
+		}
+	}
+	return signals, weights, nil
+}
+
+// DirectionDivergence computes (m, pSign, D2) given signals and weights.
+// m     : weighted mean of signals
+// pSign : total normalized weight aligned with mean direction and |s_i| >= tau
+// D2    : 1 - pSign
+func DirectionDivergence(signals []float64, weights []float64, tau float64, epsM float64) (m, pSign, D2 float64) {
+	n := len(signals)
+	if n == 0 {
+		return 0, 0, 1
+	}
+	if len(weights) != n {
+		weights = make([]float64, n)
+		for i := range weights {
+			weights[i] = 1
+		}
+	}
+	weights = normalizeWeightsFloat(weights)
+
+	// weighted mean
+	for i := 0; i < n; i++ {
+		m += weights[i] * signals[i]
+	}
+	if math.Abs(m) < epsM {
+		return m, 0, 1
+	}
+	mSign := signf(m)
+	p := 0.0
+	for i := 0; i < n; i++ {
+		if math.Abs(signals[i]) >= tau && signf(signals[i]) == mSign {
+			p += weights[i]
+		}
+	}
+	if p < 0 {
+		p = 0
+	}
+	if p > 1 {
+		p = 1
+	}
+	return m, p, 1 - p
 }
 
 // TODO: move this aggregateSignal to the signal package
@@ -2079,6 +2232,21 @@ func (s *Strategy) Defaults() error {
 
 	if s.SignalSource == "" {
 		s.SignalSource = s.HedgeSession
+	}
+
+	if s.EnableDirectionDivergence {
+		// Defaults for direction divergence (D2) widener
+		if s.DivergenceTau == 0 {
+			s.DivergenceTau = 0.2
+		}
+
+		if s.DivergenceEpsM == 0 {
+			s.DivergenceEpsM = 0.05
+		}
+
+		if s.DivergenceMarginK == 0 {
+			s.DivergenceMarginK = 1.5
+		}
 	}
 
 	return nil
