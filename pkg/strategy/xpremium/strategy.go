@@ -105,6 +105,10 @@ type Strategy struct {
 
 	BacktestConfig *BacktestConfig `json:"backtest,omitempty"`
 
+	// QuoteDepth is the quoting depth in quote currency (e.g., USDT) when deriving bid/ask from depth books
+	// Defaults to 300 USDT if not specified.
+	QuoteDepth fixedpoint.Value `json:"quoteDepth"`
+
 	logger        logrus.FieldLogger
 	metricsLabels prometheus.Labels
 
@@ -122,6 +126,9 @@ type Strategy struct {
 	// runtime fields
 	premiumBook *types.StreamOrderBook
 	baseBook    *types.StreamOrderBook
+	// depth books derived from stream books
+	premiumDepthBook *types.DepthBook
+	baseDepthBook    *types.DepthBook
 
 	premiumStream types.Stream
 	baseStream    types.Stream
@@ -268,6 +275,11 @@ func (s *Strategy) Defaults() error {
 		s.PriceType = types.PriceTypeMaker
 	}
 
+	// default depth in quote to 300 USDT
+	if s.QuoteDepth.IsZero() {
+		s.QuoteDepth = fixedpoint.NewFromInt(300)
+	}
+
 	if s.MaxLossLimit.IsZero() {
 		s.MaxLossLimit = fixedpoint.NewFromInt(20) // default to 100 units of quote currency
 	}
@@ -359,6 +371,9 @@ func (s *Strategy) Validate() error {
 	}
 	if s.StopLossSafetyRatio.Sign() < 0 {
 		return fmt.Errorf("stopLossSafetyRatio must be >= 0")
+	}
+	if s.QuoteDepth.Sign() <= 0 {
+		return fmt.Errorf("quoteDepth must be > 0 (in quote currency, e.g. 300 for 300 USDT)")
 	}
 
 	if s.EngulfingTakeProfit != nil {
@@ -479,9 +494,11 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	s.premiumBook = types.NewStreamBook(s.PremiumSymbol, s.premiumSession.ExchangeName)
 	s.premiumBook.BindStream(premiumStream)
+	s.premiumDepthBook = types.NewDepthBook(s.premiumBook)
 
 	s.baseBook = types.NewStreamBook(s.BaseSymbol, s.baseSession.ExchangeName)
 	s.baseBook.BindStream(baseStream)
+	s.baseDepthBook = types.NewDepthBook(s.baseBook)
 
 	// register streams into the connector manager and connect them via connector manager
 	s.connectorManager.Add(premiumStream, baseStream)
@@ -541,6 +558,29 @@ func (s *Strategy) compareBooks() (premium, discount float64, pBid, pAsk, bBid, 
 
 	prem, disc := s.computeSpreads(bidA, askA, bidB, askB)
 	return prem, disc, bidA, askA, bidB, askB, true
+}
+
+// compareBooksAtQuoteDepth fetches bid/ask using depth-averaged prices at the given quote depth
+func (s *Strategy) compareBooksAtQuoteDepth(depth fixedpoint.Value) (premium, discount float64, pBid, pAsk, bBid, bAsk types.PriceVolume, ok bool) {
+	if s.premiumDepthBook == nil || s.baseDepthBook == nil {
+		return 0, 0, types.PriceVolume{}, types.PriceVolume{}, types.PriceVolume{}, types.PriceVolume{}, false
+	}
+
+	// compute depth prices
+	pBidPrice, pAskPrice := s.premiumDepthBook.BestBidAndAskAtQuoteDepth(depth)
+	bBidPrice, bAskPrice := s.baseDepthBook.BestBidAndAskAtQuoteDepth(depth)
+	if pBidPrice.IsZero() || pAskPrice.IsZero() || bBidPrice.IsZero() || bAskPrice.IsZero() {
+		return 0, 0, types.PriceVolume{}, types.PriceVolume{}, types.PriceVolume{}, types.PriceVolume{}, false
+	}
+
+	// Wrap into PriceVolume with unit volumes (volume not used in spread calc)
+	pBid = types.PriceVolume{Price: pBidPrice, Volume: fixedpoint.One}
+	pAsk = types.PriceVolume{Price: pAskPrice, Volume: fixedpoint.One}
+	bBid = types.PriceVolume{Price: bBidPrice, Volume: fixedpoint.One}
+	bAsk = types.PriceVolume{Price: bAskPrice, Volume: fixedpoint.One}
+
+	prem, disc := s.computeSpreads(pBid, pAsk, bBid, bAsk)
+	return prem, disc, pBid, pAsk, bBid, bAsk, true
 }
 
 // decideSignal determines LONG when premium >= MinSpread, SHORT when discount <= -MinSpread
@@ -1094,7 +1134,8 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 			continue
 		}
 
-		premium, discount, bidA, askA, bidB, askB, ok := s.compareBooks()
+		// Use depth-averaged prices at configured quote depth for comparisons
+		premium, discount, bidA, askA, bidB, askB, ok := s.compareBooksAtQuoteDepth(s.QuoteDepth)
 		if !ok {
 			continue
 		}
