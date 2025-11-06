@@ -29,6 +29,7 @@ type ProfitFixerConfig struct {
 
 func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *ProfitFixer {
 	fixer := newProfitFixer(environment)
+	fixer.profitCurrency = config.ProfitCurrency
 	if config.UseDatabaseTrades {
 		fixer.queryTrades = fixer.queryTradesFromDB
 	} else {
@@ -41,13 +42,14 @@ func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *Pr
 }
 
 func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
-	return c.TradesSince.Equal(other.TradesSince.Time()) && c.Patch == other.Patch && c.UseDatabaseTrades == other.UseDatabaseTrades
+	return c.TradesSince.Equal(other.TradesSince.Time()) && c.Patch == other.Patch && c.UseDatabaseTrades == other.UseDatabaseTrades && c.ProfitCurrency == other.ProfitCurrency
 }
 
 // ProfitFixer implements a trade-history-based profit fixer
 type ProfitFixer struct {
-	sessions      map[string]types.ExchangeTradeHistoryService
-	feeCurrencies map[string]struct{}
+	sessions       map[string]types.ExchangeTradeHistoryService
+	profitCurrency string
+	feeCurrencies  map[string]struct{}
 
 	core.ConverterManager
 	*bbgo.Environment
@@ -155,6 +157,11 @@ func (f *ProfitFixer) buildTokenFeeDatePrices(ctx context.Context, trades []type
 		return tokenFeePrices, nil
 	}
 
+	feeCurrencies := f.getFeeCurrencies()
+	if len(feeCurrencies) == 0 {
+		return tokenFeePrices, nil
+	}
+
 	// exchangeName -> markets
 	markets := make(map[types.ExchangeName]types.MarketMap)
 	// exchangeName -> ExchangePublic: query required data by trade.Exchange
@@ -176,31 +183,8 @@ func (f *ProfitFixer) buildTokenFeeDatePrices(ctx context.Context, trades []type
 		return tokenFeePrices, nil
 	}
 
-	var quoteCurrency string
-	// scan trades to find the quote currency
-	// quote currency is assumed to be the same for all trades
-	for _, trade := range trades {
-		// skip trade if we do not have market info
-		if _, ok := markets[trade.Exchange]; !ok {
-			continue
-		}
-		market := markets[trade.Exchange][trade.Symbol]
-
-		// sanity check: all quote currency should be the same
-		if quoteCurrency != "" && quoteCurrency != market.QuoteCurrency {
-			return nil, fmt.Errorf("quote currency mismatch: %s != %s", quoteCurrency, market.QuoteCurrency)
-		}
-		quoteCurrency = market.QuoteCurrency
-	}
-	if quoteCurrency == "" {
-		return tokenFeePrices, nil
-	}
 	startTime := since.Truncate(24 * time.Hour).Add(-24 * time.Hour)
 	endTime := until.Truncate(24 * time.Hour)
-	feeCurrencies := f.getFeeCurrencies()
-	if len(feeCurrencies) == 0 {
-		return tokenFeePrices, nil
-	}
 	for exName, exchange := range exchanges {
 		markets, ok := markets[exName]
 		if !ok {
@@ -209,12 +193,12 @@ func (f *ProfitFixer) buildTokenFeeDatePrices(ctx context.Context, trades []type
 		for _, token := range feeCurrencies {
 			var symbol string
 			var priceConvert func(fixedpoint.Value) fixedpoint.Value
-			if m, ok := markets.FindPair(token, quoteCurrency); ok {
+			if m, ok := markets.FindPair(token, f.profitCurrency); ok {
 				symbol = m.Symbol
 				priceConvert = func(p fixedpoint.Value) fixedpoint.Value {
 					return p
 				}
-			} else if m, ok := markets.FindPair(quoteCurrency, token); ok {
+			} else if m, ok := markets.FindPair(f.profitCurrency, token); ok {
 				symbol = m.Symbol
 				priceConvert = func(p fixedpoint.Value) fixedpoint.Value {
 					return fixedpoint.One.Div(p)
@@ -271,6 +255,9 @@ func queryKLines(ctx context.Context, ex types.Exchange, symbol string, interval
 func (f *ProfitFixer) Fix(
 	ctx context.Context, symbol string, since, until time.Time, stats *types.ProfitStats, position *types.Position,
 ) error {
+	if f.profitCurrency == "" {
+		return fmt.Errorf("quote currency is empty for profit fixing")
+	}
 	log.Infof("start profit fixing with time range %s <=> %s", since, until)
 	allTrades, err := f.queryTrades(ctx, symbol, since, until)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/stretchr/testify/assert"
@@ -13,7 +14,7 @@ import (
 
 // mockFixer implements the iFixer interface for testing
 
-func newMockFixer() *ProfitFixer {
+func newTestFixer() *ProfitFixer {
 	fixer := &ProfitFixer{
 		Environment: &bbgo.Environment{},
 	}
@@ -84,7 +85,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("empty trades", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
-		fixer := newMockFixer()
+		fixer := newTestFixer()
 
 		err := fixer.fixFromTrades([]types.Trade{}, nil, stats, position)
 
@@ -96,7 +97,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("single buy trade without profit", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
-		fixer := newMockFixer()
+		fixer := newTestFixer()
 
 		trades := []types.Trade{
 			{
@@ -123,7 +124,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("buy and sell trades with profit", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
-		fixer := newMockFixer()
+		fixer := newTestFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -166,7 +167,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("multiple trades with partial closes", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
-		fixer := newMockFixer()
+		fixer := newTestFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -222,7 +223,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("short position trades", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
-		fixer := newMockFixer()
+		fixer := newTestFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -265,7 +266,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("with token fee prices", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
-		fixer := newMockFixer()
+		fixer := newTestFixer()
 
 		now := time.Now()
 		dateStr := now.Format(time.DateOnly)
@@ -318,7 +319,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("base currency fee", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
-		fixer := newMockFixer()
+		fixer := newTestFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -359,7 +360,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("no profit made - only opening position", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
-		fixer := newMockFixer()
+		fixer := newTestFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -399,7 +400,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("mixed fee currencies", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
-		fixer := newMockFixer()
+		fixer := newTestFixer()
 
 		now := time.Now()
 		dateStr := now.Format(time.DateOnly)
@@ -452,7 +453,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("position reversal - long to short", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
-		fixer := newMockFixer()
+		fixer := newTestFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -494,7 +495,7 @@ func Test_fixFromTrades(t *testing.T) {
 	t.Run("position reversal - short to long", func(t *testing.T) {
 		position := types.NewPositionFromMarket(market)
 		stats := types.NewProfitStats(market)
-		fixer := newMockFixer()
+		fixer := newTestFixer()
 
 		now := time.Now()
 		trades := []types.Trade{
@@ -531,5 +532,79 @@ func Test_fixFromTrades(t *testing.T) {
 		assert.Equal(t, fixedpoint.NewFromInt(1).String(), position.Base.String())
 		// Profit from closing short: (10000 - 9000) * 1 = 1000
 		assert.Equal(t, fixedpoint.NewFromInt(1000).String(), stats.AccumulatedPnL.String())
+	})
+
+	t.Run("trades with converter", func(t *testing.T) {
+		// in this test, we have:
+		// 1. a trade in BTCUSDT on max exchange
+		// 2. a trade in BTCUSDC on coinbase exchange
+		// test the profit fixer can still calculate the correct profit
+		position := types.NewPositionFromMarket(market)
+		stats := types.NewProfitStats(market)
+		fixer := newTestFixer()
+
+		// assume USDC/USDT exchange rate is 0.998 (1 USDC = 0.998 USDT)
+		usdcToUsdtRate := fixedpoint.NewFromFloat(0.998)
+		converter := core.NewDynamicConverter(
+			func(order types.Order) (types.Order, error) {
+				if order.Symbol == "BTCUSDC" {
+					order.Symbol = "BTCUSDT"
+					order.Price = order.Price.Mul(usdcToUsdtRate)
+				}
+				return order, nil
+			},
+			func(trade types.Trade) (types.Trade, error) {
+				if trade.Symbol == "BTCUSDC" {
+					trade.Symbol = "BTCUSDT"
+					trade.Price = trade.Price.Mul(usdcToUsdtRate)
+					trade.QuoteQuantity = trade.QuoteQuantity.Mul(usdcToUsdtRate)
+				}
+				return trade, nil
+			},
+		)
+		err := converter.Initialize()
+		assert.NoError(t, err)
+
+		converterManager := &core.ConverterManager{}
+		converterManager.AddConverter(converter)
+		fixer.ConverterManager = *converterManager
+
+		now := time.Now()
+		trades := []types.Trade{
+			{
+				ID:            1,
+				Exchange:      types.ExchangeMax,
+				Symbol:        "BTCUSDT",
+				Side:          types.SideTypeBuy,
+				Price:         fixedpoint.NewFromInt(50000),
+				Quantity:      fixedpoint.NewFromInt(1),
+				QuoteQuantity: fixedpoint.NewFromInt(50000),
+				Fee:           fixedpoint.NewFromFloat(50),
+				FeeCurrency:   "USDT",
+				Time:          types.Time(now),
+			},
+			{
+				ID:            2,
+				Exchange:      types.ExchangeCoinBase,
+				Symbol:        "BTCUSDC",
+				Side:          types.SideTypeSell,
+				Price:         fixedpoint.NewFromInt(55000),
+				Quantity:      fixedpoint.NewFromInt(1),
+				QuoteQuantity: fixedpoint.NewFromInt(55000),
+				Fee:           fixedpoint.NewFromFloat(55),
+				FeeCurrency:   "USDC",
+				Time:          types.Time(now.Add(time.Hour)),
+			},
+		}
+
+		err = fixer.fixFromTrades(trades, nil, stats, position)
+
+		assert.NoError(t, err)
+		assert.True(t, position.Base.IsZero())
+		// Buy BTCUSDT at 50000 with 50 USDT fee: avgCost = (50000-50)/1 = 49950
+		// Sell BTCUSDC converted to BTCUSDT: 55000 * 0.998 = 54890 USDT
+		// Profit = (54890 - 49950) * 1 = 4940 USDT
+		// Note: USDC fee is not converted, so it's ignored in the calculation
+		assert.Equal(t, 4940.0, stats.AccumulatedPnL.Float64())
 	})
 }
