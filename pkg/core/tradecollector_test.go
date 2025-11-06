@@ -68,7 +68,7 @@ func TestTradeCollector_ShouldNotCountDuplicatedTrade(t *testing.T) {
 	})
 
 	matched = collector.Process()
-	assert.True(t, matched)
+	assert.True(t, matched, "position should be updated with the matched trade")
 	assert.Equal(t, 0, len(collector.tradeStore.Trades()), "the found trade should be removed from the trade store")
 
 	matched = collector.ProcessTrade(types.Trade{
