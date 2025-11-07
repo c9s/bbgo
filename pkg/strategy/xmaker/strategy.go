@@ -130,6 +130,9 @@ type Strategy struct {
 	DivergenceTau             float64 `json:"divergenceTau,omitempty"`     // magnitude threshold to ignore weak signals (τ)
 	DivergenceEpsM            float64 `json:"divergenceEpsM,omitempty"`    // "no-consensus" threshold on |m|
 	DivergenceMarginK         float64 `json:"divergenceMarginK,omitempty"` // k used to widen margins: margin *= (1 + k*D2)
+	// Divergence-driven size and side controls
+	DivergenceSizeK            float64 `json:"divergenceSizeK,omitempty"`            // sizeScale = max(0, 1 - k*D2)
+	DivergenceDisableThreshold float64 `json:"divergenceDisableThreshold,omitempty"` // if D2 >= threshold, disable reverse side
 
 	SignalSource string `json:"signalSource,omitempty"`
 
@@ -287,6 +290,8 @@ type Strategy struct {
 
 	// lastDirectionDivergence stores the latest D2 value
 	lastDirectionDivergence MutexFloat64
+	lastDirectionMean       MutexFloat64
+	lastPSign               MutexFloat64
 
 	positionStartedAt      *time.Time
 	positionStartedAtMutex sync.Mutex
@@ -301,6 +306,10 @@ type Strategy struct {
 	makerOrderPlacementDurationMetrics prometheus.Observer
 	openOrderBidExposureInUsdMetrics   prometheus.Gauge
 	openOrderAskExposureInUsdMetrics   prometheus.Gauge
+
+	d2Metrics            prometheus.Gauge
+	directionMeanMetrics prometheus.Gauge
+	alignedWeightMetrics prometheus.Gauge
 
 	simpleHedgeMode bool
 
@@ -404,6 +413,10 @@ func (s *Strategy) Initialize() error {
 	s.makerOrderPlacementDurationMetrics = makerOrderPlacementDurationMetrics.With(s.metricsLabels)
 	s.openOrderBidExposureInUsdMetrics = openOrderBidExposureInUsdMetrics.With(s.metricsLabels)
 	s.openOrderAskExposureInUsdMetrics = openOrderAskExposureInUsdMetrics.With(s.metricsLabels)
+
+	s.d2Metrics = divergenceD2.With(s.metricsLabels)
+	s.directionMeanMetrics = directionMean.With(s.metricsLabels)
+	s.alignedWeightMetrics = directionAlignedWeight.With(s.metricsLabels)
 
 	if s.SignalReverseSideMargin != nil && s.SignalReverseSideMargin.Scale != nil {
 		scale, err := s.SignalReverseSideMargin.Scale.Scale()
@@ -582,6 +595,15 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		}
 		m, pSign, D2 := DirectionDivergence(signals, weights, s.DivergenceTau, s.DivergenceEpsM)
 		s.lastDirectionDivergence.Set(D2)
+		if s.d2Metrics != nil {
+			s.d2Metrics.Set(D2)
+		}
+		if s.directionMeanMetrics != nil {
+			s.directionMeanMetrics.Set(m)
+		}
+		if s.alignedWeightMetrics != nil {
+			s.alignedWeightMetrics.Set(pSign)
+		}
 
 		// widen both sides proportionally to D2: margin *= (1 + k*D2)
 		k := s.DivergenceMarginK
@@ -1180,6 +1202,33 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	s.logger.Infof("maker quota: %+v", makerQuota)
 
+	div2 := s.lastDirectionDivergence.Get()
+	mean := s.lastDirectionMean.Get()
+
+	// compute size scale from D2
+	sizeScale := 1.0
+	if s.EnableDirectionDivergence && s.DivergenceSizeK > 0 {
+		sz := 1.0 - s.DivergenceSizeK*div2
+		if sz < 0 {
+			sz = 0
+		}
+		sizeScale = sz
+	}
+
+	if s.EnableDirectionDivergence && s.DivergenceDisableThreshold > 0 {
+		if div2 >= s.DivergenceDisableThreshold {
+			if mean > 0 {
+				// consensus long disable the short side ask
+				disableMakerAsk = true
+				s.logger.Infof("auto-disable ASK: D2=%.3f >= %.3f with mean>0", div2, s.DivergenceDisableThreshold)
+			} else if mean < 0 {
+				// consensus short disable the long side bid
+				disableMakerBid = true
+				s.logger.Infof("auto-disable BID: D2=%.3f >= %.3f with mean<0", div2, s.DivergenceDisableThreshold)
+			}
+		}
+	}
+
 	// if
 	//  1) the source session is a margin session
 	//  2) the min margin level is configured
@@ -1369,6 +1418,11 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				return err
 			}
 
+			// apply D2 size scale
+			if sizeScale < 1.0 {
+				bidQuantity = bidQuantity.Mul(fixedpoint.NewFromFloat(sizeScale))
+			}
+
 			// for maker bid orders
 			coverBidDepth(bidQuantity)
 
@@ -1443,6 +1497,11 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			askQuantity, err := s.getInitialLayerQuantity(i)
 			if err != nil {
 				return err
+			}
+
+			// apply D2 size scale
+			if sizeScale < 1.0 {
+				askQuantity = askQuantity.Mul(fixedpoint.NewFromFloat(sizeScale))
 			}
 
 			coverAskDepth(askQuantity)
@@ -2235,17 +2294,20 @@ func (s *Strategy) Defaults() error {
 	}
 
 	if s.EnableDirectionDivergence {
-		// Defaults for direction divergence (D2) widener
 		if s.DivergenceTau == 0 {
 			s.DivergenceTau = 0.2
 		}
-
 		if s.DivergenceEpsM == 0 {
 			s.DivergenceEpsM = 0.05
 		}
-
 		if s.DivergenceMarginK == 0 {
 			s.DivergenceMarginK = 1.5
+		}
+		if s.DivergenceSizeK == 0 {
+			s.DivergenceSizeK = 0.8
+		}
+		if s.DivergenceDisableThreshold == 0 {
+			s.DivergenceDisableThreshold = 0.6
 		}
 	}
 
