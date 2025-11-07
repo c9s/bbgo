@@ -2,20 +2,16 @@ package hyperapi
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 )
 
-//go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Response.Data
-//go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Response.Data
-
 type FuturesAccount struct {
-	AssetPositions             []FuturesAssetPosition     `json:"assetPositions"`
-	CrossMaintenanceMarginUsed fixedpoint.Value           `json:"crossMaintenanceMarginUsed"`
-	CrossMarginSummary         FuturesMarginSummary       `json:"crossMarginSummary"`
-	MarginSummary              FuturesMarginSummary       `json:"marginSummary"`
-	Time                       types.MillisecondTimestamp `json:"time"`
-	Withdrawable               fixedpoint.Value           `json:"withdrawable"`
+	AssetPositions             []FuturesAssetPosition `json:"assetPositions"`
+	CrossMaintenanceMarginUsed fixedpoint.Value       `json:"crossMaintenanceMarginUsed"`
+	CrossMarginSummary         FuturesMarginSummary   `json:"crossMarginSummary"`
+	MarginSummary              FuturesMarginSummary   `json:"marginSummary"`
+	Time                       int64                  `json:"time"`
+	Withdrawable               fixedpoint.Value       `json:"withdrawable"`
 }
 
 type FuturesAssetPosition struct {
@@ -46,7 +42,7 @@ type FuturesCumFunding struct {
 type FuturesLeverage struct {
 	RawUsd fixedpoint.Value `json:"rawUsd"`
 	Type   string           `json:"type"`
-	Value  int              `json:"value"`
+	Value  fixedpoint.Value `json:"value"`
 }
 
 type FuturesMarginSummary struct {
@@ -56,7 +52,7 @@ type FuturesMarginSummary struct {
 	TotalRawUsd     fixedpoint.Value `json:"totalRawUsd"`
 }
 
-//go:generate GetRequest -url "/info" -type FuturesGetAccountBalanceRequest -responseDataType FuturesAccount
+//go:generate requestgen -method POST -url "/info" -type FuturesGetAccountBalanceRequest -responseType FuturesAccount
 type FuturesGetAccountBalanceRequest struct {
 	client requestgen.APIClient
 

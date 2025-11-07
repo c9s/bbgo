@@ -89,11 +89,59 @@ func toGlobalBalance(account *hyperapi.Account) types.BalanceMap {
 	return balances
 }
 
-func toGlobalFuturesAccountInfo(account *hyperapi.FuturesAccount) *types.FuturesAccount {
-	futuresAccount := &types.FuturesAccount{
+func toGlobalFuturesAccountInfo(rawAccount *hyperapi.FuturesAccount) *types.FuturesAccount {
+	account := &types.FuturesAccount{
 		Assets:    make(types.FuturesAssetMap),
 		Positions: make(types.FuturesPositionMap),
 	}
-	// TODO implement the conversion
-	return futuresAccount
+	account.TotalMarginBalance = rawAccount.MarginSummary.AccountValue
+	account.TotalWalletBalance = rawAccount.MarginSummary.TotalRawUsd
+	account.TotalInitialMargin = rawAccount.MarginSummary.TotalMarginUsed
+	account.TotalMaintMargin = rawAccount.CrossMaintenanceMarginUsed
+	account.AvailableBalance = rawAccount.Withdrawable
+
+	for _, asset := range rawAccount.AssetPositions {
+		p := asset.Position
+		symbol := p.Coin + QuoteCurrency
+		positionSide := types.PositionLong
+		if p.Szi.Sign() < 0 {
+			positionSide = types.PositionShort
+		}
+
+		posKey := types.NewPositionKey(symbol, positionSide)
+		account.Positions[posKey] = types.FuturesPosition{
+			Symbol:        symbol,
+			PositionSide:  positionSide,
+			BaseCurrency:  p.Coin,
+			QuoteCurrency: QuoteCurrency,
+			Base:          p.Szi.Abs(),
+			Quote:         p.PositionValue,
+			Isolated:      p.Leverage.Type == "isolated",
+			PositionRisk:  toGlobalPositionRisk(asset.Position),
+			UpdateTime:    rawAccount.Time,
+		}
+	}
+
+	return account
+}
+
+func toGlobalPositionRisk(p hyperapi.FuturesPosition) *types.PositionRisk {
+	markPrice := p.EntryPx.Add(p.UnrealizedPnl.Div(p.Szi))
+	side := types.PositionLong
+	if p.Szi.Sign() < 0 {
+		side = types.PositionShort
+	}
+	return &types.PositionRisk{
+		Leverage:              p.Leverage.Value,
+		Symbol:                p.Coin + QuoteCurrency,
+		EntryPrice:            p.EntryPx,
+		LiquidationPrice:      p.LiquidationPx,
+		PositionAmount:        p.Szi,
+		UnrealizedPnL:         p.UnrealizedPnl,
+		InitialMargin:         p.MarginUsed,
+		MarkPrice:             markPrice,
+		PositionInitialMargin: p.MarginUsed,
+		Notional:              p.PositionValue,
+		PositionSide:          side,
+	}
 }
