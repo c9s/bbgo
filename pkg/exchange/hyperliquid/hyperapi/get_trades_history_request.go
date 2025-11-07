@@ -1,6 +1,8 @@
 package hyperapi
 
 import (
+	"time"
+
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 )
@@ -30,14 +32,14 @@ type Trade struct {
 type GetTradesHistoryRequest struct {
 	client requestgen.APIClient
 
-	user            string                      `param:"user,required"`
-	startTime       types.MillisecondTimestamp  `param:"startTime"`
-	endTime         *types.MillisecondTimestamp `param:"endTime"`
-	aggregateByTime *bool                       `param:"aggregateByTime"`
-	metaType        ReqTypeInfo                 `param:"type" default:"userFills" validValues:"userFills,userFillsByTime"`
+	user            string      `param:"user,required"`
+	startTime       *time.Time  `param:"startTime,milliseconds"`
+	endTime         *time.Time  `param:"endTime,milliseconds"`
+	aggregateByTime *bool       `param:"aggregateByTime"`
+	metaType        ReqTypeInfo `param:"type" default:"userFills" validValues:"userFills,userFillsByTime"`
 }
 
-func (c *Client) NewGetOrderHistoryRequest() *GetTradesHistoryRequest {
+func (c *Client) NewGetTradesHistoryRequest() *GetTradesHistoryRequest {
 	return &GetTradesHistoryRequest{
 		client:   c,
 		metaType: ReqUserFills,

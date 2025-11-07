@@ -6,10 +6,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/types"
 	"net/url"
 	"reflect"
 	"regexp"
+	"strconv"
+	"time"
 )
 
 func (g *GetTradesHistoryRequest) User(user string) *GetTradesHistoryRequest {
@@ -17,12 +18,12 @@ func (g *GetTradesHistoryRequest) User(user string) *GetTradesHistoryRequest {
 	return g
 }
 
-func (g *GetTradesHistoryRequest) StartTime(startTime types.MillisecondTimestamp) *GetTradesHistoryRequest {
-	g.startTime = startTime
+func (g *GetTradesHistoryRequest) StartTime(startTime time.Time) *GetTradesHistoryRequest {
+	g.startTime = &startTime
 	return g
 }
 
-func (g *GetTradesHistoryRequest) EndTime(endTime types.MillisecondTimestamp) *GetTradesHistoryRequest {
+func (g *GetTradesHistoryRequest) EndTime(endTime time.Time) *GetTradesHistoryRequest {
 	g.endTime = &endTime
 	return g
 }
@@ -70,13 +71,17 @@ func (g *GetTradesHistoryRequest) GetParameters() (map[string]interface{}, error
 	// assign parameter of user
 	params["user"] = user
 	// check startTime field -> json key startTime
-	startTime := g.startTime
+	if g.startTime != nil {
+		startTime := *g.startTime
 
-	// TEMPLATE check-required
-	// END TEMPLATE check-required
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
 
-	// assign parameter of startTime
-	params["startTime"] = startTime
+		// assign parameter of startTime
+		// convert time.Time to milliseconds time stamp
+		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
+	} else {
+	}
 	// check endTime field -> json key endTime
 	if g.endTime != nil {
 		endTime := *g.endTime
@@ -85,7 +90,8 @@ func (g *GetTradesHistoryRequest) GetParameters() (map[string]interface{}, error
 		// END TEMPLATE check-required
 
 		// assign parameter of endTime
-		params["endTime"] = endTime
+		// convert time.Time to milliseconds time stamp
+		params["endTime"] = strconv.FormatInt(endTime.UnixNano()/int64(time.Millisecond), 10)
 	} else {
 	}
 	// check aggregateByTime field -> json key aggregateByTime

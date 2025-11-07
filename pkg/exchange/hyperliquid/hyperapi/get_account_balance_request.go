@@ -6,9 +6,6 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
-//go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Response.Data
-//go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Response.Data
-
 type Balance struct {
 	Coin     string           `json:"coin"`
 	Token    int64            `json:"token"`
@@ -21,7 +18,7 @@ type Account struct {
 	Balances []Balance `json:"balances"`
 }
 
-//go:generate GetRequest -url "/info" -type GetAccountBalanceRequest -responseDataType Account
+//go:generate requestgen -method POST -url "/info" -type GetAccountBalanceRequest -responseType Account
 type GetAccountBalanceRequest struct {
 	client requestgen.APIClient
 
