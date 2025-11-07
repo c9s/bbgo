@@ -118,6 +118,31 @@ var coveredPositionMetrics = prometheus.NewGaugeVec(
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"},
 )
 
+// Divergence (D2) and components
+var divergenceD2 = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_divergence_d2",
+		Help: "Direction divergence score D2 (1 - p_sign) for xmaker",
+	},
+	[]string{"strategy_type", "strategy_id", "exchange", "symbol"},
+)
+
+var directionMean = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_direction_mean",
+		Help: "Weighted mean of normalized signals (m)",
+	},
+	[]string{"strategy_type", "strategy_id", "exchange", "symbol"},
+)
+
+var directionAlignedWeight = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_direction_aligned_weight",
+		Help: "Aligned weight proportion p_sign",
+	},
+	[]string{"strategy_type", "strategy_id", "exchange", "symbol"},
+)
+
 func init() {
 	prometheus.MustRegister(
 		openOrderBidExposureInUsdMetrics,
@@ -138,5 +163,8 @@ func init() {
 		spreadMakerQuoteVolumeMetrics,
 
 		coveredPositionMetrics,
+		divergenceD2,
+		directionMean,
+		directionAlignedWeight,
 	)
 }
