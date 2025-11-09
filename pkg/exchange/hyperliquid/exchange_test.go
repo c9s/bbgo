@@ -151,10 +151,12 @@ func TestQueryAccount(t *testing.T) {
 		futuresInfo := account.FuturesInfo
 
 		// Verify futures account summary fields
-		assert.Equal(t, 121968206.668798998, futuresInfo.TotalMarginBalance.Float64())
-		assert.Equal(t, 46255052.1990050003, futuresInfo.TotalInitialMargin.Float64())
-		assert.Equal(t, 12598833.5037019998, futuresInfo.TotalMaintMargin.Float64())
-		assert.Equal(t, 75713154.4697940052, futuresInfo.AvailableBalance.Float64())
+		// Use InDelta for floating point comparisons to handle platform-specific precision differences
+		const delta = 1e-6 // Allow 0.000001 difference for large numbers
+		assert.InDelta(t, 121968206.668798998, futuresInfo.TotalMarginBalance.Float64(), delta)
+		assert.InDelta(t, 46255052.1990050003, futuresInfo.TotalInitialMargin.Float64(), delta)
+		assert.InDelta(t, 12598833.5037019998, futuresInfo.TotalMaintMargin.Float64(), delta)
+		assert.InDelta(t, 75713154.4697940052, futuresInfo.AvailableBalance.Float64(), delta)
 
 		// Verify positions count
 		assert.Equal(t, 11, len(futuresInfo.Positions))
@@ -168,14 +170,14 @@ func TestQueryAccount(t *testing.T) {
 		assert.Equal(t, "BTC", btcPos.BaseCurrency)
 		assert.Equal(t, "USDC", btcPos.QuoteCurrency)
 		assert.Equal(t, "1186.74032", btcPos.Base.String())
-		assert.Equal(t, 120498051.8718400002, btcPos.Quote.Float64())
+		assert.InDelta(t, 120498051.8718400002, btcPos.Quote.Float64(), delta)
 		assert.False(t, btcPos.Isolated, "BTC position should be cross margin")
 		assert.NotNil(t, btcPos.PositionRisk)
 		assert.Equal(t, "10", btcPos.PositionRisk.Leverage.String())
 		assert.Equal(t, "111616.8", btcPos.PositionRisk.EntryPrice.String())
-		assert.Equal(t, 191751.85621501, btcPos.PositionRisk.LiquidationPrice.Float64())
-		assert.Equal(t, 11962126.6084020007, btcPos.PositionRisk.UnrealizedPnL.Float64())
-		assert.Equal(t, 120498051.8718400002, btcPos.PositionRisk.Notional.Float64())
+		assert.InDelta(t, 191751.8562150183, btcPos.PositionRisk.LiquidationPrice.Float64(), delta)
+		assert.InDelta(t, 11962126.6084020007, btcPos.PositionRisk.UnrealizedPnL.Float64(), delta)
+		assert.InDelta(t, 120498051.8718400002, btcPos.PositionRisk.Notional.Float64(), delta)
 
 		// Verify ETH short position
 		ethPosKey := types.NewPositionKey("ETHUSDC", types.PositionShort)
@@ -185,12 +187,12 @@ func TestQueryAccount(t *testing.T) {
 		assert.Equal(t, types.PositionShort, ethPos.PositionSide)
 		assert.Equal(t, "ETH", ethPos.BaseCurrency)
 		assert.Equal(t, "51446.7322", ethPos.Base.String())
-		assert.Equal(t, 170664244.7270599902, ethPos.Quote.Float64())
+		assert.InDelta(t, 170664244.7270599902, ethPos.Quote.Float64(), delta)
 		assert.False(t, ethPos.Isolated, "ETH position should be cross margin")
 		assert.NotNil(t, ethPos.PositionRisk)
 		assert.Equal(t, "10", ethPos.PositionRisk.Leverage.String())
 		assert.Equal(t, "3527.73", ethPos.PositionRisk.EntryPrice.String())
-		assert.Equal(t, 5374.599353, ethPos.PositionRisk.LiquidationPrice.Float64())
+		assert.InDelta(t, 5374.5993530082, ethPos.PositionRisk.LiquidationPrice.Float64(), delta)
 
 		// Verify ASTER long position (the only long position in test data)
 		asterPosKey := types.NewPositionKey("ASTERUSDC", types.PositionLong)
@@ -205,6 +207,64 @@ func TestQueryAccount(t *testing.T) {
 		assert.NotNil(t, asterPos.PositionRisk)
 		assert.Equal(t, "3", asterPos.PositionRisk.Leverage.String())
 		assert.Equal(t, "0.968318", asterPos.PositionRisk.EntryPrice.String())
+	})
+
+}
+
+func TestQueryAccountBalances(t *testing.T) {
+	t.Run("succeeds querying spot account balances", func(t *testing.T) {
+		privateKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		ex := New(fmt.Sprintf("%x", crypto.FromECDSA(privateKey)), "")
+
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		spotMeta, err := os.ReadFile("./testdata/spotClearinghouseState.json")
+		require.NoError(t, err)
+
+		transport.POST("/info", func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusOK, string(spotMeta)), nil
+		})
+
+		balances, err := ex.QueryAccountBalances(context.Background())
+		assert.NoError(t, err)
+		assert.NotNil(t, balances)
+		assert.Greater(t, len(balances), 0)
+
+		// Verify USDC balance
+		usdcBalance, exists := balances["USDC"]
+		assert.True(t, exists, "USDC balance should exist")
+		assert.Equal(t, "USDC", usdcBalance.Currency)
+		assert.Equal(t, "1808443.14193129", usdcBalance.NetAsset.String())
+		assert.Equal(t, "1808443.14193129", usdcBalance.Available.String())
+		assert.Equal(t, 0.0, usdcBalance.Locked.Float64())
+		assert.Equal(t, "1808443.14193129", usdcBalance.MaxWithdrawAmount.String())
+
+		// Verify HYPE balance
+		hypeBalance, exists := balances["HYPE"]
+		assert.True(t, exists, "HYPE balance should exist")
+		assert.Equal(t, "HYPE", hypeBalance.Currency)
+		assert.Equal(t, "503808.46025243", hypeBalance.NetAsset.String())
+		assert.Equal(t, "503778.46025243", hypeBalance.Available.String())
+		assert.Equal(t, 30.0, hypeBalance.Locked.Float64())
+		assert.Equal(t, "503778.46025243", hypeBalance.MaxWithdrawAmount.String())
+
+		// Verify LATINA balance
+		latinaBalance, exists := balances["LATINA"]
+		assert.True(t, exists, "LATINA balance should exist")
+		assert.Equal(t, "LATINA", latinaBalance.Currency)
+		assert.Equal(t, "45658.0657", latinaBalance.NetAsset.String())
+		assert.Equal(t, "45658.0657", latinaBalance.Available.String())
+		assert.Equal(t, 0.0, latinaBalance.Locked.Float64())
+
+		// Verify UBTC balance (zero balance)
+		ubtcBalance, exists := balances["UBTC"]
+		assert.True(t, exists, "UBTC balance should exist")
+		assert.Equal(t, "UBTC", ubtcBalance.Currency)
+		assert.Equal(t, "0", ubtcBalance.NetAsset.String())
+		assert.Equal(t, "0", ubtcBalance.Available.String())
+		assert.Equal(t, 0.0, ubtcBalance.Locked.Float64())
 	})
 
 }

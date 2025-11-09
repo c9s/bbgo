@@ -2,6 +2,7 @@ package hyperliquid
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"strconv"
 
@@ -42,6 +43,10 @@ func (e *Exchange) queryFuturesMarkets(ctx context.Context) (types.MarketMap, er
 }
 
 func (e *Exchange) queryFuturesAccount(ctx context.Context) (*types.Account, error) {
+	if err := restSharedLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
+	}
+
 	futuresAccount, err := e.client.NewFuturesGetAccountBalanceRequest().User(e.client.UserAddress()).Do(ctx)
 	if err != nil {
 		return nil, err

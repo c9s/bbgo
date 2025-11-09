@@ -93,24 +93,39 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return e.queryFuturesAccount(ctx)
 	}
 
-	spotAccount, err := e.client.NewGetAccountBalanceRequest().User(e.client.UserAddress()).Do(ctx)
+	balances, err := e.querySpotAccountBalance(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	balances := toGlobalBalance(spotAccount)
 	account := types.NewAccount()
-	account.UpdateBalances(balances)
+	account.UpdateBalances(toGlobalBalance(balances))
 
 	return account, nil
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	// TODO implement
-	return nil, fmt.Errorf("not implemented")
+	balances, err := e.querySpotAccountBalance(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalBalance(balances), nil
+}
+
+func (e *Exchange) querySpotAccountBalance(ctx context.Context) (*hyperapi.Account, error) {
+	if err := restSharedLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
+	}
+
+	return e.client.NewGetAccountBalanceRequest().User(e.client.UserAddress()).Do(ctx)
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
+	if err := restSharedLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("submit order rate limiter wait error: %w", err)
+	}
+
 	// TODO implement
 	return nil, fmt.Errorf("not implemented")
 }
