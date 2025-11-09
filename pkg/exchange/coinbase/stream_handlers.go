@@ -382,10 +382,6 @@ func (s *Stream) handleOrderbookUpdateMessage(msg *OrderBookUpdateMessage) {
 		side := c[0]
 		price := fixedpoint.MustNewFromString(c[1])
 		volume := fixedpoint.MustNewFromString(c[2])
-		if volume.IsZero() {
-			// 0 volume means the price can be removed.
-			continue
-		}
 		switch side {
 		case "buy":
 			bids = append(bids, types.PriceVolume{
