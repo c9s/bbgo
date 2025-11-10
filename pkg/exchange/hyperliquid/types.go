@@ -23,6 +23,23 @@ var (
 		types.Interval1w:  60 * 60 * 24 * 7,
 		types.Interval1mo: 60 * 60 * 24 * 30,
 	}
+
+	ToLocalInterval = map[types.Interval]string{
+		types.Interval1m:  "1m",
+		types.Interval3m:  "3m",
+		types.Interval5m:  "5m",
+		types.Interval15m: "15m",
+		types.Interval30m: "30m",
+		types.Interval1h:  "1h",
+		types.Interval2h:  "2h",
+		types.Interval4h:  "4h",
+		types.Interval8h:  "8h",
+		types.Interval12h: "12h",
+		types.Interval1d:  "1d",
+		types.Interval3d:  "3d",
+		types.Interval1w:  "1w",
+		types.Interval1mo: "1M",
+	}
 )
 
 var spotSymbolSyncMap sync.Map

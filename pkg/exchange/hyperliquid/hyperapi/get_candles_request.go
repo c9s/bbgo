@@ -1,8 +1,5 @@
 package hyperapi
 
-//go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Response.Data
-//go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Response.Data
-
 import (
 	"github.com/c9s/requestgen"
 
@@ -18,24 +15,25 @@ type KLine struct {
 	Volume       fixedpoint.Value           `json:"v"`
 	Interval     string                     `json:"i"`
 	Symbol       string                     `json:"s"`
+	Trades       uint64                     `json:"n"`
 	StartTime    types.MillisecondTimestamp `json:"t"`
 	EndTime      types.MillisecondTimestamp `json:"T"`
 }
 
 type CandleRequest struct {
-	Coin      string         `json:"coin"`
-	Interval  types.Interval `json:"interval"`
-	StartTime int64          `json:"startTime"`
-	EndTime   int64          `json:"endTime"`
+	Coin      string `json:"coin"`
+	Interval  string `json:"interval"`
+	StartTime int64  `json:"startTime"`
+	EndTime   int64  `json:"endTime,omitempty"`
 }
 
-//go:generate PostRequest -url "/info" -type GetCandlesRequest -responseDataType []KLine
+//go:generate requestgen -method POST -url "/info" -type GetCandlesRequest -responseType []KLine
 type GetCandlesRequest struct {
 	client requestgen.APIClient
 
 	metaType ReqTypeInfo `param:"type" default:"candleSnapshot" validValues:"candleSnapshot"`
 
-	CandleRequest CandleRequest `param:"req,required"`
+	candleRequest CandleRequest `param:"req,required"`
 }
 
 func (c *Client) NewGetCandlesRequest() *GetCandlesRequest {
