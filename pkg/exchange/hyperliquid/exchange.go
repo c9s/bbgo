@@ -155,8 +155,39 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	//TODO implement
-	return nil, fmt.Errorf("not implemented")
+	if err := restSharedLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("query k line rate limiter wait error: %w", err)
+	}
+
+	localSymbol, _ := e.getLocalSymbol(symbol)
+	intervalParam, err := toLocalInterval(interval)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get interval: %w", err)
+	}
+
+	candleReq := hyperapi.CandleRequest{
+		Interval: intervalParam,
+		Coin:     localSymbol,
+	}
+
+	if options.StartTime != nil {
+		candleReq.StartTime = options.StartTime.UnixMilli()
+	}
+
+	if options.EndTime != nil {
+		candleReq.EndTime = options.EndTime.UnixMilli()
+	}
+
+	candles, err := e.client.NewGetCandlesRequest().CandleRequest(candleReq).Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var kLines []types.KLine
+	for _, candle := range candles {
+		kLines = append(kLines, kLineToGlobal(candle, interval, symbol))
+	}
+
+	return kLines, nil
 }
 
 // DefaultFeeRates returns the hyperliquid base fee schedule
@@ -214,4 +245,12 @@ func (e *Exchange) syncSymbolsToMap(ctx context.Context) error {
 	})
 
 	return nil
+}
+
+func (e *Exchange) getLocalSymbol(symbol string) (string, int) {
+	if e.IsFutures {
+		return toLocalFuturesSymbol(symbol)
+	}
+
+	return toLocalSpotSymbol(symbol)
 }

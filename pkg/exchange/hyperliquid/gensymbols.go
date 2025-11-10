@@ -44,7 +44,7 @@ func main() {
 	tokens := spotMeta.Tokens
 	for _, s := range spotMeta.Universe {
 		base, quote := tokens[s.Tokens[0]], tokens[s.Tokens[1]]
-		spotSymbolMap[base.Name+quote.Name] = "@" + strconv.Itoa(s.Index)
+		spotSymbolMap[base.Name+quote.Name] = base.Name + "@" + strconv.Itoa(s.Index)
 	}
 
 	futuresMeta, err := client.NewFuturesGetMetaRequest().Do(ctx)

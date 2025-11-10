@@ -2,11 +2,14 @@ package hyperliquid
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"testing"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testing/httptesting"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -42,7 +45,7 @@ func TestQueryMarkets(t *testing.T) {
 		assert.Equal(t, "PURRUSDC", purrUsdcMarket.Symbol)
 		assert.Equal(t, "PURR", purrUsdcMarket.BaseCurrency)
 		assert.Equal(t, "USDC", purrUsdcMarket.QuoteCurrency)
-		assert.Equal(t, "@0", purrUsdcMarket.LocalSymbol)
+		assert.Equal(t, "PURR@0", purrUsdcMarket.LocalSymbol)
 		assert.Equal(t, 8, purrUsdcMarket.PricePrecision)
 		assert.Equal(t, 0, purrUsdcMarket.VolumePrecision)
 	})
@@ -266,5 +269,62 @@ func TestQueryAccountBalances(t *testing.T) {
 		assert.Equal(t, "0", ubtcBalance.Available.String())
 		assert.Equal(t, 0.0, ubtcBalance.Locked.Float64())
 	})
+}
 
+func TestQueryKLines(t *testing.T) {
+	t.Run("succeeds querying futures klines without time bounds", func(t *testing.T) {
+		privateKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		ex := New(fmt.Sprintf("%x", crypto.FromECDSA(privateKey)), "")
+		ex.IsFutures = true
+
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		candles, err := os.ReadFile("./testdata/candles.json")
+		require.NoError(t, err)
+
+		transport.POST("/info", func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+
+			var payload map[string]any
+			require.NoError(t, json.Unmarshal(body, &payload))
+
+			reqType, ok := payload["type"].(string)
+			require.True(t, ok)
+			assert.Equal(t, "candleSnapshot", reqType)
+
+			reqPayload, ok := payload["req"].(map[string]any)
+			require.True(t, ok)
+
+			assert.Equal(t, "BTC", reqPayload["coin"])
+			assert.Equal(t, "1h", reqPayload["interval"])
+			_, hasStart := reqPayload["startTime"]
+			assert.True(t, hasStart)
+			_, hasEnd := reqPayload["endTime"]
+			assert.False(t, hasEnd)
+
+			return httptesting.BuildResponseString(http.StatusOK, string(candles)), nil
+		})
+
+		kLines, err := ex.QueryKLines(context.Background(), "BTCUSDC", types.Interval1h, types.KLineQueryOptions{})
+		require.NoError(t, err)
+		require.Len(t, kLines, 3)
+
+		first := kLines[0]
+		assert.Equal(t, types.ExchangeHyperliquid, first.Exchange)
+		assert.Equal(t, "BTCUSDC", first.Symbol)
+		assert.Equal(t, types.Interval1h, first.Interval)
+		assert.True(t, first.Closed)
+		assert.Equal(t, uint64(14946), first.NumberOfTrades)
+
+		assert.Equal(t, int64(1762776000000), first.StartTime.Time().UnixMilli())
+		assert.Equal(t, int64(1762779599999), first.EndTime.Time().UnixMilli())
+		assert.Equal(t, fixedpoint.MustNewFromString("106211.0"), first.Open)
+		assert.Equal(t, fixedpoint.MustNewFromString("105968.0"), first.Close)
+		assert.Equal(t, fixedpoint.MustNewFromString("106248.0"), first.High)
+		assert.Equal(t, fixedpoint.MustNewFromString("105886.0"), first.Low)
+		assert.Equal(t, fixedpoint.MustNewFromString("736.72125"), first.Volume)
+	})
 }

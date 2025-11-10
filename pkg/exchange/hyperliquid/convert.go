@@ -1,6 +1,7 @@
 package hyperliquid
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -18,7 +19,7 @@ func toGlobalSpotMarket(s hyperapi.UniverseMeta, tokens []hyperapi.TokenMeta) ty
 	return types.Market{
 		Exchange:        types.ExchangeHyperliquid,
 		Symbol:          base.Name + quote.Name,
-		LocalSymbol:     "@" + strconv.Itoa(s.Index),
+		LocalSymbol:     base.Name + "@" + strconv.Itoa(s.Index),
 		BaseCurrency:    base.Name,
 		QuoteCurrency:   quote.Name,
 		TickSize:        tickSize,
@@ -34,44 +35,46 @@ func toGlobalSpotMarket(s hyperapi.UniverseMeta, tokens []hyperapi.TokenMeta) ty
 	}
 }
 
-func toLocalSpotAsset(symbol string) string {
+func toLocalSpotSymbol(symbol string) (string, int) {
 	if s, ok := spotSymbolSyncMap.Load(symbol); ok {
 		if localSymbol, ok := s.(string); ok {
 			at := strings.LastIndexByte(localSymbol, '@')
 			if at < 0 || at+1 >= len(localSymbol) {
 				log.Errorf("invalid local symbol format %q for %s", localSymbol, symbol)
-				return symbol
+				return symbol, -1
 			}
 
 			if asset, err := strconv.Atoi(localSymbol[at+1:]); err == nil {
-				return strconv.Itoa(asset + 1000)
+				return localSymbol[:at], asset
 			}
 		}
 
-		log.Errorf("failed to convert symbol %s to local asset, but found in spotSymbolSyncMap", symbol)
+		log.Errorf("failed to convert symbol %s to local symbol and asset, but found in spotSymbolSyncMap", symbol)
 	}
 
-	log.Errorf("failed to look up local asset from %s", symbol)
-	return symbol
+	log.Errorf("failed to look up local symbol and asset from %s", symbol)
+	return symbol, -1
 }
 
-func toLocalFuturesAsset(symbol string) string {
+func toLocalFuturesSymbol(symbol string) (string, int) {
 	if s, ok := futuresSymbolSyncMap.Load(symbol); ok {
 		if localSymbol, ok := s.(string); ok {
 			at := strings.LastIndexByte(localSymbol, '@')
 			if at < 0 || at+1 >= len(localSymbol) {
 				log.Errorf("invalid local symbol format %q for %s", localSymbol, symbol)
-				return symbol
+				return symbol, -1
 			}
 
-			return localSymbol[at+1:]
+			if asset, err := strconv.Atoi(localSymbol[at+1:]); err == nil {
+				return localSymbol[:at], asset
+			}
 		}
 
-		log.Errorf("failed to convert symbol %s to local asset, but found in futuresSymbolSyncMaps", symbol)
+		log.Errorf("failed to convert symbol %s to local symbol and asset, but found in futuresSymbolSyncMaps", symbol)
 	}
 
-	log.Errorf("failed to look up local asset from %s", symbol)
-	return symbol
+	log.Errorf("failed to look up local symbol and asset from %s", symbol)
+	return symbol, -1
 }
 
 func toGlobalBalance(account *hyperapi.Account) types.BalanceMap {
@@ -143,5 +146,39 @@ func toGlobalPositionRisk(p hyperapi.FuturesPosition) *types.PositionRisk {
 		PositionInitialMargin: p.MarginUsed,
 		Notional:              p.PositionValue,
 		PositionSide:          side,
+	}
+}
+
+func toLocalInterval(interval types.Interval) (string, error) {
+	if _, ok := SupportedIntervals[interval]; !ok {
+		return "", fmt.Errorf("interval %s is not supported", interval)
+	}
+
+	in, ok := ToLocalInterval[interval]
+	if !ok {
+		return "", fmt.Errorf("interval %s is not supported, got local interval %s", interval, in)
+	}
+
+	return in, nil
+}
+
+func kLineToGlobal(k hyperapi.KLine, interval types.Interval, symbol string) types.KLine {
+	return types.KLine{
+		Exchange:                 types.ExchangeHyperliquid,
+		Symbol:                   symbol,
+		StartTime:                types.Time(k.StartTime),
+		EndTime:                  types.Time(k.EndTime),
+		Interval:                 interval,
+		Open:                     k.OpenPrice,
+		Close:                    k.ClosePrice,
+		High:                     k.HighestPrice,
+		Low:                      k.LowestPrice,
+		Volume:                   k.Volume,
+		NumberOfTrades:           k.Trades,
+		QuoteVolume:              fixedpoint.Zero, // not supported
+		TakerBuyBaseAssetVolume:  fixedpoint.Zero, // not supported
+		TakerBuyQuoteAssetVolume: fixedpoint.Zero, // not supported
+		LastTradeID:              0,               // not supported
+		Closed:                   true,
 	}
 }
