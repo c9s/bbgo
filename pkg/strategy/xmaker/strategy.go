@@ -121,8 +121,6 @@ type Strategy struct {
 	HedgeInterval       types.Duration `json:"hedgeInterval"`
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
 
-	SubscribeFeeTokenMarkets bool `json:"subscribeFeeTokenMarkets"`
-
 	EnableSignalMargin bool `json:"enableSignalMargin"`
 
 	// Direction-divergence (D2) control — optional risk widener driven by signal direction conflicts
@@ -345,20 +343,63 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		sig.Signal.Subscribe(sourceSession, s.SourceSymbol)
 	}
 
-	if s.SubscribeFeeTokenMarkets {
-		subscribeOpts := types.SubscribeOptions{Interval: "1m"}
-		if cu := sourceSession.Exchange.PlatformFeeCurrency(); cu != "" {
-			sourceSession.Subscribe(
-				types.KLineChannel, sourceSession.Exchange.PlatformFeeCurrency()+feeTokenQuoteCurrency, subscribeOpts,
-			)
-		}
+	subscribeFeeTokenMarkets(sourceSession)
+	subscribeFeeTokenMarkets(makerSession)
 
-		if cu := makerSession.Exchange.PlatformFeeCurrency(); cu != "" {
-			makerSession.Subscribe(
-				types.KLineChannel, makerSession.Exchange.PlatformFeeCurrency()+feeTokenQuoteCurrency, subscribeOpts,
-			)
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		for sessionName := range s.SplitHedge.HedgeMarkets {
+			if ses, ok := sessions[sessionName]; ok {
+				subscribeFeeTokenMarkets(ses)
+			}
 		}
 	}
+}
+
+func subscribeFeeTokenMarkets(session *bbgo.ExchangeSession) {
+	subOpts := types.SubscribeOptions{Interval: "1m"}
+
+	// feeTokenQuoteCurrency is quote currency we would like to convert fee token into.
+	// it's the quote currency of the market, e.g. USDT if we are market making BTC/USDT.
+	m, ok := findFeeTokenMarket(session, feeTokenQuoteCurrency)
+	if ok {
+		session.Subscribe(types.KLineChannel, m.Symbol, subOpts)
+	}
+}
+
+func findFeeTokenMarket(session *bbgo.ExchangeSession, quoteCurrency string) (types.Market, bool) {
+	markets := session.Markets()
+	platformFeeToken := session.Exchange.PlatformFeeCurrency()
+	if platformFeeToken == "" {
+		platformFeeToken = "USD"
+	}
+
+	return markets.FindPair(platformFeeToken, quoteCurrency)
+}
+
+func updateFeeTokenPrice(session *bbgo.ExchangeSession, priceSolver *pricesolver.SimplePriceSolver, position *types.Position) {
+	priceSolver.BindStream(session.MarketDataStream)
+
+	market, ok := findFeeTokenMarket(session, feeTokenQuoteCurrency)
+	if !ok {
+		return
+	}
+
+	feeToken := session.Exchange.PlatformFeeCurrency()
+	if feeToken == "" {
+		feeToken = "USD"
+	}
+
+	session.MarketDataStream.OnKLineClosed(
+		types.KLineWith(
+			market.Symbol, types.Interval1m, func(k types.KLine) {
+				log.Infof("fee token price update from %s: %s O:%s C:%s", session.Name, feeToken, k.Open, k.Close)
+
+				if feePrice, ok := priceSolver.ResolvePrice(feeToken, feeTokenQuoteCurrency); ok {
+					position.SetFeeAverageCost(feeToken, feePrice)
+				}
+			},
+		),
+	)
 }
 
 func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Value) (price fixedpoint.Value) {
@@ -2639,16 +2680,27 @@ func (s *Strategy) CrossRun(
 	}
 
 	// initialize the price resolver
+	var allMarkets types.MarketMap
 	makerMarkets := s.makerSession.Markets()
-	sourceMarkets := s.hedgeSession.Markets()
-	if len(sourceMarkets) == 0 {
-		return fmt.Errorf("source exchange %s has no markets", s.SourceExchange)
+
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		allMarkets = (types.MarketMap{}).Merge(makerMarkets)
+		for sessionName := range s.SplitHedge.HedgeMarkets {
+			if session, ok := sessions[sessionName]; ok {
+				allMarkets = allMarkets.Merge(session.Markets())
+			}
+		}
+	} else {
+		sourceMarkets := s.hedgeSession.Markets()
+		if len(sourceMarkets) == 0 {
+			return fmt.Errorf("source exchange %s has no markets", s.SourceExchange)
+		}
+
+		allMarkets = makerMarkets.Merge(sourceMarkets)
 	}
-	allMarkets := makerMarkets.Merge(sourceMarkets)
 
 	// TODO: we can share this priceSolver across different instances
 	s.priceSolver = pricesolver.NewSimplePriceResolver(allMarkets)
-	s.priceSolver.BindStream(s.hedgeSession.MarketDataStream)
 
 	s.hedgeSession.UserDataStream.OnTradeUpdate(s.priceSolver.UpdateFromTrade)
 
@@ -2657,27 +2709,16 @@ func (s *Strategy) CrossRun(
 		return err
 	}
 
-	s.hedgeSession.MarketDataStream.OnKLineClosed(
-		types.KLineWith(
-			s.SourceSymbol, types.Interval1m, func(k types.KLine) {
-				feeToken := s.hedgeSession.Exchange.PlatformFeeCurrency()
-				if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuoteCurrency); ok {
-					s.Position.SetFeeAverageCost(feeToken, feePrice)
-				}
-			},
-		),
-	)
-
-	s.makerSession.MarketDataStream.OnKLineClosed(
-		types.KLineWith(
-			s.Symbol, types.Interval1m, func(k types.KLine) {
-				feeToken := s.makerSession.Exchange.PlatformFeeCurrency()
-				if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuoteCurrency); ok {
-					s.Position.SetFeeAverageCost(feeToken, feePrice)
-				}
-			},
-		),
-	)
+	updateFeeTokenPrice(s.makerSession, s.priceSolver, s.Position)
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		for sessionName := range s.SplitHedge.HedgeMarkets {
+			if session, ok := sessions[sessionName]; ok {
+				updateFeeTokenPrice(session, s.priceSolver, s.Position)
+			}
+		}
+	} else {
+		updateFeeTokenPrice(s.hedgeSession, s.priceSolver, s.Position)
+	}
 
 	if s.ProfitFixerConfig != nil {
 		bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)

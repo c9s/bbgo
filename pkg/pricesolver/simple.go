@@ -87,9 +87,11 @@ func (m *SimplePriceSolver) UpdateFromTrade(trade types.Trade) {
 
 func (m *SimplePriceSolver) BindStream(stream types.Stream) {
 	if stream.GetPublicOnly() {
-		stream.OnKLineClosed(func(k types.KLine) {
+		f := func(k types.KLine) {
 			m.Update(k.Symbol, k.Close)
-		})
+		}
+		stream.OnKLine(f)
+		stream.OnKLineClosed(f)
 	} else {
 		stream.OnTradeUpdate(m.UpdateFromTrade)
 	}
