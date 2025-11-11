@@ -3,6 +3,8 @@ package hyperliquid
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strconv"
 	"sync"
 	"time"
 
@@ -21,6 +23,9 @@ const (
 
 // REST requests share an aggregated weight limit of 1200 per minute.
 var restSharedLimiter = rate.NewLimiter(rate.Every(50*time.Millisecond), 1)
+
+// clientOrderIdRegex is 128-bit hex string starting with 0x and followed by 32 hex characters
+var clientOrderIdRegex = regexp.MustCompile(`^0x[0-9a-fA-F]{32}$`)
 
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": ID,
@@ -122,12 +127,125 @@ func (e *Exchange) querySpotAccountBalance(ctx context.Context) (*hyperapi.Accou
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
+	// Validate order parameters
+	if len(order.Market.Symbol) == 0 {
+		return nil, fmt.Errorf("order.Market.Symbol is required: %+v", order)
+	}
+	if order.Quantity.IsZero() {
+		return nil, fmt.Errorf("order.Quantity is required: %+v", order)
+	}
+
+	// Build order request
+	_, assetIdx := e.getLocalSymbol(order.Symbol)
+	reqOrder := hyperapi.Order{
+		Asset:      strconv.Itoa(assetIdx),
+		IsBuy:      order.Side == types.SideTypeBuy,
+		Size:       order.Quantity.String(),
+		Price:      order.Price.String(),
+		ReduceOnly: order.ReduceOnly,
+	}
+
+	// Validate and set client order ID if provided
+	if len(order.ClientOrderID) > 0 {
+		if !clientOrderIdRegex.MatchString(order.ClientOrderID) {
+			return nil, fmt.Errorf("client order id should be a 128-bit hex string starting with 0x and followed by 32 hex characters: %s", order.ClientOrderID)
+		}
+		reqOrder.ClientOrderID = &order.ClientOrderID
+	}
+
+	// Set order type and time in force
+	switch order.Type {
+	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
+		tif := hyperapi.TimeInForceGTC
+		switch order.TimeInForce {
+		case types.TimeInForceIOC:
+			tif = hyperapi.TimeInForceIOC
+		case types.TimeInForceALO:
+			tif = hyperapi.TimeInForceALO
+		}
+		reqOrder.OrderType = hyperapi.OrderType{Limit: hyperapi.LimitOrderType{Tif: tif}}
+
+	case types.OrderTypeMarket:
+		reqOrder.OrderType = hyperapi.OrderType{
+			Trigger: hyperapi.TriggerOrderType{
+				IsMarket:  true,
+				TriggerPx: "0",
+			},
+		}
+
+	case types.OrderTypeStopLimit:
+		reqOrder.OrderType = hyperapi.OrderType{
+			Trigger: hyperapi.TriggerOrderType{
+				IsMarket:  false,
+				TriggerPx: order.StopPrice.String(),
+				Tpsl:      "sl",
+			},
+		}
+
+	case types.OrderTypeStopMarket, types.OrderTypeTakeProfitMarket:
+		tpsl := "sl"
+		if order.Type == types.OrderTypeTakeProfitMarket {
+			tpsl = "tp"
+		}
+		reqOrder.OrderType = hyperapi.OrderType{
+			Trigger: hyperapi.TriggerOrderType{
+				IsMarket:  true,
+				TriggerPx: order.StopPrice.String(),
+				Tpsl:      tpsl,
+			},
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported order type: %v", order.Type)
+	}
+
 	if err := restSharedLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("submit order rate limiter wait error: %w", err)
 	}
 
-	// TODO implement
-	return nil, fmt.Errorf("not implemented")
+	// Submit order to exchange
+	resp, err := e.client.NewPlaceOrderRequest().Orders([]hyperapi.Order{reqOrder}).Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to place order: %w", err)
+	}
+
+	// Validate response
+	if resp == nil || len(resp.Statuses) == 0 {
+		return nil, fmt.Errorf("invalid order response: resp=%v, statuses=%d", resp != nil, len(resp.Statuses))
+	}
+
+	status := resp.Statuses[0]
+	if status.Error != "" {
+		return nil, fmt.Errorf("order submission error: %s", status.Error)
+	}
+
+	// Extract order information from response
+	var (
+		orderID          int
+		orderStatus      = types.OrderStatusNew
+		executedQuantity = fixedpoint.Zero
+	)
+
+	if status.Resting != nil {
+		orderID = status.Resting.Oid
+	} else if status.Filled != nil {
+		orderID = status.Filled.Oid
+		orderStatus = types.OrderStatusFilled
+		executedQuantity = status.Filled.TotalSz
+	}
+
+	// Build and return order object
+	timeNow := time.Now()
+	return &types.Order{
+		SubmitOrder:      order,
+		Exchange:         types.ExchangeHyperliquid,
+		OrderID:          uint64(orderID),
+		Status:           orderStatus,
+		ExecutedQuantity: executedQuantity,
+		IsWorking:        true,
+		CreationTime:     types.Time(timeNow),
+		UpdateTime:       types.Time(timeNow),
+	}, nil
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
