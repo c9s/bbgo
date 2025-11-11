@@ -1049,9 +1049,10 @@ func (e *Exchange) QueryTrades(
 		trades, err := e.queryTradesByID(ctx, symbol, options.LastTradeID)
 		if err != nil {
 			log.WithError(err).Warnf("failed to query last trade by id %d", options.LastTradeID)
-		} else {
+		} else if len(trades) > 0 {
 			lastTrade = &trades[0]
 		}
+
 		req = e.buildFromIdTradesRequest(symbol, options, lastTrade)
 	}
 
