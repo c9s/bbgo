@@ -45,7 +45,7 @@ func toLocalSpotSymbol(symbol string) (string, int) {
 			}
 
 			if asset, err := strconv.Atoi(localSymbol[at+1:]); err == nil {
-				return localSymbol[:at], asset
+				return localSymbol[:at], asset + 1000
 			}
 		}
 

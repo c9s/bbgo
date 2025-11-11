@@ -37,6 +37,7 @@ var (
 	TimeInForceIOC TimeInForce = "IOC"
 	TimeInForceFOK TimeInForce = "FOK"
 	TimeInForceGTT TimeInForce = "GTT" // for coinbase exchange api
+	TimeInForceALO TimeInForce = "ALO" // for hyperliquid exchange api
 )
 
 // MarginOrderSideEffectType define side effect type for orders
