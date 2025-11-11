@@ -306,6 +306,10 @@ func (m MarketMap) Add(markets ...Market) {
 func (m MarketMap) Merge(marketMap MarketMap) MarketMap {
 	var result = make(MarketMap, len(m))
 
+	for symbol, market := range m {
+		result[symbol] = market
+	}
+
 	for symbol, market := range marketMap {
 		result[symbol] = market
 	}
