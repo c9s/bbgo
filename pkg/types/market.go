@@ -324,7 +324,7 @@ func (m MarketMap) FindPair(asset, quote string) (Market, bool) {
 		return market, true
 	}
 
-	reversedSymbol := asset + quote
+	reversedSymbol := quote + asset
 	if market, ok := m[reversedSymbol]; ok {
 		return market, true
 	}
