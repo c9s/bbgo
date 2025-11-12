@@ -661,6 +661,56 @@ func (m *HedgeMarket) hedge(ctx context.Context) error {
 		return nil
 	}
 
+	// Before executing the hedge, verify that we have enough balance/credit to do so.
+	can, maxQty, errCheck := m.canHedge(ctx, uncoveredPosition)
+	if errCheck != nil {
+		m.logger.WithError(errCheck).Errorf("canHedge check failed, skip this tick")
+		return errCheck
+	}
+
+	if !can {
+		m.logger.Infof("insufficient balance/credit to hedge on %s, redispatching position %s", m.InstanceID(), uncoveredPosition.String())
+		// give the whole position back to parent SplitHedge for re-dispatching
+		if err := m.RedispatchPosition(uncoveredPosition); err != nil {
+			m.logger.WithError(err).Errorf("failed to redispatch position")
+		}
+		return nil
+	}
+
+	if maxQty.Compare(quantity) < 0 {
+		// We can only hedge a portion; redispatch the exceeded quantity back to SplitHedge
+		hedgeQty := m.market.TruncateQuantity(maxQty)
+		if hedgeQty.IsZero() {
+			m.logger.Infof("can hedge only %s < required %s on %s, but hedgeable qty is zero after truncation; redispatching full position", maxQty.String(), quantity.String(), m.InstanceID())
+			if err := m.RedispatchPosition(uncoveredPosition); err != nil {
+				m.logger.WithError(err).Errorf("failed to redispatch position")
+			}
+			return nil
+		}
+
+		// compute remainder and redispatch only the exceeded part
+		remainderQty := quantity.Sub(hedgeQty)
+		if remainderQty.Sign() > 0 {
+			// build a position value with the same sign as uncoveredPosition
+			var remainderPos fixedpoint.Value
+			if uncoveredPosition.Sign() >= 0 {
+				remainderPos = remainderQty
+			} else {
+				remainderPos = remainderQty.Neg()
+			}
+
+			m.logger.Infof("can hedge only %s < required %s on %s, redispatching exceeded %s and hedging %s",
+				hedgeQty.String(), quantity.String(), m.InstanceID(), remainderPos.Abs().String(), hedgeQty.String())
+
+			if err := m.RedispatchPosition(remainderPos); err != nil {
+				m.logger.WithError(err).Errorf("failed to redispatch exceeded position")
+			}
+		
+			// proceed to hedge the hedgeable quantity
+			quantity = hedgeQty
+		}
+	}
+
 	err := m.hedgeExecutor.Hedge(ctx, uncoveredPosition, hedgeDelta, quantity, side)
 
 	// emit the hedgedC signal to notify that a hedge has been attempted
