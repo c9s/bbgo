@@ -306,6 +306,10 @@ func (m MarketMap) Add(markets ...Market) {
 func (m MarketMap) Merge(marketMap MarketMap) MarketMap {
 	var result = make(MarketMap, len(m))
 
+	for symbol, market := range m {
+		result[symbol] = market
+	}
+
 	for symbol, market := range marketMap {
 		result[symbol] = market
 	}
@@ -324,7 +328,7 @@ func (m MarketMap) FindPair(asset, quote string) (Market, bool) {
 		return market, true
 	}
 
-	reversedSymbol := asset + quote
+	reversedSymbol := quote + asset
 	if market, ok := m[reversedSymbol]; ok {
 		return market, true
 	}
