@@ -912,8 +912,7 @@ func (e *Exchange) QueryWithdrawHistory(
 			continue
 		}
 
-		for i := len(withdraws) - 1; i >= 0; i-- {
-			d := withdraws[i]
+		for _, d := range withdraws {
 			if _, ok := txIDs[d.TxID]; ok {
 				continue
 			}
@@ -943,8 +942,7 @@ func (e *Exchange) QueryWithdrawHistory(
 		if len(withdraws) < limit {
 			startTime = endTime
 		} else {
-			// its in descending order, so we get the first record
-			startTime = withdraws[0].CreatedAt.Time()
+			startTime = withdraws[len(withdraws)-1].CreatedAt.Time()
 		}
 	}
 
