@@ -6,9 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/slack-go/slack"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/slack-go/slack"
 )
 
 // canAlign checks if the strategy can align the balances by checking for active transfers.
@@ -20,7 +21,7 @@ func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.Excha
 	}
 
 	activeTransfers := make(map[string]*AssetTransfer)
-	pendingWithdraws, err := s.detectActiveWithdraw(ctx, sessions)
+	pendingWithdraws, err := s.detectActiveWithdraw(ctx, sessions, s.ActiveTransferTimeWindow.Duration())
 	if err != nil {
 		return nil, fmt.Errorf("unable to check active transfers (withdraw): %w", err)
 	}
@@ -65,11 +66,12 @@ func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.Excha
 func (s *Strategy) detectActiveWithdraw(
 	ctx context.Context,
 	sessions map[string]*bbgo.ExchangeSession,
+	timeWindow time.Duration,
 ) ([]types.Withdraw, error) {
 	var err2 error
 	var activeWithdraws []types.Withdraw
 	until := time.Now()
-	since := until.Add(-time.Hour * 24)
+	since := until.Add(-timeWindow)
 	for _, session := range sessions {
 		transferService, ok := session.Exchange.(types.WithdrawHistoryService)
 		if !ok {
@@ -78,12 +80,14 @@ func (s *Strategy) detectActiveWithdraw(
 
 		withdraws, err := transferService.QueryWithdrawHistory(ctx, "", since, until)
 		if err != nil {
-			log.WithError(err).Error("unable to query withdraw history")
+			log.WithError(err).Errorf("unable to query withdraw history from session %s", session.Name)
 			err2 = err
 			continue
 		}
+
 		for _, withdraw := range withdraws {
-			log.Infof("checking withdraw status: %s", withdraw.String())
+			log.Infof("checking %s withdraw status: %s", session.Name, withdraw.String())
+
 			switch withdraw.Status {
 			case types.WithdrawStatusSent, types.WithdrawStatusProcessing, types.WithdrawStatusAwaitingApproval:
 				activeWithdraws = append(activeWithdraws, withdraw)
