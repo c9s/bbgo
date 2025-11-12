@@ -70,6 +70,8 @@ type Strategy struct {
 
 	SkipAlignOnAnyActiveTransfer bool `json:"skipAlignOnAnyActiveTransfer"`
 
+	ActiveTransferTimeWindow types.Duration `json:"activeTransferTimeWindow"`
+
 	deviationDetectors map[string]*detector.DeviationDetector[types.Balance]
 
 	priceResolver *pricesolver.SimplePriceSolver
@@ -119,6 +121,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.ExpectedBalances == nil {
 		s.ExpectedBalances = make(map[string]fixedpoint.Value)
+	}
+
+	if s.ActiveTransferTimeWindow == 0 {
+		s.ActiveTransferTimeWindow = types.Duration(48 * time.Hour)
 	}
 
 	return nil
