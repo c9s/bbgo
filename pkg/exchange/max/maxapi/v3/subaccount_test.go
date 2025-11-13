@@ -61,7 +61,7 @@ func TestSubAccount(t *testing.T) {
 							continue
 						}
 
-						t.Logf("transfering %s %s from sub-account %s back to main account", b.Balance.String(), b.Currency, sa.SN)
+						t.Logf("transferring %s %s from sub-account %s back to main account", b.Balance.String(), b.Currency, sa.SN)
 
 						transferBackReq := client.SubAccountService.NewSubmitSubAccountTransferRequest()
 						transferBackReq.Amount(b.Balance.String()).

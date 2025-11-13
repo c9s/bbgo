@@ -81,7 +81,7 @@ func (s *Strategy) Validate() error {
 	}
 
 	if s.MaxAmount.Sign() < 0 {
-		return fmt.Errorf("maxAmount shoud not less than 0")
+		return fmt.Errorf("maxAmount should not less than 0")
 	}
 	return nil
 }

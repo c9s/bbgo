@@ -29,7 +29,7 @@ func (s *Strategy) resetTransfer(ctx context.Context, ex FuturesTransfer, asset 
 		return nil
 	}
 
-	log.Infof("transfering out futures account asset %s %s", amount, asset)
+	log.Infof("transferring out futures account asset %s %s", amount, asset)
 
 	err = ex.TransferFuturesAccountAsset(ctx, asset, amount, types.TransferOut)
 	if err != nil {
@@ -64,7 +64,7 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset st
 
 	s.State.PendingBaseTransfer = pending
 
-	log.Infof("transfering out futures account asset %f %s", available.Float64(), asset)
+	log.Infof("transferring out futures account asset %f %s", available.Float64(), asset)
 	if err := ex.TransferFuturesAccountAsset(ctx, asset, available, types.TransferOut); err != nil {
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(available)
 		return err
@@ -95,7 +95,7 @@ func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, asset str
 		return fmt.Errorf("unable to transfer zero %s from spot wallet to futures wallet", asset)
 	}
 
-	log.Infof("transfering %f %s from the spot wallet into futures wallet...", available.Float64(), asset)
+	log.Infof("transferring %f %s from the spot wallet into futures wallet...", available.Float64(), asset)
 	if err := ex.TransferFuturesAccountAsset(ctx, asset, available, types.TransferIn); err != nil {
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(available)
 		return err
