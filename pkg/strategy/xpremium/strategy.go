@@ -465,6 +465,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		if err := s.syncPositionRisks(ctx, riskSvc, tradingSymbol); err != nil {
 			s.logger.WithError(err).Errorf("failed to sync position risks on startup")
 		}
+
+		if !s.Position.GetBase().IsZero() {
+			bbgo.Notify(s.Position)
+		}
 	}
 
 	if err := s.loadOpenOrders(ctx); err != nil {
