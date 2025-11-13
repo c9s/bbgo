@@ -113,12 +113,12 @@ type Strategy struct {
 	metricsLabels prometheus.Labels
 
 	// cached metrics to avoid repeated With() lookups
-	premiumRatioObs   prometheus.Observer
-	discountRatioObs  prometheus.Observer
-	sigCounterBuy     prometheus.Counter
-	sigCounterSell    prometheus.Counter
-	sigRatioObsBuy    prometheus.Observer
-	sigRatioObsSell   prometheus.Observer
+	premiumRatioObs  prometheus.Observer
+	discountRatioObs prometheus.Observer
+	sigCounterBuy    prometheus.Counter
+	sigCounterSell   prometheus.Counter
+	sigRatioObsBuy   prometheus.Observer
+	sigRatioObsSell  prometheus.Observer
 
 	premiumSession, baseSession, tradingSession *bbgo.ExchangeSession
 	tradingMarket                               types.Market
@@ -465,6 +465,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		if err := s.syncPositionRisks(ctx, riskSvc, tradingSymbol); err != nil {
 			s.logger.WithError(err).Errorf("failed to sync position risks on startup")
 		}
+
+		if !s.Position.GetBase().IsZero() {
+			bbgo.Notify(s.Position)
+		}
 	}
 
 	if err := s.loadOpenOrders(ctx); err != nil {
@@ -479,10 +483,14 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		}))
 	}
 
-	s.premiumSession.MarketDataStream.OnKLine(types.KLineWith(s.PremiumSymbol, types.Interval1m, func(k types.KLine) {
-		// backtest ROI take-profit using kline close
+	s.tradingSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.TradingSymbol, types.Interval1m, func(k types.KLine) {
+		// update ROI take-profit and trailing stop on 1m kline close
 		if _, err := s.maybeRoiTakeProfit(ctx, k.GetClose()); err != nil {
 			s.logger.WithError(err).Warn("take-profit error")
+		}
+
+		if err := s.maybeUpdateTrailingStop(ctx, k.GetClose()); err != nil {
+			s.logger.WithError(err).Warn("trailing stop update error")
 		}
 	}))
 
@@ -617,6 +625,43 @@ func (s *Strategy) validateStopPrice(side types.SideType, currentPrice, stopPric
 	return true, nil
 }
 
+// computeTrailingStopTarget computes the desired trailing stop based on the latest price
+// and current position side. For long: price * (1 - 0.002); for short: price * (1 + 0.002).
+// Returns zero value and false if position side is unknown.
+func (s *Strategy) computeTrailingStopTarget(latestPrice fixedpoint.Value) (fixedpoint.Value, bool) {
+	if s.Position == nil || s.Position.GetBase().IsZero() || latestPrice.IsZero() {
+		return fixedpoint.Zero, false
+	}
+	if s.Position.IsLong() {
+		return latestPrice.Mul(fixedpoint.NewFromFloat(1.0 - 0.002)), true
+	}
+	if s.Position.IsShort() {
+		return latestPrice.Mul(fixedpoint.NewFromFloat(1.0 + 0.002)), true
+	}
+	return fixedpoint.Zero, false
+}
+
+// roundStopToTick applies tick-size rounding for stop prices.
+// For long (stop below market), rounding up would loosen, so we round down (floor).
+// For short (stop above market), rounding down would loosen, so we round up (ceil).
+func (s *Strategy) roundStopToTick(side types.SideType, price fixedpoint.Value) fixedpoint.Value {
+	tick := s.tradingMarket.TickSize
+	if tick.Sign() <= 0 || price.IsZero() {
+		return price
+	}
+	f := price.Div(tick)
+	switch side {
+	case types.SideTypeBuy:
+		q := math.Floor(f.Float64())
+		return tick.Mul(fixedpoint.NewFromFloat(q))
+	case types.SideTypeSell:
+		q := math.Ceil(f.Float64())
+		return tick.Mul(fixedpoint.NewFromFloat(q))
+	default:
+		return price
+	}
+}
+
 // findPivotStop derives stop from last detected pivot low/high with safety ratio applied.
 // Returns zero if no pivot is available.
 func (s *Strategy) findPivotStop(side types.SideType) fixedpoint.Value {
@@ -718,10 +763,33 @@ func (s *Strategy) findStopPrice(ctx context.Context, ticker *types.Ticker, side
 		return fixedpoint.Zero, fmt.Errorf("invalid current price")
 	}
 
-	// 1) Pivot-based
-	if sp := s.findPivotStop(side); sp.Sign() > 0 {
-		if ok, _ := s.validateStopPrice(side, currentPrice, sp); ok {
-			return sp, nil
+	// 1) Pivot-based with distance check; fallback to recent 15m klines if too far (>2%)
+	if pivot := s.findPivotStop(side); pivot.Sign() > 0 {
+		if ok, _ := s.validateStopPrice(side, currentPrice, pivot); ok {
+			// compute distance ratio between current price and pivot stop
+			var dist fixedpoint.Value
+			if side == types.SideTypeBuy {
+				dist = currentPrice.Sub(pivot).Div(currentPrice)
+			} else {
+				dist = pivot.Sub(currentPrice).Div(currentPrice)
+			}
+			// threshold 2%
+			maxDist := fixedpoint.NewFromFloat(0.02)
+			if dist.Sign() <= 0 || dist.Compare(maxDist) <= 0 {
+				// within acceptable distance, use pivot
+				return pivot, nil
+			}
+			// too far: try nearest kline stop (recent 15m klines)
+			if sp, err := s.findNearestStop(ctx, side, now, 3); err == nil && sp.Sign() > 0 {
+				if ok, _ := s.validateStopPrice(side, currentPrice, sp); ok {
+					if s.logger != nil {
+						s.logger.WithFields(logrus.Fields{"pivot": pivot.String(), "nearest": sp.String(), "dist": dist.String()}).Info("pivot stop too far, using recent kline stop instead")
+					}
+					return sp, nil
+				}
+			}
+			// fallback to pivot if nearest not available/valid
+			return pivot, nil
 		}
 	}
 
@@ -812,13 +880,14 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, side types.SideTyp
 	}
 
 	qty := fixedpoint.Min(maxQtyByRisk, maxQtyByBalance)
-	// apply market constraints
-	qty = s.tradingMarket.TruncateQuantity(qty)
+
 	if qty.Compare(s.tradingMarket.MinQuantity) < 0 {
 		qty = s.tradingMarket.MinQuantity
 	}
+
 	qty = s.tradingMarket.AdjustQuantityByMinNotional(qty, currentPrice)
-	return qty, nil
+
+	return s.tradingMarket.TruncateQuantity(qty), nil
 }
 
 func (s *Strategy) ensureOppositePositionClosed(ctx context.Context, side types.SideType) error {
@@ -1058,6 +1127,125 @@ func (s *Strategy) isBullishEngulfing(p, c types.KLine, cfg *EngulfingTakeProfit
 }
 
 // maybeEngulfingTakeProfit evaluates the last two klines and closes position if profitable
+// maybeUpdateTrailingStop adjusts existing stop-loss to trail when ROI exceeds threshold
+// If ROI > 1%, move stop to 0.2% away from current price in the profitable direction:
+// - Long: set stop at price * (1 - 0.002)
+// - Short: set stop at price * (1 + 0.002)
+// Only tightens the stop (never loosens) and respects market tick size.
+func (s *Strategy) maybeUpdateTrailingStop(ctx context.Context, latestPrice fixedpoint.Value) error {
+	if s.Position == nil || s.OrderExecutor == nil {
+		return nil
+	}
+	if s.Position.GetBase().IsZero() || latestPrice.IsZero() || s.Position.AverageCost.IsZero() {
+		return nil
+	}
+
+	roi := s.Position.ROI(latestPrice)
+	// threshold = 1%
+	if roi.Compare(fixedpoint.NewFromFloat(0.01)) < 0 {
+		return nil
+	}
+
+	// find existing stop-loss order tagged by "stop-loss"
+	active := s.OrderExecutor.ActiveMakerOrders()
+	var stopOrder *types.Order
+	for _, o := range active.Orders() {
+		if o.Symbol != s.TradingSymbol {
+			continue
+		}
+		if o.Type != types.OrderTypeStopMarket {
+			continue
+		}
+
+		// Prefer the first matched; if multiple exist, we'll work on the first
+		ord := o
+		stopOrder = &ord
+		break
+	}
+
+	if stopOrder == nil {
+		return nil
+	}
+
+	// compute target new stop via helper
+	target, ok := s.computeTrailingStopTarget(latestPrice)
+	if !ok {
+		return nil
+	}
+
+	// determine side for validations and rounding
+	side := types.SideTypeBuy
+	if s.Position.IsShort() {
+		side = types.SideTypeSell
+	}
+
+	// apply tick rounding via helper
+	target = s.roundStopToTick(side, target)
+
+	// validate stop against current price and side
+	if ok, err := s.validateStopPrice(side, latestPrice, target); !ok {
+		if err != nil {
+			s.logger.WithError(err).Debug("trailing stop validation failed")
+		}
+
+		return nil
+	}
+
+	// ensure target tightens compared to existing stop
+	existing := stopOrder.StopPrice
+	if existing.IsZero() {
+		// if exchange didn't return stop price in order, proceed
+	} else {
+		if s.Position.IsLong() {
+			// only raise the stop
+			if target.Compare(existing) <= 0 {
+				return nil
+			}
+		} else {
+			// only lower the stop for shorts
+			if target.Compare(existing) >= 0 {
+				return nil
+			}
+		}
+	}
+
+	// ensure at least one tick difference
+	tick := s.tradingMarket.TickSize
+	if tick.Sign() > 0 && target.Sub(existing).Abs().Compare(tick) < 0 {
+		return nil
+	}
+
+	// cancel existing stop and submit a replacement
+	if err := s.OrderExecutor.GracefulCancel(ctx, *stopOrder); err != nil {
+		s.logger.WithError(err).Warn("failed to cancel existing stop-loss for trailing update")
+		return err
+	}
+
+	qty := stopOrder.Quantity
+	if qty.IsZero() {
+		// fallback to absolute base position size
+		qty = s.Position.GetBase().Abs()
+	}
+
+	newStop := types.SubmitOrder{
+		Market:        s.tradingMarket,
+		Symbol:        s.TradingSymbol,
+		Side:          stopOrder.Side,
+		Type:          types.OrderTypeStopMarket,
+		Quantity:      qty,
+		StopPrice:     target,
+		ClosePosition: true,
+		Tag:           "stop-loss",
+	}
+	if _, err := s.OrderExecutor.SubmitOrders(ctx, newStop); err != nil {
+		s.logger.WithError(err).Warnf("submit trailing stop-loss failed: %+v", newStop)
+		return err
+	}
+
+	s.logger.Infof("updated trailing stop to %s (roi=%s)", target.String(), roi.FormatPercentage(2))
+	return nil
+}
+
 func (s *Strategy) maybeEngulfingTakeProfit(ctx context.Context, k types.KLine) {
 	if s.EngulfingTakeProfit == nil || !s.EngulfingTakeProfit.Enabled {
 		return
@@ -1311,6 +1499,9 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: "1h"})
 	session.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: "1d"})
 
+	// subscribe trading symbol 1m klines for backtest TP/TS updates
+	session.Subscribe(types.KLineChannel, s.TradingSymbol, types.SubscribeOptions{Interval: types.Interval1m})
+
 	// subscribe klines for engulfing take-profit detection if enabled
 	if s.EngulfingTakeProfit != nil && s.EngulfingTakeProfit.Enabled {
 		interval := s.EngulfingTakeProfit.Interval
@@ -1375,10 +1566,14 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		}))
 	}
 
-	session.MarketDataStream.OnKLine(types.KLineWith(s.PremiumSymbol, types.Interval1m, func(k types.KLine) {
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.TradingSymbol, types.Interval1m, func(k types.KLine) {
 		// backtest ROI take-profit using kline close
 		if _, err := s.maybeRoiTakeProfit(ctx, k.GetClose()); err != nil {
 			s.logger.WithError(err).Warn("backtest take-profit error")
+		}
+		// also update trailing stop with the latest close price
+		if err := s.maybeUpdateTrailingStop(ctx, k.GetClose()); err != nil {
+			s.logger.WithError(err).Warn("backtest trailing stop update error")
 		}
 	}))
 

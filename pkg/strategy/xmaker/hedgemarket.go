@@ -705,7 +705,7 @@ func (m *HedgeMarket) hedge(ctx context.Context) error {
 			if err := m.RedispatchPosition(remainderPos); err != nil {
 				m.logger.WithError(err).Errorf("failed to redispatch exceeded position")
 			}
-		
+
 			// proceed to hedge the hedgeable quantity
 			quantity = hedgeQty
 		}
