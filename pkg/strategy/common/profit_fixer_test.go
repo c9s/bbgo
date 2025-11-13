@@ -534,6 +534,146 @@ func Test_fixFromTrades(t *testing.T) {
 		assert.Equal(t, fixedpoint.NewFromInt(1000).String(), stats.AccumulatedPnL.String())
 	})
 
+	t.Run("quote currency fee - buy then sell", func(t *testing.T) {
+		position := types.NewPositionFromMarket(market)
+		stats := types.NewProfitStats(market)
+		fixer := newTestFixer()
+
+		now := time.Now()
+		trades := []types.Trade{
+			{
+				ID:            1,
+				Exchange:      types.ExchangeBinance,
+				Symbol:        symbol,
+				Side:          types.SideTypeBuy,
+				Price:         fixedpoint.NewFromInt(50000),
+				Quantity:      fixedpoint.NewFromFloat(0.5),
+				QuoteQuantity: fixedpoint.NewFromInt(25000),
+				Fee:           fixedpoint.NewFromFloat(25), // 25 USDT fee
+				FeeCurrency:   "USDT",
+				Time:          types.Time(now),
+			},
+			{
+				ID:            2,
+				Exchange:      types.ExchangeBinance,
+				Symbol:        symbol,
+				Side:          types.SideTypeSell,
+				Price:         fixedpoint.NewFromInt(52000),
+				Quantity:      fixedpoint.NewFromFloat(0.5),
+				QuoteQuantity: fixedpoint.NewFromInt(26000),
+				Fee:           fixedpoint.NewFromFloat(26), // 26 USDT fee
+				FeeCurrency:   "USDT",
+				Time:          types.Time(now.Add(time.Hour)),
+			},
+		}
+
+		err := fixer.fixFromTrades(trades, nil, stats, position)
+
+		assert.NoError(t, err)
+		assert.True(t, position.Base.IsZero())
+		// Buy: avgCost = (25000 - 25) / 0.5 = 24975 / 0.5 = 49950 per BTC
+		// Sell: profit = (26000 - 49950 * 0.5) = 26000 - 24975 = 1025
+		// Note: The fee is already deducted from quoteQuantity in profit calculation
+		assert.Equal(t, fixedpoint.NewFromInt(1025).String(), stats.AccumulatedPnL.String())
+	})
+
+	t.Run("quote currency fee - multiple buys then sell", func(t *testing.T) {
+		position := types.NewPositionFromMarket(market)
+		stats := types.NewProfitStats(market)
+		fixer := newTestFixer()
+
+		now := time.Now()
+		trades := []types.Trade{
+			{
+				ID:            1,
+				Exchange:      types.ExchangeBinance,
+				Symbol:        symbol,
+				Side:          types.SideTypeBuy,
+				Price:         fixedpoint.NewFromInt(50000),
+				Quantity:      fixedpoint.NewFromFloat(0.5),
+				QuoteQuantity: fixedpoint.NewFromInt(25000),
+				Fee:           fixedpoint.NewFromFloat(12.5), // 12.5 USDT fee
+				FeeCurrency:   "USDT",
+				Time:          types.Time(now),
+			},
+			{
+				ID:            2,
+				Exchange:      types.ExchangeBinance,
+				Symbol:        symbol,
+				Side:          types.SideTypeBuy,
+				Price:         fixedpoint.NewFromInt(51000),
+				Quantity:      fixedpoint.NewFromFloat(0.5),
+				QuoteQuantity: fixedpoint.NewFromInt(25500),
+				Fee:           fixedpoint.NewFromFloat(12.75), // 12.75 USDT fee
+				FeeCurrency:   "USDT",
+				Time:          types.Time(now.Add(30 * time.Minute)),
+			},
+			{
+				ID:            3,
+				Exchange:      types.ExchangeBinance,
+				Symbol:        symbol,
+				Side:          types.SideTypeSell,
+				Price:         fixedpoint.NewFromInt(53000),
+				Quantity:      fixedpoint.NewFromInt(1),
+				QuoteQuantity: fixedpoint.NewFromInt(53000),
+				Fee:           fixedpoint.NewFromFloat(26.5), // 26.5 USDT fee
+				FeeCurrency:   "USDT",
+				Time:          types.Time(now.Add(time.Hour)),
+			},
+		}
+
+		err := fixer.fixFromTrades(trades, nil, stats, position)
+
+		assert.NoError(t, err)
+		assert.True(t, position.Base.IsZero())
+		// First buy: avgCost = (25000 - 12.5) / 0.5 = 24987.5 / 0.5 = 49975 per BTC
+		// Second buy: avgCost = ((24987.5 + 25500 - 12.75) / 1 = 50474.75 per BTC
+		// Sell: profit = (53000 - 50474.75 * 1) = 2525.25
+		assert.Equal(t, "2525.25", stats.AccumulatedPnL.String())
+	})
+
+	t.Run("quote currency fee - short position", func(t *testing.T) {
+		position := types.NewPositionFromMarket(market)
+		stats := types.NewProfitStats(market)
+		fixer := newTestFixer()
+
+		now := time.Now()
+		trades := []types.Trade{
+			{
+				ID:            1,
+				Exchange:      types.ExchangeBinance,
+				Symbol:        symbol,
+				Side:          types.SideTypeSell,
+				Price:         fixedpoint.NewFromInt(52000),
+				Quantity:      fixedpoint.NewFromFloat(0.5),
+				QuoteQuantity: fixedpoint.NewFromInt(26000),
+				Fee:           fixedpoint.NewFromFloat(26), // 26 USDT fee
+				FeeCurrency:   "USDT",
+				Time:          types.Time(now),
+			},
+			{
+				ID:            2,
+				Exchange:      types.ExchangeBinance,
+				Symbol:        symbol,
+				Side:          types.SideTypeBuy,
+				Price:         fixedpoint.NewFromInt(50000),
+				Quantity:      fixedpoint.NewFromFloat(0.5),
+				QuoteQuantity: fixedpoint.NewFromInt(25000),
+				Fee:           fixedpoint.NewFromFloat(25), // 25 USDT fee
+				FeeCurrency:   "USDT",
+				Time:          types.Time(now.Add(time.Hour)),
+			},
+		}
+
+		err := fixer.fixFromTrades(trades, nil, stats, position)
+
+		assert.NoError(t, err)
+		assert.True(t, position.Base.IsZero())
+		// Short sell: avgCost = (26000 - 26) / 0.5 = 25974 / 0.5 = 51948 per BTC
+		// Buy back: profit = (51948 * 0.5 - 25000) = 25974 - 25000 = 974
+		assert.Equal(t, fixedpoint.NewFromInt(974).String(), stats.AccumulatedPnL.String())
+	})
+
 	t.Run("trades with converter", func(t *testing.T) {
 		// in this test, we have:
 		// 1. a trade in BTCUSDT on max exchange

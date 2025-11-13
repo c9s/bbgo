@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -190,26 +191,24 @@ func (f *ProfitFixer) buildTokenFeeDatePrices(ctx context.Context, trades []type
 		if !ok {
 			continue
 		}
+		priceSolver := pricesolver.NewSimplePriceResolver(markets)
 		for _, token := range feeCurrencies {
-			var symbol string
-			var priceConvert func(fixedpoint.Value) fixedpoint.Value
-			if m, ok := markets.FindPair(token, f.profitCurrency); ok {
-				symbol = m.Symbol
-				priceConvert = func(p fixedpoint.Value) fixedpoint.Value {
-					return p
-				}
-			} else if m, ok := markets.FindPair(f.profitCurrency, token); ok {
-				symbol = m.Symbol
-				priceConvert = func(p fixedpoint.Value) fixedpoint.Value {
-					return fixedpoint.One.Div(p)
-				}
-			}
-
-			if symbol == "" {
-				// 1. token == quoteCurrency
-				// 2. token is not tradable on this exchange
+			// fee token is the profit currency, no conversion needed
+			if token == f.profitCurrency {
 				continue
 			}
+			// find the trading symbol
+			var symbol string
+			if m, ok := markets.FindPair(token, f.profitCurrency); ok {
+				symbol = m.Symbol
+			} else if m, ok := markets.FindPair(f.profitCurrency, token); ok {
+				symbol = m.Symbol
+			}
+			if symbol == "" {
+				// token is not tradable on this exchange, skip
+				continue
+			}
+
 			if klines, err := queryKLines(
 				ctx, exchange, symbol, types.Interval1d, startTime, endTime,
 			); err == nil {
@@ -218,11 +217,20 @@ func (f *ProfitFixer) buildTokenFeeDatePrices(ctx context.Context, trades []type
 					// This is different from the actual fee calculation while trading which use the close price of the last minute.
 					// But assuming the price of USD stablecoins do not fluctuate much within a day,
 					// this should be acceptable.
-					tokenFeePrices[tokenFeeKey{
-						token:        token,
-						exchangeName: exName,
-						date:         kline.StartTime.Time().Add(24 * time.Hour).Format(time.DateOnly),
-					}] = priceConvert(kline.Close)
+					priceSolver.Update(symbol, kline.Close)
+					date := kline.StartTime.Time().Add(24 * time.Hour).Format(time.DateOnly)
+					if feePrice, ok := priceSolver.ResolvePrice(token, f.profitCurrency); ok {
+						tokenFeePrices[tokenFeeKey{
+							token:        token,
+							exchangeName: exName,
+							date:         date,
+						}] = feePrice
+					} else {
+						log.Warnf(
+							"cannot resolve fee price for %s on %s at date %s",
+							token, exName, date,
+						)
+					}
 				}
 			}
 		}
