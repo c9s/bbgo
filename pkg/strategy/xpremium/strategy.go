@@ -113,12 +113,12 @@ type Strategy struct {
 	metricsLabels prometheus.Labels
 
 	// cached metrics to avoid repeated With() lookups
-	premiumRatioObs   prometheus.Observer
-	discountRatioObs  prometheus.Observer
-	sigCounterBuy     prometheus.Counter
-	sigCounterSell    prometheus.Counter
-	sigRatioObsBuy    prometheus.Observer
-	sigRatioObsSell   prometheus.Observer
+	premiumRatioObs  prometheus.Observer
+	discountRatioObs prometheus.Observer
+	sigCounterBuy    prometheus.Counter
+	sigCounterSell   prometheus.Counter
+	sigRatioObsBuy   prometheus.Observer
+	sigRatioObsSell  prometheus.Observer
 
 	premiumSession, baseSession, tradingSession *bbgo.ExchangeSession
 	tradingMarket                               types.Market
@@ -718,10 +718,33 @@ func (s *Strategy) findStopPrice(ctx context.Context, ticker *types.Ticker, side
 		return fixedpoint.Zero, fmt.Errorf("invalid current price")
 	}
 
-	// 1) Pivot-based
-	if sp := s.findPivotStop(side); sp.Sign() > 0 {
-		if ok, _ := s.validateStopPrice(side, currentPrice, sp); ok {
-			return sp, nil
+	// 1) Pivot-based with distance check; fallback to recent 15m klines if too far (>2%)
+	if pivot := s.findPivotStop(side); pivot.Sign() > 0 {
+		if ok, _ := s.validateStopPrice(side, currentPrice, pivot); ok {
+			// compute distance ratio between current price and pivot stop
+			var dist fixedpoint.Value
+			if side == types.SideTypeBuy {
+				dist = currentPrice.Sub(pivot).Div(currentPrice)
+			} else {
+				dist = pivot.Sub(currentPrice).Div(currentPrice)
+			}
+			// threshold 2%
+			maxDist := fixedpoint.NewFromFloat(0.02)
+			if dist.Sign() <= 0 || dist.Compare(maxDist) <= 0 {
+				// within acceptable distance, use pivot
+				return pivot, nil
+			}
+			// too far: try nearest kline stop (recent 15m klines)
+			if sp, err := s.findNearestStop(ctx, side, now, 3); err == nil && sp.Sign() > 0 {
+				if ok, _ := s.validateStopPrice(side, currentPrice, sp); ok {
+					if s.logger != nil {
+						s.logger.WithFields(logrus.Fields{"pivot": pivot.String(), "nearest": sp.String(), "dist": dist.String()}).Info("pivot stop too far, using recent kline stop instead")
+					}
+					return sp, nil
+				}
+			}
+			// fallback to pivot if nearest not available/valid
+			return pivot, nil
 		}
 	}
 
@@ -812,13 +835,14 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, side types.SideTyp
 	}
 
 	qty := fixedpoint.Min(maxQtyByRisk, maxQtyByBalance)
-	// apply market constraints
-	qty = s.tradingMarket.TruncateQuantity(qty)
+
 	if qty.Compare(s.tradingMarket.MinQuantity) < 0 {
 		qty = s.tradingMarket.MinQuantity
 	}
+
 	qty = s.tradingMarket.AdjustQuantityByMinNotional(qty, currentPrice)
-	return qty, nil
+
+	return s.tradingMarket.TruncateQuantity(qty), nil
 }
 
 func (s *Strategy) ensureOppositePositionClosed(ctx context.Context, side types.SideType) error {
