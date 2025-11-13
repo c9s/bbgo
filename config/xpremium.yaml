@@ -99,7 +99,7 @@ crossExchangeStrategies:
     # Optional explicit sizing and risk parameters
     # quantity: 0.001              # fixed base quantity to trade; if omitted, size is risk-based
     # priceType: maker             # maker|taker, used to choose price for sizing
-    maxLossLimit: 100            # quote currency risk per trade used for position sizing
+    maxLossLimit: 20            # quote currency risk per trade used for position sizing
 
     # Optional risk controls (from common.Strategy). Uncomment to enable.
     # positionHardLimit: 0           # maximum absolute position value (quote)
