@@ -12,7 +12,7 @@ func TestToLocalSpotSymbol(t *testing.T) {
 		wantSymbol string
 		wantIndex  int
 	}{
-		{name: "success", key: "UNITTEST_SUCCESS", stored: "@123", wantSymbol: "", wantIndex: 123},
+		{name: "success", key: "UNITTEST_SUCCESS", stored: "BTC@123", wantSymbol: "BTC", wantIndex: 1123},
 		{name: "invalid-format-missing-at", key: "UNITTEST_BADFMT", stored: "123", wantSymbol: "UNITTEST_BADFMT", wantIndex: -1},
 		{name: "non-numeric", key: "UNITTEST_NAN", stored: "@abc", wantSymbol: "UNITTEST_NAN", wantIndex: -1},
 		{name: "invalid-type", key: "UNITTEST_BADTYPE", stored: 123, wantSymbol: "UNITTEST_BADTYPE", wantIndex: -1},

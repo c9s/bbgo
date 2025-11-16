@@ -182,3 +182,32 @@ func kLineToGlobal(k hyperapi.KLine, interval types.Interval, symbol string) typ
 		Closed:                   true,
 	}
 }
+
+func toGlobalOrder(order hyperapi.OpenOrder, isFutures bool) types.Order {
+	// TODO: implement time in force and order type
+	return types.Order{
+		SubmitOrder: types.SubmitOrder{
+			Symbol:      order.Coin + QuoteCurrency,
+			Price:       order.LimitPx,
+			Quantity:    order.Sz,
+			Side:        toGlobalSide(order.Side),
+			Type:        types.OrderType(order.OrderType),
+			TimeInForce: types.TimeInForceGTC,
+		},
+		Exchange:     types.ExchangeHyperliquid,
+		OrderID:      uint64(order.Oid),
+		CreationTime: types.Time(order.Timestamp),
+		UpdateTime:   types.Time(order.Timestamp),
+		IsFutures:    isFutures,
+	}
+}
+
+func toGlobalSide(side string) types.SideType {
+	switch side {
+	case "B":
+		return types.SideTypeBuy
+	case "A":
+		return types.SideTypeSell
+	}
+	return types.SideType(side)
+}

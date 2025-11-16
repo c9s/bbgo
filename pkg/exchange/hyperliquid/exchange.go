@@ -2,6 +2,7 @@ package hyperliquid
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 	"golang.org/x/time/rate"
 )
 
@@ -249,13 +251,63 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	// TODO implement
-	return nil, fmt.Errorf("not implemented")
+	if err := restSharedLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("query open orders rate limiter wait error: %w", err)
+	}
+
+	resp, err := e.client.NewGetOpenOrdersRequest().User(e.client.UserAddress()).Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query open orders: %w", err)
+	}
+
+	localSymbol, _ := e.getLocalSymbol(symbol)
+	for _, order := range resp {
+		if order.Coin != localSymbol {
+			continue
+		}
+		orders = append(orders, toGlobalOrder(order, e.IsFutures))
+	}
+
+	return orders, nil
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
-	//TODO implement
-	return fmt.Errorf("not implemented")
+	if len(orders) == 0 {
+		return fmt.Errorf("orders are required")
+	}
+
+	canceledOrders := make([]hyperapi.CancelOrder, 0)
+	for _, order := range orders {
+		_, assetIdx := e.getLocalSymbol(order.Symbol)
+		canceledOrders = append(canceledOrders, hyperapi.CancelOrder{
+			Asset:   assetIdx,
+			OrderId: int(order.OrderID),
+		})
+	}
+
+	if err := restSharedLimiter.Wait(ctx); err != nil {
+		return fmt.Errorf("cancel order rate limiter wait error: %w", err)
+	}
+
+	resp, err := e.client.NewCancelOrderRequest().CancelOrders(canceledOrders).Do(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to cancel orders: %w", err)
+	}
+
+	var errs error
+	if resp != nil && len(resp.Statuses) > 0 {
+		var statusError struct{ Error string }
+		for _, status := range resp.Statuses {
+			if err := json.Unmarshal(status, &statusError); err != nil {
+				continue
+			}
+			if statusError.Error != "" {
+				errs = multierr.Append(errs, fmt.Errorf("%s", statusError.Error))
+			}
+		}
+	}
+
+	return errs
 }
 
 func (e *Exchange) NewStream() types.Stream {
