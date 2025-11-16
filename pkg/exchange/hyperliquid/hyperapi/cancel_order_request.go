@@ -1,6 +1,8 @@
 package hyperapi
 
 import (
+	"encoding/json"
+
 	"github.com/c9s/requestgen"
 )
 
@@ -8,7 +10,7 @@ import (
 //go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Response.Data
 
 type CancelResponse struct {
-	Statuses []any `json:"statuses"`
+	Statuses []json.RawMessage `json:"statuses"`
 }
 
 type CancelOrder struct {

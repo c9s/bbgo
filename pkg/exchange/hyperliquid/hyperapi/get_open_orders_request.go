@@ -1,6 +1,7 @@
 package hyperapi
 
 import (
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 )
@@ -12,16 +13,16 @@ type OpenOrder struct {
 	Coin             string                     `json:"coin"`
 	IsPositionTpsl   bool                       `json:"isPositionTpsl"`
 	IsTrigger        bool                       `json:"isTrigger"`
-	LimitPx          string                     `json:"limitPx"`
+	LimitPx          fixedpoint.Value           `json:"limitPx"`
 	Oid              int64                      `json:"oid"`
 	OrderType        string                     `json:"orderType"`
-	OrigSz           string                     `json:"origSz"`
+	OrigSz           fixedpoint.Value           `json:"origSz"`
 	ReduceOnly       bool                       `json:"reduceOnly"`
 	Side             string                     `json:"side"`
-	Sz               string                     `json:"sz"`
+	Sz               fixedpoint.Value           `json:"sz"`
 	Timestamp        types.MillisecondTimestamp `json:"timestamp"`
 	TriggerCondition string                     `json:"triggerCondition"`
-	TriggerPx        string                     `json:"triggerPx"`
+	TriggerPx        fixedpoint.Value           `json:"triggerPx"`
 }
 
 //go:generate PostRequest -url "/info" -type GetOpenOrdersRequest -responseDataType []OpenOrder
