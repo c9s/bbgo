@@ -298,11 +298,11 @@ func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
 }
 
 func toLocalInterval(interval types.Interval) (string, error) {
-	if _, ok := SupportedIntervals[interval]; !ok {
+	if _, ok := localIntervals[interval]; !ok {
 		return "", fmt.Errorf("interval %s is not supported", interval)
 	}
 
-	in, ok := ToLocalInterval[interval]
+	in, ok := localIntervals[interval]
 	if !ok {
 		return "", fmt.Errorf("interval %s is not supported, got local interval %s", interval, in)
 	}

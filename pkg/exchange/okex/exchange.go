@@ -301,7 +301,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		if account.MarginLevel.Sign() > 0 {
 			account.MarginTolerance = util.CalculateMarginTolerance(account.MarginLevel)
 		}
-	
+
 	} else {
 		log.Warnf("enableSpotBorrow field is false, if you need to auto-borrow, please turn on auto-borrow from the okx UI, this is the only way to enable spot margin auto-borrow")
 	}
@@ -554,15 +554,20 @@ func (e *Exchange) QueryKLines(
 
 	instrumentID := e.getInstrumentId(symbol)
 
+	// This endpoint can only retrieve the latest 1,440 data entries.
 	req := e.client.NewGetCandlesRequest().InstrumentID(instrumentID)
 	req.Bar(intervalParam)
 
 	if options.StartTime != nil {
-		req.Before(*options.StartTime)
+		if time.Since(*options.StartTime) > time.Minute*1440 {
+			log.Warnf("!!!OKX EXCHANGE API NOTICE!!! The maximum kline query time range is recent 1440 minutes, %s given", options.StartTime)
+		}
+
+		req.After(*options.StartTime)
 	}
 
 	if options.EndTime != nil {
-		req.After(*options.EndTime)
+		req.Before(*options.EndTime)
 	}
 
 	candles, err := req.Do(ctx)
