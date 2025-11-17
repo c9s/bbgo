@@ -80,6 +80,10 @@ type Strategy struct {
 	// MinSpread is the minimum absolute price difference to trigger a signal (premium - base)
 	MinSpread fixedpoint.Value `json:"minSpread"`
 
+	// MinTriggers is the minimum number of consecutive premium/discount triggers required
+	// before opening a position. A value of 0 opens immediately on first trigger. Default is 3.
+	MinTriggers int `json:"minTriggers"`
+
 	// Leverage to set on the trading session (futures)
 	MaxLeverage int `json:"leverage"`
 
@@ -142,6 +146,10 @@ type Strategy struct {
 	pvHigh *indicatorv2.PivotHighStream
 	pvLow  *indicatorv2.PivotLowStream
 	kLines *indicatorv2.KLineStream
+
+	// trigger counters for consecutive signals
+	buyTriggerCount  int
+	sellTriggerCount int
 
 	lastTPCheck time.Time
 }
@@ -338,6 +346,11 @@ func (s *Strategy) Defaults() error {
 		}
 	}
 
+	// default minTriggers to 3 if not set
+	if s.MinTriggers == 0 {
+		s.MinTriggers = 3
+	}
+
 	return nil
 }
 
@@ -374,6 +387,9 @@ func (s *Strategy) Validate() error {
 	}
 	if s.QuoteDepth.Sign() <= 0 {
 		return fmt.Errorf("quoteDepth must be > 0 (in quote currency, e.g. 300 for 300 USDT)")
+	}
+	if s.MinTriggers < 0 {
+		return fmt.Errorf("minTriggers must be >= 0")
 	}
 
 	if s.EngulfingTakeProfit != nil {
@@ -1348,6 +1364,9 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 
 		side := s.decideSignal(premium, discount)
 		if side == "" {
+			// reset counters when condition is not met
+			s.buyTriggerCount = 0
+			s.sellTriggerCount = 0
 			continue
 		}
 
@@ -1371,9 +1390,28 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 			}
 		}
 
+
+		// update trigger counters and gate execution until count > MinTriggers
+		if side == types.SideTypeBuy {
+			s.buyTriggerCount++
+			s.sellTriggerCount = 0
+		} else if side == types.SideTypeSell {
+			s.sellTriggerCount++
+			s.buyTriggerCount = 0
+		}
+
+		// check gating based on MinTriggers (strictly greater-than as requested)
+		if s.MinTriggers > 0 {
+			if (side == types.SideTypeBuy && s.buyTriggerCount <= s.MinTriggers) ||
+				(side == types.SideTypeSell && s.sellTriggerCount <= s.MinTriggers) {
+				// not enough consecutive triggers yet
+				continue
+			}
+		}
+
 		s.logger.Infof(
-			"xpremium signal: %s premium=%.4f%% discount=%.4f%% minSpread=%.4f%% pBid=%s pAsk=%s bBid=%s bAsk=%s",
-			side.String(), premium*100, discount*100, s.MinSpread.Float64()*100,
+			"xpremium signal: %s premium=%.4f%% discount=%.4f%% minSpread=%.4f%% minTriggers=%d trigCount(buy=%d,sell=%d) pBid=%s pAsk=%s bBid=%s bAsk=%s",
+			side.String(), premium*100, discount*100, s.MinSpread.Float64()*100, s.MinTriggers, s.buyTriggerCount, s.sellTriggerCount,
 			bidA.Price.String(), askA.Price.String(), bidB.Price.String(), askB.Price.String(),
 		)
 
@@ -1397,6 +1435,10 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 
 		if err := s.executeSignal(ctx, side, time.Now()); err != nil {
 			s.logger.WithError(err).Error("executeSignal error")
+		} else {
+			// reset counters after entering a position
+			s.buyTriggerCount = 0
+			s.sellTriggerCount = 0
 		}
 	}
 }
@@ -1607,7 +1649,27 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		side := s.decideSignal(premium, discount)
 		if side == "" {
+			// reset counters when condition is not met
+			s.buyTriggerCount = 0
+			s.sellTriggerCount = 0
 			return
+		}
+
+		// update trigger counters
+		if side == types.SideTypeBuy {
+			s.buyTriggerCount++
+			s.sellTriggerCount = 0
+		} else if side == types.SideTypeSell {
+			s.sellTriggerCount++
+			s.buyTriggerCount = 0
+		}
+
+		// gate by MinTriggers (> MinTriggers)
+		if s.MinTriggers > 0 {
+			if (side == types.SideTypeBuy && s.buyTriggerCount <= s.MinTriggers) ||
+				(side == types.SideTypeSell && s.sellTriggerCount <= s.MinTriggers) {
+				return
+			}
 		}
 
 		// signal metrics in backtest (cached)
