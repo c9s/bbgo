@@ -10,29 +10,45 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
+/*
+ * InstrumentID sets
+ */
 func (g *GetCandlesRequest) InstrumentID(instrumentID string) *GetCandlesRequest {
 	g.instrumentID = instrumentID
 	return g
 }
 
+/*
+ * Limit sets
+ */
 func (g *GetCandlesRequest) Limit(limit int) *GetCandlesRequest {
 	g.limit = &limit
 	return g
 }
 
+/*
+ * Bar sets
+ */
 func (g *GetCandlesRequest) Bar(bar string) *GetCandlesRequest {
 	g.bar = &bar
 	return g
 }
 
+/*
+ * After sets
+ */
 func (g *GetCandlesRequest) After(after time.Time) *GetCandlesRequest {
 	g.after = &after
 	return g
 }
 
+/*
+ * Before sets
+ */
 func (g *GetCandlesRequest) Before(before time.Time) *GetCandlesRequest {
 	g.before = &before
 	return g
@@ -44,11 +60,22 @@ func (g *GetCandlesRequest) GetQueryParameters() (url.Values, error) {
 	// check instrumentID field -> json key instId
 	instrumentID := g.instrumentID
 
+	// TEMPLATE check-required
+	if len(instrumentID) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// assign parameter of instrumentID
 	params["instId"] = instrumentID
 	// check limit field -> json key limit
 	if g.limit != nil {
 		limit := *g.limit
+
+		// TEMPLATE check-required
+
+		if limit == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of limit
 		params["limit"] = limit
@@ -58,6 +85,11 @@ func (g *GetCandlesRequest) GetQueryParameters() (url.Values, error) {
 	if g.bar != nil {
 		bar := *g.bar
 
+		// TEMPLATE check-required
+		if len(bar) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of bar
 		params["bar"] = bar
 	} else {
@@ -65,6 +97,12 @@ func (g *GetCandlesRequest) GetQueryParameters() (url.Values, error) {
 	// check after field -> json key after
 	if g.after != nil {
 		after := *g.after
+
+		// TEMPLATE check-required
+
+		if after.IsZero() {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of after
 		// convert time.Time to milliseconds time stamp
@@ -75,6 +113,12 @@ func (g *GetCandlesRequest) GetQueryParameters() (url.Values, error) {
 	if g.before != nil {
 		before := *g.before
 
+		// TEMPLATE check-required
+
+		if before.IsZero() {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of before
 		// convert time.Time to milliseconds time stamp
 		params["before"] = strconv.FormatInt(before.UnixNano()/int64(time.Millisecond), 10)
@@ -83,7 +127,13 @@ func (g *GetCandlesRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -135,9 +185,19 @@ func (g *GetCandlesRequest) GetSlugParameters() (map[string]interface{}, error) 
 	return params, nil
 }
 
+var GetCandlesRequestSlugReCache sync.Map
+
 func (g *GetCandlesRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetCandlesRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetCandlesRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
@@ -205,15 +265,29 @@ func (g *GetCandlesRequest) Do(ctx context.Context) (KLineSlice, error) {
 	}
 
 	var apiResponse APIResponse
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
 	}
 
 	type responseValidator interface {
 		Validate() error
 	}
-	validator, ok := interface{}(apiResponse).(responseValidator)
-	if ok {
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
 		if err := validator.Validate(); err != nil {
 			return nil, err
 		}
