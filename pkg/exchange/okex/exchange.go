@@ -559,7 +559,7 @@ func (e *Exchange) QueryKLines(
 	req.Bar(intervalParam)
 
 	if options.StartTime != nil {
-		if time.Since(*options.StartTime) > time.Minute*1440 {
+		if time.Since(*options.StartTime) > time.Minute*1440 && interval.Duration() < time.Hour {
 			log.Warnf("!!!OKX EXCHANGE API NOTICE!!! The maximum kline query time range is recent 1440 minutes, %s given", options.StartTime)
 		}
 
