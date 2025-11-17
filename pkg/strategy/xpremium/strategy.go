@@ -495,7 +495,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}))
 
 	// allocate isolated public streams for books and bind StreamBooks
-	premiumStream := bbgo.NewBookStream(s.premiumSession, s.PremiumSymbol)
+	premiumStream := bbgo.NewBookStream(s.premiumSession, s.PremiumSymbol, types.SubscribeOptions{
+		Depth: types.DepthLevelFull,
+		Speed: types.SpeedHigh,
+	})
 	baseStream := bbgo.NewBookStream(s.baseSession, s.BaseSymbol)
 
 	s.premiumStream, s.baseStream = premiumStream, baseStream
