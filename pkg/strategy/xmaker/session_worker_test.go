@@ -24,10 +24,10 @@ func TestSessionWorker_StartOncePerWorker(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool := &sessionWorkerPool{workers: make(map[sessionWorkerKey]*sessionWorker)}
+	pool := &sessionWorkerPool{workers: make(map[sessionWorkerKey]*SessionWorker)}
 
 	var runs int32
-	pool.Add(nil, "w1", func(ctx context.Context) {
+	pool.Add(nil, "w1", func(ctx context.Context, w *SessionWorker) {
 		// simulate short work
 		atomic.AddInt32(&runs, 1)
 	})
@@ -43,11 +43,11 @@ func TestSessionWorker_DistinctWorkersBothRun(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool := &sessionWorkerPool{workers: make(map[sessionWorkerKey]*sessionWorker)}
+	pool := &sessionWorkerPool{workers: make(map[sessionWorkerKey]*SessionWorker)}
 
 	var a, b int32
-	pool.Add(nil, "a", func(ctx context.Context) { atomic.AddInt32(&a, 1) })
-	pool.Add(nil, "b", func(ctx context.Context) { atomic.AddInt32(&b, 1) })
+	pool.Add(nil, "a", func(ctx context.Context, w *SessionWorker) { atomic.AddInt32(&a, 1) })
+	pool.Add(nil, "b", func(ctx context.Context, w *SessionWorker) { atomic.AddInt32(&b, 1) })
 
 	pool.Start(ctx)
 
@@ -58,13 +58,13 @@ func TestSessionWorker_OverwriteSameKeyOnlyNewestRunsOnStart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool := &sessionWorkerPool{workers: make(map[sessionWorkerKey]*sessionWorker)}
+	pool := &sessionWorkerPool{workers: make(map[sessionWorkerKey]*SessionWorker)}
 
 	var first, second int32
 
 	// Add two workers with the same key (same session pointer and id)
-	pool.Add(nil, "dup", func(ctx context.Context) { atomic.AddInt32(&first, 1) })
-	pool.Add(nil, "dup", func(ctx context.Context) { atomic.AddInt32(&second, 1) })
+	pool.Add(nil, "dup", func(ctx context.Context, w *SessionWorker) { atomic.AddInt32(&first, 1) })
+	pool.Add(nil, "dup", func(ctx context.Context, w *SessionWorker) { atomic.AddInt32(&second, 1) })
 
 	pool.Start(ctx)
 

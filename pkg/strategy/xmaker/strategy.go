@@ -799,59 +799,6 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 	return q, nil
 }
 
-const debtQuotaCacheDuration = 30 * time.Second
-
-// margin level = totalValue / totalDebtValue * MMR (maintenance margin ratio)
-// on binance:
-// - MMR with 10x leverage = 5%
-// - MMR with 5x leverage = 9%
-// - MMR with 3x leverage = 10%
-func (s *Strategy) calculateDebtQuota(totalValue, debtValue, minMarginLevel, leverage fixedpoint.Value) fixedpoint.Value {
-	now := time.Now()
-	if s.debtQuotaCache != nil {
-		if v, ok := s.debtQuotaCache.Get(now); ok {
-			return v
-		}
-	}
-
-	if minMarginLevel.IsZero() || totalValue.IsZero() {
-		return fixedpoint.Zero
-	}
-
-	defaultMmr := fixedpoint.NewFromFloat(9.0 * 0.01)
-	if leverage.Compare(fixedpoint.NewFromFloat(10.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(5.0 * 0.01) // 5%
-	} else if leverage.Compare(fixedpoint.NewFromFloat(5.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(9.0 * 0.01) // 9%
-	} else if leverage.Compare(fixedpoint.NewFromFloat(3.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(10.0 * 0.01) // 10%
-	}
-
-	debtCap := totalValue.Div(minMarginLevel).Div(defaultMmr)
-	marginLevel := totalValue.Div(debtValue).Div(defaultMmr)
-
-	s.logger.Infof(
-		"calculateDebtQuota: debtCap=%f, debtValue=%f currentMarginLevel=%f mmr=%f",
-		debtCap.Float64(),
-		debtValue.Float64(),
-		marginLevel.Float64(),
-		defaultMmr.Float64(),
-	)
-
-	debtQuota := debtCap.Sub(debtValue)
-	if debtQuota.Sign() < 0 {
-		return fixedpoint.Zero
-	}
-
-	if s.debtQuotaCache == nil {
-		s.debtQuotaCache = fixedpoint.NewExpirable(debtQuota, now.Add(debtQuotaCacheDuration))
-	} else {
-		s.debtQuotaCache.Set(debtQuota, now.Add(debtQuotaCacheDuration))
-	}
-
-	return debtQuota
-}
-
 func (s *Strategy) allowMarginHedge(
 	session *bbgo.ExchangeSession,
 	minMarginLevel, maxHedgeAccountLeverage fixedpoint.Value,
@@ -2624,9 +2571,8 @@ func (s *Strategy) CrossRun(
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 
 	if sessionWorkers != nil {
-		sessionWorkers.Add(s.hedgeSession, "debt-quota", func(ctx context.Context) {
-
-		})
+		debtQuotaWorker := &DebtQuotaWorker{}
+		sessionWorkers.Add(s.hedgeSession, "debt-quota", debtQuotaWorker.Run)
 	}
 
 	// restore position into the position exposure
