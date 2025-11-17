@@ -3144,7 +3144,6 @@ func (s *Strategy) fixProfit(ctx context.Context, makerSession, sourceSession *b
 		// already fixed
 		return nil
 	}
-	s.LastProfitFixConfig = s.ProfitFixerConfig
 
 	bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)
 
@@ -3184,6 +3183,7 @@ func (s *Strategy) fixProfit(ctx context.Context, makerSession, sourceSession *b
 	); err2 != nil {
 		return err2
 	}
+	s.LastProfitFixConfig = s.ProfitFixerConfig
 
 	bbgo.Notify("Fixed %s position", s.Symbol, position)
 	bbgo.Notify("Fixed %s profitStats", s.Symbol, profitStats)
