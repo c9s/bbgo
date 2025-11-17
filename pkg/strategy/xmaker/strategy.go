@@ -2623,6 +2623,12 @@ func (s *Strategy) CrossRun(
 	s.Position.UpdateMetrics(nil)
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 
+	if sessionWorkers != nil {
+		sessionWorkers.Add(s.hedgeSession, "debt-quota", func(ctx context.Context) {
+
+		})
+	}
+
 	// restore position into the position exposure
 	s.logger.Infof("restoring position into the exposure: %s", s.Position.GetBase().String())
 	s.positionExposure.Open(s.Position.GetBase())
