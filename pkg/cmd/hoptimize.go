@@ -99,7 +99,7 @@ var hoptimizeCmd = &cobra.Command{
 
 		go func() {
 			<-sigs
-			log.Info("Early stop by manual cancelation")
+			log.Info("Early stop by manual cancellation")
 			cancel()
 		}()
 

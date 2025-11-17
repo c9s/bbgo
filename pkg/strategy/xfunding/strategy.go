@@ -785,7 +785,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		return
 	}
 
-	log.Infof("syncFuturesPosition: position comparision: %s (spot) <=> %s (futures)", spotBase.String(), futuresBase.String())
+	log.Infof("syncFuturesPosition: position comparison: %s (spot) <=> %s (futures)", spotBase.String(), futuresBase.String())
 
 	if futuresBase.Sign() > 0 {
 		// unexpected error

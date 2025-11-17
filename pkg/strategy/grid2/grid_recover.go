@@ -68,7 +68,7 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 	}
 	s.debugOrders("emit filled orders", filledOrders)
 
-	// add open orders into avtive maker orders
+	// add open orders into active maker orders
 	s.addOrdersToActiveOrderBook(openOrders)
 
 	// emit the filled orders
