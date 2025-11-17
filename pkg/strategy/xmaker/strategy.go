@@ -212,7 +212,8 @@ type Strategy struct {
 	Pips fixedpoint.Value `json:"pips"`
 
 	// ProfitFixerConfig is the profit fixer configuration
-	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer,omitempty"`
+	LastProfitFixConfig *common.ProfitFixerConfig `persistence:"last_profit_fix_config"`
+	ProfitFixerConfig   *common.ProfitFixerConfig `json:"profitFixer,omitempty"`
 
 	UseSandbox              bool                        `json:"useSandbox,omitempty"`
 	SandboxExchangeBalances map[string]fixedpoint.Value `json:"sandboxExchangeBalances,omitempty"`
@@ -2721,50 +2722,11 @@ func (s *Strategy) CrossRun(
 	}
 
 	if s.ProfitFixerConfig != nil {
-		bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)
-
-		s.logger.Infof("profitFixer is enabled, checking checkpoint: %+v", s.ProfitFixerConfig.TradesSince)
-
-		if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
-			return errors.New("tradesSince time can not be zero")
+		if err := s.fixProfit(ctx, makerSession, sourceSession); err != nil {
+			s.logger.WithError(err).Warnf("profit fixer failure")
+		} else {
+			s.logger.Infof("last profit fix config: %+v", s.LastProfitFixConfig)
 		}
-
-		position := types.NewPositionFromMarket(s.makerMarket)
-		position.ExchangeFeeRates = s.Position.ExchangeFeeRates
-		position.FeeRate = s.Position.FeeRate
-		position.StrategyInstanceID = s.Position.StrategyInstanceID
-		position.Strategy = s.Position.Strategy
-
-		profitStats := types.NewProfitStats(s.makerMarket)
-
-		fixer := common.NewProfitFixer(*s.ProfitFixerConfig, s.Environment)
-		// fixer.ConverterManager = s.ConverterManager
-
-		if ss, ok := makerSession.Exchange.(types.ExchangeTradeHistoryService); ok {
-			s.logger.Infof("adding makerSession %s to profitFixer", makerSession.Name)
-			fixer.AddExchange(makerSession.Name, ss)
-		}
-
-		if ss, ok := sourceSession.Exchange.(types.ExchangeTradeHistoryService); ok {
-			s.logger.Infof("adding hedgeSession %s to profitFixer", sourceSession.Name)
-			fixer.AddExchange(sourceSession.Name, ss)
-		}
-
-		if err2 := fixer.Fix(
-			ctx, s.makerMarket.Symbol,
-			s.ProfitFixerConfig.TradesSince.Time(),
-			time.Now(),
-			profitStats,
-			position,
-		); err2 != nil {
-			return err2
-		}
-
-		bbgo.Notify("Fixed %s position", s.Symbol, position)
-		bbgo.Notify("Fixed %s profitStats", s.Symbol, profitStats)
-
-		s.Position = position
-		s.ProfitStats.ProfitStats = profitStats
 	}
 
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
@@ -3175,4 +3137,58 @@ func parseSymbolSelector(
 		return nil, types.Market{}, fmt.Errorf("market %s not found in session %s", symbol, sessionName)
 	}
 	return session, market, nil
+}
+
+func (s *Strategy) fixProfit(ctx context.Context, makerSession, sourceSession *bbgo.ExchangeSession) error {
+	if s.LastProfitFixConfig != nil && s.LastProfitFixConfig.Equal(*s.ProfitFixerConfig) {
+		// already fixed
+		return nil
+	}
+	s.LastProfitFixConfig = s.ProfitFixerConfig
+
+	bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)
+
+	s.logger.Infof("running profit fixing with config: %+v", s.ProfitFixerConfig)
+
+	if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
+		return errors.New("tradesSince time can not be zero")
+	}
+
+	position := types.NewPositionFromMarket(s.makerMarket)
+	position.ExchangeFeeRates = s.Position.ExchangeFeeRates
+	position.FeeRate = s.Position.FeeRate
+	position.StrategyInstanceID = s.Position.StrategyInstanceID
+	position.Strategy = s.Position.Strategy
+
+	profitStats := types.NewProfitStats(s.makerMarket)
+
+	fixer := common.NewProfitFixer(*s.ProfitFixerConfig, s.Environment)
+	// fixer.ConverterManager = s.ConverterManager
+
+	if ss, ok := makerSession.Exchange.(types.ExchangeTradeHistoryService); ok {
+		s.logger.Infof("adding makerSession %s to profitFixer", makerSession.Name)
+		fixer.AddExchange(makerSession.Name, ss)
+	}
+
+	if ss, ok := sourceSession.Exchange.(types.ExchangeTradeHistoryService); ok {
+		s.logger.Infof("adding hedgeSession %s to profitFixer", sourceSession.Name)
+		fixer.AddExchange(sourceSession.Name, ss)
+	}
+
+	if err2 := fixer.Fix(
+		ctx, s.makerMarket.Symbol,
+		s.ProfitFixerConfig.TradesSince.Time(),
+		time.Now(),
+		profitStats,
+		position,
+	); err2 != nil {
+		return err2
+	}
+
+	bbgo.Notify("Fixed %s position", s.Symbol, position)
+	bbgo.Notify("Fixed %s profitStats", s.Symbol, profitStats)
+
+	s.Position = position
+	s.ProfitStats.ProfitStats = profitStats
+	return nil
 }
