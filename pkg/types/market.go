@@ -88,9 +88,13 @@ func (m Market) TruncateQuantity(quantity fixedpoint.Value) fixedpoint.Value {
 // TruncateQuoteQuantity uses the tick size to truncate floating number, in order to avoid the rounding issue
 // this is usually used for calculating the order size from the quote quantity.
 func (m Market) TruncateQuoteQuantity(quantity fixedpoint.Value) fixedpoint.Value {
-	var ts = m.TickSize.Float64()
-	var prec = int(math.Round(math.Log10(ts) * -1.0))
-	var pow10 = math.Pow10(prec)
+	if m.TickSize.IsZero() {
+		return quantity
+	}
+
+	ts := m.TickSize.Float64()
+	prec := int(math.Round(math.Log10(ts) * -1.0))
+	pow10 := math.Pow10(prec)
 
 	qf := math.Trunc(quantity.Float64() * pow10)
 	qf = qf / pow10

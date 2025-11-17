@@ -1780,22 +1780,18 @@ func AdjustHedgeQuantityWithAvailableBalance(
 	switch side {
 
 	case types.SideTypeBuy:
-		// check quote quantity
 		if quote, ok := account.Balance(market.QuoteCurrency); ok {
 			if quote.Available.Compare(market.MinNotional) < 0 {
-				// adjust price to higher 0.1%, so that we can ensure that the order can be executed
-				availableQuote := market.TruncateQuoteQuantity(quote.Available)
-				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, lastPrice, availableQuote)
-
+				return fixedpoint.Zero
 			}
+
+			availableQuote := market.TruncateQuoteQuantity(quote.Available)
+			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, lastPrice, availableQuote)
 		}
 
 	case types.SideTypeSell:
-		// check quote quantity
 		if base, ok := account.Balance(market.BaseCurrency); ok {
-			if base.Available.Compare(quantity) < 0 {
-				quantity = base.Available
-			}
+			quantity = fixedpoint.Min(quantity, base.Available)
 		}
 	}
 
