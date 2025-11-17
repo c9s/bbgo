@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -18,6 +19,68 @@ import (
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+type StrategyProfitFixer struct {
+	LastProfitFixConfig *ProfitFixerConfig `persistence:"last_profit_fix_config"`
+	ProfitFixerConfig   *ProfitFixerConfig `json:"profitFixer,omitempty"`
+}
+
+func (s *StrategyProfitFixer) NeedsProfitFixing() bool {
+	if s.ProfitFixerConfig == nil {
+		return false
+	}
+	if s.LastProfitFixConfig != nil && s.LastProfitFixConfig.Equal(*s.ProfitFixerConfig) {
+		return false
+	}
+	return true
+}
+
+func (s *StrategyProfitFixer) Fix(
+	ctx context.Context,
+	environment *bbgo.Environment,
+	converter *core.ConverterManager,
+	market types.Market,
+	sessions []*bbgo.ExchangeSession,
+	oriPosition *types.Position,
+	oriProfitStats *types.ProfitStats,
+) (*types.Position, *types.ProfitStats, error) {
+	if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
+		return nil, nil, errors.New("tradesSince time can not be zero")
+	}
+
+	fixer := NewProfitFixer(*s.ProfitFixerConfig, environment)
+	if converter != nil {
+		fixer.SetConverter(converter)
+	}
+	for _, session := range sessions {
+		if ss, ok := session.Exchange.(types.ExchangeTradeHistoryService); ok {
+			fixer.AddExchange(session.Name, ss)
+		}
+	}
+	if len(fixer.sessions) == 0 {
+		return nil, nil, fmt.Errorf("no exchange sessions added to profit fixer")
+	}
+
+	position := types.NewPositionFromMarket(market)
+	position.ExchangeFeeRates = oriPosition.ExchangeFeeRates
+	position.FeeRate = oriPosition.FeeRate
+	position.Strategy = oriPosition.Strategy
+	position.StrategyInstanceID = oriPosition.StrategyInstanceID
+
+	profitStats := types.NewProfitStats(market)
+
+	err := fixer.Fix(
+		ctx, market.Symbol,
+		s.ProfitFixerConfig.TradesSince.Time(),
+		time.Now(),
+		profitStats,
+		position,
+	)
+	if err == nil {
+		s.LastProfitFixConfig = s.ProfitFixerConfig
+	}
+	return position, profitStats, err
+}
 
 // ProfitFixerConfig is used for fixing profitStats and position by re-playing the trade history
 type ProfitFixerConfig struct {
