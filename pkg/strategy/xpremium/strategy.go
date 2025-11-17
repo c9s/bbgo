@@ -949,9 +949,11 @@ func (s *Strategy) executeSignal(ctx context.Context, side types.SideType, now t
 
 	qty, qerr := s.calculatePositionSize(ctx, side, stopLossPrice)
 	if qerr != nil {
-		s.logger.WithError(qerr).Warn("position sizing failed, fallback to min qty")
+		s.logger.WithError(qerr).Warnf("position sizing failed, fallback to min qty %s", s.tradingMarket.MinQuantity.String())
 		qty = s.tradingMarket.MinQuantity
 	}
+
+	qty = s.tradingMarket.TruncateQuantity(qty)
 
 	order := types.SubmitOrder{
 		Symbol:   s.TradingSymbol,
