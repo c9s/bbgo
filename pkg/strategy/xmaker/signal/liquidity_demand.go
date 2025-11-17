@@ -33,7 +33,7 @@ func (s *LiquidityDemandSignal) ID() string {
 func (s *LiquidityDemandSignal) Subscribe(session *bbgo.ExchangeSession, symbol string) {
 	s.Symbol = symbol
 	if s.Threshold == 0 {
-		s.Threshold = 1000000.0
+		s.Threshold = 100.0
 	}
 	if s.WarmUpSampleCount == 0 {
 		s.WarmUpSampleCount = 100
@@ -62,25 +62,42 @@ func (s *LiquidityDemandSignal) CalculateSignal(_ context.Context) (float64, err
 		return 0.0, nil
 	}
 	// update mean and std by incremental calculation (Welford's online algorithm)
+	var mean, std float64
 	if s.indicator.Length() <= s.StatsUpdateSampleCount {
-		s.mean = s.indicator.Slice.Mean()
-		s.std = s.indicator.Slice.Std()
+		mean = s.indicator.Slice.Mean()
+		std = s.indicator.Slice.Std()
 	} else {
-		s.mean = (s.mean*s.statsUpdateSampleCountf + last) / (s.statsUpdateSampleCountf + 1)
-		d := last - s.mean
-		s.std = math.Sqrt((s.std*s.std*s.statsUpdateSampleCountf + d*d) / (s.statsUpdateSampleCountf + 1))
+		mean = (s.mean*s.statsUpdateSampleCountf + last) / (s.statsUpdateSampleCountf + 1)
+		d := last - mean
+		std = math.Sqrt((s.std*s.std*s.statsUpdateSampleCountf + d*d) / (s.statsUpdateSampleCountf + 1))
 	}
+	if !s.updateStats(mean, std) {
+		return 0.0, nil
+	}
+
 	// avoid division by zero
 	if s.std == 0 {
 		return 0.0, nil
 	}
 	score := (last - s.mean) / s.std
 	sig := math.Tanh(score) * 2 // scale to [-2, 2]
-	if math.IsNaN(sig) {
+	if math.IsNaN(sig) || math.IsInf(sig, 0) {
 		sig = 0.0
 	}
 	if s.logger != nil {
 		s.logger.Infof("[LiquidityDemandSignal] last=%.2f, mean=%.2f, std=%.2f, score=%.2f, sig=%.2f", last, s.mean, s.std, score, sig)
 	}
 	return sig, nil
+}
+
+func (s *LiquidityDemandSignal) updateStats(mean, std float64) bool {
+	if math.IsNaN(mean) || math.IsInf(mean, 0) {
+		return false
+	}
+	if math.IsNaN(std) || math.IsInf(std, 0) {
+		return false
+	}
+	s.mean = mean
+	s.std = std
+	return true
 }
