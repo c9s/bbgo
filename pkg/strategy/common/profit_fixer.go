@@ -92,13 +92,12 @@ type ProfitFixerConfig struct {
 }
 
 func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *ProfitFixer {
-	fixer := newProfitFixer(environment)
-	fixer.profitCurrency = config.ProfitCurrency
-	if config.UseDatabaseTrades {
-		fixer.queryTrades = fixer.queryTradesFromDB
-	} else {
-		fixer.queryTrades = fixer.queryTradesRestful
+	fixer := &ProfitFixer{
+		sessions:    make(map[string]types.ExchangeTradeHistoryService),
+		Environment: environment,
 	}
+	fixer.profitCurrency = config.ProfitCurrency
+	fixer.useDatabaseTrades = config.UseDatabaseTrades
 	for _, feeCurrency := range config.FeeCurrencies {
 		fixer.addFeeCurrency(feeCurrency)
 	}
@@ -118,20 +117,13 @@ type ProfitFixer struct {
 	core.ConverterManager
 	*bbgo.Environment
 
-	queryTrades func(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error)
+	useDatabaseTrades bool
 }
 
 type tokenFeeKey struct {
 	token        string
 	exchangeName types.ExchangeName
 	date         string
-}
-
-func newProfitFixer(environment *bbgo.Environment) *ProfitFixer {
-	return &ProfitFixer{
-		sessions:    make(map[string]types.ExchangeTradeHistoryService),
-		Environment: environment,
-	}
 }
 
 func (f *ProfitFixer) SetConverter(converter *core.ConverterManager) {
@@ -330,7 +322,13 @@ func (f *ProfitFixer) Fix(
 		return fmt.Errorf("quote currency is empty for profit fixing")
 	}
 	log.Infof("start profit fixing with time range %s <=> %s", since, until)
-	allTrades, err := f.queryTrades(ctx, symbol, since, until)
+	var allTrades []types.Trade
+	var err error
+	if f.useDatabaseTrades {
+		allTrades, err = f.queryTradesFromDB(ctx, symbol, since, until)
+	} else {
+		allTrades, err = f.queryTradesRestful(ctx, symbol, since, until)
+	}
 	if err != nil {
 		return err
 	}
