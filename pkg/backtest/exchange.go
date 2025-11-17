@@ -425,7 +425,7 @@ func (e *Exchange) ConsumeKLine(k types.KLine, requiredInterval types.Interval) 
 	requiredKline, ok := matching.klineCache[k.Interval]
 	if ok { // pop out all the old
 		if requiredKline.Interval != requiredInterval {
-			panic(fmt.Sprintf("expect required kline interval %s, got interval %s", requiredInterval.String(), requiredKline.Interval.String()))
+			panic(fmt.Sprintf("expect required kline interval %s, got interval %s, kline = %+v", requiredInterval.String(), requiredKline.Interval.String(), requiredKline))
 		}
 		e.currentTime = requiredKline.EndTime.Time()
 		// here we generate trades and order updates
