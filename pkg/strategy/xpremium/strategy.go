@@ -1311,7 +1311,6 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 			return
 		case <-s.premiumBook.C:
 			// fallthrough to evaluate when either book updates
-		case <-s.baseBook.C:
 		}
 
 		bookA := s.premiumBook
