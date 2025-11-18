@@ -3147,7 +3147,7 @@ func (s *Strategy) fixProfit(ctx context.Context, sessions ...*bbgo.ExchangeSess
 		nil,
 		s.makerMarket,
 		sessions,
-		s.Position, s.ProfitStats.ProfitStats,
+		s.Position,
 	)
 	if err != nil {
 		return err

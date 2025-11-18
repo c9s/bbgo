@@ -1323,7 +1323,6 @@ func (s *Strategy) fixProfit(
 		makerMarket,
 		[]*bbgo.ExchangeSession{makerSession, hedgeSession},
 		s.CrossExchangeMarketMakingStrategy.Position,
-		s.CrossExchangeMarketMakingStrategy.ProfitStats,
 	)
 	if err != nil {
 		return err

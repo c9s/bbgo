@@ -1213,7 +1213,6 @@ func (s *Strategy) fixProfit(
 		s.spotMarket,
 		[]*bbgo.ExchangeSession{s.spotSession},
 		s.SpotPosition,
-		s.ProfitStats.ProfitStats,
 	)
 	if err != nil {
 		return fmt.Errorf("spot market profit fix failed: %w", err)
@@ -1225,7 +1224,6 @@ func (s *Strategy) fixProfit(
 		s.futuresMarket,
 		[]*bbgo.ExchangeSession{s.futuresSession},
 		s.FuturesPosition,
-		s.ProfitStats.ProfitStats,
 	)
 	if err != nil {
 		return fmt.Errorf("futures market profit fix failed: %w", err)
