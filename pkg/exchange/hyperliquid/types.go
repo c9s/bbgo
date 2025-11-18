@@ -24,7 +24,7 @@ var (
 		types.Interval1mo: 60 * 60 * 24 * 30,
 	}
 
-	ToLocalInterval = map[types.Interval]string{
+	localInterval = map[types.Interval]string{
 		types.Interval1m:  "1m",
 		types.Interval3m:  "3m",
 		types.Interval5m:  "5m",
