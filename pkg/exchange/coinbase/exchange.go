@@ -681,13 +681,13 @@ func (e *Exchange) queryProductTradesByPagination(
 	req.ProductID(toLocalSymbol(symbol))
 	if options.StartTime != nil {
 		req.StartDate(
-			options.StartTime.Format("2006-01-02"),
+			options.StartTime.Format(time.DateOnly),
 		)
 	}
 	if options.EndTime != nil {
 		// end_date is exclusive, add one day to the end date
 		req.EndDate(
-			options.EndTime.AddDate(0, 0, 1).Format("2006-01-02"),
+			options.EndTime.AddDate(0, 0, 1).Format(time.DateOnly),
 		)
 	}
 	paginateBackward := false
