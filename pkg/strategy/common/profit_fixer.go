@@ -108,7 +108,11 @@ func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *Pr
 }
 
 func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
-	return c.TradesSince.Equal(other.TradesSince.Time()) && c.Patch == other.Patch && c.UseDatabaseTrades == other.UseDatabaseTrades && c.ProfitCurrency == other.ProfitCurrency
+	return c.TradesSince.Equal(other.TradesSince.Time()) &&
+		c.Patch == other.Patch &&
+		c.UseDatabaseTrades == other.UseDatabaseTrades &&
+		c.ProfitCurrency == other.ProfitCurrency &&
+		c.Apply == other.Apply
 }
 
 // ProfitFixer implements a trade-history-based profit fixer

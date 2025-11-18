@@ -3156,7 +3156,9 @@ func (s *Strategy) fixProfit(ctx context.Context, sessions ...*bbgo.ExchangeSess
 	bbgo.Notify("Fixed %s position", s.Symbol, position)
 	bbgo.Notify("Fixed %s profitStats", s.Symbol, profitStats)
 
-	s.Position = position
-	s.ProfitStats.ProfitStats = profitStats
+	if s.StrategyProfitFixer.ProfitFixerConfig.Apply {
+		s.Position = position
+		s.ProfitStats.ProfitStats = profitStats
+	}
 	return nil
 }
