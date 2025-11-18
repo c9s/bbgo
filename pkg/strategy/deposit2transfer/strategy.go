@@ -238,7 +238,7 @@ func (s *Strategy) checkDeposits(ctx context.Context, firstTime bool) {
 				if ok {
 					logger.Infof("spot account balance %s: %+v", d.Asset, bal)
 				} else {
-					logger.Errorf("unexpected error: %s balance not found", d.Asset)
+					logger.Warnf("unexpected error: %s balance not found", d.Asset)
 				}
 				// the spot account is found or it's zero balance
 				amount = fixedpoint.Min(bal.Available, amount)
