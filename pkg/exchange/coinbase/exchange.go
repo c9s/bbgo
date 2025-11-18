@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -689,6 +690,12 @@ func (e *Exchange) queryProductTradesByPagination(
 			options.EndTime.AddDate(0, 0, 1).Format("2006-01-02"),
 		)
 	}
+	paginateBackward := false
+	before := options.LastTradeID
+	if before != 0 {
+		paginateBackward = true
+		req.Before(before)
+	}
 	cbTradesDirty, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -696,16 +703,28 @@ func (e *Exchange) queryProductTradesByPagination(
 	// do pagination to get all trades within the start_date and end_date
 	// pagination done if the trades are less than PaginationLimit -> have reached the end of the pagination
 	donePagination := len(cbTradesDirty) < PaginationLimit
+	if paginateBackward && len(cbTradesDirty) > 0 {
+		before = cbTradesDirty[0].TradeID
+	}
 	for !donePagination {
 		select {
 		case <-ctx.Done():
 			return cbTradesDirty, ctx.Err()
 		default:
-			lastTrade := cbTradesDirty[len(cbTradesDirty)-1]
-			req.After(lastTrade.TradeID)
+			if paginateBackward {
+				// paginate backwards using `before`
+				req.Before(before)
+			} else {
+				// paginate forwards using `after`
+				lastTrade := cbTradesDirty[len(cbTradesDirty)-1]
+				req.After(lastTrade.TradeID)
+			}
 			newTrades, err := req.Do(ctx)
 			if err != nil {
 				return nil, err
+			}
+			if paginateBackward && len(newTrades) > 0 {
+				before = newTrades[0].TradeID
 			}
 			cbTradesDirty = append(cbTradesDirty, newTrades...)
 			donePagination = len(newTrades) < PaginationLimit
@@ -715,8 +734,17 @@ func (e *Exchange) queryProductTradesByPagination(
 		if options.LastTradeID != 0 && trade.TradeID <= options.LastTradeID {
 			continue
 		}
+		if options.StartTime != nil && trade.CreatedAt.Time().Before(*options.StartTime) {
+			continue
+		}
+		if options.EndTime != nil && trade.CreatedAt.Time().After(*options.EndTime) {
+			continue
+		}
 		cbTrades = append(cbTrades, trade)
 	}
+	sort.Slice(cbTrades, func(i, j int) bool {
+		return cbTrades[i].CreatedAt.Time().After(cbTrades[j].CreatedAt.Time())
+	})
 	return cbTrades, nil
 }
 

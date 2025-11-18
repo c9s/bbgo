@@ -292,7 +292,6 @@ func TestExchange_QueryOrderTrades(t *testing.T) {
 func TestExchange_QueryTrades(t *testing.T) {
 	ex, saveRecord := getExchangeOrSkip(t)
 	defer saveRecord()
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -313,7 +312,7 @@ func TestExchange_QueryTrades(t *testing.T) {
 	t.Logf("queried last 20 trades: %+v", trades)
 	assert.NoError(t, err)
 	assert.NotNil(t, trades)
-	assert.Equal(t, len(trades), 20)
+	assert.Equal(t, 20, len(trades))
 	for _, trade := range trades {
 		assert.NotEmpty(t, trade)
 	}
@@ -326,7 +325,7 @@ func TestExchange_QueryTrades(t *testing.T) {
 	t.Logf("queried trades after last trade ID %d: %+v", lastTradeID, trades)
 	assert.NoError(t, err)
 	assert.NotNil(t, trades)
-	assert.Equal(t, len(trades), 10)
+	assert.Equal(t, 10, len(trades))
 	for _, trade := range trades {
 		assert.NotEmpty(t, trade)
 	}
