@@ -66,6 +66,9 @@ spec:
           {{- if .Values.debug.enabled }}
           - "--debug"
           {{- end }}
+          {{- if .Values.sync.enabled }}
+          - "--no-sync"
+          {{- end }}
 
           ports:
           {{- if .Values.webserver.enabled }}

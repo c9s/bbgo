@@ -95,6 +95,8 @@ environment: dev
 rbTreeOrderbook:
   enabled: false
 
+# sync controls the kubernetes cronjob for data synchronization from exchanges
+# it starts a cronjob to run bbgo sync command periodically
 sync:
   enabled: false
   schedule: "0 * * * *"

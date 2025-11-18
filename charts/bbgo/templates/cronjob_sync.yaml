@@ -9,9 +9,11 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   labels:
+    service: sync
     {{- include "bbgo.labels" . | nindent 4 }}
 spec:
   schedule: {{ .Values.sync.schedule | quote }}
+  concurrencyPolicy: Forbid
   jobTemplate:
     spec:
       template:
