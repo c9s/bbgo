@@ -154,7 +154,7 @@ func toLocalInterval(interval types.Interval) (string, error) {
 		return "", fmt.Errorf("interval %s is not supported", interval)
 	}
 
-	in, ok := ToLocalInterval[interval]
+	in, ok := localInterval[interval]
 	if !ok {
 		return "", fmt.Errorf("interval %s is not supported, got local interval %s", interval, in)
 	}

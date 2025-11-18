@@ -315,13 +315,32 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	//TODO implement
-	return nil, fmt.Errorf("not implemented")
+	tickers, err := e.QueryTickers(ctx, symbol)
+	if err != nil {
+		return nil, err
+	}
+
+	t, ok := tickers[symbol]
+	if !ok {
+		return nil, fmt.Errorf("ticker not found for symbol: %s", symbol)
+	}
+	return &t, nil
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
-	//TODO implement
-	return nil, fmt.Errorf("not implemented")
+	if err := restSharedLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("query ticker rate limiter wait error: %w", err)
+	}
+
+	_, err := e.client.NewSpotGetMetaAndAssetCtxsRequest().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]types.Ticker, len(symbol))
+	// TODO
+
+	return result, nil
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {

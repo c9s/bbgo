@@ -24,6 +24,8 @@ const (
 	ReqHistoricalOrders          ReqTypeInfo = "historicalOrders"
 	ReqSpotClearinghouseState    ReqTypeInfo = "spotClearinghouseState"
 	ReqFuturesClearinghouseState ReqTypeInfo = "clearinghouseState"
+	ReqSpotMetaAndAssetCtxs      ReqTypeInfo = "spotMetaAndAssetCtxs"
+	ReqFuturesMetaAndAssetCtxs   ReqTypeInfo = "metaAndAssetCtxs"
 )
 
 type TimeInForce string
