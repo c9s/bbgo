@@ -376,3 +376,30 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 		// Footer:        "",
 	}
 }
+
+func (s *ProfitStats) Merge(other *ProfitStats) error {
+	if s.Symbol != other.Symbol {
+		return fmt.Errorf("cannot merge profit stats with different symbols: %s != %s", s.Symbol, other.Symbol)
+	}
+
+	s.AccumulatedPnL = s.AccumulatedPnL.Add(other.AccumulatedPnL)
+	s.AccumulatedNetProfit = s.AccumulatedNetProfit.Add(other.AccumulatedNetProfit)
+	s.AccumulatedGrossProfit = s.AccumulatedGrossProfit.Add(other.AccumulatedGrossProfit)
+	s.AccumulatedGrossLoss = s.AccumulatedGrossLoss.Add(other.AccumulatedGrossLoss)
+	s.AccumulatedVolume = s.AccumulatedVolume.Add(other.AccumulatedVolume)
+
+	s.TodayPnL = s.TodayPnL.Add(other.TodayPnL)
+	s.TodayNetProfit = s.TodayNetProfit.Add(other.TodayNetProfit)
+	s.TodayGrossProfit = s.TodayGrossProfit.Add(other.TodayGrossProfit)
+	s.TodayGrossLoss = s.TodayGrossLoss.Add(other.TodayGrossLoss)
+
+	if other.AccumulatedSince < s.AccumulatedSince || s.AccumulatedSince == 0 {
+		s.AccumulatedSince = other.AccumulatedSince
+	}
+
+	if other.TodaySince < s.TodaySince || s.TodaySince == 0 {
+		s.TodaySince = other.TodaySince
+	}
+
+	return nil
+}
