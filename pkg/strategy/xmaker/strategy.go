@@ -3140,7 +3140,7 @@ func (s *Strategy) fixProfit(ctx context.Context, sessions ...*bbgo.ExchangeSess
 		return nil
 	}
 
-	s.logger.Infof("running profit fixing with config: %+v", s.ProfitFixerConfig)
+	s.logger.Infof("running profit fixing with config: %+v", s.StrategyProfitFixer.ProfitFixerConfig)
 	bbgo.Notify("Fixing %s profitStats and position...", s.makerMarket.Symbol)
 	position, profitStats, err := s.StrategyProfitFixer.Fix(
 		ctx, s.Environment,
