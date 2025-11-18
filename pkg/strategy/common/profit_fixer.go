@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -19,6 +20,68 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type StrategyProfitFixer struct {
+	LastProfitFixConfig *ProfitFixerConfig `persistence:"last_profit_fix_config"`
+	ProfitFixerConfig   *ProfitFixerConfig `json:"profitFixer,omitempty"`
+}
+
+func (s *StrategyProfitFixer) NeedsProfitFixing() bool {
+	if s.ProfitFixerConfig == nil {
+		return false
+	}
+	if s.LastProfitFixConfig != nil && s.LastProfitFixConfig.Equal(*s.ProfitFixerConfig) {
+		return false
+	}
+	return true
+}
+
+func (s *StrategyProfitFixer) Fix(
+	ctx context.Context,
+	environment *bbgo.Environment,
+	converter *core.ConverterManager,
+	market types.Market,
+	sessions []*bbgo.ExchangeSession,
+	oriPosition *types.Position,
+	oriProfitStats *types.ProfitStats,
+) (*types.Position, *types.ProfitStats, error) {
+	if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
+		return nil, nil, errors.New("tradesSince time can not be zero")
+	}
+
+	fixer := NewProfitFixer(*s.ProfitFixerConfig, environment)
+	if converter != nil {
+		fixer.SetConverter(converter)
+	}
+	for _, session := range sessions {
+		if ss, ok := session.Exchange.(types.ExchangeTradeHistoryService); ok {
+			fixer.AddExchange(session.Name, ss)
+		}
+	}
+	if len(fixer.sessions) == 0 {
+		return nil, nil, fmt.Errorf("no exchange sessions added to profit fixer")
+	}
+
+	position := types.NewPositionFromMarket(market)
+	position.ExchangeFeeRates = oriPosition.ExchangeFeeRates
+	position.FeeRate = oriPosition.FeeRate
+	position.Strategy = oriPosition.Strategy
+	position.StrategyInstanceID = oriPosition.StrategyInstanceID
+
+	profitStats := types.NewProfitStats(market)
+
+	err := fixer.Fix(
+		ctx, market.Symbol,
+		s.ProfitFixerConfig.TradesSince.Time(),
+		time.Now(),
+		profitStats,
+		position,
+	)
+	if err == nil {
+		s.LastProfitFixConfig = s.ProfitFixerConfig
+	}
+	return position, profitStats, err
+}
+
 // ProfitFixerConfig is used for fixing profitStats and position by re-playing the trade history
 type ProfitFixerConfig struct {
 	TradesSince       types.Time `json:"tradesSince,omitempty"`
@@ -29,13 +92,12 @@ type ProfitFixerConfig struct {
 }
 
 func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *ProfitFixer {
-	fixer := newProfitFixer(environment)
-	fixer.profitCurrency = config.ProfitCurrency
-	if config.UseDatabaseTrades {
-		fixer.queryTrades = fixer.queryTradesFromDB
-	} else {
-		fixer.queryTrades = fixer.queryTradesRestful
+	fixer := &ProfitFixer{
+		sessions:    make(map[string]types.ExchangeTradeHistoryService),
+		Environment: environment,
 	}
+	fixer.profitCurrency = config.ProfitCurrency
+	fixer.useDatabaseTrades = config.UseDatabaseTrades
 	for _, feeCurrency := range config.FeeCurrencies {
 		fixer.addFeeCurrency(feeCurrency)
 	}
@@ -55,20 +117,13 @@ type ProfitFixer struct {
 	core.ConverterManager
 	*bbgo.Environment
 
-	queryTrades func(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error)
+	useDatabaseTrades bool
 }
 
 type tokenFeeKey struct {
 	token        string
 	exchangeName types.ExchangeName
 	date         string
-}
-
-func newProfitFixer(environment *bbgo.Environment) *ProfitFixer {
-	return &ProfitFixer{
-		sessions:    make(map[string]types.ExchangeTradeHistoryService),
-		Environment: environment,
-	}
 }
 
 func (f *ProfitFixer) SetConverter(converter *core.ConverterManager) {
@@ -267,7 +322,13 @@ func (f *ProfitFixer) Fix(
 		return fmt.Errorf("quote currency is empty for profit fixing")
 	}
 	log.Infof("start profit fixing with time range %s <=> %s", since, until)
-	allTrades, err := f.queryTrades(ctx, symbol, since, until)
+	var allTrades []types.Trade
+	var err error
+	if f.useDatabaseTrades {
+		allTrades, err = f.queryTradesFromDB(ctx, symbol, since, until)
+	} else {
+		allTrades, err = f.queryTradesRestful(ctx, symbol, since, until)
+	}
 	if err != nil {
 		return err
 	}

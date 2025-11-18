@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -17,9 +16,6 @@ import (
 func newTestFixer() *ProfitFixer {
 	fixer := &ProfitFixer{
 		Environment: &bbgo.Environment{},
-	}
-	fixer.queryTrades = func(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
-		return []types.Trade{}, nil
 	}
 	return fixer
 }
