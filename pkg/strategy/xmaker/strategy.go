@@ -2715,7 +2715,11 @@ func (s *Strategy) CrossRun(
 		updateFeeTokenPrice(s.hedgeSession, s.priceSolver, s.Position)
 	}
 
-	if err := s.fixProfit(ctx, makerSession, sourceSession); err != nil {
+	profitFixSessions := []*bbgo.ExchangeSession{}
+	for _, session := range sessions {
+		profitFixSessions = append(profitFixSessions, session)
+	}
+	if err := s.fixProfit(ctx, profitFixSessions...); err != nil {
 		s.logger.WithError(err).Warnf("profit fixer failure")
 	} else {
 		s.logger.Infof("last profit fix config: %+v", s.LastProfitFixConfig)
@@ -3131,7 +3135,7 @@ func parseSymbolSelector(
 	return session, market, nil
 }
 
-func (s *Strategy) fixProfit(ctx context.Context, makerSession, sourceSession *bbgo.ExchangeSession) error {
+func (s *Strategy) fixProfit(ctx context.Context, sessions ...*bbgo.ExchangeSession) error {
 	if needFix := s.StrategyProfitFixer.NeedsProfitFixing(); !needFix {
 		return nil
 	}
@@ -3142,7 +3146,7 @@ func (s *Strategy) fixProfit(ctx context.Context, makerSession, sourceSession *b
 		ctx, s.Environment,
 		nil,
 		s.makerMarket,
-		[]*bbgo.ExchangeSession{makerSession, sourceSession},
+		sessions,
 		s.Position, s.ProfitStats.ProfitStats,
 	)
 	if err != nil {
