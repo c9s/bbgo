@@ -84,11 +84,13 @@ func (s *StrategyProfitFixer) Fix(
 
 // ProfitFixerConfig is used for fixing profitStats and position by re-playing the trade history
 type ProfitFixerConfig struct {
+	Apply             bool       `json:"apply,omitempty"`
 	TradesSince       types.Time `json:"tradesSince,omitempty"`
 	Patch             string     `json:"patch,omitempty"`
 	UseDatabaseTrades bool       `json:"useDatabaseTrades,omitempty"`
 	ProfitCurrency    string     `json:"profitCurrency,omitempty"` // the currency to calculate profit in
 	FeeCurrencies     []string   `json:"feeCurrencies,omitempty"`  // list of fee currencies to consider for fee price conversion
+	ExtraSymbols      []string   `json:"extraSymbols,omitempty"`
 }
 
 func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *ProfitFixer {
@@ -98,6 +100,7 @@ func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *Pr
 	}
 	fixer.profitCurrency = config.ProfitCurrency
 	fixer.useDatabaseTrades = config.UseDatabaseTrades
+	fixer.extraTargetSymbols = config.ExtraSymbols
 	for _, feeCurrency := range config.FeeCurrencies {
 		fixer.addFeeCurrency(feeCurrency)
 	}
@@ -117,7 +120,8 @@ type ProfitFixer struct {
 	core.ConverterManager
 	*bbgo.Environment
 
-	useDatabaseTrades bool
+	useDatabaseTrades  bool
+	extraTargetSymbols []string
 }
 
 type tokenFeeKey struct {
@@ -324,10 +328,17 @@ func (f *ProfitFixer) Fix(
 	log.Infof("start profit fixing with time range %s <=> %s", since, until)
 	var allTrades []types.Trade
 	var err error
+	queryFunc := f.queryTradesRestful
 	if f.useDatabaseTrades {
-		allTrades, err = f.queryTradesFromDB(ctx, symbol, since, until)
-	} else {
-		allTrades, err = f.queryTradesRestful(ctx, symbol, since, until)
+		queryFunc = f.queryTradesFromDB
+	}
+	allTrades, err = queryFunc(ctx, symbol, since, until)
+	for _, extraSymbol := range f.extraTargetSymbols {
+		extraTrades, err := queryFunc(ctx, extraSymbol, since, until)
+		if err != nil {
+			return err
+		}
+		allTrades = append(allTrades, extraTrades...)
 	}
 	if err != nil {
 		return err
