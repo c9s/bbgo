@@ -37,7 +37,7 @@ var (
 const (
 	ID                = "coinbase"
 	PlatformToken     = "COIN"
-	PaginationLimit   = 100
+	PaginationLimit   = 1000
 	DefaultKLineLimit = 300
 )
 
