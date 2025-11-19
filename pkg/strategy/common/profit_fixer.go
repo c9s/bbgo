@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -84,11 +85,16 @@ func (s *StrategyProfitFixer) Fix(
 
 // ProfitFixerConfig is used for fixing profitStats and position by re-playing the trade history
 type ProfitFixerConfig struct {
+	Apply             bool       `json:"apply,omitempty"`
 	TradesSince       types.Time `json:"tradesSince,omitempty"`
 	Patch             string     `json:"patch,omitempty"`
 	UseDatabaseTrades bool       `json:"useDatabaseTrades,omitempty"`
 	ProfitCurrency    string     `json:"profitCurrency,omitempty"` // the currency to calculate profit in
 	FeeCurrencies     []string   `json:"feeCurrencies,omitempty"`  // list of fee currencies to consider for fee price conversion
+	// ExtraSymbolSelectors is a list of symbol selectors to include in profit fixing
+	// In the format of "sessionName.symbol", e.g. "coinbase.BTCUSD"
+	// The trades selected by the selectors will also be included in profit fixing
+	ExtraSymbolSelectors []string `json:"extraSymbolSelectors,omitempty"`
 }
 
 func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *ProfitFixer {
@@ -98,6 +104,7 @@ func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *Pr
 	}
 	fixer.profitCurrency = config.ProfitCurrency
 	fixer.useDatabaseTrades = config.UseDatabaseTrades
+	fixer.extraSymbolSelectors = config.ExtraSymbolSelectors
 	for _, feeCurrency := range config.FeeCurrencies {
 		fixer.addFeeCurrency(feeCurrency)
 	}
@@ -105,7 +112,11 @@ func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *Pr
 }
 
 func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
-	return c.TradesSince.Equal(other.TradesSince.Time()) && c.Patch == other.Patch && c.UseDatabaseTrades == other.UseDatabaseTrades && c.ProfitCurrency == other.ProfitCurrency
+	return c.TradesSince.Equal(other.TradesSince.Time()) &&
+		c.Patch == other.Patch &&
+		c.UseDatabaseTrades == other.UseDatabaseTrades &&
+		c.ProfitCurrency == other.ProfitCurrency &&
+		c.Apply == other.Apply
 }
 
 // ProfitFixer implements a trade-history-based profit fixer
@@ -117,7 +128,8 @@ type ProfitFixer struct {
 	core.ConverterManager
 	*bbgo.Environment
 
-	useDatabaseTrades bool
+	useDatabaseTrades    bool
+	extraSymbolSelectors []string
 }
 
 type tokenFeeKey struct {
@@ -162,12 +174,15 @@ func (f *ProfitFixer) batchQueryTrades(
 	})
 }
 
-func (f *ProfitFixer) queryTradesRestful(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
+func (f *ProfitFixer) queryTradesRestful(ctx context.Context, symbol string, since, until time.Time, targetSession string) ([]types.Trade, error) {
 	var mu sync.Mutex
 	var allTrades = make([]types.Trade, 0, 1000)
 
 	g, subCtx := errgroup.WithContext(ctx)
 	for n, s := range f.sessions {
+		if targetSession != "" && n != targetSession {
+			continue
+		}
 		// allocate a copy of the iteration variables
 		sessionName := n
 		service := s
@@ -324,10 +339,21 @@ func (f *ProfitFixer) Fix(
 	log.Infof("start profit fixing with time range %s <=> %s", since, until)
 	var allTrades []types.Trade
 	var err error
+	queryFunc := f.queryTradesRestful
 	if f.useDatabaseTrades {
-		allTrades, err = f.queryTradesFromDB(ctx, symbol, since, until)
-	} else {
-		allTrades, err = f.queryTradesRestful(ctx, symbol, since, until)
+		queryFunc = f.queryTradesFromDB
+	}
+	allTrades, err = queryFunc(ctx, symbol, since, until, "")
+	for _, selector := range f.extraSymbolSelectors {
+		targetSessionName, extraSymbol, err := parseSymbolSelector(selector)
+		if err != nil {
+			continue
+		}
+		extraTrades, err := queryFunc(ctx, extraSymbol, since, until, targetSessionName)
+		if err != nil {
+			return err
+		}
+		allTrades = append(allTrades, extraTrades...)
 	}
 	if err != nil {
 		return err
@@ -443,7 +469,7 @@ func (f *ProfitFixerBundle) Fix(
 		position)
 }
 
-func (f *ProfitFixer) queryTradesFromDB(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
+func (f *ProfitFixer) queryTradesFromDB(ctx context.Context, symbol string, since, until time.Time, targetSession string) ([]types.Trade, error) {
 	if f.Environment.TradeService == nil {
 		return nil, fmt.Errorf("trade service is not available in the environment: %s", symbol)
 	}
@@ -452,6 +478,9 @@ func (f *ProfitFixer) queryTradesFromDB(ctx context.Context, symbol string, sinc
 		return nil, fmt.Errorf("symbol can not be empty")
 	}
 	for sessionName, s := range f.sessions {
+		if targetSession != "" && sessionName != targetSession {
+			continue
+		}
 		options := service.QueryTradesOptions{
 			Symbol: symbol,
 			Since:  &since,
@@ -487,4 +516,17 @@ func (f *ProfitFixer) queryTradesFromDB(ctx context.Context, symbol string, sinc
 		}
 	}
 	return trades, nil
+}
+
+func parseSymbolSelector(
+	selector string,
+) (string, string, error) {
+	parts := strings.SplitN(selector, ".", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid symbol selector: %s", selector)
+	}
+	sessionName := parts[0]
+	symbol := parts[1]
+
+	return sessionName, symbol, nil
 }
