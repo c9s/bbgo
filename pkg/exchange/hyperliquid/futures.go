@@ -22,10 +22,12 @@ func (e *Exchange) queryFuturesMarkets(ctx context.Context) (types.MarketMap, er
 	for i, u := range meta.Universe {
 		stepSize := fixedpoint.NewFromFloat(1 / math.Pow10(u.SzDecimals))
 		tickSize := fixedpoint.NewFromFloat(1 / math.Pow10(8))
+		localSymbol := u.Name + "@" + strconv.Itoa(i)
+
 		markets.Add(types.Market{
 			Exchange:        types.ExchangeHyperliquid,
 			Symbol:          u.Name + QuoteCurrency,
-			LocalSymbol:     u.Name + "@" + strconv.Itoa(i),
+			LocalSymbol:     localSymbol,
 			BaseCurrency:    u.Name,
 			QuoteCurrency:   QuoteCurrency,
 			PricePrecision:  8,

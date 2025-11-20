@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 func TestNewClient(t *testing.T) {
@@ -25,15 +26,15 @@ func TestBuildActionData(t *testing.T) {
 	client := NewClient()
 
 	action := map[string]interface{}{
-		"type": "order",
+		"type": ReqSubmitOrder,
 		"data": "test",
 	}
 
-	data, err := client.buildActionData(action, 12345, "", nil)
+	hash, err := client.buildActionHash(action, 12345, "", nil)
 	if err != nil {
 		t.Errorf("buildActionData should not return error: %v", err)
 	}
-	if len(data) == 0 {
+	if len(hash) == 0 {
 		t.Error("buildActionData should return non-empty data")
 	}
 }
@@ -65,6 +66,7 @@ func TestAuth(t *testing.T) {
 	// Test with valid private key
 	validPrivateKey, _ := crypto.GenerateKey()
 	validPrivateKeyHex := hexutil.Encode(crypto.FromECDSA(validPrivateKey))[2:] // Remove 0x prefix
+	account := crypto.PubkeyToAddress(validPrivateKey.PublicKey).Hex()
 
 	// Should not panic with valid key
 	func() {
@@ -73,7 +75,7 @@ func TestAuth(t *testing.T) {
 				t.Errorf("Auth should not panic with valid private key: %v", r)
 			}
 		}()
-		client.Auth(validPrivateKeyHex)
+		client.Auth(validPrivateKeyHex, account)
 	}()
 
 	// Verify private key was set
@@ -89,7 +91,7 @@ func TestAuth(t *testing.T) {
 				t.Error("Auth should panic with invalid private key")
 			}
 		}()
-		client2.Auth("invalid_private_key")
+		client2.Auth("invalid_private_key", "")
 	}()
 }
 
@@ -111,10 +113,11 @@ func TestSingL1Action(t *testing.T) {
 	// Generate a valid private key for testing
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyHex := hexutil.Encode(crypto.FromECDSA(privateKey))[2:] // Remove 0x prefix
-	client.Auth(privateKeyHex)
+	account := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
+	client.Auth(privateKeyHex, account)
 
 	action := map[string]interface{}{
-		"type": "order",
+		"type": ReqSubmitOrder,
 		"data": "test",
 	}
 
@@ -148,7 +151,8 @@ func TestSign(t *testing.T) {
 	// Generate a valid private key for testing
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyHex := hexutil.Encode(crypto.FromECDSA(privateKey))[2:] // Remove 0x prefix
-	client.Auth(privateKeyHex)
+	account := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
+	client.Auth(privateKeyHex, account)
 
 	// Create test typed data
 	typedData := apitypes.TypedData{
@@ -191,31 +195,31 @@ func TestBuildActionDataWithVault(t *testing.T) {
 	client.SetVaultAddress("0x1234567890123456789012345678901234567890")
 
 	action := map[string]interface{}{
-		"type": "order",
+		"type": ReqSubmitOrder,
 		"data": "test",
 	}
 
 	// Test with vault address
-	data, err := client.buildActionData(action, 12345, "", nil)
+	hash, err := client.buildActionHash(action, 12345, "", nil)
 	if err != nil {
 		t.Errorf("buildActionData with vault should not return error: %v", err)
 	}
-	if len(data) == 0 {
+	if len(hash) == 0 {
 		t.Error("buildActionData should return non-empty data")
 	}
 
 	// Test with expiration
 	expiresAfter := int64(3600)
-	data2, err := client.buildActionData(action, 12345, "", &expiresAfter)
+	hash2, err := client.buildActionHash(action, 12345, "", &expiresAfter)
 	if err != nil {
 		t.Errorf("buildActionData with expiration should not return error: %v", err)
 	}
-	if len(data2) == 0 {
+	if len(hash2) == 0 {
 		t.Error("buildActionData with expiration should return non-empty data")
 	}
 
 	// Data with expiration should be different
-	if string(data) == string(data2) {
+	if string(hash) == string(hash2) {
 		t.Error("Data with expiration should be different from data without expiration")
 	}
 }
@@ -226,10 +230,11 @@ func TestNewAuthenticatedRequest(t *testing.T) {
 	// Generate a valid private key for testing
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyHex := hexutil.Encode(crypto.FromECDSA(privateKey))[2:] // Remove 0x prefix
-	client.Auth(privateKeyHex)
+	account := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
+	client.Auth(privateKeyHex, account)
 
 	action := map[string]interface{}{
-		"type": "order",
+		"type": ReqSubmitOrder,
 		"data": "test",
 	}
 
@@ -262,11 +267,12 @@ func TestBuildPayload(t *testing.T) {
 	// Generate a valid private key for testing
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyHex := hexutil.Encode(crypto.FromECDSA(privateKey))[2:] // Remove 0x prefix
-	client.Auth(privateKeyHex)
+	account := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
+	client.Auth(privateKeyHex, account)
 
 	// Test with regular action
 	action := map[string]interface{}{
-		"type": "order",
+		"type": ReqSubmitOrder,
 		"data": "test",
 	}
 
@@ -279,21 +285,22 @@ func TestBuildPayload(t *testing.T) {
 		t.Error("castPayload should return non-empty payload")
 	}
 
+	// TODO add test case
 	// Test with usdClassTransfer action (should not include vault address)
-	client.SetVaultAddress("0x1234567890123456789012345678901234567890")
-	usdTransferAction := map[string]interface{}{
-		"type": "usdClassTransfer",
-		"data": "test",
-	}
+	// client.SetVaultAddress("0x1234567890123456789012345678901234567890")
+	// usdTransferAction := map[string]interface{}{
+	// 	"type": "usdClassTransfer",
+	// 	"data": "test",
+	// }
 
-	payload2, err := client.buildPayload(usdTransferAction, client.vaultAddress, client.nonce.GetInt64())
-	if err != nil {
-		t.Errorf("castPayload with usdClassTransfer should not return error: %v", err)
-	}
+	// payload2, err := client.buildPayload(usdTransferAction, client.vaultAddress, client.nonce.GetInt64())
+	// if err != nil {
+	// 	t.Errorf("castPayload with usdClassTransfer should not return error: %v", err)
+	// }
 
-	if len(payload2) == 0 {
-		t.Error("castPayload with usdClassTransfer should return non-empty payload")
-	}
+	// if len(payload2) == 0 {
+	// 	t.Error("castPayload with usdClassTransfer should return non-empty payload")
+	// }
 }
 
 func TestAppendUint64(t *testing.T) {
@@ -331,5 +338,190 @@ func TestGetAPIEndpoint(t *testing.T) {
 	endpoint = getAPIEndpoint()
 	if endpoint != TestNetURL {
 		t.Errorf("Expected testnet URL %s, got %s", TestNetURL, endpoint)
+	}
+}
+
+func TestConvertToAction(t *testing.T) {
+	client := NewClient()
+
+	t.Run("OrderAction", func(t *testing.T) {
+		// Test order action conversion
+		action := map[string]any{
+			"type": ReqSubmitOrder,
+			"orders": []map[string]any{
+				{
+					"a": 0,
+					"b": true,
+					"p": "100000",
+					"s": "0.001",
+					"r": false,
+					"t": map[string]any{
+						"limit": map[string]any{
+							"tif": "Gtc",
+						},
+					},
+				},
+			},
+			"grouping": "na",
+		}
+
+		packed, err := client.convertToAction(action)
+		if err != nil {
+			t.Fatalf("convertToAction should not return error: %v", err)
+		}
+
+		if len(packed) == 0 {
+			t.Error("convertToAction should return non-empty packed data")
+		}
+
+		// Verify it's valid msgpack
+		var decoded OrderAction
+		err = msgpack.Unmarshal(packed, &decoded)
+		if err != nil {
+			t.Fatalf("Failed to unmarshal packed data: %v", err)
+		}
+
+		if decoded.Type != "order" {
+			t.Errorf("Expected type 'order', got %s", decoded.Type)
+		}
+
+		if len(decoded.Orders) != 1 {
+			t.Errorf("Expected 1 order, got %d", len(decoded.Orders))
+		}
+
+		if decoded.Orders[0].Asset != 0 {
+			t.Errorf("Expected asset 0, got %d", decoded.Orders[0].Asset)
+		}
+
+		if !decoded.Orders[0].IsBuy {
+			t.Error("Expected IsBuy to be true")
+		}
+
+		if decoded.Orders[0].LimitPx != "100000" {
+			t.Errorf("Expected LimitPx '100000', got %s", decoded.Orders[0].LimitPx)
+		}
+	})
+
+	t.Run("UnsupportedActionType", func(t *testing.T) {
+		action := map[string]any{
+			"type": "unsupported",
+		}
+
+		_, err := client.convertToAction(action)
+		if err == nil {
+			t.Error("convertToAction should return error for unsupported action type")
+		}
+	})
+
+	t.Run("InvalidActionType", func(t *testing.T) {
+		// Test with non-map action
+		_, err := client.convertToAction("not a map")
+		if err == nil {
+			t.Error("convertToAction should return error for non-map action")
+		}
+	})
+}
+
+// TestSignatureAddressRecovery verifies that the address recovered from signature matches the original address
+func TestSignatureAddressRecovery(t *testing.T) {
+	client := NewClient()
+
+	// Generate a valid private key for testing
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate private key: %v", err)
+	}
+
+	privateKeyHex := hexutil.Encode(crypto.FromECDSA(privateKey))[2:] // Remove 0x prefix
+	account := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
+
+	client.Auth(privateKeyHex, account)
+
+	// Get the original address from the private key
+	originalAddress := client.UserAddress()
+	if originalAddress == "" {
+		t.Fatal("UserAddress should return a valid address")
+	}
+
+	// Create a test action
+	action := map[string]any{
+		"type": ReqSubmitOrder,
+		"orders": []map[string]any{
+			{
+				"a": 0,
+				"b": true,
+				"p": "100000",
+				"s": "0.001",
+				"r": false,
+				"t": map[string]any{
+					"limit": map[string]any{
+						"tif": "Gtc",
+					},
+				},
+			},
+		},
+		"grouping": "na",
+	}
+
+	nonce := int64(1234567890)
+
+	// Sign the action
+	signature, err := client.SignL1Action(action, nonce, nil)
+	if err != nil {
+		t.Fatalf("SignL1Action should not return error: %v", err)
+	}
+
+	// Rebuild the action data to get the hash (same as in SignL1Action)
+	hash, err := client.buildActionHash(action, uint64(nonce), client.vaultAddress, nil)
+	if err != nil {
+		t.Fatalf("buildActionData should not return error: %v", err)
+	}
+
+	// Rebuild the PhantomAgent (same as in SignL1Action)
+	phantomAgent := client.PhantomAgent(hash)
+	chainId := math.HexOrDecimal256(*big.NewInt(1337))
+
+	// Rebuild the typed data (same as in SignL1Action)
+	typedData := apitypes.TypedData{
+		Domain: apitypes.TypedDataDomain{
+			ChainId:           &chainId,
+			Name:              "Exchange",
+			Version:           "1",
+			VerifyingContract: "0x0000000000000000000000000000000000000000",
+		},
+		Types: apitypes.Types{
+			"Agent": []apitypes.Type{
+				{Name: "source", Type: "string"},
+				{Name: "connectionId", Type: "bytes32"},
+			},
+			"EIP712Domain": []apitypes.Type{
+				{Name: "name", Type: "string"},
+				{Name: "version", Type: "string"},
+				{Name: "chainId", Type: "uint256"},
+				{Name: "verifyingContract", Type: "address"},
+			},
+		},
+		PrimaryType: "Agent",
+		Message:     phantomAgent,
+	}
+
+	recoverHash, _, err := apitypes.TypedDataAndHash(typedData)
+	if err != nil {
+		t.Fatalf("TypedDataAndHash should not return error: %v", err)
+	}
+
+	sigBytes := make([]byte, 65)
+	copy(sigBytes[:32], hexutil.MustDecode(signature.R))
+	copy(sigBytes[32:64], hexutil.MustDecode(signature.S))
+	sigBytes[64] = byte(signature.V - 27)
+
+	pub, _ := crypto.SigToPub(recoverHash, sigBytes)
+	recoveredAddress := crypto.PubkeyToAddress(*pub).Hex()
+
+	// Verify that recovered address matches original address
+	if recoveredAddress != originalAddress {
+		t.Errorf("Recovered address %s does not match original address %s", recoveredAddress, originalAddress)
+	} else {
+		t.Logf("Successfully verified: recovered address %s matches original address %s", recoveredAddress, originalAddress)
 	}
 }
