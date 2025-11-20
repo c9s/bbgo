@@ -23,28 +23,33 @@ type OrderResponse struct {
 }
 
 type Order struct {
-	Asset         string    `json:"a"`
+	Asset         int       `json:"a"`
 	IsBuy         bool      `json:"b"`
-	Size          string    `json:"s"`
 	Price         string    `json:"p"`
+	Size          string    `json:"s"`
 	ReduceOnly    bool      `json:"r"`
-	ClientOrderID *string   `json:"c"`
 	OrderType     OrderType `json:"t"`
+	ClientOrderID *string   `json:"c,omitempty"`
 }
 
 type OrderType struct {
-	Limit   LimitOrderType   `json:"limit,omitempty"`
-	Trigger TriggerOrderType `json:"trigger,omitempty"`
+	Limit   *LimitOrderType   `json:"limit,omitempty"`
+	Trigger *TriggerOrderType `json:"trigger,omitempty"`
 }
 
 type LimitOrderType struct {
-	Tif TimeInForce `json:"tif" validate:"Alo,Ioc,Gtc"`
+	Tif TimeInForce `json:"tif,omitempty" validate:"Alo,Ioc,Gtc"`
 }
 
 type TriggerOrderType struct {
 	IsMarket  bool   `json:"isMarket"`
 	TriggerPx string `json:"triggerPx,omitempty"`
-	Tpsl      string `json:"tpsl,omitempty" validate:"tp,sl"`
+	Tpsl      Tpsl   `json:"tpsl,omitempty" validate:"tp,sl"`
+}
+
+type BuilderInfo struct {
+	Builder string `json:"b"`
+	Fee     int    `json:"f"`
 }
 
 //go:generate PostRequest -url "/exchange" -type PlaceOrderRequest -responseDataType OrderResponse
@@ -55,12 +60,9 @@ type PlaceOrderRequest struct {
 
 	orders []Order `param:"orders,required"`
 
-	grouping string `param:"grouping" default:"na" validValues:"na,normalTpsl,positionTpsl"`
+	grouping Grouping `param:"grouping" default:"na" validValues:"na,normalTpsl,positionTpsl"`
 
-	builder *struct {
-		FeeAddress string `json:"b"`
-		FeeSize    string `json:"f"`
-	} `param:"builder,omitempty"`
+	builder *BuilderInfo `param:"builder,omitempty"`
 }
 
 func (c *Client) NewPlaceOrderRequest() *PlaceOrderRequest {

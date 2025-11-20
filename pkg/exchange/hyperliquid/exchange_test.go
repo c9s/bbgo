@@ -7,11 +7,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/c9s/bbgo/pkg/exchange/hyperliquid/hyperapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testing/httptesting"
+	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/testutil"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -25,7 +27,7 @@ func newMockTestExchange(t *testing.T, isFutures bool) (*Exchange, *httptesting.
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	ex := New(fmt.Sprintf("%x", crypto.FromECDSA(privateKey)), "")
+	ex := New(fmt.Sprintf("%x", crypto.FromECDSA(privateKey)), crypto.PubkeyToAddress(privateKey.PublicKey).Hex(), "")
 	ex.IsFutures = isFutures
 
 	transport := &httptesting.MockTransport{}
@@ -338,7 +340,7 @@ func TestMockExchange_SubmitOrder(t *testing.T) {
 			require.Len(t, payload.Action.Orders, 1)
 
 			submitted := payload.Action.Orders[0]
-			assert.Equal(t, "0", submitted.Asset)
+			assert.Equal(t, 0, submitted.Asset)
 			assert.True(t, submitted.IsBuy)
 			assert.Equal(t, quantity.String(), submitted.Size)
 			assert.Equal(t, price.String(), submitted.Price)
@@ -463,16 +465,43 @@ func TestMockExchange_SubmitOrder(t *testing.T) {
 }
 
 func TestExchange_SubmitOrder(t *testing.T) {
-	privateKey, vaultAccount, _ := testutil.IntegrationTestWithPrivateKeyConfigured(t, "HYPERLIQUID")
+	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
+		t.Skip("skip test for CI")
+	}
+
+	privateKey, mainAccount, vaultAccount, ok := testutil.IntegrationTestWithPrivateKeyConfigured(t, "HYPERLIQUID")
+	if !ok {
+		t.SkipNow()
+	}
+
 	ctx := context.Background()
-	ex := New(privateKey, vaultAccount)
+	ex := New(privateKey, mainAccount, vaultAccount)
 	hyperapi.TestNet = true
 	ex.IsFutures = true
 
-	balances, err := ex.QueryAccountBalances(ctx)
+	account, err := ex.QueryAccount(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, account)
+
+	t.Logf("account: %+v", account)
+
+	markets, err := ex.QueryMarkets(ctx)
 	assert.NoError(t, err)
 
-	t.Logf("balances: %+v", balances)
-
-	// TODO add more integration tests
+	market, ok := markets["BTCUSDC"]
+	if assert.True(t, ok) {
+		t.Logf("market: %+v", market)
+		createdOrder, err := ex.SubmitOrder(ctx, types.SubmitOrder{
+			Symbol:   "BTCUSDC",
+			Type:     types.OrderTypeLimit,
+			Price:    Number(84925),
+			Quantity: fixedpoint.MustNewFromString("0.001"),
+			Side:     types.SideTypeBuy,
+			Market:   market,
+		})
+		if assert.NoError(t, err) {
+			t.Error(err.Error())
+			t.Logf("createdOrder: %+v", createdOrder)
+		}
+	}
 }

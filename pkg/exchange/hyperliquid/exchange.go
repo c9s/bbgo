@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"strconv"
 	"sync"
 	"time"
 
@@ -41,10 +40,10 @@ type Exchange struct {
 	client *hyperapi.Client
 }
 
-func New(secret, vaultAddress string) *Exchange {
+func New(secret, accountAddress, vaultAddress string) *Exchange {
 	client := hyperapi.NewClient()
 	if len(secret) > 0 {
-		client.Auth(secret)
+		client.Auth(secret, accountAddress)
 	}
 
 	if len(vaultAddress) > 0 {
@@ -140,7 +139,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	// Build order request
 	_, assetIdx := e.getLocalSymbol(order.Symbol)
 	reqOrder := hyperapi.Order{
-		Asset:      strconv.Itoa(assetIdx),
+		Asset:      assetIdx,
 		IsBuy:      order.Side == types.SideTypeBuy,
 		Size:       order.Quantity.String(),
 		Price:      order.Price.String(),
@@ -165,11 +164,11 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		case types.TimeInForceALO:
 			tif = hyperapi.TimeInForceALO
 		}
-		reqOrder.OrderType = hyperapi.OrderType{Limit: hyperapi.LimitOrderType{Tif: tif}}
+		reqOrder.OrderType = hyperapi.OrderType{Limit: &hyperapi.LimitOrderType{Tif: tif}}
 
 	case types.OrderTypeMarket:
 		reqOrder.OrderType = hyperapi.OrderType{
-			Trigger: hyperapi.TriggerOrderType{
+			Trigger: &hyperapi.TriggerOrderType{
 				IsMarket:  true,
 				TriggerPx: "0",
 			},
@@ -177,20 +176,20 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 
 	case types.OrderTypeStopLimit:
 		reqOrder.OrderType = hyperapi.OrderType{
-			Trigger: hyperapi.TriggerOrderType{
+			Trigger: &hyperapi.TriggerOrderType{
 				IsMarket:  false,
 				TriggerPx: order.StopPrice.String(),
-				Tpsl:      "sl",
+				Tpsl:      hyperapi.StopLoss,
 			},
 		}
 
 	case types.OrderTypeStopMarket, types.OrderTypeTakeProfitMarket:
-		tpsl := "sl"
+		tpsl := hyperapi.StopLoss
 		if order.Type == types.OrderTypeTakeProfitMarket {
-			tpsl = "tp"
+			tpsl = hyperapi.TakeProfit
 		}
 		reqOrder.OrderType = hyperapi.OrderType{
-			Trigger: hyperapi.TriggerOrderType{
+			Trigger: &hyperapi.TriggerOrderType{
 				IsMarket:  true,
 				TriggerPx: order.StopPrice.String(),
 				Tpsl:      tpsl,

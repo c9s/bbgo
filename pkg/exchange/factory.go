@@ -23,6 +23,7 @@ const (
 	OptionKeyAPIPassphrase   = "API_PASSPHRASE"
 	OptionKeyAPIPrivateKey   = "API_PRIVATE_KEY"
 	OptionKeyAPISubAccount   = "API_SUB_ACCOUNT"   // for exchanges like Coinbase Pro which support sub accounts
+	OptionKeyAPIMainAccount  = "API_MAIN_ACCOUNT"  // for exchanges like hyperliquid which main accounts
 	OptionKeyAPIVaultAccount = "API_VAULT_ACCOUNT" // for exchanges like hyperliquid which support vault accounts
 )
 
@@ -93,7 +94,7 @@ var factories = map[types.ExchangeName]Factory{
 	types.ExchangeHyperliquid: {
 		EnvLoader: DefaultEnvVarLoader,
 		Constructor: func(options Options) (types.Exchange, error) {
-			return hyperliquid.New(options[OptionKeyAPIPrivateKey], options[OptionKeyAPIVaultAccount]), nil
+			return hyperliquid.New(options[OptionKeyAPIPrivateKey], options[OptionKeyAPIMainAccount], options[OptionKeyAPIVaultAccount]), nil
 		},
 	},
 }
