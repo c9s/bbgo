@@ -41,14 +41,15 @@ func IntegrationTestWithPassphraseConfigured(t *testing.T, prefix string) (key, 
 	return key, secret, passphrase, ok
 }
 
-func IntegrationTestWithPrivateKeyConfigured(t *testing.T, prefix string) (privateKey, vaultAccount string, ok bool) {
+func IntegrationTestWithPrivateKeyConfigured(t *testing.T, prefix string) (privateKey, account, vaultAccount string, ok bool) {
 	var hasKey bool
 	privateKey, hasKey = os.LookupEnv(prefix + "_API_PRIVATE_KEY")
+	accountAddr, hasAccount := os.LookupEnv(prefix + "_API_MAIN_ACCOUNT")
 	vaultAccount, _ = os.LookupEnv(prefix + "_API_VAULT_ACCOUNT")
-	ok = hasKey && os.Getenv("TEST_"+prefix) == "1"
+	ok = hasKey && hasAccount && os.Getenv("TEST_"+prefix) == "1"
 	if ok {
 		t.Logf(prefix+" api integration test enabled, privateKey = %s, vaultAccount = %s", maskSecret(privateKey), maskSecret(vaultAccount))
 	}
 
-	return privateKey, vaultAccount, ok
+	return privateKey, accountAddr, vaultAccount, ok
 }

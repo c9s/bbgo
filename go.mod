@@ -33,6 +33,7 @@ require (
 	github.com/joho/godotenv v1.3.0
 	github.com/leekchan/accounting v0.0.0-20191218023648-17a4ce5f94d4
 	github.com/mattn/go-shellwords v1.0.12
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/muesli/clusters v0.0.0-20180605185049-a07a36e67d36
 	github.com/muesli/kmeans v0.3.0
 	github.com/pkg/errors v0.9.1
@@ -56,7 +57,7 @@ require (
 	go.uber.org/mock v0.4.0
 	go.uber.org/multierr v1.11.0
 	golang.org/x/oauth2 v0.22.0
-	golang.org/x/sync v0.16.0
+	golang.org/x/sync v0.18.0
 	golang.org/x/time v0.9.0
 	gonum.org/v1/gonum v0.8.2
 	google.golang.org/api v0.194.0
@@ -128,7 +129,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mattn/go-sqlite3 v1.14.23 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect

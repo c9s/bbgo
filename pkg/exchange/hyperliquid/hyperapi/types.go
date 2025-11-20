@@ -36,6 +36,21 @@ const (
 	TimeInForceGTC TimeInForce = "Gtc"
 )
 
+type Grouping string
+
+const (
+	GroupingNA           Grouping = "na"
+	GroupingNormalTpsl   Grouping = "normalTpsl"
+	GroupingPositionTpls Grouping = "positionTpsl"
+)
+
+type Tpsl string // Advanced order type
+
+const (
+	TakeProfit Tpsl = "tp"
+	StopLoss   Tpsl = "sl"
+)
+
 type APIResponse struct {
 	Status   string `json:"status"`
 	Response struct {

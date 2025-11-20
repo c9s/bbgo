@@ -21,15 +21,12 @@ func (p *PlaceOrderRequest) Orders(orders []Order) *PlaceOrderRequest {
 	return p
 }
 
-func (p *PlaceOrderRequest) Grouping(grouping string) *PlaceOrderRequest {
+func (p *PlaceOrderRequest) Grouping(grouping Grouping) *PlaceOrderRequest {
 	p.grouping = grouping
 	return p
 }
 
-func (p *PlaceOrderRequest) Builder(builder struct {
-	FeeAddress string "json:\"b\""
-	FeeSize    string "json:\"f\""
-}) *PlaceOrderRequest {
+func (p *PlaceOrderRequest) Builder(builder BuilderInfo) *PlaceOrderRequest {
 	p.builder = &builder
 	return p
 }

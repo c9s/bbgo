@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
+	"github.com/mitchellh/mapstructure"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -30,16 +31,17 @@ const (
 )
 
 var (
-	ErrInvalidSignature = errors.New("invalid signature")
-	TestNet             = false
+	ErrInvalidSignature      = errors.New("invalid signature")
+	ErrInvalidAccountAddress = errors.New("invalid account address")
+	TestNet                  = false
 )
 
 type Client struct {
 	requestgen.BaseAPIClient
 
-	apiSecret    string
-	vaultAddress string
-	privateKey   *ecdsa.PrivateKey
+	apiSecret, account string
+	vaultAddress       string
+	privateKey         *ecdsa.PrivateKey
 
 	nonce *nonce.MillisecondNonce
 }
@@ -61,7 +63,7 @@ func NewClient() *Client {
 	}
 }
 
-func (c *Client) Auth(secret string) {
+func (c *Client) Auth(secret, account string) {
 	c.apiSecret = secret
 
 	privateKey, err := crypto.HexToECDSA(c.apiSecret)
@@ -69,6 +71,11 @@ func (c *Client) Auth(secret string) {
 		panic(err)
 	}
 	c.privateKey = privateKey
+
+	if !common.IsHexAddress(account) {
+		panic(fmt.Errorf("%w: %s", ErrInvalidAccountAddress, account))
+	}
+	c.account = account
 }
 
 func (c *Client) SetVaultAddress(address string) {
@@ -162,8 +169,7 @@ func (c *Client) PhantomAgent(hash []byte) map[string]any {
 }
 
 func (c *Client) UserAddress() string {
-	address := crypto.PubkeyToAddress(c.privateKey.PublicKey)
-	return address.Hex()
+	return c.account
 }
 
 func (c *Client) sign(typedData apitypes.TypedData, privateKey *ecdsa.PrivateKey) (SignatureResult, error) {
@@ -188,30 +194,23 @@ func (c *Client) sign(typedData apitypes.TypedData, privateKey *ecdsa.PrivateKey
 	}
 
 	// Extract r, s, v components
-	r := new(big.Int).SetBytes(signature[:32])
-	s := new(big.Int).SetBytes(signature[32:64])
+	r := signature[:32]
+	s := signature[32:64]
 	v := int(signature[64]) + 27
 
 	return SignatureResult{
-		R: hexutil.EncodeBig(r),
-		S: hexutil.EncodeBig(s),
+		R: hexutil.Encode(r),
+		S: hexutil.Encode(s),
 		V: v,
 	}, nil
 }
 
 // buildActionData constructs the data for action hashing
 func (c *Client) buildActionData(action any, nonce uint64, vaultAddress string, expiresAfter *int64) ([]byte, error) {
-	// Marshal action to msgpack
-	var buf bytes.Buffer
-	enc := msgpack.NewEncoder(&buf)
-	enc.SetSortMapKeys(true)
-	enc.UseCompactInts(true)
-
-	if err := enc.Encode(action); err != nil {
-		return nil, fmt.Errorf("failed to marshal action: %v", err)
+	data, err := c.convertToAction(action)
+	if err != nil {
+		return nil, err
 	}
-
-	data := buf.Bytes()
 
 	// Append nonce
 	data = appendUint64(data, nonce)
@@ -234,6 +233,47 @@ func (c *Client) buildActionData(action any, nonce uint64, vaultAddress string, 
 	}
 
 	return data, nil
+}
+
+func (c *Client) convertToAction(action any) ([]byte, error) {
+	// Convert action to map[string]any
+	actionMap, ok := action.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("action is not a map[string]any")
+	}
+
+	actionType, ok := actionMap["type"]
+	if !ok {
+		return nil, fmt.Errorf("action missing required 'type' field")
+	}
+
+	switch actionType {
+	case ReqSubmitOrder:
+		// Normalize nested map structures through JSON serialization/deserialization
+		// This ensures mapstructure can correctly decode nested map[string]any structures
+		data, err := json.Marshal(actionMap)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal action map: %w", err)
+		}
+
+		var normalizedMap map[string]any
+		if err := json.Unmarshal(data, &normalizedMap); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal normalized action map: %w", err)
+		}
+
+		var orderAction OrderAction
+		if err := mapstructure.Decode(normalizedMap, &orderAction); err != nil {
+			return nil, fmt.Errorf("failed to decode order action: %w", err)
+		}
+
+		packed, err := msgpack.Marshal(orderAction)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal order action to msgpack: %w", err)
+		}
+		return packed, nil
+	default:
+		return nil, fmt.Errorf("action type %v is not supported", actionType)
+	}
 }
 
 func (c *Client) buildPayload(action any, vaultAddress string, nonce int64) ([]byte, error) {
