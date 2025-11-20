@@ -9,22 +9,34 @@ import (
 	"os"
 	"testing"
 
+	"github.com/c9s/bbgo/pkg/exchange/hyperliquid/hyperapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testing/httptesting"
+	"github.com/c9s/bbgo/pkg/testutil"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func newMockTestExchange(t *testing.T, isFutures bool) (*Exchange, *httptesting.MockTransport) {
+	t.Helper()
+
+	privateKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	ex := New(fmt.Sprintf("%x", crypto.FromECDSA(privateKey)), "")
+	ex.IsFutures = isFutures
+
+	transport := &httptesting.MockTransport{}
+	ex.client.HttpClient.Transport = transport
+
+	return ex, transport
+}
+
 func TestQueryMarkets(t *testing.T) {
 	t.Run("succeeds querying spot markets", func(t *testing.T) {
-		privateKey, err := crypto.GenerateKey()
-		require.NoError(t, err)
-		ex := New(fmt.Sprintf("%x", crypto.FromECDSA(privateKey)), "")
-
-		transport := &httptesting.MockTransport{}
-		ex.client.HttpClient.Transport = transport
+		ex, transport := newMockTestExchange(t, false)
 
 		spotMeta, err := os.ReadFile("./testdata/spotMeta.json")
 		require.NoError(t, err)
@@ -51,13 +63,7 @@ func TestQueryMarkets(t *testing.T) {
 	})
 
 	t.Run("succeeds querying preps markets", func(t *testing.T) {
-		privateKey, err := crypto.GenerateKey()
-		require.NoError(t, err)
-		ex := New(fmt.Sprintf("%x", crypto.FromECDSA(privateKey)), "")
-		ex.IsFutures = true
-
-		transport := &httptesting.MockTransport{}
-		ex.client.HttpClient.Transport = transport
+		ex, transport := newMockTestExchange(t, true)
 
 		perpsMeta, err := os.ReadFile("./testdata/perpsMeta.json")
 		require.NoError(t, err)
@@ -81,12 +87,7 @@ func TestQueryMarkets(t *testing.T) {
 
 func TestQueryAccount(t *testing.T) {
 	t.Run("succeeds querying spot account", func(t *testing.T) {
-		privateKey, err := crypto.GenerateKey()
-		require.NoError(t, err)
-		ex := New(fmt.Sprintf("%x", crypto.FromECDSA(privateKey)), "")
-
-		transport := &httptesting.MockTransport{}
-		ex.client.HttpClient.Transport = transport
+		ex, transport := newMockTestExchange(t, false)
 
 		spotMeta, err := os.ReadFile("./testdata/spotClearinghouseState.json")
 		require.NoError(t, err)
@@ -124,13 +125,7 @@ func TestQueryAccount(t *testing.T) {
 	})
 
 	t.Run("succeeds querying futures account", func(t *testing.T) {
-		privateKey, err := crypto.GenerateKey()
-		require.NoError(t, err)
-		ex := New(fmt.Sprintf("%x", crypto.FromECDSA(privateKey)), "")
-		ex.IsFutures = true
-
-		transport := &httptesting.MockTransport{}
-		ex.client.HttpClient.Transport = transport
+		ex, transport := newMockTestExchange(t, true)
 
 		clearinghouseState, err := os.ReadFile("./testdata/clearinghouseState.json")
 		require.NoError(t, err)
@@ -216,12 +211,7 @@ func TestQueryAccount(t *testing.T) {
 
 func TestQueryAccountBalances(t *testing.T) {
 	t.Run("succeeds querying spot account balances", func(t *testing.T) {
-		privateKey, err := crypto.GenerateKey()
-		require.NoError(t, err)
-		ex := New(fmt.Sprintf("%x", crypto.FromECDSA(privateKey)), "")
-
-		transport := &httptesting.MockTransport{}
-		ex.client.HttpClient.Transport = transport
+		ex, transport := newMockTestExchange(t, false)
 
 		spotMeta, err := os.ReadFile("./testdata/spotClearinghouseState.json")
 		require.NoError(t, err)
@@ -273,13 +263,7 @@ func TestQueryAccountBalances(t *testing.T) {
 
 func TestQueryKLines(t *testing.T) {
 	t.Run("succeeds querying futures klines without time bounds", func(t *testing.T) {
-		privateKey, err := crypto.GenerateKey()
-		require.NoError(t, err)
-		ex := New(fmt.Sprintf("%x", crypto.FromECDSA(privateKey)), "")
-		ex.IsFutures = true
-
-		transport := &httptesting.MockTransport{}
-		ex.client.HttpClient.Transport = transport
+		ex, transport := newMockTestExchange(t, true)
 
 		candles, err := os.ReadFile("./testdata/candles.json")
 		require.NoError(t, err)
@@ -327,4 +311,168 @@ func TestQueryKLines(t *testing.T) {
 		assert.Equal(t, fixedpoint.MustNewFromString("105886.0"), first.Low)
 		assert.Equal(t, fixedpoint.MustNewFromString("736.72125"), first.Volume)
 	})
+}
+
+func TestMockExchange_SubmitOrder(t *testing.T) {
+
+	t.Run("places limit order and returns resting response", func(t *testing.T) {
+		ex, transport := newMockTestExchange(t, true)
+		ctx := context.Background()
+
+		quantity := fixedpoint.MustNewFromString("0.5")
+		price := fixedpoint.MustNewFromString("100000")
+
+		transport.POST("/exchange", func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+
+			var payload struct {
+				Action struct {
+					Type     string           `json:"type"`
+					Orders   []hyperapi.Order `json:"orders"`
+					Grouping string           `json:"grouping"`
+				} `json:"action"`
+			}
+
+			require.NoError(t, json.Unmarshal(body, &payload))
+			require.Len(t, payload.Action.Orders, 1)
+
+			submitted := payload.Action.Orders[0]
+			assert.Equal(t, "0", submitted.Asset)
+			assert.True(t, submitted.IsBuy)
+			assert.Equal(t, quantity.String(), submitted.Size)
+			assert.Equal(t, price.String(), submitted.Price)
+			assert.False(t, submitted.ReduceOnly)
+			assert.Equal(t, hyperapi.TimeInForceGTC, submitted.OrderType.Limit.Tif)
+
+			return httptesting.BuildResponseJson(http.StatusOK, map[string]any{
+				"status": "success",
+				"response": map[string]any{
+					"type": "order",
+					"data": map[string]any{
+						"statuses": []any{
+							map[string]any{
+								"resting": map[string]any{"oid": 123456},
+							},
+						},
+					},
+				},
+			}), nil
+		})
+
+		order := types.SubmitOrder{
+			Symbol:      "BTCUSDC",
+			Market:      types.Market{Symbol: "BTCUSDC"},
+			Side:        types.SideTypeBuy,
+			Type:        types.OrderTypeLimit,
+			Quantity:    quantity,
+			Price:       price,
+			TimeInForce: types.TimeInForceGTC,
+		}
+
+		createdOrder, err := ex.SubmitOrder(ctx, order)
+		require.NoError(t, err)
+		require.NotNil(t, createdOrder)
+
+		assert.Equal(t, uint64(123456), createdOrder.OrderID)
+		assert.Equal(t, types.OrderStatusNew, createdOrder.Status)
+		assert.True(t, createdOrder.IsWorking)
+		assert.True(t, createdOrder.ExecutedQuantity.IsZero())
+	})
+
+	t.Run("returns filled status when order is fully executed", func(t *testing.T) {
+		ex, transport := newMockTestExchange(t, true)
+		ctx := context.Background()
+
+		quantity := fixedpoint.MustNewFromString("1.25")
+
+		transport.POST("/exchange", func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+
+			var payload struct {
+				Action struct {
+					Type   string           `json:"type"`
+					Orders []hyperapi.Order `json:"orders"`
+				} `json:"action"`
+			}
+
+			require.NoError(t, json.Unmarshal(body, &payload))
+			require.Len(t, payload.Action.Orders, 1)
+
+			submitted := payload.Action.Orders[0]
+			assert.True(t, submitted.OrderType.Trigger.IsMarket)
+			assert.Equal(t, "0", submitted.OrderType.Trigger.TriggerPx)
+
+			return httptesting.BuildResponseJson(http.StatusOK, map[string]any{
+				"status": "success",
+				"response": map[string]any{
+					"type": "order",
+					"data": map[string]any{
+						"statuses": []any{
+							map[string]any{
+								"filled": map[string]any{
+									"oid":     888,
+									"totalSz": quantity.String(),
+									"avgPx":   "105000",
+								},
+							},
+						},
+					},
+				},
+			}), nil
+		})
+
+		order := types.SubmitOrder{
+			Symbol:   "BTCUSDC",
+			Market:   types.Market{Symbol: "BTCUSDC"},
+			Side:     types.SideTypeSell,
+			Type:     types.OrderTypeMarket,
+			Quantity: quantity,
+			Price:    fixedpoint.Zero,
+		}
+
+		createdOrder, err := ex.SubmitOrder(ctx, order)
+		require.NoError(t, err)
+		require.NotNil(t, createdOrder)
+
+		assert.Equal(t, uint64(888), createdOrder.OrderID)
+		assert.Equal(t, types.OrderStatusFilled, createdOrder.Status)
+		assert.Equal(t, quantity.String(), createdOrder.ExecutedQuantity.String())
+	})
+
+	t.Run("rejects invalid client order id", func(t *testing.T) {
+		ex, _ := newMockTestExchange(t, true)
+		ctx := context.Background()
+
+		order := types.SubmitOrder{
+			Symbol:        "BTCUSDC",
+			Market:        types.Market{Symbol: "BTCUSDC"},
+			Side:          types.SideTypeBuy,
+			Type:          types.OrderTypeLimit,
+			Quantity:      fixedpoint.MustNewFromString("0.1"),
+			Price:         fixedpoint.MustNewFromString("100000"),
+			ClientOrderID: "invalidID",
+		}
+
+		createdOrder, err := ex.SubmitOrder(ctx, order)
+		require.Error(t, err)
+		assert.Nil(t, createdOrder)
+		assert.Contains(t, err.Error(), "client order id")
+	})
+}
+
+func TestExchange_SubmitOrder(t *testing.T) {
+	privateKey, vaultAccount, _ := testutil.IntegrationTestWithPrivateKeyConfigured(t, "HYPERLIQUID")
+	ctx := context.Background()
+	ex := New(privateKey, vaultAccount)
+	hyperapi.TestNet = true
+	ex.IsFutures = true
+
+	balances, err := ex.QueryAccountBalances(ctx)
+	assert.NoError(t, err)
+
+	t.Logf("balances: %+v", balances)
+
+	// TODO add more integration tests
 }
