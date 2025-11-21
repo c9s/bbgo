@@ -974,7 +974,7 @@ func (s *Strategy) executeSignal(ctx context.Context, side types.SideType, now t
 
 	qty = s.tradingMarket.TruncateQuantity(qty)
 
-	order := types.SubmitOrder{
+	submitOrder := types.SubmitOrder{
 		Symbol:   s.TradingSymbol,
 		Side:     side,
 		Type:     types.OrderTypeMarket,
@@ -983,9 +983,12 @@ func (s *Strategy) executeSignal(ctx context.Context, side types.SideType, now t
 
 		Tag: "entry",
 	}
-	_, err = s.OrderExecutor.SubmitOrders(ctx, order)
+
+	s.logger.Infof("submitting %s entry order: qty=%s stopLoss=%s submitOrder=%+v", side, qty.String(), stopLossPrice.String(), submitOrder)
+
+	_, err = s.OrderExecutor.SubmitOrders(ctx, submitOrder)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to submit entry order: %w", err)
 	}
 
 	// place stop loss if we have a valid stop
@@ -1389,7 +1392,6 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 				s.sigRatioObsSell.Observe(sigRatio)
 			}
 		}
-
 
 		// update trigger counters and gate execution until count > MinTriggers
 		if side == types.SideTypeBuy {
