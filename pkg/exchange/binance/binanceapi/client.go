@@ -20,7 +20,6 @@ import (
 	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -35,7 +34,7 @@ var usedWeightGauge = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "binance_used_weight",
 		Help: "Binance REST API used weight from response headers (X-MBX-USED-WEIGHT and X-MBX-USED-WEIGHT-(interval)))",
-	}, []string{"window"},
+	}, []string{"window", "uri"},
 )
 
 var usedWeightWindowRe = regexp.MustCompile(`(?i)^X-MBX-USED-WEIGHT-(\d+)([SMHD])$`)
@@ -137,17 +136,6 @@ func (c *RestClient) SetTimeOffsetFromServer(ctx context.Context) error {
 }
 
 func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error) {
-	if DebugRequestResponse {
-		logrus.Debugf("-> request: %+v", req)
-		response, err := c.BaseAPIClient.SendRequest(req)
-
-		if response != nil {
-			c.observeUsedWeight(response)
-		}
-
-		return response, err
-	}
-
 	resp, err := c.BaseAPIClient.SendRequest(req)
 	if err == nil && resp != nil {
 		c.observeUsedWeight(resp)
@@ -169,7 +157,7 @@ func (c *RestClient) observeUsedWeight(resp *requestgen.Response) {
 			label := intervalNum + intervalLetter
 			if v := resp.Header.Get(k); v != "" {
 				if f, err := strconv.ParseFloat(v, 64); err == nil {
-					usedWeightGauge.WithLabelValues(label).Set(f)
+					usedWeightGauge.WithLabelValues(label, resp.Request.RequestURI).Set(f)
 				}
 			}
 		}
