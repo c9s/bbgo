@@ -632,12 +632,14 @@ func (s *Strategy) validateStopPrice(side types.SideType, currentPrice, stopPric
 	if stopPrice.Sign() <= 0 || currentPrice.IsZero() {
 		return false, fmt.Errorf("invalid price: current=%s stop=%s", currentPrice.String(), stopPrice.String())
 	}
+
 	if side == types.SideTypeBuy {
 		if stopPrice.Compare(currentPrice) >= 0 {
 			return false, fmt.Errorf("stop loss must be below current price for long: stop=%s current=%s", stopPrice.String(), currentPrice.String())
 		}
 		return true, nil
 	}
+
 	if stopPrice.Compare(currentPrice) <= 0 {
 		return false, fmt.Errorf("stop loss must be above current price for short: stop=%s current=%s", stopPrice.String(), currentPrice.String())
 	}
@@ -829,29 +831,64 @@ func (s *Strategy) findStopPrice(ctx context.Context, ticker *types.Ticker, side
 	return fixedpoint.Zero, fmt.Errorf("unable to determine a valid stop price")
 }
 
-// calculatePositionSize sizes order using MaxLossLimit and stop loss like tradingdesk
+// calculatePositionSize determines the entry quantity based on the configured Quantity.
+// If MaxLossLimit is set and the potential loss at the configured Quantity (from stopLoss) exceeds
+// the limit, the quantity will be reduced to satisfy MaxLossLimit. Balance/leverage constraints are applied.
 func (s *Strategy) calculatePositionSize(ctx context.Context, side types.SideType, stopLoss fixedpoint.Value) (fixedpoint.Value, error) {
-	// If MaxLossLimit is zero or stopLoss invalid, fallback to configured Quantity or min
-	if s.MaxLossLimit.IsZero() || stopLoss.IsZero() {
-		if s.Quantity.Sign() > 0 {
-			return s.Quantity, nil
-		}
-		return s.tradingMarket.MinQuantity, nil
+	currentPrice, err := s.getCurrentPriceForSizing(ctx, side)
+	if err != nil {
+		return fixedpoint.Zero, err
 	}
 
+	// 1) Determine desired quantity from config or risk (if no explicit Quantity)
+	desiredQty, riskPerUnit, err := s.determineDesiredQuantity(side, currentPrice, stopLoss)
+	if err != nil {
+		return fixedpoint.Zero, err
+	}
+
+	// 2) Cap by MaxLossLimit when both stop and limit are valid
+	desiredQty = s.capQuantityByMaxLoss(desiredQty, riskPerUnit)
+
+	// 3) Cap by balance and leverage
+	maxQtyByBalance, err := s.computeMaxQtyByBalance(ctx, side, currentPrice)
+	if err != nil {
+		return fixedpoint.Zero, err
+	}
+	qty := desiredQty
+	if !maxQtyByBalance.IsZero() && qty.Compare(maxQtyByBalance) > 0 {
+		qty = maxQtyByBalance
+	}
+
+	// 4) Enforce market constraints and finalize
+	qty = s.finalizeQuantity(currentPrice, qty)
+	return qty, nil
+}
+
+// getCurrentPriceForSizing fetches the latest ticker and resolves the price based on PriceType.
+func (s *Strategy) getCurrentPriceForSizing(ctx context.Context, side types.SideType) (fixedpoint.Value, error) {
 	ticker, err := s.tradingSession.Exchange.QueryTicker(ctx, s.TradingSymbol)
 	if err != nil {
 		return fixedpoint.Zero, err
 	}
+
 	currentPrice := s.PriceType.GetPrice(ticker, side)
 	if currentPrice.IsZero() {
 		currentPrice = ticker.GetValidPrice()
 	}
+
 	if currentPrice.IsZero() {
 		return fixedpoint.Zero, fmt.Errorf("invalid current price")
 	}
 
-	// validate stop relative to price using shared validator
+	return currentPrice, nil
+}
+
+// computeRiskPerUnit validates the stop price against the current price and returns per-unit risk.
+func (s *Strategy) computeRiskPerUnit(side types.SideType, currentPrice, stopLoss fixedpoint.Value) (fixedpoint.Value, error) {
+	if stopLoss.Sign() <= 0 {
+		return fixedpoint.Zero, nil
+	}
+
 	if ok, err := s.validateStopPrice(side, currentPrice, stopLoss); !ok {
 		return fixedpoint.Zero, err
 	}
@@ -867,46 +904,108 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, side types.SideTyp
 		return fixedpoint.Zero, fmt.Errorf("invalid risk per unit, computed as %s", riskPerUnit)
 	}
 
-	maxQtyByRisk := s.MaxLossLimit.Div(riskPerUnit)
+	return riskPerUnit, nil
+}
 
-	// balance constraint
+// determineDesiredQuantity returns the desired quantity and the computed riskPerUnit (if available).
+// Behavior:
+// - If Quantity > 0: use it as desired.
+// - Else if MaxLossLimit > 0 and stopLoss valid: desired = MaxLossLimit / riskPerUnit.
+// - Else: desired = MinQuantity.
+func (s *Strategy) determineDesiredQuantity(side types.SideType, currentPrice, stopLoss fixedpoint.Value) (fixedpoint.Value, fixedpoint.Value, error) {
+	if s.Quantity.Sign() > 0 {
+		// If user provided Quantity, still compute riskPerUnit when stop/maxLoss are present
+		if stopLoss.Sign() > 0 && !s.MaxLossLimit.IsZero() {
+			riskPerUnit, err := s.computeRiskPerUnit(side, currentPrice, stopLoss)
+			if err != nil {
+				s.logger.WithError(err).Warnf("unable to compute risk per unit, using configured quantity, side=%s, qty=%s", side, s.Quantity.String())
+				return s.Quantity, fixedpoint.Zero, nil // ignore risk error for desired quantity; cap step will be skipped
+			}
+
+			return s.Quantity, riskPerUnit, nil
+		}
+
+		return s.Quantity, fixedpoint.Zero, nil
+	}
+
+	if stopLoss.Sign() > 0 && !s.MaxLossLimit.IsZero() {
+		riskPerUnit, err := s.computeRiskPerUnit(side, currentPrice, stopLoss)
+		if err != nil {
+			s.logger.WithError(err).Warnf("unable to compute risk per unit, using configured min quantity, side=%s, riskPerUnit=%s", side, riskPerUnit.String())
+			return fixedpoint.Zero, fixedpoint.Zero, err
+		}
+
+		if riskPerUnit.Sign() > 0 {
+			return s.MaxLossLimit.Div(riskPerUnit), riskPerUnit, nil
+		}
+	}
+
+	s.logger.Warnf("no valid stop loss or max loss limit configured, using min quantity: %s", s.tradingMarket.MinQuantity.String())
+	return s.tradingMarket.MinQuantity, fixedpoint.Zero, nil
+}
+
+// capQuantityByMaxLoss reduces desiredQty when both MaxLossLimit and riskPerUnit are valid and
+// the loss at desiredQty would exceed the limit.
+func (s *Strategy) capQuantityByMaxLoss(desiredQty, riskPerUnit fixedpoint.Value) fixedpoint.Value {
+	if desiredQty.IsZero() || riskPerUnit.IsZero() || s.MaxLossLimit.IsZero() {
+		return desiredQty
+	}
+	lossAtDesired := riskPerUnit.Mul(desiredQty)
+	if lossAtDesired.Compare(s.MaxLossLimit) > 0 {
+		capQty := s.MaxLossLimit.Div(riskPerUnit)
+		if capQty.Sign() > 0 && capQty.Compare(desiredQty) < 0 {
+			return capQty
+		}
+	}
+	return desiredQty
+}
+
+// computeMaxQtyByBalance returns the maximum quantity allowed by available balance and leverage.
+func (s *Strategy) computeMaxQtyByBalance(ctx context.Context, side types.SideType, currentPrice fixedpoint.Value) (fixedpoint.Value, error) {
 	account := s.tradingSession.GetAccount()
-	var maxQtyByBalance fixedpoint.Value
 	if s.tradingSession.Futures {
 		quoteBal, ok := account.Balance(s.tradingMarket.QuoteCurrency)
 		if !ok {
 			return fixedpoint.Zero, fmt.Errorf("no %s balance", s.tradingMarket.QuoteCurrency)
 		}
-		maxQtyByBalance = quoteBal.Available.Mul(fixedpoint.NewFromInt(int64(s.MaxLeverage))).Div(currentPrice)
-	} else {
-		// TODO: use accountValueCalculator to calculate the position size that we can borrow from the margin account.
-		accountValueCalculator := s.tradingSession.GetAccountValueCalculator()
-		_ = accountValueCalculator
 
-		if side == types.SideTypeBuy {
-			quoteBal, ok := account.Balance(s.tradingMarket.QuoteCurrency)
-			if !ok {
-				return fixedpoint.Zero, fmt.Errorf("no %s balance", s.tradingMarket.QuoteCurrency)
-			}
-			maxQtyByBalance = quoteBal.Available.Div(currentPrice)
-		} else {
-			baseBal, ok := account.Balance(s.tradingMarket.BaseCurrency)
-			if !ok {
-				return fixedpoint.Zero, fmt.Errorf("no %s balance", s.tradingMarket.BaseCurrency)
-			}
-			maxQtyByBalance = baseBal.Available
+		lev := s.MaxLeverage
+		if lev <= 0 {
+			lev = 1
 		}
+	
+		return quoteBal.Available.Mul(fixedpoint.NewFromInt(int64(lev))).Div(currentPrice), nil
 	}
+	// Spot or margin
+	// TODO: use accountValueCalculator to calculate the position size that we can borrow from the margin account.
+	accountValueCalculator := s.tradingSession.GetAccountValueCalculator()
+	_ = accountValueCalculator
 
-	qty := fixedpoint.Min(maxQtyByRisk, maxQtyByBalance)
+	if side == types.SideTypeBuy {
+		quoteBal, ok := account.Balance(s.tradingMarket.QuoteCurrency)
+		if !ok {
+			return fixedpoint.Zero, fmt.Errorf("no %s balance", s.tradingMarket.QuoteCurrency)
+		}
+		return quoteBal.Available.Div(currentPrice), nil
+	}
+	baseBal, ok := account.Balance(s.tradingMarket.BaseCurrency)
+	if !ok {
+		return fixedpoint.Zero, fmt.Errorf("no %s balance", s.tradingMarket.BaseCurrency)
+	}
+	return baseBal.Available, nil
+}
 
+// finalizeQuantity enforces market minimums, minNotional, truncation, and zero fallback.
+func (s *Strategy) finalizeQuantity(currentPrice, qty fixedpoint.Value) fixedpoint.Value {
 	if qty.Compare(s.tradingMarket.MinQuantity) < 0 {
 		qty = s.tradingMarket.MinQuantity
 	}
-
 	qty = s.tradingMarket.AdjustQuantityByMinNotional(qty, currentPrice)
-
-	return s.tradingMarket.TruncateQuantity(qty), nil
+	qty = s.tradingMarket.TruncateQuantity(qty)
+	if qty.IsZero() {
+		qty = s.tradingMarket.MinQuantity
+	}
+	return qty
 }
 
 func (s *Strategy) ensureOppositePositionClosed(ctx context.Context, side types.SideType) error {
