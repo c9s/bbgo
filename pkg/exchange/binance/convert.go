@@ -40,7 +40,7 @@ func toGlobalMarket(symbol binance.Symbol) types.Market {
 		Exchange:        types.ExchangeBinance,
 		Symbol:          symbol.Symbol,
 		LocalSymbol:     symbol.Symbol,
-		PricePrecision:  symbol.QuotePrecision,
+		PricePrecision:  symbol.QuoteAssetPrecision,
 		VolumePrecision: symbol.BaseAssetPrecision,
 		QuoteCurrency:   symbol.QuoteAsset,
 		BaseCurrency:    symbol.BaseAsset,
@@ -85,11 +85,13 @@ func toGlobalFuturesMarket(symbol futures.Symbol) types.Market {
 		Exchange:        types.ExchangeBinance,
 		Symbol:          symbol.Symbol,
 		LocalSymbol:     symbol.Symbol,
-		PricePrecision:  symbol.QuotePrecision,
+		PricePrecision:  symbol.PricePrecision,
 		VolumePrecision: symbol.BaseAssetPrecision,
 		QuoteCurrency:   symbol.QuoteAsset,
 		BaseCurrency:    symbol.BaseAsset,
 	}
+
+	// TODO: symbol.QuotePrecision will be used for quote amount
 
 	if f := symbol.MinNotionalFilter(); f != nil {
 		market.MinNotional = fixedpoint.MustNewFromString(f.Notional)
