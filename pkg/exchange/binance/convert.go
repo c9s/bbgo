@@ -42,6 +42,7 @@ func toGlobalMarket(symbol binance.Symbol) types.Market {
 		LocalSymbol:     symbol.Symbol,
 		PricePrecision:  symbol.QuoteAssetPrecision,
 		VolumePrecision: symbol.BaseAssetPrecision,
+		QuotePrecision:  symbol.QuoteAssetPrecision,
 		QuoteCurrency:   symbol.QuoteAsset,
 		BaseCurrency:    symbol.BaseAsset,
 	}
@@ -87,6 +88,7 @@ func toGlobalFuturesMarket(symbol futures.Symbol) types.Market {
 		LocalSymbol:     symbol.Symbol,
 		PricePrecision:  symbol.PricePrecision,
 		VolumePrecision: symbol.BaseAssetPrecision,
+		QuotePrecision:  symbol.QuotePrecision,
 		QuoteCurrency:   symbol.QuoteAsset,
 		BaseCurrency:    symbol.BaseAsset,
 	}

@@ -29,6 +29,10 @@ type Market struct {
 	//    int(math.Log10(quantity step size))
 	VolumePrecision int `json:"volumePrecision"`
 
+	// QuotePrecision is the precision used for formatting quote quantity
+	// e.g. in BTC/USDT market, if you want to format the USDT amount with 2 decimals, then QuotePrecision = 2
+	QuotePrecision int `json:"quotePrecision"`
+
 	// QuoteCurrency is the currency name for quote, e.g. USDT in BTC/USDT, USDC in BTC/USDC
 	QuoteCurrency string `json:"quoteCurrency"`
 
