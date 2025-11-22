@@ -12,12 +12,14 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -27,7 +29,19 @@ const RestBaseURL = "https://api.binance.com"
 const SandboxRestBaseURL = "https://testnet.binance.vision"
 const DebugRequestResponse = false
 
-var errEmptyPrivateKey = errors.New("empty private key")
+// usedWeightGauge is the prometheus metrics for Binance rate limit usage
+var usedWeightGauge = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "binance_used_weight",
+		Help: "Binance REST API used weight from response headers (X-MBX-USED-WEIGHT and X-MBX-USED-WEIGHT-(interval)))",
+	}, []string{"window", "uri"},
+)
+
+var usedWeightWindowRe = regexp.MustCompile(`(?i)^X-MBX-USED-WEIGHT-(\d+)([SMHD])$`)
+
+func init() {
+	prometheus.MustRegister(usedWeightGauge)
+}
 
 var errNoApiKey = errors.New("empty api key")
 
@@ -122,14 +136,32 @@ func (c *RestClient) SetTimeOffsetFromServer(ctx context.Context) error {
 }
 
 func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error) {
-	if DebugRequestResponse {
-		logrus.Debugf("-> request: %+v", req)
-		response, err := c.BaseAPIClient.SendRequest(req)
-		logrus.Debugf("<- response: %s", string(response.Body))
-		return response, err
+	resp, err := c.BaseAPIClient.SendRequest(req)
+	if err == nil && resp != nil {
+		c.observeUsedWeight(resp)
+	}
+	return resp, err
+}
+
+// observeUsedWeight reads Binance-specific rate limit headers and updates Prometheus gauges.
+func (c *RestClient) observeUsedWeight(resp *requestgen.Response) {
+	if resp == nil {
+		return
 	}
 
-	return c.BaseAPIClient.SendRequest(req)
+	// Iterate all headers to find X-MBX-USED-WEIGHT-(interval) variants as documented
+	for k := range resp.Header {
+		if m := usedWeightWindowRe.FindStringSubmatch(k); len(m) == 3 {
+			intervalNum := m[1]
+			intervalLetter := strings.ToLower(m[2])
+			label := intervalNum + intervalLetter
+			if v := resp.Header.Get(k); v != "" {
+				if f, err := strconv.ParseFloat(v, 64); err == nil {
+					usedWeightGauge.WithLabelValues(label, resp.Request.RequestURI).Set(f)
+				}
+			}
+		}
+	}
 }
 
 // NewAuthenticatedRequest creates new http request for authenticated routes.
