@@ -43,7 +43,6 @@ func (s *StrategyProfitFixer) Fix(
 	market types.Market,
 	sessions []*bbgo.ExchangeSession,
 	oriPosition *types.Position,
-	oriProfitStats *types.ProfitStats,
 ) (*types.Position, *types.ProfitStats, error) {
 	if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
 		return nil, nil, errors.New("tradesSince time can not be zero")

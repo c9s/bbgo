@@ -106,6 +106,7 @@ func (s *State) Reset() {
 // Right now it only supports short position in the USDT futures account.
 // When opening the short position, it uses spot account to buy inventory, then transfer the inventory to the futures account as collateral assets.
 type Strategy struct {
+	common.StrategyProfitFixer
 	Environment *bbgo.Environment
 
 	// These fields will be filled from the config file (it translates YAML to JSON)
@@ -137,8 +138,6 @@ type Strategy struct {
 
 	// Reset your position info
 	Reset bool `json:"reset"`
-
-	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer"`
 
 	// CloseFuturesPosition can be enabled to close the futures position and then transfer the collateral asset back to the spot account.
 	CloseFuturesPosition bool `json:"closeFuturesPosition"`
@@ -321,43 +320,10 @@ func (s *Strategy) CrossRun(
 		s.State = newState()
 	}
 
-	if s.ProfitFixerConfig != nil {
-		log.Infof("profitFixer is enabled, start fixing with config: %+v", s.ProfitFixerConfig)
-
-		s.SpotPosition = types.NewPositionFromMarket(s.spotMarket)
-		s.FuturesPosition = types.NewPositionFromMarket(s.futuresMarket)
-		s.ProfitStats.ProfitStats = types.NewProfitStats(s.Market)
-
-		since := s.ProfitFixerConfig.TradesSince.Time()
-		now := time.Now()
-
-		spotFixer := common.NewProfitFixer(*s.ProfitFixerConfig, s.Environment)
-		if ss, ok := s.spotSession.Exchange.(types.ExchangeTradeHistoryService); ok {
-			spotFixer.AddExchange(s.spotSession.Name, ss)
-		}
-
-		if err2 := spotFixer.Fix(ctx, s.Symbol,
-			since, now,
-			s.ProfitStats.ProfitStats,
-			s.SpotPosition); err2 != nil {
-			return err2
-		}
-
-		futuresFixer := common.NewProfitFixer(*s.ProfitFixerConfig, s.Environment)
-		if ss, ok := s.futuresSession.Exchange.(types.ExchangeTradeHistoryService); ok {
-			futuresFixer.AddExchange(s.futuresSession.Name, ss)
-		}
-
-		if err2 := futuresFixer.Fix(ctx, s.Symbol,
-			since, now,
-			s.ProfitStats.ProfitStats,
-			s.FuturesPosition); err2 != nil {
-			return err2
-		}
-
-		bbgo.Notify("Fixed spot position", s.SpotPosition)
-		bbgo.Notify("Fixed futures position", s.FuturesPosition)
-		bbgo.Notify("Fixed profit stats", s.ProfitStats.ProfitStats)
+	if err := s.fixProfit(ctx); err != nil {
+		log.WithError(err).Error("profit fixer failure")
+	} else {
+		log.Infof("last profit fix config: %+v", s.StrategyProfitFixer.LastProfitFixConfig)
 	}
 
 	if err := s.syncPositionRisks(ctx); err != nil {
@@ -1229,6 +1195,49 @@ func (s *Strategy) syncPositionRisks(ctx context.Context) error {
 			s.FuturesPosition.Base.String(),
 			s.FuturesPosition.AverageCost.String(),
 			positionRisk)
+	}
+
+	return nil
+}
+
+func (s *Strategy) fixProfit(
+	ctx context.Context,
+) error {
+	if !s.StrategyProfitFixer.NeedsProfitFixing() {
+		return nil
+	}
+	log.Infof("profitFixer is enabled, start fixing with config: %+v", s.StrategyProfitFixer.ProfitFixerConfig)
+	spotPosition, profitStats, err := s.StrategyProfitFixer.Fix(
+		ctx, s.Environment,
+		nil,
+		s.spotMarket,
+		[]*bbgo.ExchangeSession{s.spotSession},
+		s.SpotPosition,
+	)
+	if err != nil {
+		return fmt.Errorf("spot market profit fix failed: %w", err)
+	}
+
+	futurePosition, futuresProfitstats, err := s.StrategyProfitFixer.Fix(
+		ctx, s.Environment,
+		nil,
+		s.futuresMarket,
+		[]*bbgo.ExchangeSession{s.futuresSession},
+		s.FuturesPosition,
+	)
+	if err != nil {
+		return fmt.Errorf("futures market profit fix failed: %w", err)
+	}
+	profitStats.Merge(futuresProfitstats)
+
+	bbgo.Notify("Fixed spot position", spotPosition)
+	bbgo.Notify("Fixed futures position", futurePosition)
+	bbgo.Notify("Fixed profit stats", profitStats)
+
+	if s.StrategyProfitFixer.ProfitFixerConfig.Apply {
+		s.SpotPosition = spotPosition
+		s.FuturesPosition = futurePosition
+		s.ProfitStats.ProfitStats = profitStats
 	}
 
 	return nil
