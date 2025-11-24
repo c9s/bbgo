@@ -3003,6 +3003,8 @@ func (s *Strategy) CrossRun(
 			go s.tradeRecover(s.tradingCtx)
 		}
 
+		positionTracker := common.NewPositionTracker(s, types.Interval1m)
+		go positionTracker.Run(s.tradingCtx)
 	}()
 
 	bbgo.OnShutdown(
@@ -3161,4 +3163,12 @@ func (s *Strategy) fixProfit(ctx context.Context, sessions ...*bbgo.ExchangeSess
 		s.ProfitStats.ProfitStats = profitStats
 	}
 	return nil
+}
+
+func (s *Strategy) GetPosition() fixedpoint.Value {
+	return s.Position.GetBase()
+}
+
+func (s *Strategy) GetSymbol() string {
+	return s.Symbol
 }
