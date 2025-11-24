@@ -7,7 +7,7 @@ go 1.23.0
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/squirrel v1.5.3
-	github.com/adshao/go-binance/v2 v2.6.0
+	github.com/adshao/go-binance/v2 v2.6.1
 	github.com/c-bata/goptuna v0.8.1
 	github.com/c9s/requestgen v1.4.8-0.20250926152618-e010b2fe9f58
 	github.com/c9s/rockhopper/v2 v2.0.6
