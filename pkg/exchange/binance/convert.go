@@ -88,12 +88,13 @@ func toGlobalFuturesMarket(symbol futures.Symbol) types.Market {
 		LocalSymbol:     symbol.Symbol,
 		PricePrecision:  symbol.PricePrecision,
 		VolumePrecision: symbol.BaseAssetPrecision,
-		QuotePrecision:  symbol.QuotePrecision,
+		QuotePrecision:  symbol.QuotePrecision, // symbol.QuotePrecision will be used for quote amount
 		QuoteCurrency:   symbol.QuoteAsset,
 		BaseCurrency:    symbol.BaseAsset,
 	}
 
-	// TODO: symbol.QuotePrecision will be used for quote amount
+	// TODO: symbol.QuantityPrecision looks like the same thing as stepSize
+	// should we add to types.Market?
 
 	if f := symbol.MinNotionalFilter(); f != nil {
 		market.MinNotional = fixedpoint.MustNewFromString(f.Notional)

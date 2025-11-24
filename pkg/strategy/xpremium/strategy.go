@@ -225,6 +225,9 @@ func (s *Strategy) Initialize() error {
 		"symbol":      s.Symbol,
 		"strategy":    ID,
 		"strategy_id": s.InstanceID(),
+
+		"base_session":    s.BaseSession,
+		"premium_session": s.PremiumSession,
 	})
 
 	s.metricsLabels = prometheus.Labels{
@@ -974,7 +977,7 @@ func (s *Strategy) executeSignal(ctx context.Context, side types.SideType, now t
 
 	qty = s.tradingMarket.TruncateQuantity(qty)
 
-	order := types.SubmitOrder{
+	submitOrder := types.SubmitOrder{
 		Symbol:   s.TradingSymbol,
 		Side:     side,
 		Type:     types.OrderTypeMarket,
@@ -983,7 +986,10 @@ func (s *Strategy) executeSignal(ctx context.Context, side types.SideType, now t
 
 		Tag: "entry",
 	}
-	_, err = s.OrderExecutor.SubmitOrders(ctx, order)
+
+	s.logger.Infof("submitting %s order: %+v", s.TradingSymbol, submitOrder)
+
+	_, err = s.OrderExecutor.SubmitOrders(ctx, submitOrder)
 	if err != nil {
 		return err
 	}
@@ -1389,7 +1395,6 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 				s.sigRatioObsSell.Observe(sigRatio)
 			}
 		}
-
 
 		// update trigger counters and gate execution until count > MinTriggers
 		if side == types.SideTypeBuy {
