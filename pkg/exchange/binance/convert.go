@@ -40,7 +40,7 @@ func toGlobalMarket(symbol binance.Symbol) types.Market {
 		Exchange:        types.ExchangeBinance,
 		Symbol:          symbol.Symbol,
 		LocalSymbol:     symbol.Symbol,
-		PricePrecision:  symbol.QuoteAssetPrecision,
+		PricePrecision:  symbol.QuotePrecision,
 		VolumePrecision: symbol.BaseAssetPrecision,
 		QuotePrecision:  symbol.QuoteAssetPrecision,
 		QuoteCurrency:   symbol.QuoteAsset,
