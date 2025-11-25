@@ -125,7 +125,8 @@ type Strategy struct {
 	sigRatioObsSell  prometheus.Observer
 
 	premiumSession, baseSession, tradingSession *bbgo.ExchangeSession
-	tradingMarket                               types.Market
+
+	tradingMarket types.Market
 
 	// runtime fields
 	premiumBook *types.StreamOrderBook
@@ -460,6 +461,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	if !ok {
 		return fmt.Errorf("trading session market %s is not defined", tradingSymbol)
 	}
+
 	// keep a reference to trading market
 	s.tradingMarket = tradingMarket
 

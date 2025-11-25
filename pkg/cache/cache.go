@@ -3,7 +3,6 @@ package cache
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path"
 	"reflect"
@@ -14,12 +13,13 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/envvar"
+	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util/backoff"
 )
 
-const memCacheExpiry = 5 * time.Minute
-const fileCacheExpiry = 24 * time.Hour
+const memCacheExpiryTime = 5 * time.Minute
+const fileCacheExpiryTime = 24 * time.Hour
 
 var globalMarketMemCache *marketMemCache = newMarketMemCache()
 
@@ -45,7 +45,7 @@ func (c *marketMemCache) IsOutdated(exName string) bool {
 	defer c.Unlock()
 
 	data, ok := c.markets[exName]
-	return !ok || time.Since(data.updatedAt) > memCacheExpiry
+	return !ok || time.Since(data.updatedAt) > memCacheExpiryTime
 }
 
 func (c *marketMemCache) Set(exName string, markets types.MarketMap) {
@@ -85,7 +85,7 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 	cacheFile := path.Join(cacheDir, key+".json")
 
 	stat, err := os.Stat(cacheFile)
-	if os.IsNotExist(err) || (stat != nil && time.Since(stat.ModTime()) > fileCacheExpiry) {
+	if os.IsNotExist(err) || (stat != nil && time.Since(stat.ModTime()) > fileCacheExpiryTime) {
 		log.Debugf("cache %s not found or cache expired, executing fetcher callback to get the data", cacheFile)
 
 		data, err := fetcher()
@@ -137,8 +137,8 @@ func LoadExchangeMarketsWithCache(ctx context.Context, ex types.ExchangePublic) 
 
 // loadMarketsFromMem is useful for one process to run multiple bbgos in different go routines.
 func loadMarketsFromMem(ctx context.Context, ex types.ExchangePublic) (markets types.MarketMap, _ error) {
-	exName := ex.Name().String()
-	if globalMarketMemCache.IsOutdated(exName) {
+	cacheKey := ExchangeCacheKey(ex) + "-markets"
+	if globalMarketMemCache.IsOutdated(cacheKey) {
 		op := func() error {
 			rst, err2 := ex.QueryMarkets(ctx)
 			if err2 != nil {
@@ -146,7 +146,7 @@ func loadMarketsFromMem(ctx context.Context, ex types.ExchangePublic) (markets t
 			}
 
 			markets = rst
-			globalMarketMemCache.Set(exName, rst)
+			globalMarketMemCache.Set(cacheKey, rst)
 			return nil
 		}
 
@@ -157,21 +157,30 @@ func loadMarketsFromMem(ctx context.Context, ex types.ExchangePublic) (markets t
 		return markets, nil
 	}
 
-	rst, _ := globalMarketMemCache.Get(exName)
+	rst, _ := globalMarketMemCache.Get(cacheKey)
 	return rst, nil
 }
 
 func loadMarketsFromFile(ctx context.Context, ex types.ExchangePublic) (markets types.MarketMap, err error) {
-	key := fmt.Sprintf("%s-markets", ex.Name())
-	if futureExchange, implemented := ex.(types.FuturesExchange); implemented {
-		settings := futureExchange.GetFuturesSettings()
-		if settings.IsFutures {
-			key = fmt.Sprintf("%s-futures-markets", ex.Name())
-		}
-	}
-
+	key := ExchangeCacheKey(ex) + "-markets"
 	err = WithCache(key, &markets, func() (interface{}, error) {
 		return ex.QueryMarkets(ctx)
 	})
 	return markets, err
+}
+
+func ExchangeCacheKey(ex types.ExchangeMinimal) string {
+	key := string(ex.Name())
+	isMargin, isFutures, isIsolated, isolatedSymbol := exchange2.GetSessionAttributes(ex)
+	if isMargin {
+		key += "_margin"
+	} else if isFutures {
+		key += "_futures"
+	}
+
+	if isIsolated {
+		key += "_isolated_" + isolatedSymbol
+	}
+
+	return key
 }

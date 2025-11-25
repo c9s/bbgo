@@ -54,7 +54,7 @@ func Test_marketMemCache_GetSet(t *testing.T) {
 	assert.False(t, expired)
 
 	detailed := cache.markets["max"]
-	detailed.updatedAt = time.Now().Add(-2 * memCacheExpiry)
+	detailed.updatedAt = time.Now().Add(-2 * memCacheExpiryTime)
 	cache.markets["max"] = detailed
 	expired = cache.IsOutdated("max")
 	assert.True(t, expired)
