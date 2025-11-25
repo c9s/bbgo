@@ -5,7 +5,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func GetSessionAttributes(exchange types.Exchange) (isMargin, isFutures, isIsolated bool, isolatedSymbol string) {
+func GetSessionAttributes(exchange types.ExchangeMinimal) (isMargin, isFutures, isIsolated bool, isolatedSymbol string) {
 	if marginExchange, ok := exchange.(types.MarginExchange); ok {
 		marginSettings := marginExchange.GetMarginSettings()
 		isMargin = marginSettings.IsMargin
