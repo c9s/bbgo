@@ -640,7 +640,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	p.Lock()
 	defer p.Unlock()
 
-	defer p.updateMetrics()
+	defer p.updateMetrics(&td.Price)
 
 	// update changedAt field before we unlock in the defer func
 	defer func() {
@@ -740,13 +740,13 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	return fixedpoint.Zero, fixedpoint.Zero, false
 }
 
-func (p *Position) UpdateMetrics() {
+func (p *Position) UpdateMetrics(price *fixedpoint.Value) {
 	p.Lock()
-	p.updateMetrics()
+	p.updateMetrics(price)
 	p.Unlock()
 }
 
-func (p *Position) updateMetrics() {
+func (p *Position) updateMetrics(price *fixedpoint.Value) {
 	// update the position metrics only if the position defines the strategy ID
 	if p.StrategyInstanceID == "" || p.Strategy == "" {
 		return
@@ -760,4 +760,9 @@ func (p *Position) updateMetrics() {
 	positionAverageCostMetrics.With(labels).Set(p.AverageCost.Float64())
 	positionBaseQuantityMetrics.With(labels).Set(p.Base.Float64())
 	positionQuoteQuantityMetrics.With(labels).Set(p.Quote.Float64())
+
+	if price != nil {
+		unrealizedProfit := p.UnrealizedProfit(*price)
+		positionUnrealizedProfitMetrics.With(labels).Set(unrealizedProfit.Float64())
+	}
 }
