@@ -30,6 +30,9 @@ func (s *StrategyProfitFixer) NeedsProfitFixing() bool {
 	if s.ProfitFixerConfig == nil {
 		return false
 	}
+	if !s.ProfitFixerConfig.Enabled {
+		return false
+	}
 	if s.LastProfitFixConfig != nil && s.LastProfitFixConfig.Equal(*s.ProfitFixerConfig) {
 		return false
 	}
@@ -43,7 +46,6 @@ func (s *StrategyProfitFixer) Fix(
 	market types.Market,
 	sessions []*bbgo.ExchangeSession,
 	oriPosition *types.Position,
-	oriProfitStats *types.ProfitStats,
 ) (*types.Position, *types.ProfitStats, error) {
 	if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
 		return nil, nil, errors.New("tradesSince time can not be zero")
@@ -86,6 +88,7 @@ func (s *StrategyProfitFixer) Fix(
 // ProfitFixerConfig is used for fixing profitStats and position by re-playing the trade history
 type ProfitFixerConfig struct {
 	Apply             bool       `json:"apply,omitempty"`
+	Enabled           bool       `json:"enabled,omitempty"`
 	TradesSince       types.Time `json:"tradesSince,omitempty"`
 	Patch             string     `json:"patch,omitempty"`
 	UseDatabaseTrades bool       `json:"useDatabaseTrades,omitempty"`

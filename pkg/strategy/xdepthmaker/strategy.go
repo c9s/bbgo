@@ -210,6 +210,7 @@ const (
 )
 
 type Strategy struct {
+	common.StrategyProfitFixer
 	*CrossExchangeMarketMakingStrategy
 
 	Environment *bbgo.Environment
@@ -274,8 +275,6 @@ type Strategy struct {
 
 	// Pips is the pips of the layer prices
 	Pips fixedpoint.Value `json:"pips"`
-
-	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer,omitempty"`
 
 	DryRun bool `json:"dryRun"`
 
@@ -541,44 +540,10 @@ func (s *Strategy) CrossRun(
 
 	log.Infof("makerSession: %s hedgeSession: %s", makerSession.Name, hedgeSession.Name)
 
-	if s.ProfitFixerConfig != nil {
-		bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)
-
-		log.Infof("profitFixer is enabled, checking checkpoint: %+v", s.ProfitFixerConfig.TradesSince)
-
-		if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
-			return errors.New("tradesSince time can not be zero")
-		}
-
-		makerMarket, _ := makerSession.Market(s.Symbol)
-		s.CrossExchangeMarketMakingStrategy.Position = types.NewPositionFromMarket(makerMarket)
-		s.CrossExchangeMarketMakingStrategy.ProfitStats = types.NewProfitStats(makerMarket)
-
-		fixer := common.NewProfitFixer(
-			*s.ProfitFixerConfig, s.Environment,
-		)
-		fixer.SetConverter(&s.ConverterManager)
-
-		if ss, ok := makerSession.Exchange.(types.ExchangeTradeHistoryService); ok {
-			log.Infof("adding makerSession %s to profitFixer", makerSession.Name)
-			fixer.AddExchange(makerSession.Name, ss)
-		}
-
-		if ss, ok := hedgeSession.Exchange.(types.ExchangeTradeHistoryService); ok {
-			log.Infof("adding hedgeSession %s to profitFixer", hedgeSession.Name)
-			fixer.AddExchange(hedgeSession.Name, ss)
-		}
-
-		if err2 := fixer.Fix(ctx, makerMarket.Symbol,
-			s.ProfitFixerConfig.TradesSince.Time(),
-			time.Now(),
-			s.CrossExchangeMarketMakingStrategy.ProfitStats,
-			s.CrossExchangeMarketMakingStrategy.Position); err2 != nil {
-			return err2
-		}
-
-		bbgo.Notify("Fixed %s position", s.Symbol, s.CrossExchangeMarketMakingStrategy.Position)
-		bbgo.Notify("Fixed %s profitStats", s.Symbol, s.CrossExchangeMarketMakingStrategy.ProfitStats)
+	if err := s.fixProfit(ctx, makerSession, hedgeSession); err != nil {
+		s.logger.WithError(err).Error("profit fixer failure")
+	} else {
+		s.logger.Infof("last profit fix config: %+v", s.StrategyProfitFixer.LastProfitFixConfig)
 	}
 
 	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx,
@@ -1337,4 +1302,36 @@ func selectSessions2(
 	s1 = sessions[n1]
 	s2 = sessions[n2]
 	return s1, s2, nil
+}
+
+func (s *Strategy) fixProfit(
+	ctx context.Context,
+	makerSession, hedgeSession *bbgo.ExchangeSession,
+) error {
+	if !s.StrategyProfitFixer.NeedsProfitFixing() {
+		return nil
+	}
+	bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)
+	log.Infof("profitFixer is enabled, checking checkpoint: %+v", s.StrategyProfitFixer.ProfitFixerConfig.TradesSince)
+
+	makerMarket, _ := makerSession.Market(s.Symbol)
+
+	position, profitStats, err := s.StrategyProfitFixer.Fix(
+		ctx,
+		s.Environment,
+		&s.ConverterManager,
+		makerMarket,
+		[]*bbgo.ExchangeSession{makerSession, hedgeSession},
+		s.CrossExchangeMarketMakingStrategy.Position,
+	)
+	if err != nil {
+		return err
+	}
+	bbgo.Notify("Fixed %s position", s.Symbol, position)
+	bbgo.Notify("Fixed %s profitStats", s.Symbol, profitStats)
+	if s.StrategyProfitFixer.ProfitFixerConfig.Apply {
+		s.CrossExchangeMarketMakingStrategy.Position = position
+		s.CrossExchangeMarketMakingStrategy.ProfitStats = profitStats
+	}
+	return nil
 }
