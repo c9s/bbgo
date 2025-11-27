@@ -2660,7 +2660,7 @@ func (s *Strategy) CrossRun(
 		s.logger.WithError(err).Warnf("unable to cancel all orders: %v", err)
 	}
 
-	s.Position.UpdateMetrics()
+	s.Position.UpdateMetrics(nil)
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 
 	// restore position into the position exposure
