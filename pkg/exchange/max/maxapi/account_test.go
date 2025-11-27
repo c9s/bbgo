@@ -5,17 +5,19 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/testutil"
 )
 
 func TestAccountService_GetAccountsRequest(t *testing.T) {
-	key, secret, ok := integrationTestConfigured(t, "MAX")
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
 	if !ok {
 		t.SkipNow()
 	}
 
 	ctx := context.Background()
 
-	client := NewRestClient(ProductionAPIURL)
+	client := NewRestClientDefault()
 	client.Auth(key, secret)
 
 	req := client.NewGetAccountsRequest()
@@ -28,14 +30,14 @@ func TestAccountService_GetAccountsRequest(t *testing.T) {
 }
 
 func TestAccountService_GetAccountRequest(t *testing.T) {
-	key, secret, ok := integrationTestConfigured(t, "MAX")
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
 	if !ok {
 		t.SkipNow()
 	}
 
 	ctx := context.Background()
 
-	client := NewRestClient(ProductionAPIURL)
+	client := NewRestClientDefault()
 	client.Auth(key, secret)
 
 	req := client.NewGetAccountRequest()
@@ -54,14 +56,14 @@ func TestAccountService_GetAccountRequest(t *testing.T) {
 }
 
 func TestAccountService_GetVipLevelRequest(t *testing.T) {
-	key, secret, ok := integrationTestConfigured(t, "MAX")
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
 	if !ok {
 		t.SkipNow()
 	}
 
 	ctx := context.Background()
 
-	client := NewRestClient(ProductionAPIURL)
+	client := NewRestClientDefault()
 	client.Auth(key, secret)
 
 	req := client.NewGetVipLevelRequest()
@@ -72,14 +74,14 @@ func TestAccountService_GetVipLevelRequest(t *testing.T) {
 }
 
 func TestAccountService_GetWithdrawHistoryRequest(t *testing.T) {
-	key, secret, ok := integrationTestConfigured(t, "MAX")
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
 	if !ok {
 		t.SkipNow()
 	}
 
 	ctx := context.Background()
 
-	client := NewRestClient(ProductionAPIURL)
+	client := NewRestClientDefault()
 	client.Auth(key, secret)
 
 	req := client.NewGetWithdrawalHistoryRequest()
@@ -92,14 +94,14 @@ func TestAccountService_GetWithdrawHistoryRequest(t *testing.T) {
 }
 
 func TestAccountService_NewGetDepositHistoryRequest(t *testing.T) {
-	key, secret, ok := integrationTestConfigured(t, "MAX")
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
 	if !ok {
 		t.SkipNow()
 	}
 
 	ctx := context.Background()
 
-	client := NewRestClient(ProductionAPIURL)
+	client := NewRestClientDefault()
 	client.Auth(key, secret)
 
 	req := client.NewGetDepositHistoryRequest()

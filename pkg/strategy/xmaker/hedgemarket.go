@@ -581,6 +581,10 @@ func (m *HedgeMarket) allowMarginHedge(
 		debtQuota = fixedpoint.Min(debtQuota, leverageQuotaInUsd)
 	}
 
+	if debtQuota.Sign() <= 0 {
+		return false, zero
+	}
+
 	if price.IsZero() {
 		return false, zero
 	}

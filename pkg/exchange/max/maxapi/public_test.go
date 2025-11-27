@@ -5,16 +5,18 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/testutil"
 )
 
 func TestPublicService(t *testing.T) {
-	key, secret, ok := integrationTestConfigured(t, "MAX")
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
 	if !ok {
 		t.SkipNow()
 	}
 
 	ctx := context.Background()
-	client := NewRestClient(ProductionAPIURL)
+	client := NewRestClientDefault()
 	_ = key
 	_ = secret
 
