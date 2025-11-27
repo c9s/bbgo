@@ -61,35 +61,6 @@ type VipLevel struct {
 	Next    VipLevelSettings `json:"next_vip_level"`
 }
 
-//go:generate GetRequest -url "v2/members/vip_level" -type GetVipLevelRequest -responseType .VipLevel
-type GetVipLevelRequest struct {
-	client requestgen.AuthenticatedAPIClient
-}
-
-func (c *RestClient) NewGetVipLevelRequest() *GetVipLevelRequest {
-	return &GetVipLevelRequest{client: c}
-}
-
-//go:generate GetRequest -url "v2/members/accounts/:currency" -type GetAccountRequest -responseType .Account
-type GetAccountRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	currency string `param:"currency,slug"`
-}
-
-func (c *RestClient) NewGetAccountRequest() *GetAccountRequest {
-	return &GetAccountRequest{client: c}
-}
-
-//go:generate GetRequest -url "v2/members/accounts" -type GetAccountsRequest -responseType []Account
-type GetAccountsRequest struct {
-	client requestgen.AuthenticatedAPIClient
-}
-
-func (c *RestClient) NewGetAccountsRequest() *GetAccountsRequest {
-	return &GetAccountsRequest{client: c}
-}
-
 // submitted -> accepted -> processing -> sent -> confirmed
 type WithdrawState string
 
