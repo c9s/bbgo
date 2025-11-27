@@ -41,26 +41,6 @@ type Ticker struct {
 	VolumeInBTC fixedpoint.Value `json:"vol_in_btc"`
 }
 
-func (s *PublicService) Timestamp(ctx context.Context) (int64, error) {
-	req := s.client.NewGetTimestampRequest()
-	ts, err := req.Do(ctx)
-	if err != nil || ts == nil {
-		return 0, nil
-	}
-
-	return int64(*ts), nil
-}
-
-func (s *PublicService) Markets(ctx context.Context) ([]Market, error) {
-	req := s.client.NewGetMarketsRequest()
-	return req.Do(ctx)
-}
-
-func (s *PublicService) Tickers(ctx context.Context) (TickerMap, error) {
-	req := s.client.NewGetTickersRequest()
-	return req.Do(ctx)
-}
-
 func (s *PublicService) Ticker(market string) (*Ticker, error) {
 	req := s.client.NewGetTickerRequest()
 	req.Market(market)
