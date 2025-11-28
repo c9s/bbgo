@@ -58,24 +58,22 @@ func toGlobalSideType(v string) types.SideType {
 	return types.SideType(v)
 }
 
-func toGlobalRewards(maxRewards []max.Reward) ([]types.Reward, error) {
+func toGlobalRewards(maxRewards []v3.Reward) []types.Reward {
 	// convert to global reward
 	var rewards []types.Reward
 	for _, r := range maxRewards {
-		// ignore "accepted"
-		if r.State != "done" {
-			continue
-		}
-
-		reward, err := r.Reward()
-		if err != nil {
-			return nil, err
-		}
-
-		rewards = append(rewards, *reward)
+		rewards = append(rewards, types.Reward{
+			UUID:      r.UUID,
+			Exchange:  types.ExchangeMax,
+			Type:      types.RewardType(r.Type),
+			Currency:  toGlobalCurrency(r.Currency),
+			Quantity:  r.Amount,
+			Note:      r.Note,
+			CreatedAt: types.Time(r.CreatedAt.Time()),
+		})
 	}
 
-	return rewards, nil
+	return rewards
 }
 
 func toGlobalOrderStatus(
