@@ -214,25 +214,6 @@ func (s *StandardStream) SetParser(parser Parser) {
 	s.parser = parser
 }
 
-func (s *StandardStream) SetConn(ctx context.Context, conn *websocket.Conn) (context.Context, context.CancelFunc) {
-	// should only start one connection one time, so we lock the mutex
-	connCtx, connCancel := context.WithCancel(ctx)
-	s.ConnLock.Lock()
-
-	// ensure the previous context is cancelled and all routines are closed.
-	if s.ConnCancel != nil {
-		s.ConnCancel()
-		s.sg.WaitAndClear()
-	}
-
-	// create a new context for this connection
-	s.Conn = conn
-	s.ConnCtx = connCtx
-	s.ConnCancel = connCancel
-	s.ConnLock.Unlock()
-	return connCtx, connCancel
-}
-
 func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc) {
 	defer func() {
 		cancel()
@@ -456,12 +437,26 @@ func (s *StandardStream) reconnector(ctx context.Context) {
 }
 
 func (s *StandardStream) DialAndConnect(ctx context.Context) error {
-	conn, err := s.Dial(ctx)
+	// should only start one connection one time, so we lock the mutex
+	s.ConnLock.Lock()
+	defer s.ConnLock.Unlock()
+
+	// ensure the previous context is cancelled and all routines are closed.
+	if s.ConnCancel != nil {
+		s.ConnCancel()
+		s.sg.WaitAndClear()
+	}
+
+	connCtx, connCancel := context.WithCancel(ctx)
+	conn, err := s.Dial(connCtx)
 	if err != nil {
 		return err
 	}
 
-	connCtx, connCancel := s.SetConn(ctx, conn)
+	s.Conn = conn
+	s.ConnCtx = connCtx
+	s.ConnCancel = connCancel
+
 	s.EmitConnect()
 
 	s.sg.Add(func() {
@@ -488,7 +483,7 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 		return nil, errors.New("can not dial, neither url nor endpoint creator is not defined, you should pass an url to Dial() or call SetEndpointCreator()")
 	}
 
-	conn, _, err := defaultDialer.Dial(url, nil)
+	conn, _, err := defaultDialer.DialContext(ctx, url, nil)
 	if err != nil {
 		return nil, err
 	}
