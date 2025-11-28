@@ -1,5 +1,10 @@
 package v3
 
+import (
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
 type RewardType string
 
 const (
@@ -13,3 +18,19 @@ const (
 	RewardVipRebate  = RewardType("vip_rebate")
 	RewardYield      = RewardType("yield")
 )
+
+type Reward struct {
+	// UUID here is more like SN, not the real UUID
+	UUID string `json:"uuid"`
+
+	Type RewardType `json:"type"`
+
+	Currency string `json:"currency"`
+
+	Amount fixedpoint.Value `json:"amount"`
+
+	Note string `json:"note"`
+
+	// Unix timestamp in seconds
+	CreatedAt types.MillisecondTimestamp `json:"created_at"`
+}
