@@ -207,7 +207,7 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		ExecutedQuantity: Number(1.0),
 		Status:           types.OrderStatusFilled,
 	}
-	sourceSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, nil)
+	sourceSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, nil).Times(1)
 
 	submitOrder2 := types.SubmitOrder{
 		Market:           fiatMarket,
@@ -223,7 +223,7 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		ExecutedQuantity: Number(104000.0),
 		Status:           types.OrderStatusFilled,
 	}
-	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().SubmitOrder(gomock.Any(), submitOrder2).Return(&createdOrder2, nil)
+	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().SubmitOrder(gomock.Any(), submitOrder2).Return(&createdOrder2, nil).Times(1)
 
 	// add position to delta
 	makerPosition.AddTrade(types.Trade{
@@ -247,14 +247,15 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	// TRIGGER: send position delta to source hedge market
 	sourceHedgeMarket.positionDeltaC <- Number(1.0)
 	time.Sleep(stepTime)
+	<-sourceHedgeMarket.hedgedC
 
 	sourceUserDataStream.EmitTradeUpdate(types.Trade{
 		ID:            createdOrder.OrderID,
 		OrderID:       createdOrder.OrderID,
 		Exchange:      createdOrder.Exchange,
 		Price:         Number(104_000.0),
-		Quantity:      Number(1.0),
-		QuoteQuantity: Number(104000.0 * 1.0),
+		Quantity:      createdOrder.Quantity,
+		QuoteQuantity: Number(104000.0).Mul(createdOrder.Quantity),
 		Symbol:        createdOrder.Symbol,
 		Side:          createdOrder.Side,
 		IsBuyer:       createdOrder.Side == types.SideTypeBuy,
@@ -271,8 +272,8 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		OrderID:       createdOrder2.OrderID,
 		Exchange:      createdOrder2.Exchange,
 		Price:         Number(30.0),
-		Quantity:      Number(104000.0),
-		QuoteQuantity: Number(104000.0 * 30.0),
+		Quantity:      createdOrder2.Quantity,
+		QuoteQuantity: Number(30.0).Mul(createdOrder2.Quantity),
 		Symbol:        createdOrder2.Symbol,
 		Side:          createdOrder2.Side,
 		IsBuyer:       createdOrder2.Side == types.SideTypeBuy,
@@ -282,6 +283,7 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		FeeCurrency:   "",
 	})
 	time.Sleep(stepTime)
+	<-fiatHedgeMarket.hedgedC
 	assert.Equal(t, Number(0).Float64(), sourceHedgeMarket.Position.GetBase().Float64(), "source position should be closed to 0")
 	assert.Equal(t, Number(0).Float64(), fiatHedgeMarket.Position.GetBase().Float64(), "fiat position should be closed to 0")
 	assert.Equal(t, Number(0).Float64(), makerPosition.GetBase().Float64(), "the maker position should be closed to 0")
