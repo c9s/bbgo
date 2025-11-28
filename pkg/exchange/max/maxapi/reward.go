@@ -4,7 +4,6 @@ package maxapi
 //go:generate -command PostRequest requestgen -method POST
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -46,22 +45,6 @@ func ParseRewardType(s string) (RewardType, error) {
 	}
 
 	return RewardType(""), fmt.Errorf("unknown reward type: %s", s)
-}
-
-func (t *RewardType) UnmarshalJSON(o []byte) error {
-	var s string
-	var err = json.Unmarshal(o, &s)
-	if err != nil {
-		return err
-	}
-
-	rt, err := ParseRewardType(s)
-	if err != nil {
-		return err
-	}
-
-	*t = rt
-	return nil
 }
 
 func (t RewardType) RewardType() (types.RewardType, error) {

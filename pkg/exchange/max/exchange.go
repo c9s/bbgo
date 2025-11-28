@@ -1297,15 +1297,6 @@ func (e *Exchange) QueryDepth(
 
 var Two = fixedpoint.NewFromInt(2)
 
-func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedpoint.Value, error) {
-	ticker, err := e.client.PublicService.Ticker(toLocalSymbol(symbol))
-	if err != nil {
-		return fixedpoint.Zero, err
-	}
-
-	return ticker.Sell.Add(ticker.Buy).Div(Two), nil
-}
-
 func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
 	req := e.v3client.NewMarginRepayRequest()
 	req.Currency(toLocalCurrency(asset))

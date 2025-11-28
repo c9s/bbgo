@@ -120,7 +120,6 @@ type RestClient struct {
 
 	SubAccount string
 
-	PublicService     *PublicService
 	RewardService     *RewardService
 	WithdrawalService *WithdrawalService
 
@@ -155,7 +154,6 @@ func NewRestClient(baseURL string) *RestClient {
 		apiKeyNonce: make(map[string]int64),
 	}
 
-	client.PublicService = &PublicService{client}
 	client.RewardService = &RewardService{client}
 	client.WithdrawalService = &WithdrawalService{client}
 

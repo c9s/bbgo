@@ -4,8 +4,6 @@ package maxapi
 //go:generate -command PostRequest requestgen -method POST
 
 import (
-	"github.com/c9s/requestgen"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -61,30 +59,6 @@ const (
 	OrderTypeStopMarket = OrderType("stop_market")
 	OrderTypeIOCLimit   = OrderType("ioc_limit")
 )
-
-type QueryOrderOptions struct {
-	GroupID int
-	Offset  int
-	Limit   int
-	Page    int
-	OrderBy string
-}
-
-// OrderService manages the Order endpoint.
-type OrderService struct {
-	client requestgen.AuthenticatedAPIClient
-}
-
-type SubmitOrder struct {
-	Side      string    `json:"side"`
-	Market    string    `json:"market"`
-	Price     string    `json:"price"`
-	StopPrice string    `json:"stop_price,omitempty"`
-	OrderType OrderType `json:"ord_type"`
-	Volume    string    `json:"volume"`
-	GroupID   uint32    `json:"group_id,omitempty"`
-	ClientOID string    `json:"client_oid,omitempty"`
-}
 
 // Order represents one returned order (POST order/GET order/GET orders) on the max platform.
 type Order struct {
