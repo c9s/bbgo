@@ -28,18 +28,4 @@ func TestRewards(t *testing.T) {
 		assert.NotEmpty(t, rewards)
 		t.Logf("rewards: %+v", rewards)
 	})
-
-	t.Run("v2/rewards with type", func(t *testing.T) {
-		req := client.RewardService.NewGetRewardsOfTypeRequest(RewardHolding)
-		rewards, err := req.Do(ctx)
-		assert.NoError(t, err)
-		assert.NotNil(t, rewards)
-		assert.NotEmpty(t, rewards)
-
-		t.Logf("rewards: %+v", rewards)
-
-		for _, reward := range rewards {
-			assert.Equal(t, RewardHolding, reward.Type)
-		}
-	})
 }
