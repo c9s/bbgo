@@ -9,33 +9,52 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
+/*
+ * From sets From Unix-timestamp
+ */
 func (g *GetRewardsOfTypeRequest) From(from int64) *GetRewardsOfTypeRequest {
 	g.from = &from
 	return g
 }
 
+/*
+ * To sets To Unix-timestamp
+ */
 func (g *GetRewardsOfTypeRequest) To(to int64) *GetRewardsOfTypeRequest {
 	g.to = &to
 	return g
 }
 
+/*
+ * Page sets
+ */
 func (g *GetRewardsOfTypeRequest) Page(page int64) *GetRewardsOfTypeRequest {
 	g.page = &page
 	return g
 }
 
+/*
+ * Limit sets
+ */
 func (g *GetRewardsOfTypeRequest) Limit(limit int64) *GetRewardsOfTypeRequest {
 	g.limit = &limit
 	return g
 }
 
+/*
+ * Offset sets
+ */
 func (g *GetRewardsOfTypeRequest) Offset(offset int64) *GetRewardsOfTypeRequest {
 	g.offset = &offset
 	return g
 }
 
+/*
+ * PathType sets
+ */
 func (g *GetRewardsOfTypeRequest) PathType(pathType RewardType) *GetRewardsOfTypeRequest {
 	g.pathType = &pathType
 	return g
@@ -46,8 +65,14 @@ func (g *GetRewardsOfTypeRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
 
 	query := url.Values{}
-	for k, v := range params {
-		query.Add(k, fmt.Sprintf("%v", v))
+	for _k, _v := range params {
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -60,6 +85,12 @@ func (g *GetRewardsOfTypeRequest) GetParameters() (map[string]interface{}, error
 	if g.from != nil {
 		from := *g.from
 
+		// TEMPLATE check-required
+
+		if from == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of from
 		params["from"] = from
 	} else {
@@ -67,6 +98,12 @@ func (g *GetRewardsOfTypeRequest) GetParameters() (map[string]interface{}, error
 	// check to field -> json key to
 	if g.to != nil {
 		to := *g.to
+
+		// TEMPLATE check-required
+
+		if to == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of to
 		params["to"] = to
@@ -76,6 +113,12 @@ func (g *GetRewardsOfTypeRequest) GetParameters() (map[string]interface{}, error
 	if g.page != nil {
 		page := *g.page
 
+		// TEMPLATE check-required
+
+		if page == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of page
 		params["page"] = page
 	} else {
@@ -84,6 +127,12 @@ func (g *GetRewardsOfTypeRequest) GetParameters() (map[string]interface{}, error
 	if g.limit != nil {
 		limit := *g.limit
 
+		// TEMPLATE check-required
+
+		if limit == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of limit
 		params["limit"] = limit
 	} else {
@@ -91,6 +140,12 @@ func (g *GetRewardsOfTypeRequest) GetParameters() (map[string]interface{}, error
 	// check offset field -> json key offset
 	if g.offset != nil {
 		offset := *g.offset
+
+		// TEMPLATE check-required
+
+		if offset == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of offset
 		params["offset"] = offset
@@ -109,13 +164,13 @@ func (g *GetRewardsOfTypeRequest) GetParametersQuery() (url.Values, error) {
 		return query, err
 	}
 
-	for k, v := range params {
-		if g.isVarSlice(v) {
-			g.iterateSlice(v, func(it interface{}) {
-				query.Add(k+"[]", fmt.Sprintf("%v", it))
+	for _k, _v := range params {
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
 			})
 		} else {
-			query.Add(k, fmt.Sprintf("%v", v))
+			query.Add(_k, fmt.Sprintf("%v", _v))
 		}
 	}
 
@@ -139,33 +194,49 @@ func (g *GetRewardsOfTypeRequest) GetSlugParameters() (map[string]interface{}, e
 	if g.pathType != nil {
 		pathType := *g.pathType
 
+		// TEMPLATE check-required
+		if len(pathType) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of pathType
 		params["path_type"] = pathType
 
+	} else {
 	}
 
 	return params, nil
 }
 
+var GetRewardsOfTypeRequestSlugReCache sync.Map
+
 func (g *GetRewardsOfTypeRequest) applySlugsToUrl(url string, slugs map[string]string) string {
-	for k, v := range slugs {
-		needleRE := regexp.MustCompile(":" + k + "\\b")
-		url = needleRE.ReplaceAllString(url, v)
+	for _k, _v := range slugs {
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetRewardsOfTypeRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetRewardsOfTypeRequestSlugReCache.Store(_k, needleRE)
+		}
+
+		url = needleRE.ReplaceAllString(url, _v)
 	}
 
 	return url
 }
 
-func (g *GetRewardsOfTypeRequest) iterateSlice(slice interface{}, f func(it interface{})) {
+func (g *GetRewardsOfTypeRequest) iterateSlice(slice interface{}, _f func(it interface{})) {
 	sliceValue := reflect.ValueOf(slice)
-	for i := 0; i < sliceValue.Len(); i++ {
-		it := sliceValue.Index(i).Interface()
-		f(it)
+	for _i := 0; _i < sliceValue.Len(); _i++ {
+		it := sliceValue.Index(_i).Interface()
+		_f(it)
 	}
 }
 
-func (g *GetRewardsOfTypeRequest) isVarSlice(v interface{}) bool {
-	rt := reflect.TypeOf(v)
+func (g *GetRewardsOfTypeRequest) isVarSlice(_v interface{}) bool {
+	rt := reflect.TypeOf(_v)
 	switch rt.Kind() {
 	case reflect.Slice:
 		return true
@@ -180,13 +251,19 @@ func (g *GetRewardsOfTypeRequest) GetSlugsMap() (map[string]string, error) {
 		return slugs, nil
 	}
 
-	for k, v := range params {
-		slugs[k] = fmt.Sprintf("%v", v)
+	for _k, _v := range params {
+		slugs[_k] = fmt.Sprintf("%v", _v)
 	}
 
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetRewardsOfTypeRequest) GetPath() string {
+	return "v2/rewards/:path_type"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetRewardsOfTypeRequest) Do(ctx context.Context) ([]Reward, error) {
 
 	// empty params for GET operation
@@ -196,7 +273,9 @@ func (g *GetRewardsOfTypeRequest) Do(ctx context.Context) ([]Reward, error) {
 		return nil, err
 	}
 
-	apiURL := "v2/rewards/:path_type"
+	var apiURL string
+
+	apiURL = g.GetPath()
 	slugs, err := g.GetSlugsMap()
 	if err != nil {
 		return nil, err
@@ -215,8 +294,32 @@ func (g *GetRewardsOfTypeRequest) Do(ctx context.Context) ([]Reward, error) {
 	}
 
 	var apiResponse []Reward
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return apiResponse, nil
 }

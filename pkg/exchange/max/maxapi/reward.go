@@ -25,28 +25,6 @@ const (
 	RewardVipRebate  = RewardType("vip_rebate")
 )
 
-func ParseRewardType(s string) (RewardType, error) {
-	switch s {
-	case "airdrop_reward":
-		return RewardAirdrop, nil
-	case "commission":
-		return RewardCommission, nil
-	case "holding_reward":
-		return RewardHolding, nil
-	case "mining_reward":
-		return RewardMining, nil
-	case "trading_reward":
-		return RewardTrading, nil
-	case "vip_rebate":
-		return RewardVipRebate, nil
-	case "redemption_reward":
-		return RewardRedemption, nil
-
-	}
-
-	return RewardType(""), fmt.Errorf("unknown reward type: %s", s)
-}
-
 func (t RewardType) RewardType() (types.RewardType, error) {
 	switch t {
 
@@ -107,46 +85,4 @@ func (reward Reward) Reward() (*types.Reward, error) {
 
 type RewardService struct {
 	client requestgen.AuthenticatedAPIClient
-}
-
-func (s *RewardService) NewGetRewardsRequest() *GetRewardsRequest {
-	return &GetRewardsRequest{client: s.client}
-}
-
-func (s *RewardService) NewGetRewardsOfTypeRequest(pathType RewardType) *GetRewardsOfTypeRequest {
-	return &GetRewardsOfTypeRequest{client: s.client, pathType: &pathType}
-}
-
-//go:generate GetRequest -url "v2/rewards/:path_type" -type GetRewardsOfTypeRequest -responseType []Reward
-type GetRewardsOfTypeRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	pathType *RewardType `param:"path_type,slug"`
-
-	// From Unix-timestamp
-	from *int64 `param:"from"`
-
-	// To Unix-timestamp
-	to *int64 `param:"to"`
-
-	page   *int64 `param:"page"`
-	limit  *int64 `param:"limit"`
-	offset *int64 `param:"offset"`
-}
-
-//go:generate GetRequest -url "v2/rewards" -type GetRewardsRequest -responseType []Reward
-type GetRewardsRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	currency *string `param:"currency"`
-
-	// From Unix-timestamp
-	from *int64 `param:"from"`
-
-	// To Unix-timestamp
-	to *int64 `param:"to"`
-
-	page   *int64 `param:"page"`
-	limit  *int64 `param:"limit"`
-	offset *int64 `param:"offset"`
 }
