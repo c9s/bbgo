@@ -13,10 +13,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type AccountService struct {
-	client requestgen.AuthenticatedAPIClient
-}
-
 // Account is for max rest api v2, Balance and Type will be conflict with types.PrivateBalanceUpdate
 type Account struct {
 	Type     string           `json:"type"`
