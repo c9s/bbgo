@@ -37,10 +37,28 @@ var usedWeightGauge = prometheus.NewGaugeVec(
 	}, []string{"window", "uri"},
 )
 
+// requestCounter counts outgoing Binance REST API requests by HTTP method and URI path.
+var requestCounter = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "binance_request_total",
+		Help: "Total number of Binance REST API requests sent, partitioned by HTTP method and request URI path.",
+	}, []string{"method", "uri"},
+)
+
+// durationHistogram observes the latency (in milliseconds) of Binance REST API requests by HTTP method and URI path.
+var durationHistogram = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name:    "binance_request_duration_milliseconds",
+		Help:    "Latency of Binance REST API requests in milliseconds, partitioned by HTTP method and request URI path.",
+		// Millisecond buckets: 1ms,2ms,5ms,10ms,25ms,50ms,100ms,250ms,500ms,1s,2.5s,5s,10s
+		Buckets: []float64{1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000},
+	}, []string{"method", "uri"},
+)
+
 var usedWeightWindowRe = regexp.MustCompile(`(?i)^X-MBX-USED-WEIGHT-(\d+)([SMHD])$`)
 
 func init() {
-	prometheus.MustRegister(usedWeightGauge)
+	prometheus.MustRegister(usedWeightGauge, requestCounter, durationHistogram)
 }
 
 var errNoApiKey = errors.New("empty api key")
@@ -136,7 +154,25 @@ func (c *RestClient) SetTimeOffsetFromServer(ctx context.Context) error {
 }
 
 func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error) {
+	// Increment request counter by method and URI path as soon as we are about to send the request.
+	var method, uriPath string
+	if req != nil && req.URL != nil {
+		method = strings.ToUpper(req.Method)
+		if method == "" {
+			method = "GET"
+		}
+		uriPath = req.URL.Path
+		requestCounter.WithLabelValues(method, uriPath).Inc()
+	}
+
+	start := time.Now()
 	resp, err := c.BaseAPIClient.SendRequest(req)
+	// Observe duration in milliseconds to match metric unit
+	ms := float64(time.Since(start).Milliseconds())
+	if method != "" && uriPath != "" {
+		durationHistogram.WithLabelValues(method, uriPath).Observe(ms)
+	}
+
 	if err == nil && resp != nil {
 		c.observeUsedWeight(resp)
 	}
