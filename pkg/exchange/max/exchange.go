@@ -1179,50 +1179,22 @@ func (e *Exchange) queryTradesByID(ctx context.Context, symbol string, tradeID u
 }
 
 func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]types.Reward, error) {
-	var from = startTime
-	var emptyTime = time.Time{}
-
-	if from == emptyTime {
-		from = time.Unix(maxapi.TimestampSince, 0)
+	if startTime.IsZero() {
+		startTime = time.Unix(maxapi.TimestampSince, 0)
 	}
 
-	var now = time.Now()
-	for {
-		if from.After(now) {
-			return nil, nil
-		}
-
-		// scan by 30 days
-		// an user might get most 14 commission records by currency per day
-		// limit 1000 / 14 = 71 days
-		to := from.Add(time.Hour * 24 * 30)
-		req := e.client.RewardService.NewGetRewardsRequest()
-		req.From(from.Unix())
-		req.To(to.Unix())
-		req.Limit(1000)
-
-		maxRewards, err := req.Do(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(maxRewards) == 0 {
-			// next page
-			from = to
-			continue
-		}
-
-		rewards, err := toGlobalRewards(maxRewards)
-		if err != nil {
-			return nil, err
-		}
-
-		// sort them in the ascending order
-		sort.Sort(types.RewardSliceByCreationTime(rewards))
-		return rewards, nil
+	req := e.v3client.NewGetRewardsRequest()
+	req.Timestamp(startTime.Unix())
+	req.Order("asc")
+	req.Limit(1000) // max limit = 1000
+	maxRewards, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, errors.New("unknown error")
+	rewards := toGlobalRewards(maxRewards)
+	sort.Sort(types.RewardSliceByCreationTime(rewards))
+	return rewards, nil
 }
 
 // QueryKLines returns the klines from the MAX exchange API.
