@@ -41,19 +41,6 @@ func (s *PositionService) Load(ctx context.Context, id int64) (*types.Position, 
 	return nil, errors.Wrapf(ErrTradeNotFound, "position id:%d not found", id)
 }
 
-func (s *PositionService) scanRows(rows *sqlx.Rows) (positions []types.Position, err error) {
-	for rows.Next() {
-		var p types.Position
-		if err := rows.StructScan(&p); err != nil {
-			return positions, err
-		}
-
-		positions = append(positions, p)
-	}
-
-	return positions, rows.Err()
-}
-
 func (s *PositionService) Insert(
 	position *types.Position,
 	trade types.Trade,
