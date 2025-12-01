@@ -35,19 +35,6 @@ func (s *ProfitService) Load(ctx context.Context, id int64) (*types.Trade, error
 	return nil, errors.Wrapf(ErrTradeNotFound, "trade id:%d not found", id)
 }
 
-func (s *ProfitService) scanRows(rows *sqlx.Rows) (profits []types.Profit, err error) {
-	for rows.Next() {
-		var profit types.Profit
-		if err := rows.StructScan(&profit); err != nil {
-			return profits, err
-		}
-
-		profits = append(profits, profit)
-	}
-
-	return profits, rows.Err()
-}
-
 func (s *ProfitService) Insert(profit types.Profit) error {
 	_, err := s.DB.NamedExec(`
 		INSERT INTO profits (
