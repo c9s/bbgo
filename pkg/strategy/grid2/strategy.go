@@ -994,22 +994,18 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 // CloseGrid closes the grid orders
 func (s *Strategy) CloseGrid(ctx context.Context) error {
 	s.writeMutex.Lock()
-	defer s.writeMutex.Unlock()
-
 	s.logger.Infof("closing %s grid", s.Symbol)
-
 	if s.cancelWrite != nil {
 		s.cancelWrite()
 	}
 
 	defer s.EmitGridClosed()
 
-	bbgo.Sync(ctx, s)
-
 	// now we can cancel the open orders
 	s.logger.Infof("canceling grid orders...")
 
 	err := s.cancelAll(ctx)
+	s.writeMutex.Unlock()
 
 	// free the grid object
 	s.setGrid(nil)
@@ -2140,42 +2136,4 @@ func (s *Strategy) newClientOrderID() string {
 		return uuid.New().String()
 	}
 	return ""
-}
-
-func (s *Strategy) recoverActiveOrders(ctx context.Context, session *bbgo.ExchangeSession) {
-	s.logger.Infof("recovering active orders after websocket connect")
-
-	grid := s.getGrid()
-	if grid == nil {
-		return
-	}
-
-	// this lock avoids recovering the active orders while the openGrid is executing
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// TODO: move this logics into the active maker orders component, like activeOrders.Sync(ctx)
-	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
-	activeOrders := activeOrderBook.Orders()
-	if len(activeOrders) == 0 {
-		return
-	}
-
-	s.logger.Infof("found %d active orders to update...", len(activeOrders))
-	for i, o := range activeOrders {
-		s.logger.Infof("updating %d/%d order #%d...", i+1, len(activeOrders), o.OrderID)
-
-		updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, s.orderQueryService, types.OrderQuery{
-			Symbol:  o.Symbol,
-			OrderID: strconv.FormatUint(o.OrderID, 10),
-		})
-
-		if err != nil {
-			s.logger.WithError(err).Errorf("unable to query order")
-			return
-		}
-
-		s.logger.Infof("triggering updated order #%d: %s", o.OrderID, o.String())
-		activeOrderBook.Update(*updatedOrder)
-	}
 }
