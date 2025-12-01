@@ -14,12 +14,14 @@ func TestPosition_ROI(t *testing.T) {
 	t.Run("short position", func(t *testing.T) {
 		// Long position
 		pos := &Position{
-			Symbol:        "BTCUSDT",
-			BaseCurrency:  "BTC",
-			QuoteCurrency: "USDT",
-			Base:          fixedpoint.NewFromFloat(-10.0),
-			AverageCost:   fixedpoint.NewFromFloat(8000.0),
-			Quote:         fixedpoint.NewFromFloat(8000.0 * 10.0),
+			Symbol:             "BTCUSDT",
+			BaseCurrency:       "BTC",
+			QuoteCurrency:      "USDT",
+			Base:               fixedpoint.NewFromFloat(-10.0),
+			AverageCost:        fixedpoint.NewFromFloat(8000.0),
+			Quote:              fixedpoint.NewFromFloat(8000.0 * 10.0),
+			StrategyInstanceID: "test-position:BTCUSDT",
+			Strategy:           "test-position",
 		}
 
 		assert.True(t, pos.IsShort(), "should be a short position")
@@ -33,12 +35,14 @@ func TestPosition_ROI(t *testing.T) {
 	t.Run("long position", func(t *testing.T) {
 		// Long position
 		pos := &Position{
-			Symbol:        "BTCUSDT",
-			BaseCurrency:  "BTC",
-			QuoteCurrency: "USDT",
-			Base:          fixedpoint.NewFromFloat(10.0),
-			AverageCost:   fixedpoint.NewFromFloat(8000.0),
-			Quote:         fixedpoint.NewFromFloat(-8000.0 * 10.0),
+			Symbol:             "BTCUSDT",
+			BaseCurrency:       "BTC",
+			QuoteCurrency:      "USDT",
+			Base:               fixedpoint.NewFromFloat(10.0),
+			AverageCost:        fixedpoint.NewFromFloat(8000.0),
+			Quote:              fixedpoint.NewFromFloat(-8000.0 * 10.0),
+			StrategyInstanceID: "test-position:BTCUSDT",
+			Strategy:           "test-position",
 		}
 
 		assert.True(t, pos.IsLong(), "should be a long position")
@@ -52,9 +56,11 @@ func TestPosition_ROI(t *testing.T) {
 
 func TestPosition_ExchangeFeeRate_Short(t *testing.T) {
 	pos := &Position{
-		Symbol:        "BTCUSDT",
-		BaseCurrency:  "BTC",
-		QuoteCurrency: "USDT",
+		Symbol:             "BTCUSDT",
+		BaseCurrency:       "BTC",
+		QuoteCurrency:      "USDT",
+		StrategyInstanceID: "test-position:BTCUSDT",
+		Strategy:           "test-position",
 	}
 
 	feeRate := fixedpoint.NewFromFloat(0.075 * 0.01)
@@ -99,9 +105,11 @@ func TestPosition_ExchangeFeeRate_Short(t *testing.T) {
 
 func TestPosition_ExchangeFeeRate_Long(t *testing.T) {
 	pos := &Position{
-		Symbol:        "BTCUSDT",
-		BaseCurrency:  "BTC",
-		QuoteCurrency: "USDT",
+		Symbol:             "BTCUSDT",
+		BaseCurrency:       "BTC",
+		QuoteCurrency:      "USDT",
+		StrategyInstanceID: "test-position:BTCUSDT",
+		Strategy:           "test-position",
 	}
 
 	feeRate := fixedpoint.NewFromFloat(0.075 * 0.01)
@@ -328,9 +336,11 @@ func TestPosition(t *testing.T) {
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			pos := Position{
-				Symbol:        "BTCUSDT",
-				BaseCurrency:  "BTC",
-				QuoteCurrency: "USDT",
+				Symbol:             "BTCUSDT",
+				BaseCurrency:       "BTC",
+				QuoteCurrency:      "USDT",
+				StrategyInstanceID: "test-position:BTCUSDT",
+				Strategy:           "test-position",
 			}
 			profitAmount, _, profit := pos.AddTrades(testcase.trades)
 			assert.InDelta(t, testcase.expectedQuote.Float64(), pos.Quote.Float64(), 1e-3, "expectedQuote")
@@ -357,11 +367,13 @@ func TestPosition_SetClosing(t *testing.T) {
 
 func TestPosition_GetBaseAndAverageCost(t *testing.T) {
 	pos := Position{
-		Symbol:        "BTCUSDT",
-		BaseCurrency:  "BTC",
-		QuoteCurrency: "USDT",
-		Base:          fixedpoint.NewFromFloat(0.01),
-		AverageCost:   fixedpoint.NewFromFloat(1000),
+		Symbol:             "BTCUSDT",
+		BaseCurrency:       "BTC",
+		QuoteCurrency:      "USDT",
+		Base:               fixedpoint.NewFromFloat(0.01),
+		AverageCost:        fixedpoint.NewFromFloat(1000),
+		StrategyInstanceID: "test-position:BTCUSDT",
+		Strategy:           "test-position",
 	}
 	base, avgCost := pos.GetBaseAndAverageCost()
 	assert.Equal(t, pos.Base, base)
