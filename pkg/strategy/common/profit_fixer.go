@@ -380,7 +380,7 @@ func (f *ProfitFixer) fixFromTrades(
 	if len(allTrades) == 0 {
 		return nil
 	}
-
+	log.Infof("fixing profitStats and position from %d trades: %s", len(allTrades), position.Symbol)
 	trades := types.SortTradesAscending(allTrades)
 	oldestTrade := trades[0]
 	lastTrade := trades[len(trades)-1]
@@ -395,6 +395,8 @@ func (f *ProfitFixer) fixFromTrades(
 		if err != nil {
 			return fmt.Errorf("failed to delete existing position records: %w", err)
 		}
+		log.Infof("successfully cleared existing position records: %s (%s <==> %s)",
+			position.Symbol, oldestTrade.Time.String(), lastTrade.Time.String())
 	}
 	if f.Environment.ProfitService != nil {
 		// TODO: add strategy and strategy_instance_id filter
@@ -406,6 +408,8 @@ func (f *ProfitFixer) fixFromTrades(
 		if err != nil {
 			return fmt.Errorf("failed to delete existing profit records: %w", err)
 		}
+		log.Infof("successfully cleared existing profit records: %s (%s <==> %s)",
+			position.Symbol, oldestTrade.Time.String(), lastTrade.Time.String())
 	}
 	// do fixing from trades
 	for _, trade := range trades {
