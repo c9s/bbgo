@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -83,7 +84,7 @@ func Test_fixFromTrades(t *testing.T) {
 		stats := types.NewProfitStats(market)
 		fixer := newTestFixer()
 
-		err := fixer.fixFromTrades([]types.Trade{}, nil, stats, position)
+		err := fixer.fixFromTrades(context.Background(), []types.Trade{}, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -110,7 +111,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, nil, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.Equal(t, fixedpoint.NewFromInt(1).String(), position.Base.String())
@@ -150,7 +151,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, nil, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -205,7 +206,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, nil, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -249,7 +250,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, nil, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -302,7 +303,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, tokenFeePrices, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, tokenFeePrices, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -345,7 +346,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, nil, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -386,7 +387,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, nil, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.Equal(t, fixedpoint.NewFromInt(2).String(), position.Base.String())
@@ -436,7 +437,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, tokenFeePrices, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, tokenFeePrices, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -479,7 +480,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, nil, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		// After reversal, position should be short 1 BTC
@@ -521,7 +522,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, nil, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		// After reversal, position should be long 1 BTC
@@ -563,7 +564,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, nil, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -618,7 +619,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, nil, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -661,7 +662,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err := fixer.fixFromTrades(trades, nil, stats, position)
+		err := fixer.fixFromTrades(context.Background(), trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
@@ -733,7 +734,7 @@ func Test_fixFromTrades(t *testing.T) {
 			},
 		}
 
-		err = fixer.fixFromTrades(trades, nil, stats, position)
+		err = fixer.fixFromTrades(context.Background(), trades, nil, stats, position)
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())

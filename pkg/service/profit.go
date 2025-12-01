@@ -18,7 +18,7 @@ type ProfitService struct {
 func (s *ProfitService) Load(ctx context.Context, id int64) (*types.Trade, error) {
 	var trade types.Trade
 
-	rows, err := s.DB.NamedQuery("SELECT * FROM trades WHERE id = :id", map[string]interface{}{
+	rows, err := s.DB.NamedQueryContext(ctx, "SELECT * FROM trades WHERE id = :id", map[string]interface{}{
 		"id": id,
 	})
 	if err != nil {
@@ -36,7 +36,10 @@ func (s *ProfitService) Load(ctx context.Context, id int64) (*types.Trade, error
 }
 
 func (s *ProfitService) Insert(profit types.Profit) error {
-	_, err := s.DB.NamedExec(`
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	_, err := s.DB.NamedExecContext(ctx, `
 		INSERT INTO profits (
 			strategy,
 			strategy_instance_id,
@@ -102,7 +105,7 @@ type ProfitQueryOptions struct {
 	EndTime            time.Time // inclusive
 }
 
-func (s *ProfitService) Delete(options ProfitQueryOptions) error {
+func (s *ProfitService) Delete(ctx context.Context, options ProfitQueryOptions) error {
 	del := sq.Delete("profits")
 	if options.Strategy != "" {
 		del = del.Where(sq.Eq{"strategy": options.Strategy})
@@ -123,6 +126,6 @@ func (s *ProfitService) Delete(options ProfitQueryOptions) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.Exec(sql, args...)
+	_, err = s.DB.ExecContext(ctx, sql, args...)
 	return err
 }

@@ -369,10 +369,11 @@ func (f *ProfitFixer) Fix(
 	if err != nil {
 		return err
 	}
-	return f.fixFromTrades(allTrades, fm, stats, position)
+	return f.fixFromTrades(ctx, allTrades, fm, stats, position)
 }
 
 func (f *ProfitFixer) fixFromTrades(
+	ctx context.Context,
 	allTrades []types.Trade, tokenFeePrices map[tokenFeeKey]fixedpoint.Value,
 	stats *types.ProfitStats, position *types.Position,
 ) error {
@@ -386,7 +387,7 @@ func (f *ProfitFixer) fixFromTrades(
 	// clear existing position and profit records
 	if f.Environment.PositionService != nil {
 		// TODO: add strategy and strategy_instance_id filter
-		err := f.Environment.PositionService.Delete(service.PositionQueryOptions{
+		err := f.Environment.PositionService.Delete(ctx, service.PositionQueryOptions{
 			Symbol:    position.Symbol,
 			StartTime: oldestTrade.Time.Time(),
 			EndTime:   lastTrade.Time.Time(),
@@ -397,7 +398,7 @@ func (f *ProfitFixer) fixFromTrades(
 	}
 	if f.Environment.ProfitService != nil {
 		// TODO: add strategy and strategy_instance_id filter
-		err := f.Environment.ProfitService.Delete(service.ProfitQueryOptions{
+		err := f.Environment.ProfitService.Delete(ctx, service.ProfitQueryOptions{
 			Symbol:    position.Symbol,
 			StartTime: oldestTrade.Time.Time(),
 			EndTime:   lastTrade.Time.Time(),

@@ -24,7 +24,7 @@ func NewPositionService(db *sqlx.DB) *PositionService {
 func (s *PositionService) Load(ctx context.Context, id int64) (*types.Position, error) {
 	var pos types.Position
 
-	rows, err := s.DB.NamedQuery("SELECT * FROM positions WHERE id = :id", map[string]interface{}{
+	rows, err := s.DB.NamedQueryContext(ctx, "SELECT * FROM positions WHERE id = :id", map[string]interface{}{
 		"id": id,
 	})
 	if err != nil {
@@ -105,7 +105,7 @@ type PositionQueryOptions struct {
 	EndTime            time.Time // inclusive
 }
 
-func (s *PositionService) Delete(options PositionQueryOptions) error {
+func (s *PositionService) Delete(ctx context.Context, options PositionQueryOptions) error {
 	del := sq.Delete("positions")
 	if options.Strategy != "" {
 		del = del.Where(sq.Eq{"strategy": options.Strategy})
@@ -126,6 +126,6 @@ func (s *PositionService) Delete(options PositionQueryOptions) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.Exec(sql, args...)
+	_, err = s.DB.ExecContext(ctx, sql, args...)
 	return err
 }
