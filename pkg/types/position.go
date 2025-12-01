@@ -264,7 +264,14 @@ func (p *Position) GetQuantity() fixedpoint.Value {
 }
 
 func (p *Position) UnrealizedProfit(price fixedpoint.Value) fixedpoint.Value {
-	quantity := p.GetBase().Abs()
+	p.Lock()
+	defer p.Unlock()
+
+	return p.unrealizedProfit(price)
+}
+
+func (p *Position) unrealizedProfit(price fixedpoint.Value) fixedpoint.Value {
+	quantity := p.Base.Abs()
 
 	if p.IsLong() {
 		return price.Sub(p.AverageCost).Mul(quantity)
@@ -762,7 +769,7 @@ func (p *Position) updateMetrics(price *fixedpoint.Value) {
 	positionQuoteQuantityMetrics.With(labels).Set(p.Quote.Float64())
 
 	if price != nil {
-		unrealizedProfit := p.UnrealizedProfit(*price)
+		unrealizedProfit := p.unrealizedProfit(*price)
 		positionUnrealizedProfitMetrics.With(labels).Set(unrealizedProfit.Float64())
 	}
 }
