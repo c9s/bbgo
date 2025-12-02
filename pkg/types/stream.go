@@ -181,6 +181,18 @@ type StandardStreamEmitter interface {
 	EmitFuturesPositionSnapshot(FuturesPositionMap)
 }
 
+// NewStandardStream constructs a StandardStream with sane defaults.
+//
+// Key defaults:
+// - ReconnectC: a buffered channel used as a signal to reconnect
+// - CloseC: an unbuffered channel used to signal shutdown to internal goroutines
+// - pingInterval: defaults to 30s
+//
+// After construction, typical setup is:
+//  s.SetEndpointCreator(...)
+//  s.SetParser(...)
+//  s.SetDispatcher(...)
+//  s.Connect(ctx)
 func NewStandardStream() StandardStream {
 	return StandardStream{
 		ReconnectC:   make(chan struct{}, 1),
@@ -190,30 +202,43 @@ func NewStandardStream() StandardStream {
 	}
 }
 
+// SetPublicOnly switches the stream to public-only mode.
+// In public-only mode, the stream will connect to public market data endpoints
+// and skip any private/user-data setup that may require authentication.
+// This should typically be called before Connect.
 func (s *StandardStream) SetPublicOnly() {
 	s.PublicOnly = true
 }
 
+// GetPublicOnly reports whether the stream is in public-only mode.
 func (s *StandardStream) GetPublicOnly() bool {
 	return s.PublicOnly
 }
 
-// SetEndpointCreator sets the endpoint creator function to create the websocket endpoint URL.
-// This is useful when the endpoint URL is dynamic or needs to be created based on some context.
+// SetEndpointCreator sets a function that returns the websocket endpoint URL used by Dial.
+// Use this when the endpoint depends on runtime state (e.g. auth tokens, listen-keys).
+// If no URL argument is passed to Dial, this creator will be invoked. If neither is provided,
+// Dial returns an error.
 func (s *StandardStream) SetEndpointCreator(creator EndpointCreator) {
 	s.endpointCreator = creator
 }
 
-// SetDispatcher sets the dispatcher function to dispatch the parsed websocket message.
+// SetDispatcher sets the dispatcher function that receives parsed events from Read.
+// If set, every successfully parsed message will be passed to this dispatcher.
+// The dispatcher should be non-blocking or handle its own goroutine if it may block.
 func (s *StandardStream) SetDispatcher(dispatcher Dispatcher) {
 	s.dispatcher = dispatcher
 }
 
-// SetParser sets the parser function to parse the websocket message.
+// SetParser sets the parser that converts raw text WebSocket frames into typed events.
+// If not set, all text frames are emitted via OnRawMessage and not dispatched.
 func (s *StandardStream) SetParser(parser Parser) {
 	s.parser = parser
 }
 
+// SetConn atomically installs the given websocket connection and returns a derived context and cancel.
+// If a previous connection exists, its context is cancelled and internal goroutines are waited and cleared
+// before the new connection is set. This ensures only one active connection lifecycle at a time.
 func (s *StandardStream) SetConn(ctx context.Context, conn *websocket.Conn) (context.Context, context.CancelFunc) {
 	// should only start one connection one time, so we lock the mutex
 	connCtx, connCancel := context.WithCancel(ctx)
@@ -233,6 +258,13 @@ func (s *StandardStream) SetConn(ctx context.Context, conn *websocket.Conn) (con
 	return connCtx, connCancel
 }
 
+// Read runs the main read loop for a connected websocket.
+// It:
+// - sets read deadlines and reads text frames
+// - emits OnRawMessage when no parser is set, or when parsing fails, or when the event is not a pong
+// - invokes the parser (if any) and then the dispatcher (if any)
+// - on read/control errors, it closes the connection and schedules a reconnect via Reconnect()
+// The loop exits when ctx is done or Close() is called.
 func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc) {
 	defer func() {
 		cancel()
@@ -325,10 +357,15 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 	}
 }
 
+// SetPingInterval overrides the default ping interval used by the ping worker.
+// Useful to shorten intervals in tests or adapt to exchange-specific requirements.
 func (s *StandardStream) SetPingInterval(interval time.Duration) {
 	s.pingInterval = interval
 }
 
+// ping runs the periodic ping worker. On each tick it optionally calls the custom
+// heartBeat (if set) and then writes a websocket ping control frame. Any error from
+// the heartbeat or ping write triggers Reconnect() and exits the worker.
 func (s *StandardStream) ping(
 	ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc,
 ) {
@@ -367,6 +404,8 @@ func (s *StandardStream) ping(
 	}
 }
 
+// GetSubscriptions returns the current subscription list in a thread-safe way.
+// The returned slice is the internal one; treat it as read-only.
 func (s *StandardStream) GetSubscriptions() []Subscription {
 	s.subLock.Lock()
 	defer s.subLock.Unlock()
@@ -392,6 +431,9 @@ func (s *StandardStream) Resubscribe(fn func(old []Subscription) (new []Subscrip
 	return nil
 }
 
+// Subscribe appends a new subscription in a thread-safe manner.
+// This only records the intent locally; concrete exchange streams usually
+// send the broker-specific subscribe command in their OnConnect handler.
 func (s *StandardStream) Subscribe(channel Channel, symbol string, options SubscribeOptions) {
 	s.subLock.Lock()
 	defer s.subLock.Unlock()
@@ -403,6 +445,10 @@ func (s *StandardStream) Subscribe(channel Channel, symbol string, options Subsc
 	})
 }
 
+// Reconnect schedules a reconnection by sending a signal into ReconnectC.
+// The reconnector goroutine (started by Connect) will cool down briefly and
+// then attempt DialAndConnect again. Multiple calls coalesce thanks to the
+// buffered channel and default case.
 func (s *StandardStream) Reconnect() {
 	select {
 	case s.ReconnectC <- struct{}{}:
@@ -410,7 +456,14 @@ func (s *StandardStream) Reconnect() {
 	}
 }
 
-// Connect starts the stream and create the websocket connection
+// Connect initializes and starts the stream lifecycle.
+// Steps:
+// 1) Run the optional beforeConnect hook.
+// 2) Dial and establish the connection, starting the read and ping workers.
+// 3) Start a background reconnector goroutine listening on ReconnectC.
+// 4) Emit OnStart once.
+//
+// Connect is non-blocking after initial dialing; it spawns goroutines.
 func (s *StandardStream) Connect(ctx context.Context) error {
 	if s.beforeConnect != nil {
 		if err := s.beforeConnect(ctx); err != nil {
@@ -455,6 +508,9 @@ func (s *StandardStream) reconnector(ctx context.Context) {
 	}
 }
 
+// DialAndConnect dials (using Dial) and starts the read and ping workers for the new connection.
+// It emits OnConnect after installing the connection and before starting workers.
+// Existing connection state, if any, is cleaned up by SetConn.
 func (s *StandardStream) DialAndConnect(ctx context.Context) error {
 	conn, err := s.Dial(ctx)
 	if err != nil {
@@ -474,6 +530,10 @@ func (s *StandardStream) DialAndConnect(ctx context.Context) error {
 	return nil
 }
 
+// Dial opens the websocket connection.
+// If an explicit URL argument is provided, it is used. Otherwise, the EndpointCreator
+// (if set) is called to construct the URL. If neither is available, an error is returned.
+// It also installs default Ping/Pong handlers and logs the mode (public vs user data).
 func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.Conn, error) {
 	var url string
 	var err error
@@ -515,6 +575,11 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 	return conn, nil
 }
 
+// Close stops the stream gracefully:
+// - closes CloseC to stop read/ping workers
+// - cancels the connection context
+// - writes a websocket close frame
+// After Close returns, internal goroutines should be stopped shortly after.
 func (s *StandardStream) Close() error {
 	if s.PublicOnly {
 		log.Debugf("[websocket] closing public stream...")
@@ -550,18 +615,21 @@ func (s *StandardStream) Close() error {
 	return nil
 }
 
+// String returns a human-readable identifier for debugging purposes.
 func (s *StandardStream) String() string {
 	ss := "StandardStream"
 	ss += fmt.Sprintf("(%p)", s)
 	return ss
 }
 
-// SetHeartBeat sets the custom heart beat implementation if needed
+// SetHeartBeat installs a custom heartbeat function executed before each ping.
+// Return an error from the heartbeat to force the stream to reconnect.
 func (s *StandardStream) SetHeartBeat(fn HeartBeat) {
 	s.heartBeat = fn
 }
 
-// SetBeforeConnect sets the custom hook function before connect
+// SetBeforeConnect sets a hook invoked by Connect before dialing.
+// Use this to refresh credentials, update listen keys, or compute endpoints.
 func (s *StandardStream) SetBeforeConnect(fn BeforeConnect) {
 	s.beforeConnect = fn
 }
