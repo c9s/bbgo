@@ -1,5 +1,5 @@
 # First stage container
-FROM golang:1.23-alpine3.20 AS builder
+FROM golang:1.25-alpine3.22 AS builder
 RUN apk add --no-cache git ca-certificates gcc musl-dev libc-dev pkgconfig
 # gcc is for github.com/mattn/go-sqlite3
 # ADD . $GOPATH/src/github.com/c9s/bbgo
@@ -18,7 +18,7 @@ RUN go get github.com/mattn/go-sqlite3
 RUN go build -o $GOPATH_ORIG/bin/bbgo ./cmd/bbgo
 
 # Second stage container
-FROM alpine:3.20
+FROM alpine:3.22
 
 # Create the default user 'bbgo' and assign to env 'USER'
 ENV USER=bbgo
