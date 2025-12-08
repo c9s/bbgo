@@ -33,9 +33,9 @@ func IntegrationTestWithPassphraseConfigured(t *testing.T, prefix string) (key, 
 	passphrase, hasPassphrase = os.LookupEnv(prefix + "_API_PASSPHRASE")
 	ok = hasKey && hasSecret && hasPassphrase && os.Getenv("TEST_"+prefix) == "1"
 	if ok {
-		t.Logf(prefix+" api integration test enabled, key = %s, secret = %s, passphrase= %s", maskSecret(key), maskSecret(secret), maskSecret(passphrase))
+		t.Logf("%s api integration test enabled, key = %s, secret = %s, passphrase= %s", prefix, maskSecret(key), maskSecret(secret), maskSecret(passphrase))
 	} else {
-		t.Skipf(prefix + " api key is not configured, skipping integration test")
+		t.Skipf("%s api key is not configured, skipping integration test", prefix)
 	}
 
 	return key, secret, passphrase, ok

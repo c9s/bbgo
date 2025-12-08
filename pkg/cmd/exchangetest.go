@@ -312,7 +312,7 @@ func testMarketDataStream(ctx context.Context, ex types.Exchange) {
 }
 
 func checked(msg, desc string, args ...any) {
-	log.Infof(fmt.Sprintf(msg+": ✅ "+desc, args...))
+	log.Info(fmt.Sprintf(msg+": ✅ "+desc, args...))
 }
 
 func testUserDataStream(ctx context.Context, ex types.Exchange) {

@@ -353,15 +353,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Close 100% position
 		percentage := fixedpoint.NewFromFloat(1.0)
 		if err := s.ClosePosition(context.Background(), percentage); err != nil {
-			errMsg := "failed to close position"
-			log.WithError(err).Errorf(errMsg)
-			bbgo.Notify(errMsg)
+			log.WithError(err).Errorf("failed to close position")
+			bbgo.Notify("failed to close position")
 		}
 
 		if err := s.Suspend(); err != nil {
-			errMsg := "failed to suspend strategy"
-			log.WithError(err).Errorf(errMsg)
-			bbgo.Notify(errMsg)
+			log.WithError(err).Errorf("failed to suspend strategy")
+			bbgo.Notify("failed to suspend strategy")
 		}
 	})
 

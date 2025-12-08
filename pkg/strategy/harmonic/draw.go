@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/wcharczuk/go-chart/v2"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/wcharczuk/go-chart/v2"
 )
 
 func (s *Strategy) InitDrawCommands(profit, cumProfit types.Series) {
@@ -39,7 +40,7 @@ func (s *Strategy) Draw(profit, cumProfit types.Series) error {
 	canvas := DrawPNL(s.InstanceID(), profit)
 	fPnL, err := os.Create(s.GraphPNLPath)
 	if err != nil {
-		return fmt.Errorf("cannot create on path " + s.GraphPNLPath)
+		return fmt.Errorf("cannot create on path %s", s.GraphPNLPath)
 	}
 	defer fPnL.Close()
 	if err = canvas.Render(chart.PNG, fPnL); err != nil {
@@ -48,7 +49,7 @@ func (s *Strategy) Draw(profit, cumProfit types.Series) error {
 	canvas = DrawCumPNL(s.InstanceID(), cumProfit)
 	fCumPnL, err := os.Create(s.GraphCumPNLPath)
 	if err != nil {
-		return fmt.Errorf("cannot create on path " + s.GraphCumPNLPath)
+		return fmt.Errorf("cannot create on path %s", s.GraphCumPNLPath)
 	}
 	defer fCumPnL.Close()
 	if err = canvas.Render(chart.PNG, fCumPnL); err != nil {
