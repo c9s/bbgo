@@ -6,6 +6,14 @@ linters:
   default: none
   enable:
     - staticcheck
+    - bodyclose
+    - contextcheck
+    - dupword
+    - decorder
+    - goconst
+    - govet
+    - gosec
+    - misspell
   exclusions:
     generated: lax
     presets:
