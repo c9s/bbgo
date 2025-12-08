@@ -29,5 +29,5 @@ COPY --from=builder /go/bin/bbgo /usr/local/bin
 
 WORKDIR /home/${USER}
 ENTRYPOINT ["/usr/local/bin/bbgo"]
-CMD ["run", "--config", "/config/bbgo.yaml", "--no-compile"]
+CMD ["run", "--config", "/config/bbgo.yaml", "--no-compile", "--no-sync"]
 # vim:filetype=dockerfile:
