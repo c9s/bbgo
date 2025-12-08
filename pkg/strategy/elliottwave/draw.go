@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/wcharczuk/go-chart/v2"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/wcharczuk/go-chart/v2"
 )
 
 func (s *Strategy) InitDrawCommands(store *types.SerialMarketDataStore, profit, cumProfit types.Series) {
@@ -102,7 +103,7 @@ func (s *Strategy) Draw(store *types.SerialMarketDataStore, profit, cumProfit ty
 	canvas := s.DrawIndicators(store)
 	f, err := os.Create(s.GraphIndicatorPath)
 	if err != nil {
-		log.WithError(err).Errorf("cannot create on path " + s.GraphIndicatorPath)
+		log.WithError(err).Errorf("cannot create on path %s", s.GraphIndicatorPath)
 		return
 	}
 	if err = canvas.Render(chart.PNG, f); err != nil {
@@ -113,7 +114,7 @@ func (s *Strategy) Draw(store *types.SerialMarketDataStore, profit, cumProfit ty
 	canvas = s.DrawPNL(profit)
 	f, err = os.Create(s.GraphPNLPath)
 	if err != nil {
-		log.WithError(err).Errorf("cannot create on path " + s.GraphPNLPath)
+		log.WithError(err).Errorf("cannot create on path %s", s.GraphPNLPath)
 		return
 	}
 	if err = canvas.Render(chart.PNG, f); err != nil {
@@ -124,7 +125,7 @@ func (s *Strategy) Draw(store *types.SerialMarketDataStore, profit, cumProfit ty
 	canvas = s.DrawCumPNL(cumProfit)
 	f, err = os.Create(s.GraphCumPNLPath)
 	if err != nil {
-		log.WithError(err).Errorf("cannot create on path " + s.GraphCumPNLPath)
+		log.WithError(err).Errorf("cannot create on path %s", s.GraphCumPNLPath)
 		return
 	}
 	if err = canvas.Render(chart.PNG, f); err != nil {
