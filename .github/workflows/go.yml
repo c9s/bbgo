@@ -20,7 +20,7 @@ jobs:
         redis-version:
         - "6.2"
         go-version:
-        - "1.23"
+        - "1.25"
     env:
       GITHUB_CI: true
       MYSQL_DATABASE: bbgo
