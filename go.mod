@@ -49,7 +49,6 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/valyala/fastjson v1.5.1
 	github.com/wcharczuk/go-chart/v2 v2.1.2
-	github.com/webview/webview v0.0.0-20210216142346-e0bfdf0e5d90
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/zserge/lorca v0.1.9
 	go.uber.org/mock v0.4.0
