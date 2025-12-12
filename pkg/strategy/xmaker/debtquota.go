@@ -68,11 +68,14 @@ type DebtQuota struct {
 func (w *DebtQuotaWorker) Run(ctx context.Context, sesWorker *SessionWorker) {
 	session := sesWorker.session
 
+	ticker := time.NewTicker(time.Second * 5)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-ticker.C:
 			debtQuota := w.calculateDebtQuota(ctx, session)
 			sesWorker.SetValue(&DebtQuota{
 				AmountInQuote: debtQuota,
