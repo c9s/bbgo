@@ -18,6 +18,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/bbgo/sessionworker"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/exchange/sandbox"
@@ -2570,10 +2571,8 @@ func (s *Strategy) CrossRun(
 	s.Position.UpdateMetrics(nil)
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 
-	if sessionWorkers != nil {
-		debtQuotaWorker := &DebtQuotaWorker{}
-		sessionWorkers.Add(s.hedgeSession, "debt-quota", debtQuotaWorker.Run)
-	}
+	debtQuotaWorker := &DebtQuotaWorker{}
+	sessionworker.Start(ctx, s.hedgeSession, "debt-quota", debtQuotaWorker.Run)
 
 	// restore position into the position exposure
 	s.logger.Infof("restoring position into the exposure: %s", s.Position.GetBase().String())
