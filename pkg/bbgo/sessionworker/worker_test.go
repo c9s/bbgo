@@ -1,4 +1,4 @@
-package xmaker
+package sessionworker
 
 import (
 	"context"
@@ -20,17 +20,24 @@ func waitUntil(t *testing.T, cond func() bool, timeout time.Duration) {
 	t.Fatalf("condition not met within %v", timeout)
 }
 
+type testWorker struct {
+	f func(ctx context.Context, w *Handle)
+}
+
+func (w *testWorker) Run(ctx context.Context, worker *Handle) {
+	w.f(ctx, worker)
+}
+
 func TestSessionWorker_StartOncePerWorker(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool := &sessionWorkerPool{workers: make(map[sessionWorkerKey]*SessionWorker)}
+	pool := &Pool{workers: make(map[Key]*Handle)}
 
 	var runs int32
-	pool.Add(nil, "w1", func(ctx context.Context, w *SessionWorker) {
-		// simulate short work
+	pool.Add(nil, "w1", &testWorker{f: func(ctx context.Context, w *Handle) {
 		atomic.AddInt32(&runs, 1)
-	})
+	}})
 
 	// Call Start multiple times; worker function should execute only once due to sync.Once
 	pool.Start(ctx)
@@ -43,11 +50,11 @@ func TestSessionWorker_DistinctWorkersBothRun(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool := &sessionWorkerPool{workers: make(map[sessionWorkerKey]*SessionWorker)}
+	pool := &Pool{workers: make(map[Key]*Handle)}
 
 	var a, b int32
-	pool.Add(nil, "a", func(ctx context.Context, w *SessionWorker) { atomic.AddInt32(&a, 1) })
-	pool.Add(nil, "b", func(ctx context.Context, w *SessionWorker) { atomic.AddInt32(&b, 1) })
+	pool.Add(nil, "a", &testWorker{f: func(ctx context.Context, w *Handle) { atomic.AddInt32(&a, 1) }})
+	pool.Add(nil, "b", &testWorker{f: func(ctx context.Context, w *Handle) { atomic.AddInt32(&b, 1) }})
 
 	pool.Start(ctx)
 
@@ -58,13 +65,13 @@ func TestSessionWorker_OverwriteSameKeyOnlyNewestRunsOnStart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool := &sessionWorkerPool{workers: make(map[sessionWorkerKey]*SessionWorker)}
+	pool := &Pool{workers: make(map[Key]*Handle)}
 
 	var first, second int32
 
-	// Add two workers with the same key (same session pointer and id)
-	pool.Add(nil, "dup", func(ctx context.Context, w *SessionWorker) { atomic.AddInt32(&first, 1) })
-	pool.Add(nil, "dup", func(ctx context.Context, w *SessionWorker) { atomic.AddInt32(&second, 1) })
+	// Start two workers with the same key (same session pointer and id)
+	pool.Add(nil, "dup", &testWorker{f: func(ctx context.Context, w *Handle) { atomic.AddInt32(&first, 1) }})
+	pool.Add(nil, "dup", &testWorker{f: func(ctx context.Context, w *Handle) { atomic.AddInt32(&second, 1) }})
 
 	pool.Start(ctx)
 

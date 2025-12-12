@@ -18,6 +18,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/bbgo/sessionworker"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/exchange/sandbox"
@@ -840,6 +841,12 @@ func (s *Strategy) allowMarginHedge(
 
 		// debtQuota is the quota with minimal margin level
 		debtQuota := s.calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel, maxHedgeAccountLeverage)
+
+		// var debtQuota = fixedpoint.Zero
+		if worker := sessionworker.Get(session, "debt-quota"); worker != nil {
+			quota := worker.Value().(*DebtQuota)
+			debtQuota = quota.AmountInQuote
+		}
 
 		s.logger.Infof(
 			"hedge account margin level %f > %f, debt quota: %f",
@@ -2570,10 +2577,10 @@ func (s *Strategy) CrossRun(
 	s.Position.UpdateMetrics(nil)
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 
-	if sessionWorkers != nil {
-		debtQuotaWorker := &DebtQuotaWorker{}
-		sessionWorkers.Add(s.hedgeSession, "debt-quota", debtQuotaWorker.Run)
+	debtQuotaWorker := &DebtQuotaWorker{
+		logger: s.logger,
 	}
+	sessionworker.Start(ctx, s.hedgeSession, "debt-quota", debtQuotaWorker)
 
 	// restore position into the position exposure
 	s.logger.Infof("restoring position into the exposure: %s", s.Position.GetBase().String())

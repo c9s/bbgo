@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/bbgo/sessionworker"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
@@ -65,8 +66,8 @@ type DebtQuota struct {
 	AmountInQuote fixedpoint.Value
 }
 
-func (w *DebtQuotaWorker) Run(ctx context.Context, sesWorker *SessionWorker) {
-	session := sesWorker.session
+func (w *DebtQuotaWorker) Run(ctx context.Context, sesWorker *sessionworker.Handle) {
+	session := sesWorker.Session()
 
 	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
