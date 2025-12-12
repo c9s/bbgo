@@ -21,6 +21,7 @@ type DebtQuotaWorker struct {
 
 func (w *DebtQuotaWorker) calculateDebtQuota(ctx context.Context, session *bbgo.ExchangeSession) fixedpoint.Value {
 	minMarginLevel := fixedpoint.NewFromFloat(1.01)
+
 	// hedgeAccount := session.GetAccount()
 	// bufMinMarginLevel := minMarginLevel.Mul(fixedpoint.NewFromFloat(1.005))
 
@@ -33,7 +34,7 @@ func (w *DebtQuotaWorker) calculateDebtQuota(ctx context.Context, session *bbgo.
 
 	// sourceMarket := s.hedgeMarket
 	w.logger.Infof(
-		"hedge account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
+		"account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
 		netValueInUsd.Float64(),
 		debtValue.Float64(),
 		marketValue.Float64(),
