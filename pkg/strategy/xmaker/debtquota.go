@@ -9,6 +9,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/bbgo/sessionworker"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/risk"
 )
 
 const debtQuotaCacheDuration = 30 * time.Second
@@ -41,7 +42,7 @@ func (w *DebtQuotaWorker) calculateDebtQuota(ctx context.Context, session *bbgo.
 		marketValue.Float64(),
 	)
 
-	defaultMmr := calculateDefaultMMR(w.leverage)
+	defaultMmr := risk.DefaultMaintenanceMarginRatio(w.leverage)
 
 	debtCap := totalValue.Div(minMarginLevel).Div(defaultMmr)
 	marginLevel := totalValue.Div(debtValue).Div(defaultMmr)
@@ -85,19 +86,6 @@ func (w *DebtQuotaWorker) Run(ctx context.Context, sesWorker *sessionworker.Hand
 	}
 }
 
-// calculateDefaultMMR calculates the default maintenance margin ratio based on leverage.
-func calculateDefaultMMR(leverage fixedpoint.Value) fixedpoint.Value {
-	defaultMmr := fixedpoint.NewFromFloat(9.0 * 0.01)
-	if leverage.Compare(fixedpoint.NewFromFloat(10.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(5.0 * 0.01) // 5%
-	} else if leverage.Compare(fixedpoint.NewFromFloat(5.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(9.0 * 0.01) // 9%
-	} else if leverage.Compare(fixedpoint.NewFromFloat(3.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(10.0 * 0.01) // 10%
-	}
-	return defaultMmr
-}
-
 // margin level = totalValue / totalDebtValue * MMR (maintenance margin ratio)
 // on binance:
 // - MMR with 10x leverage = 5%
@@ -115,7 +103,7 @@ func (s *Strategy) calculateDebtQuota(totalValue, debtValue, minMarginLevel, lev
 		return fixedpoint.Zero
 	}
 
-	defaultMmr := calculateDefaultMMR(leverage)
+	defaultMmr := risk.DefaultMaintenanceMarginRatio(leverage)
 
 	debtCap := totalValue.Div(minMarginLevel).Div(defaultMmr)
 	marginLevel := totalValue.Div(debtValue).Div(defaultMmr)
