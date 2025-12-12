@@ -18,6 +18,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/bbgo/sessionworker"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/exchange/sandbox"
@@ -550,7 +551,7 @@ func (s *Strategy) getPositionHoldingPeriod(now time.Time) (time.Duration, bool)
 }
 
 func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
-	sig, err := s.aggregateSignal(ctx)
+	sig, err := s.AggregateSignal(ctx)
 	if err != nil {
 		return err
 	}
@@ -742,48 +743,8 @@ func (s *Strategy) collectSignalsAndWeights(ctx context.Context) (signals []floa
 	return signals, weights, nil
 }
 
-// DirectionDivergence computes (m, pSign, D2) given signals and weights.
-// m     : weighted mean of signals
-// pSign : total normalized weight aligned with mean direction and |s_i| >= tau
-// D2    : 1 - pSign
-func DirectionDivergence(signals []float64, weights []float64, tau float64, epsM float64) (m, pSign, D2 float64) {
-	n := len(signals)
-	if n == 0 {
-		return 0, 0, 1
-	}
-	if len(weights) != n {
-		weights = make([]float64, n)
-		for i := range weights {
-			weights[i] = 1
-		}
-	}
-	weights = normalizeWeightsFloat(weights)
-
-	// weighted mean
-	for i := 0; i < n; i++ {
-		m += weights[i] * signals[i]
-	}
-	if math.Abs(m) < epsM {
-		return m, 0, 1
-	}
-	mSign := signf(m)
-	p := 0.0
-	for i := 0; i < n; i++ {
-		if math.Abs(signals[i]) >= tau && signf(signals[i]) == mSign {
-			p += weights[i]
-		}
-	}
-	if p < 0 {
-		p = 0
-	}
-	if p > 1 {
-		p = 1
-	}
-	return m, p, 1 - p
-}
-
-// TODO: move this aggregateSignal to the signal package
-func (s *Strategy) aggregateSignal(ctx context.Context) (float64, error) {
+// TODO: move this AggregateSignal to the signal package
+func (s *Strategy) AggregateSignal(ctx context.Context) (float64, error) {
 	sum := 0.0
 	voters := 0.0
 	for _, signalWrapper := range s.SignalConfigList.Signals {
@@ -837,59 +798,6 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 
 	// fallback to the fixed quantity
 	return q, nil
-}
-
-const debtQuotaCacheDuration = 30 * time.Second
-
-// margin level = totalValue / totalDebtValue * MMR (maintenance margin ratio)
-// on binance:
-// - MMR with 10x leverage = 5%
-// - MMR with 5x leverage = 9%
-// - MMR with 3x leverage = 10%
-func (s *Strategy) calculateDebtQuota(totalValue, debtValue, minMarginLevel, leverage fixedpoint.Value) fixedpoint.Value {
-	now := time.Now()
-	if s.debtQuotaCache != nil {
-		if v, ok := s.debtQuotaCache.Get(now); ok {
-			return v
-		}
-	}
-
-	if minMarginLevel.IsZero() || totalValue.IsZero() {
-		return fixedpoint.Zero
-	}
-
-	defaultMmr := fixedpoint.NewFromFloat(9.0 * 0.01)
-	if leverage.Compare(fixedpoint.NewFromFloat(10.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(5.0 * 0.01) // 5%
-	} else if leverage.Compare(fixedpoint.NewFromFloat(5.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(9.0 * 0.01) // 9%
-	} else if leverage.Compare(fixedpoint.NewFromFloat(3.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(10.0 * 0.01) // 10%
-	}
-
-	debtCap := totalValue.Div(minMarginLevel).Div(defaultMmr)
-	marginLevel := totalValue.Div(debtValue).Div(defaultMmr)
-
-	s.logger.Infof(
-		"calculateDebtQuota: debtCap=%f, debtValue=%f currentMarginLevel=%f mmr=%f",
-		debtCap.Float64(),
-		debtValue.Float64(),
-		marginLevel.Float64(),
-		defaultMmr.Float64(),
-	)
-
-	debtQuota := debtCap.Sub(debtValue)
-	if debtQuota.Sign() < 0 {
-		return fixedpoint.Zero
-	}
-
-	if s.debtQuotaCache == nil {
-		s.debtQuotaCache = fixedpoint.NewExpirable(debtQuota, now.Add(debtQuotaCacheDuration))
-	} else {
-		s.debtQuotaCache.Set(debtQuota, now.Add(debtQuotaCacheDuration))
-	}
-
-	return debtQuota
 }
 
 func (s *Strategy) allowMarginHedge(
@@ -1087,7 +995,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		return nil
 	}
 
-	sig, err := s.aggregateSignal(ctx)
+	sig, err := s.AggregateSignal(ctx)
 	if err != nil {
 		return err
 	}
@@ -2662,6 +2570,9 @@ func (s *Strategy) CrossRun(
 
 	s.Position.UpdateMetrics(nil)
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
+
+	debtQuotaWorker := &DebtQuotaWorker{}
+	sessionworker.Start(ctx, s.hedgeSession, "debt-quota", debtQuotaWorker.Run)
 
 	// restore position into the position exposure
 	s.logger.Infof("restoring position into the exposure: %s", s.Position.GetBase().String())
