@@ -12,10 +12,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// canAlign checks if the strategy can align the balances by checking for active transfers.
+// getActiveTransfers checks if the strategy can align the balances by checking for active transfers.
 // It returns a map of currencies as keys and their corresponding active transfers.
 // If the asset is not involved in any active transfer, it will not be included in the map.
-func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) (map[string]*AssetTransfer, error) {
+func (s *Strategy) getActiveTransfers(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) (map[string]*AssetTransfer, error) {
 	if s.SkipTransferCheck {
 		return nil, nil
 	}

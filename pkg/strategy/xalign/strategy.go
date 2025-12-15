@@ -47,7 +47,8 @@ type LargeAmountAlertConfig struct {
 
 type Strategy struct {
 	*bbgo.Environment
-	Interval                 types.Interval              `json:"interval"`
+	ActiveTransferInterval   types.Duration              `json:"interval"` // keep the same tag name for backward compatibility
+	IdleInterval             *types.Duration             `json:"idleInterval,omitempty"`
 	PreferredSessions        []string                    `json:"sessions"`
 	PreferredQuoteCurrencies *QuoteCurrencyPreference    `json:"quoteCurrencies"`
 	ExpectedBalances         map[string]fixedpoint.Value `json:"expectedBalances"`
@@ -125,6 +126,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.ActiveTransferTimeWindow == 0 {
 		s.ActiveTransferTimeWindow = types.Duration(48 * time.Hour)
+	}
+
+	if s.IdleInterval == nil {
+		s.IdleInterval = &s.ActiveTransferInterval
 	}
 
 	return nil
@@ -428,19 +433,34 @@ func (s *Strategy) CrossRun(
 }
 
 func (s *Strategy) monitor(ctx context.Context) {
-	s.align(ctx, s.sessions)
+	activeTransferExists := s.align(ctx, s.sessions)
 
-	ticker := time.NewTicker(s.Interval.Duration())
-	defer ticker.Stop()
+	activeTicker := time.NewTicker(s.ActiveTransferInterval.Duration())
+	idleTicker := time.NewTicker(s.IdleInterval.Duration())
+	defer activeTicker.Stop()
+	defer idleTicker.Stop()
+
+	var ticker *time.Ticker
+	if activeTransferExists {
+		ticker = activeTicker
+	} else {
+		ticker = idleTicker
+	}
 
 	for {
 		select {
-
 		case <-ctx.Done():
+			log.Infof("xalign monitor exiting...")
 			return
-
 		case <-ticker.C:
-			s.align(ctx, s.sessions)
+			activeTransferExists = s.align(ctx, s.sessions)
+			if activeTransferExists {
+				ticker = activeTicker
+			} else {
+				ticker = idleTicker
+			}
+			activeTicker.Reset(s.ActiveTransferInterval.Duration())
+			idleTicker.Reset(s.IdleInterval.Duration())
 		}
 	}
 }
@@ -516,12 +536,12 @@ func (s *Strategy) recordBalances(totalBalances types.BalanceMap, now time.Time)
 	}
 }
 
-func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) {
+func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) (activeTransferExists bool) {
 	for sessionName, session := range sessions {
 		ob, ok := s.orderBooks[sessionName]
 		if !ok {
 			log.Errorf("orderbook on session %s not found", sessionName)
-			return
+			return false
 		}
 
 		if err := ob.GracefulCancel(ctx, session.Exchange); err != nil {
@@ -530,13 +550,13 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 	}
 
 	// detect if there is any active transfer for this currency. Skip aligning if there is any.
-	activeTransfers, err := s.canAlign(ctx, sessions)
+	activeTransfers, err := s.getActiveTransfers(ctx, sessions)
 	if err != nil {
 		log.WithError(err).Errorf("unable to transfer activities")
-		return
+		return false
 	}
 
-	activeTransferExists := len(activeTransfers) > 0
+	activeTransferExists = len(activeTransfers) > 0
 	if s.SkipAlignOnAnyActiveTransfer && activeTransferExists {
 		log.Info("balance alignment will be skipped due to active transfer")
 		if s.activeTransferNotificationLimiter.Allow() {
@@ -554,7 +574,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 	totalBalances, _, err := sessions.AggregateBalances(ctx, false)
 	if err != nil {
 		log.WithError(err).Errorf("unable to aggregate balances")
-		return
+		return activeTransferExists
 	}
 
 	s.recordBalances(totalBalances, time.Now())
@@ -675,7 +695,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 			if market, hasMarket := selectedSession.Market(submitOrder.Symbol); hasMarket && submitOrder.Price.Sign() > 0 {
 				if market.IsDustQuantity(q.Abs(), submitOrder.Price) {
 					log.Infof("skip placing dust order for %s: %+v", currency, submitOrder)
-					return
+					return activeTransferExists
 				}
 			}
 
@@ -688,13 +708,13 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 				submitOrder)
 
 			if s.DryRun {
-				return
+				return activeTransferExists
 			}
 
 			createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
 			if err != nil {
 				log.WithError(err).WithFields(submitOrder.LogFields()).Errorf("can not place order: %+v", submitOrder)
-				return
+				return activeTransferExists
 			} else if createdOrder != nil {
 				if ob, ok := s.orderBooks[selectedSession.Name]; ok {
 					ob.Add(*createdOrder)
@@ -706,6 +726,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 			}
 		}
 	}
+	return activeTransferExists
 }
 
 func (s *Strategy) calculateRefillQuantity(
