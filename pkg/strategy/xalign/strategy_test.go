@@ -5,6 +5,7 @@ package xalign
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -105,6 +106,12 @@ func getTestMarkets() types.MarketMap {
 			TickSize:        Number(0.00100000),
 		},
 	}
+}
+
+// mockExchange combines Exchange and ExchangeTransferHistoryService for testing
+type mockExchange struct {
+	types.Exchange
+	types.ExchangeTransferHistoryService
 }
 
 func TestStrategy(t *testing.T) {
@@ -215,5 +222,152 @@ func TestStrategy(t *testing.T) {
 		assert.Equal(t, types.SideTypeBuy, submitOrder.Side)
 		assert.Equal(t, "36000", submitOrder.Price.String())
 		assert.Equal(t, "0.045", submitOrder.Quantity.String())
+	})
+}
+
+func Test_align(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	ctx := context.Background()
+	testMarkets := getTestMarkets()
+
+	// Helper lambda to create mock exchange with transfer history
+	newMockExchange := func(withdraws []types.Withdraw, deposits []types.Deposit) (*mocks.MockExchange, *mockExchange, *types.Account) {
+		baseMockEx := mocks.NewMockExchange(mockCtrl)
+		mockTransferHistory := mocks.NewMockExchangeTransferHistoryService(mockCtrl)
+
+		// Setup account with balances that need refilling
+		account := types.NewAccount()
+		account.AddBalance("USDT", Number(5000)) // Need 10000, so need to refill 5000
+		account.AddBalance("TWD", Number(20000))
+
+		// Mock QueryAccount to return the account
+		baseMockEx.EXPECT().QueryAccount(ctx).Return(account, nil).AnyTimes()
+
+		// Mock CancelOrders for GracefulCancel in orderBooks
+		baseMockEx.EXPECT().CancelOrders(ctx).Return(nil).AnyTimes()
+
+		// Mock ticker query for USDTTWD market (for refilling USDT)
+		baseMockEx.EXPECT().QueryTicker(ctx, "USDTTWD").Return(&types.Ticker{
+			Buy:  Number(32.0),
+			Sell: Number(33.0),
+		}, nil).AnyTimes()
+
+		// Mock the transfer history services
+		mockTransferHistory.EXPECT().QueryWithdrawHistory(
+			ctx,
+			"",
+			gomock.Any(), // since time
+			gomock.Any(), // until time
+		).Return(withdraws, nil).AnyTimes()
+
+		mockTransferHistory.EXPECT().QueryDepositHistory(
+			ctx,
+			"",
+			gomock.Any(), // since time
+			gomock.Any(), // until time
+		).Return(deposits, nil).AnyTimes()
+
+		// Create composite exchange with transfer history
+		mockEx := &mockExchange{
+			Exchange:                       baseMockEx,
+			ExchangeTransferHistoryService: mockTransferHistory,
+		}
+
+		return baseMockEx, mockEx, account
+	}
+
+	// Helper lambda to setup session
+	newTestSession := func(mockEx *mockExchange, account *types.Account) map[string]*bbgo.ExchangeSession {
+		session := &bbgo.ExchangeSession{
+			ExchangeSessionConfig: bbgo.ExchangeSessionConfig{
+				Name: "max",
+			},
+			Exchange: mockEx,
+			Account:  account,
+		}
+		session.SetMarkets(testMarkets)
+
+		return map[string]*bbgo.ExchangeSession{
+			"max": session,
+		}
+	}
+
+	// Helper lambda to create and initialize strategy
+	newStrategyForTest := func(dryRun bool) *Strategy {
+		s := &Strategy{
+			ExpectedBalances: map[string]fixedpoint.Value{
+				"USDT": Number(10000),
+			},
+			PreferredQuoteCurrencies: &QuoteCurrencyPreference{
+				Buy:  []string{"TWD", "USDT"},
+				Sell: []string{"TWD", "USDT"},
+			},
+			PreferredSessions:        []string{"max"},
+			UseTakerOrder:            true,
+			SkipTransferCheck:        false,
+			ActiveTransferTimeWindow: types.Duration(48 * time.Hour),
+			DryRun:                   dryRun,
+		}
+
+		// Initialize the strategy
+		err := s.Initialize()
+		assert.NoError(t, err)
+
+		// Initialize orderBooks
+		s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
+		s.orderBooks["max"] = bbgo.NewActiveOrderBook("")
+
+		// Initialize price resolver
+		s.priceResolver = s.initializePriceResolver(testMarkets)
+
+		return s
+	}
+
+	t.Run("with active transfers", func(t *testing.T) {
+		// This is a pending withdraw that should trigger the active transfer flag
+		activeWithdraw := types.Withdraw{
+			Asset:  "USDT",
+			Amount: Number(1000),
+			Status: types.WithdrawStatusProcessing,
+		}
+
+		_, mockEx, account := newMockExchange([]types.Withdraw{activeWithdraw}, []types.Deposit{})
+		sessions := newTestSession(mockEx, account)
+		s := newStrategyForTest(false)
+
+		activeTransferExists := s.align(ctx, sessions)
+
+		// active transfer detected
+		assert.True(t, activeTransferExists, "align should return true when there are active transfers")
+	})
+
+	t.Run("no active transfers", func(t *testing.T) {
+		baseMockEx, mockEx, account := newMockExchange([]types.Withdraw{}, []types.Deposit{})
+
+		// Mock order submission for refilling balances
+		baseMockEx.EXPECT().SubmitOrder(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
+			// Verify the order is for buying USDT
+			assert.Equal(t, "USDTTWD", order.Symbol)
+			assert.Equal(t, types.SideTypeBuy, order.Side)
+
+			// Return a created order
+			createdOrder := &types.Order{
+				SubmitOrder:      order,
+				OrderID:          1,
+				Status:           types.OrderStatusNew,
+				ExecutedQuantity: fixedpoint.Zero,
+			}
+			return createdOrder, nil
+		}).Times(1)
+
+		sessions := newTestSession(mockEx, account)
+		s := newStrategyForTest(false)
+
+		activeTransferExists := s.align(ctx, sessions)
+
+		// no active transfer detected
+		assert.False(t, activeTransferExists, "align should return false when there are no active transfers")
 	})
 }
