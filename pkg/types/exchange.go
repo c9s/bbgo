@@ -176,6 +176,8 @@ type WithdrawHistoryService interface {
 	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)
 }
 
+//go:generate mockgen -destination=mocks/mock_exchange_transfer_history.go -package=mocks . ExchangeTransferHistoryService
+
 type ExchangeTransferHistoryService interface {
 	DepositHistoryService
 	WithdrawHistoryService
