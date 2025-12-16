@@ -435,19 +435,25 @@ func (s *Strategy) CrossRun(
 func (s *Strategy) monitor(ctx context.Context) {
 	activeTransferExists := s.align(ctx, s.sessions)
 
-	activeTicker := time.NewTicker(s.ActiveTransferInterval.Duration())
-	idleTicker := time.NewTicker(s.IdleInterval.Duration())
+	activeInterval := s.ActiveTransferInterval.Duration()
+	idleInterval := s.IdleInterval.Duration()
+	activeTicker := time.NewTicker(activeInterval)
+	idleTicker := time.NewTicker(idleInterval)
 	defer activeTicker.Stop()
 	defer idleTicker.Stop()
 
 	var ticker *time.Ticker
+	var currentInterval time.Duration
 	if activeTransferExists {
+		currentInterval = activeInterval
 		ticker = activeTicker
 	} else {
+		currentInterval = idleInterval
 		ticker = idleTicker
 	}
 
 	for {
+		log.Infof("current xalign monitor interval: %s", currentInterval)
 		select {
 		case <-ctx.Done():
 			log.Infof("xalign monitor exiting...")
@@ -455,12 +461,14 @@ func (s *Strategy) monitor(ctx context.Context) {
 		case <-ticker.C:
 			activeTransferExists = s.align(ctx, s.sessions)
 			if activeTransferExists {
+				currentInterval = activeInterval
 				ticker = activeTicker
 			} else {
+				currentInterval = idleInterval
 				ticker = idleTicker
 			}
-			activeTicker.Reset(s.ActiveTransferInterval.Duration())
-			idleTicker.Reset(s.IdleInterval.Duration())
+			activeTicker.Reset(activeInterval)
+			idleTicker.Reset(idleInterval)
 		}
 	}
 }
