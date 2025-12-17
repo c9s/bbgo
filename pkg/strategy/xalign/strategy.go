@@ -437,19 +437,14 @@ func (s *Strategy) monitor(ctx context.Context) {
 
 	activeInterval := s.ActiveTransferInterval.Duration()
 	idleInterval := s.IdleInterval.Duration()
-	activeTicker := time.NewTicker(activeInterval)
-	idleTicker := time.NewTicker(idleInterval)
-	defer activeTicker.Stop()
-	defer idleTicker.Stop()
+	ticker := time.NewTicker(activeInterval)
+	defer ticker.Stop()
 
-	var ticker *time.Ticker
 	var currentInterval time.Duration
 	if activeTransferExists {
 		currentInterval = activeInterval
-		ticker = activeTicker
 	} else {
 		currentInterval = idleInterval
-		ticker = idleTicker
 	}
 
 	for {
@@ -462,13 +457,10 @@ func (s *Strategy) monitor(ctx context.Context) {
 			activeTransferExists = s.align(ctx, s.sessions)
 			if activeTransferExists {
 				currentInterval = activeInterval
-				ticker = activeTicker
 			} else {
 				currentInterval = idleInterval
-				ticker = idleTicker
 			}
-			activeTicker.Reset(activeInterval)
-			idleTicker.Reset(idleInterval)
+			ticker.Reset(currentInterval)
 		}
 	}
 }
