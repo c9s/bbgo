@@ -441,11 +441,19 @@ func (s *Strategy) monitor(ctx context.Context) {
 	defer ticker.Stop()
 
 	var currentInterval time.Duration
-	if activeTransferExists {
-		currentInterval = activeInterval
-	} else {
+	updateDetectParams := func(foundActiveTransfer bool) {
+		duration := s.Duration.Duration()
 		currentInterval = idleInterval
+		if foundActiveTransfer {
+			currentInterval = activeInterval
+			duration = 2 * time.Hour
+		}
+		log.Infof("deviation detection duration set to %s", duration)
+		for _, d := range s.deviationDetectors {
+			d.SetDuration(duration)
+		}
 	}
+	updateDetectParams(activeTransferExists)
 
 	for {
 		log.Infof("current xalign monitor interval: %s", currentInterval)
@@ -455,11 +463,7 @@ func (s *Strategy) monitor(ctx context.Context) {
 			return
 		case <-ticker.C:
 			activeTransferExists = s.align(ctx, s.sessions)
-			if activeTransferExists {
-				currentInterval = activeInterval
-			} else {
-				currentInterval = idleInterval
-			}
+			updateDetectParams(activeTransferExists)
 			ticker.Reset(currentInterval)
 		}
 	}
