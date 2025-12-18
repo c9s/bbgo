@@ -53,12 +53,12 @@ func (p *Pool) Get(session *bbgo.ExchangeSession, id string) *Handle {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	key := Key{session: session, id: id}
-	worker, ok := p.workers[key]
+	handle, ok := p.workers[key]
 	if !ok {
 		return nil
 	}
 
-	return worker
+	return handle
 }
 
 func (p *Pool) Start(ctx context.Context) {
