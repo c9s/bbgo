@@ -818,60 +818,24 @@ func (s *Strategy) allowMarginHedge(
 	}
 
 	lastPrice := s.lastPrice.Get()
-	bufMinMarginLevel := minMarginLevel.Mul(fixedpoint.NewFromFloat(1.005))
-
-	accountValueCalculator := session.GetAccountValueCalculator()
-	marketValue := accountValueCalculator.MarketValue()
-	debtValue := accountValueCalculator.DebtValue()
-	netValueInUsd := accountValueCalculator.NetValue()
+	if lastPrice.IsZero() {
+		return false, zero
+	}
 
 	marginInfoUpdater := session.GetMarginInfoUpdater()
-	sourceMarket := s.hedgeMarket
+	market := s.hedgeMarket
 
-	s.logger.Infof(
-		"hedge account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
-		netValueInUsd.Float64(),
-		debtValue.Float64(),
-		marketValue.Float64(),
-	)
+	// debtQuota is the quota with minimal margin level
+	var debtQuota = fixedpoint.Zero
+	if workerHandle := sessionworker.Get(session, "debt-quota"); workerHandle != nil {
+		rst := workerHandle.Value().(*DebtQuotaResult)
+		debtQuota = rst.AmountInQuote
+	}
 
 	// if the margin level is higher than the minimal margin level,
 	// we can hedge the position, but we need to check the debt quota
 	if hedgeAccount.MarginLevel.Compare(minMarginLevel) > 0 {
-
-		// debtQuota is the quota with minimal margin level
-		debtQuota := s.calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel, maxHedgeAccountLeverage)
-
-		// var debtQuota = fixedpoint.Zero
-		if worker := sessionworker.Get(session, "debt-quota"); worker != nil {
-			quota := worker.Value().(*DebtQuota)
-			debtQuota = quota.AmountInQuote
-		}
-
-		s.logger.Infof(
-			"hedge account margin level %f > %f, debt quota: %f",
-			hedgeAccount.MarginLevel.Float64(), minMarginLevel.Float64(), debtQuota.Float64(),
-		)
-
 		if debtQuota.Sign() <= 0 {
-			return false, zero
-		}
-
-		// if MaxHedgeAccountLeverage is set, we need to calculate credit buffer
-		if maxHedgeAccountLeverage.Sign() > 0 {
-			maximumValueInUsd := netValueInUsd.Mul(maxHedgeAccountLeverage)
-			leverageQuotaInUsd := maximumValueInUsd.Sub(debtValue)
-			s.logger.Infof(
-				"hedge account maximum leveraged value in usd: %f (%f x), quota in usd: %f",
-				maximumValueInUsd.Float64(),
-				maxHedgeAccountLeverage.Float64(),
-				leverageQuotaInUsd.Float64(),
-			)
-
-			debtQuota = fixedpoint.Min(debtQuota, leverageQuotaInUsd)
-		}
-
-		if lastPrice.IsZero() {
 			return false, zero
 		}
 
@@ -890,7 +854,7 @@ func (s *Strategy) allowMarginHedge(
 			// - Our debt quota is calculated using the soft leverage of 3x.
 			// - Using maxBorrowable + available would max out the leverage which is too risky.
 			if marginInfoUpdater != nil {
-				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(sourceMarket.BaseCurrency)
+				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(market.BaseCurrency)
 				if hasMaxBorrowable {
 					maxBuyableQuote = fixedpoint.Min(maxBuyableQuote, maxBorrowable.Mul(lastPrice))
 				}
@@ -904,7 +868,7 @@ func (s *Strategy) allowMarginHedge(
 			// - borrow another 5
 			// But when this goes back to the caller,
 			// it will take the minimum value with maker balance (this is what the AI doesn't understand)
-			bal, hasBal := hedgeAccount.Balance(sourceMarket.BaseCurrency)
+			bal, hasBal := hedgeAccount.Balance(market.BaseCurrency)
 			if hasBal {
 				maxBuyableQuote = fixedpoint.Max(maxBuyableQuote, bal.Available.Mul(lastPrice))
 			}
@@ -917,14 +881,14 @@ func (s *Strategy) allowMarginHedge(
 			maxSellable := debtQuota.Div(lastPrice)
 
 			if marginInfoUpdater != nil {
-				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(sourceMarket.QuoteCurrency)
+				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(market.QuoteCurrency)
 				if hasMaxBorrowable {
 					maxSellable = fixedpoint.Min(maxSellable, maxBorrowable.Div(lastPrice))
 				}
 			}
 
 			// Ditto, using Max() here should be correct because this only calculates the hedge side balance
-			bal, hasBal := hedgeAccount.Balance(sourceMarket.QuoteCurrency)
+			bal, hasBal := hedgeAccount.Balance(market.QuoteCurrency)
 			if hasBal {
 				maxSellable = fixedpoint.Max(maxSellable, bal.Available.Div(lastPrice))
 			}
@@ -2578,7 +2542,9 @@ func (s *Strategy) CrossRun(
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 
 	debtQuotaWorker := &DebtQuotaWorker{
-		logger: s.logger,
+		logger:         s.logger,
+		minMarginLevel: s.MinMarginLevel,
+		maxLeverage:    s.MaxHedgeAccountLeverage,
 	}
 	sessionworker.Start(ctx, s.hedgeSession, "debt-quota", debtQuotaWorker)
 

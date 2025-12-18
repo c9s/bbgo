@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/bbgo/sessionworker"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
@@ -530,14 +531,6 @@ func (m *HedgeMarket) allowMarginHedge(
 	accountValueCalculator := session.GetAccountValueCalculator()
 	marketValue := accountValueCalculator.MarketValue()
 	debtValue := accountValueCalculator.DebtValue()
-	netValueInUsd := accountValueCalculator.NetValue()
-
-	m.logger.Infof(
-		"hedge account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
-		netValueInUsd.Float64(),
-		debtValue.Float64(),
-		marketValue.Float64(),
-	)
 
 	// if the margin level is lower than the minimal margin level,
 	// we need to repay the debt first
@@ -556,31 +549,7 @@ func (m *HedgeMarket) allowMarginHedge(
 	// if the margin level is higher than the minimal margin level,
 	// we can hedge the position, but we need to check the debt quota
 	// debtQuota is the quota with minimal margin level
-	debtQuota := m.calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel, maxLeverage)
-
-	m.logger.Infof(
-		"hedge account margin level %f > %f, debt quota: %f",
-		account.MarginLevel.Float64(), minMarginLevel.Float64(), debtQuota.Float64(),
-	)
-
-	if debtQuota.Sign() <= 0 {
-		return false, zero
-	}
-
-	// if MaxHedgeAccountLeverage is set, we need to calculate credit buffer
-	if maxLeverage.Sign() > 0 {
-		maximumValueInUsd := netValueInUsd.Mul(maxLeverage)
-		leverageQuotaInUsd := maximumValueInUsd.Sub(debtValue)
-		m.logger.Infof(
-			"hedge account maximum leveraged value in usd: %f (%f x), quota in usd: %f",
-			maximumValueInUsd.Float64(),
-			maxLeverage.Float64(),
-			leverageQuotaInUsd.Float64(),
-		)
-
-		debtQuota = fixedpoint.Min(debtQuota, leverageQuotaInUsd)
-	}
-
+	debtQuota := m.getDebtQuota()
 	if debtQuota.Sign() <= 0 {
 		return false, zero
 	}
@@ -604,47 +573,11 @@ func (m *HedgeMarket) allowMarginHedge(
 // - MMR with 10x leverage = 5%
 // - MMR with 5x leverage = 9%
 // - MMR with 3x leverage = 10%
-func (m *HedgeMarket) calculateDebtQuota(totalValue, debtValue, minMarginLevel, leverage fixedpoint.Value) fixedpoint.Value {
-	now := time.Now()
-	if m.debtQuotaCache != nil {
-		if v, ok := m.debtQuotaCache.Get(now); ok {
-			return v
-		}
-	}
-
-	if minMarginLevel.IsZero() || totalValue.IsZero() {
-		return fixedpoint.Zero
-	}
-
-	defaultMmr := fixedpoint.NewFromFloat(9.0 * 0.01)
-	if leverage.Compare(fixedpoint.NewFromFloat(10.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(5.0 * 0.01) // 5%
-	} else if leverage.Compare(fixedpoint.NewFromFloat(5.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(9.0 * 0.01) // 9%
-	} else if leverage.Compare(fixedpoint.NewFromFloat(3.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(10.0 * 0.01) // 10%
-	}
-
-	debtCap := totalValue.Div(minMarginLevel).Div(defaultMmr)
-	marginLevel := totalValue.Div(debtValue).Div(defaultMmr)
-
-	m.logger.Infof(
-		"calculateDebtQuota: debtCap=%f, debtValue=%f currentMarginLevel=%f mmr=%f",
-		debtCap.Float64(),
-		debtValue.Float64(),
-		marginLevel.Float64(),
-		defaultMmr.Float64(),
-	)
-
-	debtQuota := debtCap.Sub(debtValue)
-	if debtQuota.Sign() < 0 {
-		return fixedpoint.Zero
-	}
-
-	if m.debtQuotaCache == nil {
-		m.debtQuotaCache = fixedpoint.NewExpirable(debtQuota, now.Add(debtQuotaCacheDuration))
-	} else {
-		m.debtQuotaCache.Set(debtQuota, now.Add(debtQuotaCacheDuration))
+func (m *HedgeMarket) getDebtQuota() fixedpoint.Value {
+	var debtQuota = fixedpoint.Zero
+	if workerHandle := sessionworker.Get(m.session, "debt-quota"); workerHandle != nil {
+		rst := workerHandle.Value().(*DebtQuotaResult)
+		debtQuota = rst.AmountInQuote
 	}
 
 	return debtQuota
