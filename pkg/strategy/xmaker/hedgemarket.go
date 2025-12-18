@@ -526,12 +526,6 @@ func (m *HedgeMarket) allowMarginHedge(
 		return false, zero
 	}
 
-	bufMinMarginLevel := minMarginLevel.Mul(fixedpoint.NewFromFloat(1.005))
-
-	accountValueCalculator := session.GetAccountValueCalculator()
-	marketValue := accountValueCalculator.MarketValue()
-	debtValue := accountValueCalculator.DebtValue()
-
 	// if the margin level is lower than the minimal margin level,
 	// we need to repay the debt first
 	if account.MarginLevel.Sign() > 0 && account.MarginLevel.Compare(minMarginLevel) < 0 {

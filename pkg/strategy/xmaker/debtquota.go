@@ -33,11 +33,8 @@ type DebtQuotaResult struct {
 	MarginLevel     fixedpoint.Value
 }
 
-func (w *DebtQuotaWorker) calculate(ctx context.Context, session *bbgo.ExchangeSession) *DebtQuotaResult {
+func (w *DebtQuotaWorker) calculate(session *bbgo.ExchangeSession) *DebtQuotaResult {
 	minMarginLevel := fixedpoint.NewFromFloat(1.01)
-
-	// hedgeAccount := session.GetAccount()
-	// bufMinMarginLevel := minMarginLevel.Mul(fixedpoint.NewFromFloat(1.005))
 
 	accountValueCalculator := session.GetAccountValueCalculator()
 	marketValue := accountValueCalculator.MarketValue()
@@ -46,25 +43,26 @@ func (w *DebtQuotaWorker) calculate(ctx context.Context, session *bbgo.ExchangeS
 	totalValue := accountValueCalculator.MarketValue()
 	// marginInfoUpdater := session.GetMarginInfoUpdater()
 
-	// sourceMarket := s.hedgeMarket
 	w.logger.Infof(
-		"account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
+		"%s account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
+		session.Name,
 		netValueInUsd.Float64(),
 		debtValueInUsd.Float64(),
 		marketValue.Float64(),
 	)
 
 	defaultMmr := risk.DefaultMaintenanceMarginRatio(w.leverage)
-
 	debtCap := totalValue.Div(minMarginLevel).Div(defaultMmr)
 	marginLevel := totalValue.Div(debtValueInUsd).Div(defaultMmr)
 	debtQuota := debtCap.Sub(debtValueInUsd)
 
 	w.logger.Infof(
-		"calculateDebtQuota: debtQuota=%f debtCap=%f, debtValueInUsd=%f currentMarginLevel=%f mmr=%f",
+		"%s account debtQuota=%f debtCap=%f, debtValueInUsd=%f minMarginLevel=%f currentMarginLevel=%f mmr=%f",
+		session.Name,
 		debtQuota.Float64(),
 		debtCap.Float64(),
 		debtValueInUsd.Float64(),
+		minMarginLevel.Float64(),
 		marginLevel.Float64(),
 		defaultMmr.Float64(),
 	)
@@ -76,7 +74,8 @@ func (w *DebtQuotaWorker) calculate(ctx context.Context, session *bbgo.ExchangeS
 		maximumValueInUsd := netValueInUsd.Mul(w.maxLeverage)
 		leverageQuotaInUsd := maximumValueInUsd.Sub(debtValueInUsd)
 		w.logger.Infof(
-			"account maximum leveraged value in usd: %f (%f x), quota in usd: %f, min margin level quota: %f",
+			"%s account maximum leveraged value in usd: %f (%f x), quota in usd: %f, min margin level quota: %f",
+			session.Name,
 			maximumValueInUsd.Float64(),
 			w.maxLeverage.Float64(),
 			leverageQuotaInUsd.Float64(),
@@ -102,6 +101,12 @@ func (w *DebtQuotaWorker) Run(ctx context.Context, sesWorker *sessionworker.Hand
 		w.interval = 5 * time.Second
 	}
 
+	w.logger = w.logger.WithFields(logrus.Fields{
+		"worker":   "debt_quota",
+		"session":  session.Name,
+		"exchange": session.ExchangeName,
+	})
+
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
 
@@ -110,7 +115,7 @@ func (w *DebtQuotaWorker) Run(ctx context.Context, sesWorker *sessionworker.Hand
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			rst := w.calculate(ctx, session)
+			rst := w.calculate(session)
 			sesWorker.SetValue(rst)
 		}
 	}
