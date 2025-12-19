@@ -56,6 +56,7 @@ type Strategy struct {
 	DryRun                   bool                        `json:"dryRun"`
 	BalanceToleranceRange    fixedpoint.Value            `json:"balanceToleranceRange"`
 	Duration                 types.Duration              `json:"for"`
+	InstantAlignAmount       fixedpoint.Value            `json:"instantAlignAmount"`
 
 	WarningDuration types.Duration `json:"warningFor"`
 
@@ -132,6 +133,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.IdleInterval == nil {
 		s.IdleInterval = &s.ActiveTransferInterval
+	}
+
+	if s.InstantAlignAmount.IsZero() {
+		s.InstantAlignAmount = fixedpoint.NewFromFloat(50.0)
 	}
 
 	return nil
@@ -640,6 +645,10 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 			should, sustainedDuration := d.ShouldFix()
 			if sustainedDuration > 0 {
 				log.Infof("%s sustained deviation for %s...", currency, sustainedDuration)
+			}
+			// always adjust for small amount discrepancies
+			if amount.Compare(s.InstantAlignAmount) <= 0 {
+				should = true
 			}
 
 			if s.WarningDuration > 0 && sustainedDuration >= s.WarningDuration.Duration() {
