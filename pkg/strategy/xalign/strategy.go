@@ -57,6 +57,7 @@ type Strategy struct {
 	BalanceToleranceRange    fixedpoint.Value            `json:"balanceToleranceRange"`
 	Duration                 types.Duration              `json:"for"`
 	InstantAlignAmount       fixedpoint.Value            `json:"instantAlignAmount"`
+	Disabled                 bool                        `json:"disabled"`
 
 	WarningDuration types.Duration `json:"warningFor"`
 
@@ -550,6 +551,11 @@ func (s *Strategy) recordBalances(totalBalances types.BalanceMap, now time.Time)
 }
 
 func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) (activeTransferExists bool) {
+	if s.Disabled {
+		log.Info("xalign strategy is disabled, skipping alignment")
+		return false
+	}
+
 	for sessionName, session := range sessions {
 		ob, ok := s.orderBooks[sessionName]
 		if !ok {
