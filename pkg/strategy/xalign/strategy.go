@@ -85,6 +85,8 @@ type Strategy struct {
 	activeTransferNotificationLimiter *rate.Limiter
 
 	deltaGaugesMap map[deltaGaugeKey]prometheus.Gauge
+
+	ticker *time.Ticker
 }
 
 func (s *Strategy) ID() string {
@@ -434,18 +436,11 @@ func (s *Strategy) CrossRun(
 
 func (s *Strategy) monitor(ctx context.Context) {
 	activeTransferExists := s.align(ctx, s.sessions)
+	s.ticker = time.NewTicker(time.Second) // dummy initial duration, will be updated later
+	defer s.ticker.Stop()
 
-	activeInterval := s.ActiveTransferInterval.Duration()
-	idleInterval := s.IdleInterval.Duration()
-	ticker := time.NewTicker(activeInterval)
-	defer ticker.Stop()
-
-	var currentInterval time.Duration
-	if activeTransferExists {
-		currentInterval = activeInterval
-	} else {
-		currentInterval = idleInterval
-	}
+	currentInterval, detectDuration := s.nextDectectParams(activeTransferExists)
+	s.updateDurations(currentInterval, detectDuration)
 
 	for {
 		log.Infof("current xalign monitor interval: %s", currentInterval)
@@ -453,16 +448,29 @@ func (s *Strategy) monitor(ctx context.Context) {
 		case <-ctx.Done():
 			log.Infof("xalign monitor exiting...")
 			return
-		case <-ticker.C:
+		case <-s.ticker.C:
 			activeTransferExists = s.align(ctx, s.sessions)
-			if activeTransferExists {
-				currentInterval = activeInterval
-			} else {
-				currentInterval = idleInterval
-			}
-			ticker.Reset(currentInterval)
+			currentInterval, detectDuration = s.nextDectectParams(activeTransferExists)
+			s.updateDurations(currentInterval, detectDuration)
 		}
 	}
+}
+
+func (s *Strategy) updateDurations(tickDuration, detectDuration time.Duration) {
+	s.ticker.Reset(tickDuration)
+	log.Infof("deviation detection duration set to %s", detectDuration)
+	for _, d := range s.deviationDetectors {
+		d.SetDuration(detectDuration)
+	}
+}
+
+func (s *Strategy) nextDectectParams(foundActiveTransfer bool) (interval, detectDuration time.Duration) {
+	activeInterval := s.ActiveTransferInterval.Duration()
+	idleInterval := s.IdleInterval.Duration()
+	if foundActiveTransfer {
+		return activeInterval, 2 * time.Hour
+	}
+	return idleInterval, s.Duration.Duration()
 }
 
 func (s *Strategy) initializePriceResolver(allMarkets types.MarketMap) *pricesolver.SimplePriceSolver {

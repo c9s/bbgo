@@ -13,6 +13,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/strategy/xalign/detector"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
@@ -370,4 +371,29 @@ func Test_align(t *testing.T) {
 		// no active transfer detected
 		assert.False(t, activeTransferExists, "align should return false when there are no active transfers")
 	})
+}
+
+func Test_updateDurations(t *testing.T) {
+	s := &Strategy{
+		ActiveTransferInterval: types.Duration(3 * time.Minute),
+		Duration:               types.Duration(time.Minute * 30),
+		ticker:                 time.NewTicker(1 * time.Second),
+		deviationDetectors:     make(map[string]*detector.DeviationDetector[types.Balance]),
+	}
+	err := s.Defaults()
+	assert.NoError(t, err)
+
+	s.deviationDetectors["test"] = detector.NewDeviationDetector(
+		types.NewBalance("USDT", fixedpoint.NewFromFloat(0.5)),
+		0.01,
+		5*time.Minute,
+		s.netBalanceValue,
+	)
+	tickerDuration, detectDuration := s.nextDectectParams(true)
+	s.updateDurations(tickerDuration, detectDuration)
+	assert.Equal(t, 2*time.Hour, s.deviationDetectors["test"].GetDuration())
+
+	tickerDuration, detectDuration = s.nextDectectParams(false)
+	s.updateDurations(tickerDuration, detectDuration)
+	assert.Equal(t, 30*time.Minute, s.deviationDetectors["test"].GetDuration())
 }

@@ -56,6 +56,18 @@ func (d *DeviationDetector[T]) SetLogger(logger logrus.FieldLogger) {
 	d.logger = logger
 }
 
+func (d *DeviationDetector[T]) SetDuration(duration time.Duration) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.duration = duration
+}
+
+func (d *DeviationDetector[T]) GetDuration() time.Duration {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.duration
+}
+
 func (d *DeviationDetector[T]) AddRecord(at time.Time, value T) (bool, time.Duration) {
 	// Calculate deviation percentage
 	expected, err := d.toFloat64Amount(d.expectedValue)
