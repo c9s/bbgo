@@ -552,7 +552,7 @@ func (s *Strategy) recordBalances(totalBalances types.BalanceMap, now time.Time)
 
 func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) (activeTransferExists bool) {
 	if s.Disabled {
-		log.Info("xalign strategy is disabled, skipping alignment")
+		bbgo.Notify("xalign strategy is disabled, skipping alignment")
 		return false
 	}
 
