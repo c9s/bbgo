@@ -18,6 +18,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/bbgo/sessionworker"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/exchange/sandbox"
@@ -550,7 +551,7 @@ func (s *Strategy) getPositionHoldingPeriod(now time.Time) (time.Duration, bool)
 }
 
 func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
-	sig, err := s.aggregateSignal(ctx)
+	sig, err := s.AggregateSignal(ctx)
 	if err != nil {
 		return err
 	}
@@ -742,48 +743,8 @@ func (s *Strategy) collectSignalsAndWeights(ctx context.Context) (signals []floa
 	return signals, weights, nil
 }
 
-// DirectionDivergence computes (m, pSign, D2) given signals and weights.
-// m     : weighted mean of signals
-// pSign : total normalized weight aligned with mean direction and |s_i| >= tau
-// D2    : 1 - pSign
-func DirectionDivergence(signals []float64, weights []float64, tau float64, epsM float64) (m, pSign, D2 float64) {
-	n := len(signals)
-	if n == 0 {
-		return 0, 0, 1
-	}
-	if len(weights) != n {
-		weights = make([]float64, n)
-		for i := range weights {
-			weights[i] = 1
-		}
-	}
-	weights = normalizeWeightsFloat(weights)
-
-	// weighted mean
-	for i := 0; i < n; i++ {
-		m += weights[i] * signals[i]
-	}
-	if math.Abs(m) < epsM {
-		return m, 0, 1
-	}
-	mSign := signf(m)
-	p := 0.0
-	for i := 0; i < n; i++ {
-		if math.Abs(signals[i]) >= tau && signf(signals[i]) == mSign {
-			p += weights[i]
-		}
-	}
-	if p < 0 {
-		p = 0
-	}
-	if p > 1 {
-		p = 1
-	}
-	return m, p, 1 - p
-}
-
-// TODO: move this aggregateSignal to the signal package
-func (s *Strategy) aggregateSignal(ctx context.Context) (float64, error) {
+// TODO: move this AggregateSignal to the signal package
+func (s *Strategy) AggregateSignal(ctx context.Context) (float64, error) {
 	sum := 0.0
 	voters := 0.0
 	for _, signalWrapper := range s.SignalConfigList.Signals {
@@ -839,59 +800,6 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 	return q, nil
 }
 
-const debtQuotaCacheDuration = 30 * time.Second
-
-// margin level = totalValue / totalDebtValue * MMR (maintenance margin ratio)
-// on binance:
-// - MMR with 10x leverage = 5%
-// - MMR with 5x leverage = 9%
-// - MMR with 3x leverage = 10%
-func (s *Strategy) calculateDebtQuota(totalValue, debtValue, minMarginLevel, leverage fixedpoint.Value) fixedpoint.Value {
-	now := time.Now()
-	if s.debtQuotaCache != nil {
-		if v, ok := s.debtQuotaCache.Get(now); ok {
-			return v
-		}
-	}
-
-	if minMarginLevel.IsZero() || totalValue.IsZero() {
-		return fixedpoint.Zero
-	}
-
-	defaultMmr := fixedpoint.NewFromFloat(9.0 * 0.01)
-	if leverage.Compare(fixedpoint.NewFromFloat(10.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(5.0 * 0.01) // 5%
-	} else if leverage.Compare(fixedpoint.NewFromFloat(5.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(9.0 * 0.01) // 9%
-	} else if leverage.Compare(fixedpoint.NewFromFloat(3.0)) >= 0 {
-		defaultMmr = fixedpoint.NewFromFloat(10.0 * 0.01) // 10%
-	}
-
-	debtCap := totalValue.Div(minMarginLevel).Div(defaultMmr)
-	marginLevel := totalValue.Div(debtValue).Div(defaultMmr)
-
-	s.logger.Infof(
-		"calculateDebtQuota: debtCap=%f, debtValue=%f currentMarginLevel=%f mmr=%f",
-		debtCap.Float64(),
-		debtValue.Float64(),
-		marginLevel.Float64(),
-		defaultMmr.Float64(),
-	)
-
-	debtQuota := debtCap.Sub(debtValue)
-	if debtQuota.Sign() < 0 {
-		return fixedpoint.Zero
-	}
-
-	if s.debtQuotaCache == nil {
-		s.debtQuotaCache = fixedpoint.NewExpirable(debtQuota, now.Add(debtQuotaCacheDuration))
-	} else {
-		s.debtQuotaCache.Set(debtQuota, now.Add(debtQuotaCacheDuration))
-	}
-
-	return debtQuota
-}
-
 func (s *Strategy) allowMarginHedge(
 	session *bbgo.ExchangeSession,
 	minMarginLevel, maxHedgeAccountLeverage fixedpoint.Value,
@@ -910,54 +818,24 @@ func (s *Strategy) allowMarginHedge(
 	}
 
 	lastPrice := s.lastPrice.Get()
-	bufMinMarginLevel := minMarginLevel.Mul(fixedpoint.NewFromFloat(1.005))
-
-	accountValueCalculator := session.GetAccountValueCalculator()
-	marketValue := accountValueCalculator.MarketValue()
-	debtValue := accountValueCalculator.DebtValue()
-	netValueInUsd := accountValueCalculator.NetValue()
+	if lastPrice.IsZero() {
+		return false, zero
+	}
 
 	marginInfoUpdater := session.GetMarginInfoUpdater()
-	sourceMarket := s.hedgeMarket
+	market := s.hedgeMarket
 
-	s.logger.Infof(
-		"hedge account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
-		netValueInUsd.Float64(),
-		debtValue.Float64(),
-		marketValue.Float64(),
-	)
+	// debtQuota is the quota with minimal margin level
+	var debtQuota = fixedpoint.Zero
+	if workerHandle := sessionworker.Get(session, "debt-quota"); workerHandle != nil {
+		rst := workerHandle.Value().(*DebtQuotaResult)
+		debtQuota = rst.AmountInQuote
+	}
 
 	// if the margin level is higher than the minimal margin level,
 	// we can hedge the position, but we need to check the debt quota
 	if hedgeAccount.MarginLevel.Compare(minMarginLevel) > 0 {
-
-		// debtQuota is the quota with minimal margin level
-		debtQuota := s.calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel, maxHedgeAccountLeverage)
-
-		s.logger.Infof(
-			"hedge account margin level %f > %f, debt quota: %f",
-			hedgeAccount.MarginLevel.Float64(), minMarginLevel.Float64(), debtQuota.Float64(),
-		)
-
 		if debtQuota.Sign() <= 0 {
-			return false, zero
-		}
-
-		// if MaxHedgeAccountLeverage is set, we need to calculate credit buffer
-		if maxHedgeAccountLeverage.Sign() > 0 {
-			maximumValueInUsd := netValueInUsd.Mul(maxHedgeAccountLeverage)
-			leverageQuotaInUsd := maximumValueInUsd.Sub(debtValue)
-			s.logger.Infof(
-				"hedge account maximum leveraged value in usd: %f (%f x), quota in usd: %f",
-				maximumValueInUsd.Float64(),
-				maxHedgeAccountLeverage.Float64(),
-				leverageQuotaInUsd.Float64(),
-			)
-
-			debtQuota = fixedpoint.Min(debtQuota, leverageQuotaInUsd)
-		}
-
-		if lastPrice.IsZero() {
 			return false, zero
 		}
 
@@ -976,7 +854,7 @@ func (s *Strategy) allowMarginHedge(
 			// - Our debt quota is calculated using the soft leverage of 3x.
 			// - Using maxBorrowable + available would max out the leverage which is too risky.
 			if marginInfoUpdater != nil {
-				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(sourceMarket.BaseCurrency)
+				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(market.BaseCurrency)
 				if hasMaxBorrowable {
 					maxBuyableQuote = fixedpoint.Min(maxBuyableQuote, maxBorrowable.Mul(lastPrice))
 				}
@@ -990,7 +868,7 @@ func (s *Strategy) allowMarginHedge(
 			// - borrow another 5
 			// But when this goes back to the caller,
 			// it will take the minimum value with maker balance (this is what the AI doesn't understand)
-			bal, hasBal := hedgeAccount.Balance(sourceMarket.BaseCurrency)
+			bal, hasBal := hedgeAccount.Balance(market.BaseCurrency)
 			if hasBal {
 				maxBuyableQuote = fixedpoint.Max(maxBuyableQuote, bal.Available.Mul(lastPrice))
 			}
@@ -1003,14 +881,14 @@ func (s *Strategy) allowMarginHedge(
 			maxSellable := debtQuota.Div(lastPrice)
 
 			if marginInfoUpdater != nil {
-				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(sourceMarket.QuoteCurrency)
+				maxBorrowable, hasMaxBorrowable := marginInfoUpdater.GetMaxBorrowable(market.QuoteCurrency)
 				if hasMaxBorrowable {
 					maxSellable = fixedpoint.Min(maxSellable, maxBorrowable.Div(lastPrice))
 				}
 			}
 
 			// Ditto, using Max() here should be correct because this only calculates the hedge side balance
-			bal, hasBal := hedgeAccount.Balance(sourceMarket.QuoteCurrency)
+			bal, hasBal := hedgeAccount.Balance(market.QuoteCurrency)
 			if hasBal {
 				maxSellable = fixedpoint.Max(maxSellable, bal.Available.Div(lastPrice))
 			}
@@ -1087,7 +965,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		return nil
 	}
 
-	sig, err := s.aggregateSignal(ctx)
+	sig, err := s.AggregateSignal(ctx)
 	if err != nil {
 		return err
 	}
@@ -2662,6 +2540,13 @@ func (s *Strategy) CrossRun(
 
 	s.Position.UpdateMetrics(nil)
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
+
+	debtQuotaWorker := &DebtQuotaWorker{
+		logger:         s.logger,
+		minMarginLevel: s.MinMarginLevel,
+		maxLeverage:    s.MaxHedgeAccountLeverage,
+	}
+	sessionworker.Start(ctx, s.hedgeSession, "debt-quota", debtQuotaWorker)
 
 	// restore position into the position exposure
 	s.logger.Infof("restoring position into the exposure: %s", s.Position.GetBase().String())
