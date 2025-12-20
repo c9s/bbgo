@@ -797,23 +797,13 @@ func (s *Strategy) findStopPrice(ctx context.Context, ticker *types.Ticker, side
 			} else {
 				dist = pivot.Sub(currentPrice).Div(currentPrice)
 			}
-			// threshold 2%
+
+			// max distance threshold 2%
 			maxDist := fixedpoint.NewFromFloat(0.02)
 			if dist.Sign() <= 0 || dist.Compare(maxDist) <= 0 {
 				// within acceptable distance, use pivot
 				return pivot, nil
 			}
-			// too far: try nearest kline stop (recent 15m klines)
-			if sp, err := s.findNearestStop(ctx, side, now, 3); err == nil && sp.Sign() > 0 {
-				if ok, _ := s.validateStopPrice(side, currentPrice, sp); ok {
-					if s.logger != nil {
-						s.logger.WithFields(logrus.Fields{"pivot": pivot.String(), "nearest": sp.String(), "dist": dist.String()}).Info("pivot stop too far, using recent kline stop instead")
-					}
-					return sp, nil
-				}
-			}
-			// fallback to pivot if nearest not available/valid
-			return pivot, nil
 		}
 	}
 
