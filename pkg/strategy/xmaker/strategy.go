@@ -2702,11 +2702,9 @@ func (s *Strategy) CrossRun(
 			setter.SetLogger(s.logger)
 		}
 
-		if binder, ok := sigProvider.(SessionBinder); ok {
-			s.logger.Infof("binding session on signal %T", sigProvider)
-			if err := binder.Bind(s.tradingCtx, s.hedgeSession, s.SourceSymbol); err != nil {
-				return err
-			}
+		s.logger.Infof("binding session on signal %T", sigProvider)
+		if err := sigProvider.Bind(s.tradingCtx, s.hedgeSession, s.SourceSymbol); err != nil {
+			return err
 		}
 	}
 

@@ -21,6 +21,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
+	xmakersignal "github.com/c9s/bbgo/pkg/strategy/xmaker/signal"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -109,12 +110,20 @@ type Strategy struct {
 
 	BacktestConfig *BacktestConfig `json:"backtest,omitempty"`
 
+	// SignalConfigList imports xmaker's signal configuration. All signals will be bound
+	// to the PremiumSession as the data source by default unless the config explicitly
+	// specifies otherwise. The aggregated signal value is used to gate entries:
+	// we will only open a position if the aggregated signal side matches the intended side.
+	SignalConfigList *xmakersignal.DynamicConfig `json:"signals,omitempty"`
+
 	// QuoteDepth is the quoting depth in quote currency (e.g., USDT) when deriving bid/ask from depth books
 	// Defaults to 300 USDT if not specified.
 	QuoteDepth fixedpoint.Value `json:"quoteDepth"`
 
 	logger        logrus.FieldLogger
 	metricsLabels prometheus.Labels
+
+	marketTradeStream types.Stream
 
 	// cached metrics to avoid repeated With() lookups
 	premiumRatioObs  prometheus.Observer
@@ -153,6 +162,9 @@ type Strategy struct {
 	sellTriggerCount int
 
 	lastTPCheck time.Time
+
+	// cached flag to indicate whether external signals are configured
+	hasExternalSignals bool
 }
 
 type Signal struct {
@@ -244,19 +256,18 @@ func (s *Strategy) Initialize() error {
 
 	// cache metrics objects to avoid repeated With() lookups
 	base := s.metricsLabels
-	if base != nil {
-		// histograms without side label
-		s.premiumRatioObs = premiumRatioHistogram.With(base)
-		s.discountRatioObs = discountRatioHistogram.With(base)
 
-		// signal metrics (with side)
-		curriedSigCounter := signalCounter.MustCurryWith(base)
-		curriedSigHist := signalRatioHistogram.MustCurryWith(base)
-		s.sigCounterBuy = curriedSigCounter.With(prometheus.Labels{"side": types.SideTypeBuy.String()})
-		s.sigCounterSell = curriedSigCounter.With(prometheus.Labels{"side": types.SideTypeSell.String()})
-		s.sigRatioObsBuy = curriedSigHist.With(prometheus.Labels{"side": types.SideTypeBuy.String()})
-		s.sigRatioObsSell = curriedSigHist.With(prometheus.Labels{"side": types.SideTypeSell.String()})
-	}
+	// histograms without side label
+	s.premiumRatioObs = premiumRatioHistogram.With(base)
+	s.discountRatioObs = discountRatioHistogram.With(base)
+
+	// signal metrics (with side)
+	curriedSigCounter := signalCounter.MustCurryWith(base)
+	curriedSigHist := signalRatioHistogram.MustCurryWith(base)
+	s.sigCounterBuy = curriedSigCounter.With(prometheus.Labels{"side": types.SideTypeBuy.String()})
+	s.sigCounterSell = curriedSigCounter.With(prometheus.Labels{"side": types.SideTypeSell.String()})
+	s.sigRatioObsBuy = curriedSigHist.With(prometheus.Labels{"side": types.SideTypeBuy.String()})
+	s.sigRatioObsSell = curriedSigHist.With(prometheus.Labels{"side": types.SideTypeSell.String()})
 	return nil
 }
 
@@ -355,6 +366,22 @@ func (s *Strategy) Defaults() error {
 		s.MinTriggers = 3
 	}
 
+	// default and normalize external signal config to use premium session+symbol as source
+	if s.SignalConfigList != nil {
+		// prefer PremiumSession/Symbol as the default source
+		if s.SignalConfigList.SessionName == "" {
+			s.SignalConfigList.SessionName = s.PremiumSession
+		}
+		if s.SignalConfigList.Symbol == "" {
+			if s.PremiumSymbol != "" {
+				s.SignalConfigList.Symbol = s.PremiumSymbol
+			} else if s.Symbol != "" {
+				s.SignalConfigList.Symbol = s.Symbol
+			}
+		}
+		s.hasExternalSignals = len(s.SignalConfigList.Signals) > 0
+	}
+
 	return nil
 }
 
@@ -427,6 +454,16 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 			interval := s.PivotStop.Interval
 			premiumSession.Subscribe(types.KLineChannel, s.PremiumSymbol, types.SubscribeOptions{Interval: interval})
 			tradingSession.Subscribe(types.KLineChannel, s.TradingSymbol, types.SubscribeOptions{Interval: interval})
+		}
+	}
+
+	// subscribe external signal providers (using premium session as the source by default)
+	if s.SignalConfigList != nil && len(s.SignalConfigList.Signals) > 0 {
+		premiumSession := sessions[s.PremiumSession]
+		if premiumSession != nil {
+			for _, sw := range s.SignalConfigList.Signals {
+				sw.Signal.Subscribe(premiumSession, s.SignalConfigList.Symbol)
+			}
 		}
 	}
 }
@@ -535,6 +572,36 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	// register streams into the connector manager and connect them via connector manager
 	s.connectorManager.Add(premiumStream, baseStream)
 
+	// bind external signal providers to premium session + symbol
+	if s.SignalConfigList != nil && len(s.SignalConfigList.Signals) > 0 {
+		s.marketTradeStream = bbgo.NewMarketTradeStream(s.premiumSession, s.PremiumSymbol)
+		s.connectorManager.Add(s.marketTradeStream)
+
+		for _, sw := range s.SignalConfigList.Signals {
+			sigProvider := sw.Signal
+			if setter, ok := sigProvider.(xmakersignal.StreamBookSetter); ok {
+				s.logger.Infof("setting stream book on signal %T", sigProvider)
+				setter.SetStreamBook(s.premiumBook)
+			}
+
+			if setter, ok := sigProvider.(xmakersignal.MarketTradeStreamSetter); ok {
+				s.logger.Infof("setting market trade stream on signal %T", sigProvider)
+				setter.SetMarketTradeStream(s.marketTradeStream)
+			}
+
+			// pass logger to the signal provider
+			if setter, ok := sigProvider.(interface {
+				SetLogger(logger logrus.FieldLogger)
+			}); ok {
+				setter.SetLogger(s.logger)
+			}
+
+			if err := sw.Signal.Bind(ctx, s.premiumSession, s.SignalConfigList.Symbol); err != nil {
+				return fmt.Errorf("failed to bind signal provider %s: %w", sw.Signal.ID(), err)
+			}
+		}
+	}
+
 	if err := s.connectorManager.Connect(ctx); err != nil {
 		s.logger.WithError(err).Error("connector manager connect error")
 		return err
@@ -626,6 +693,49 @@ func (s *Strategy) decideSignal(premium, discount float64) types.SideType {
 		return types.SideTypeBuy
 	}
 	if discount <= -s.MinSpread.Float64() {
+		return types.SideTypeSell
+	}
+	return ""
+}
+
+// aggregateExternalSignal computes the weighted aggregated signal from imported xmaker signals.
+// Returns (value, true) when signals are configured, otherwise (0, false).
+// The value is clamped to [-2, 2].
+func (s *Strategy) aggregateExternalSignal(ctx context.Context) (float64, bool) {
+	if s.SignalConfigList == nil || len(s.SignalConfigList.Signals) == 0 {
+		return 0.0, false
+	}
+
+	var sum float64
+	var wsum float64
+	for _, sw := range s.SignalConfigList.Signals {
+		v, err := sw.Signal.CalculateSignal(ctx)
+		if err != nil {
+			if s.logger != nil {
+				s.logger.WithError(err).Warnf("signal %s calculation error", sw.Signal.ID())
+			}
+			continue
+		}
+		sum += v * sw.Weight
+		wsum += math.Abs(sw.Weight)
+	}
+	if wsum == 0 {
+		return 0.0, true
+	}
+	sig := sum / wsum
+	if sig > 2 {
+		sig = 2
+	} else if sig < -2 {
+		sig = -2
+	}
+	return sig, true
+}
+
+func signalToSide(sig float64) types.SideType {
+	if sig > 0 {
+		return types.SideTypeBuy
+	}
+	if sig < 0 {
 		return types.SideTypeSell
 	}
 	return ""
@@ -1354,10 +1464,17 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 			s.discountRatioObs.Observe(math.Abs(discount))
 		}
 
+		var sig float64
+		var hasSig bool
+
 		if logLimiter.Allow() {
-			s.logger.Infof("comparing books: premium bid=%s ask=%s | base bid=%s ask=%s => premium=%.4f%% discount=%.4f%%",
+			if s.hasExternalSignals {
+				sig, hasSig = s.aggregateExternalSignal(ctx)
+			}
+
+			s.logger.Infof("comparing: premium bid=%s ask=%s | base bid=%s ask=%s => premium=%.4f%% discount=%.4f%% signal=%.3f",
 				bidA.Price.String(), askA.Price.String(), bidB.Price.String(), askB.Price.String(),
-				premium*100, discount*100)
+				premium*100, discount*100, sig)
 		}
 
 		side := s.decideSignal(premium, discount)
@@ -1368,24 +1485,21 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 			continue
 		}
 
+		// ensure we have the signal for side checking
+		if s.hasExternalSignals && !hasSig {
+			sig, hasSig = s.aggregateExternalSignal(ctx)
+		}
+
 		// signal metrics (cached)
 		var sigRatio float64
 		if side == types.SideTypeBuy {
 			sigRatio = math.Abs(premium)
-			if s.sigCounterBuy != nil {
-				s.sigCounterBuy.Inc()
-			}
-			if s.sigRatioObsBuy != nil {
-				s.sigRatioObsBuy.Observe(sigRatio)
-			}
+			s.sigCounterBuy.Inc()
+			s.sigRatioObsBuy.Observe(sigRatio)
 		} else {
 			sigRatio = math.Abs(discount)
-			if s.sigCounterSell != nil {
-				s.sigCounterSell.Inc()
-			}
-			if s.sigRatioObsSell != nil {
-				s.sigRatioObsSell.Observe(sigRatio)
-			}
+			s.sigCounterSell.Inc()
+			s.sigRatioObsSell.Observe(sigRatio)
 		}
 
 		// update trigger counters and gate execution until count > MinTriggers
@@ -1402,6 +1516,26 @@ func (s *Strategy) premiumWorker(ctx context.Context) {
 			if (side == types.SideTypeBuy && s.buyTriggerCount <= s.MinTriggers) ||
 				(side == types.SideTypeSell && s.sellTriggerCount <= s.MinTriggers) {
 				// not enough consecutive triggers yet
+				continue
+			}
+		}
+
+		// If external signals are configured, ensure their side agrees with the intended position side
+		if hasSig {
+			sigSide := signalToSide(sig)
+			if sigSide == "" {
+				// neutral signal: do not open new positions
+				if s.logger != nil {
+					s.logger.Debugf("external signal neutral (%.4f), skip opening position", sig)
+				}
+				continue
+			}
+
+			if sigSide != side {
+				// mismatch between book-premium trigger and external signal direction
+				if s.logger != nil {
+					s.logger.Infof("skip entry due to external signal mismatch: trigger=%s signal=%.4f(%s)", side, sig, sigSide)
+				}
 				continue
 			}
 		}
