@@ -195,6 +195,13 @@ func (it *Interact) AddMessenger(messenger Messenger) {
 	it.messengers = append(it.messengers, messenger)
 }
 
+func (it *Interact) GetMessengers() []Messenger {
+	it.mu.Lock()
+	defer it.mu.Unlock()
+
+	return it.messengers
+}
+
 // builtin initializes the built-in commands
 func (it *Interact) builtin() error {
 	it.Command("/uptime", "show bot uptime", func(reply Reply) error {
