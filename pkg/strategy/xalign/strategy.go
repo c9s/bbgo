@@ -744,8 +744,6 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 				} else {
 					log.Errorf("orderbook %s not found", selectedSession.Name)
 				}
-
-				s.orderBooks[selectedSession.Name].Add(*createdOrder)
 			}
 		}
 	}
