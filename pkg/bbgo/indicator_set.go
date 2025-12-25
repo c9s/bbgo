@@ -126,3 +126,18 @@ func (i *IndicatorSet) LiquidityDemand(
 		i.SMA(iw),
 	)
 }
+
+func (i *IndicatorSet) ChandelierStop(
+	interval types.Interval,
+	length, atrPeriod int,
+	multiplier float64,
+	emitDirection bool,
+) *indicatorv2.ChandelierStopStream {
+	return indicatorv2.ChandelierStop(
+		i.KLines(interval),
+		length,
+		atrPeriod,
+		multiplier,
+		emitDirection,
+	)
+}
