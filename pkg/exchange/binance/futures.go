@@ -3,11 +3,13 @@ package binance
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
@@ -18,6 +20,7 @@ import (
 func (e *Exchange) queryFuturesClosedOrders(
 	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
 ) (orders []types.Order, err error) {
+	// Query regular orders
 	req := e.futuresClient.NewListOrdersService().Symbol(symbol)
 
 	if lastOrderID > 0 {
@@ -33,7 +36,39 @@ func (e *Exchange) queryFuturesClosedOrders(
 	if err != nil {
 		return orders, err
 	}
-	return toGlobalFuturesOrders(binanceOrders, false)
+
+	regularOrders, err := toGlobalFuturesOrders(binanceOrders, false)
+	if err != nil {
+		return orders, err
+	}
+	orders = append(orders, regularOrders...)
+
+	// Query algo orders
+	reqAlgo := e.futuresClient.NewListAllAlgoOrdersService().Symbol(symbol)
+	if lastOrderID == 0 {
+		reqAlgo.StartTime(since.UnixNano() / int64(time.Millisecond))
+		if until.Sub(since) < 24*time.Hour {
+			reqAlgo.EndTime(until.UnixNano() / int64(time.Millisecond))
+		}
+	} else {
+		// For algo orders, we can use AlgoID to filter
+		reqAlgo.AlgoID(int64(lastOrderID))
+	}
+
+	binanceAlgoOrders, err := reqAlgo.Do(ctx)
+	if err != nil {
+		// If algo orders query fails, still return regular orders
+		return orders, nil
+	}
+
+	algoOrders, err := toGlobalFuturesOrders(binanceAlgoOrders, false)
+	if err != nil {
+		// If conversion fails, still return regular orders
+		return orders, nil
+	}
+	orders = append(orders, algoOrders...)
+
+	return orders, nil
 }
 
 func (e *Exchange) TransferFuturesAccountAsset(
@@ -116,6 +151,11 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 
 func (e *Exchange) cancelFuturesOrders(ctx context.Context, orders ...types.Order) (err error) {
 	for _, o := range orders {
+		if isAlgoOrderType(o.Type) {
+			err = multierr.Append(err, e.cancelFuturesAlgoOrder(ctx, o))
+			continue
+		}
+
 		var req = e.futuresClient.NewCancelOrderService()
 
 		// Mandatory
@@ -139,7 +179,34 @@ func (e *Exchange) cancelFuturesOrders(ctx context.Context, orders ...types.Orde
 	return err
 }
 
+func (e *Exchange) cancelFuturesAlgoOrder(ctx context.Context, order types.Order) error {
+	// Cancel specific algo order by OrderID
+	if order.OrderID > 0 {
+		req := e.futuresClient.NewCancelAlgoOrderService().AlgoID(int64(order.OrderID))
+		if order.ClientOrderID != "" {
+			req.ClientAlgoID(order.ClientOrderID)
+		}
+
+		_, err := req.Do(ctx)
+		return err
+	}
+
+	// Cancel all algo open orders for the symbol
+	if order.Symbol != "" {
+		req := e.futuresClient.NewCancelAllAlgoOpenOrdersService().
+			Symbol(order.Symbol)
+		return req.Do(ctx)
+	}
+
+	return fmt.Errorf("can not cancel algo order, order does not contain orderID or symbol")
+}
+
 func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
+	// Check if this is an Algo order type
+	if isAlgoOrderType(order.Type) {
+		return e.submitFuturesAlgoOrder(ctx, order)
+	}
+
 	orderType, err := toLocalFuturesOrderType(order.Type)
 	if err != nil {
 		return nil, err
@@ -231,6 +298,92 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		ClosePosition:    response.ClosePosition,
 	}, false)
 
+	return createdOrder, err
+}
+
+// submitFuturesAlgoOrder submits an Algo order (conditional order) to Binance Futures
+func (e *Exchange) submitFuturesAlgoOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
+	orderType, err := toLocalFuturesAlgoOrderType(order.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	req := e.futuresClient.NewCreateAlgoOrderService().
+		Symbol(order.Symbol).
+		Type(orderType).
+		Side(futures.SideType(order.Side))
+
+	// Set client order ID
+	clientOrderID := newFuturesClientOrderID(order.ClientOrderID)
+	if len(clientOrderID) > 0 {
+		req.ClientAlgoId(clientOrderID)
+	}
+
+	// Set position side for hedge mode (dual side position mode)
+	// According to Binance API: positionSide must be sent in Hedge Mode
+	if dualSidePosition {
+		setDualSidePosition(req, order)
+	}
+
+	// Set quantity (not supported when closePosition is true)
+	if !order.ClosePosition {
+		if order.Market.Symbol != "" {
+			req.Quantity(order.Market.FormatQuantity(order.Quantity))
+		} else {
+			req.Quantity(order.Quantity.FormatString(8))
+		}
+	}
+
+	// Set price for limit orders (STOP and TAKE_PROFIT)
+	switch order.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeTakeProfit:
+		if order.Market.Symbol != "" {
+			req.Price(order.Market.FormatPrice(order.Price))
+		} else {
+			req.Price(order.Price.FormatString(8))
+		}
+	}
+
+	// Set trigger price (stop price)
+	if order.StopPrice.Sign() > 0 {
+		if order.Market.Symbol != "" {
+			req.TriggerPrice(order.Market.FormatPrice(order.StopPrice))
+		} else {
+			req.TriggerPrice(order.StopPrice.FormatString(8))
+		}
+	}
+
+	// Set time in force
+	if len(order.TimeInForce) > 0 {
+		req.TimeInForce(futures.TimeInForceType(order.TimeInForce))
+	} else {
+		// Default to GTC for limit orders
+		switch order.Type {
+		case types.OrderTypeStopLimit, types.OrderTypeTakeProfit:
+			req.TimeInForce(futures.TimeInForceTypeGTC)
+		}
+	}
+
+	// Set reduce only and close position
+	// According to Binance API:
+	// - reduceOnly cannot be sent in Hedge Mode
+	// - reduceOnly cannot be sent with closePosition=true
+	if order.ReduceOnly && !dualSidePosition && !order.ClosePosition {
+		req.ReduceOnly(order.ReduceOnly)
+	}
+	if order.ClosePosition {
+		req.ClosePosition(order.ClosePosition)
+	}
+
+	response, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infof("futures algo order creation response: %+v", response)
+
+	// Convert response to global order type
+	createdOrder, err := toGlobalFuturesOrder(response, false)
 	return createdOrder, err
 }
 
@@ -466,19 +619,124 @@ func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol ...string) ([]t
 	return toGlobalPositionRisk(filteredPositions), nil
 }
 
-func setDualSidePosition(req *futures.CreateOrderService, order types.SubmitOrder) {
+func (e *Exchange) queryFuturesOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
+	req := e.futuresClient.NewListOpenOrdersService().Symbol(symbol)
+	binanceOrders, err := req.Do(ctx)
+	if err != nil {
+		return orders, err
+	}
+
+	globalOrders, err := toGlobalFuturesOrders(binanceOrders, false)
+	if err != nil {
+		return orders, err
+	}
+	orders = append(orders, globalOrders...)
+
+	reqAlgo := e.futuresClient.NewListAllAlgoOrdersService().Symbol(symbol)
+	binanceAlgoOrders, err := reqAlgo.Do(ctx)
+	if err != nil {
+		return orders, err
+	}
+
+	globalOrders, err = toGlobalFuturesOrders(binanceAlgoOrders, false)
+	if err != nil {
+		return orders, err
+	}
+
+	orders = append(orders, globalOrders...)
+	return
+}
+
+func (e *Exchange) queryFuturesOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	if q.Symbol == "" {
+		return nil, errors.New("symbol is required")
+	}
+
+	// Try to query regular order first
+	if order, err := e.queryRegularFuturesOrder(ctx, q); err == nil {
+		return order, nil
+	}
+
+	// If regular order query fails, try algo order
+	return e.queryAlgoFuturesOrder(ctx, q)
+}
+
+// queryRegularFuturesOrder queries a regular futures order
+func (e *Exchange) queryRegularFuturesOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	req := e.futuresClient.NewGetOrderService().Symbol(q.Symbol)
+
+	if len(q.OrderID) > 0 {
+		orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid order id: %w", err)
+		}
+		req.OrderID(orderID)
+	} else if len(q.ClientOrderID) > 0 {
+		req.OrigClientOrderID(q.ClientOrderID)
+	} else {
+		return nil, errors.New("order id or client order id is required")
+	}
+
+	order, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalFuturesOrder(order, false)
+}
+
+// queryAlgoFuturesOrder queries an algo futures order
+func (e *Exchange) queryAlgoFuturesOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	req := e.futuresClient.NewGetAlgoOrderService()
+
+	if len(q.OrderID) > 0 {
+		orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid algo order id: %w", err)
+		}
+		req.AlgoID(orderID)
+	} else if len(q.ClientOrderID) > 0 {
+		req.ClientAlgoID(q.ClientOrderID)
+	} else {
+		return nil, errors.New("algo order id or client algo order id is required")
+	}
+
+	algoOrder, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalFuturesOrder(algoOrder, false)
+}
+
+// OrderServiceConstraint is a type constraint for order services that support setting position side
+type OrderServiceConstraint interface {
+	*futures.CreateOrderService | *futures.CreateAlgoOrderService
+}
+
+func setDualSidePosition[T OrderServiceConstraint](req T, order types.SubmitOrder) {
+	var positionSide futures.PositionSideType
+
 	switch order.Side {
 	case types.SideTypeBuy:
 		if order.ReduceOnly {
-			req.PositionSide(futures.PositionSideTypeShort)
+			positionSide = futures.PositionSideTypeShort
 		} else {
-			req.PositionSide(futures.PositionSideTypeLong)
+			positionSide = futures.PositionSideTypeLong
 		}
 	case types.SideTypeSell:
 		if order.ReduceOnly {
-			req.PositionSide(futures.PositionSideTypeLong)
+			positionSide = futures.PositionSideTypeLong
 		} else {
-			req.PositionSide(futures.PositionSideTypeShort)
+			positionSide = futures.PositionSideTypeShort
 		}
+	}
+
+	// Use type assertion to call PositionSide method
+	switch v := any(req).(type) {
+	case *futures.CreateOrderService:
+		v.PositionSide(positionSide)
+	case *futures.CreateAlgoOrderService:
+		v.PositionSide(positionSide)
 	}
 }
