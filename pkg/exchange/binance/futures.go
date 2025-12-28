@@ -26,9 +26,9 @@ func (e *Exchange) queryFuturesClosedOrders(
 	if lastOrderID > 0 {
 		req.OrderID(int64(lastOrderID))
 	} else {
-		req.StartTime(since.UnixNano() / int64(time.Millisecond))
+		req.StartTime(since.UnixMilli() / int64(time.Millisecond))
 		if until.Sub(since) < 24*time.Hour {
-			req.EndTime(until.UnixNano() / int64(time.Millisecond))
+			req.EndTime(until.UnixMilli() / int64(time.Millisecond))
 		}
 	}
 
@@ -46,9 +46,9 @@ func (e *Exchange) queryFuturesClosedOrders(
 	// Query algo orders
 	reqAlgo := e.futuresClient.NewListAllAlgoOrdersService().Symbol(symbol)
 	if lastOrderID == 0 {
-		reqAlgo.StartTime(since.UnixNano() / int64(time.Millisecond))
+		reqAlgo.StartTime(since.UnixMilli() / int64(time.Millisecond))
 		if until.Sub(since) < 24*time.Hour {
-			reqAlgo.EndTime(until.UnixNano() / int64(time.Millisecond))
+			reqAlgo.EndTime(until.UnixMilli() / int64(time.Millisecond))
 		}
 	} else {
 		// For algo orders, we can use AlgoID to filter
