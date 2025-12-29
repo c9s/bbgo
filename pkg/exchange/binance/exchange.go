@@ -854,14 +854,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	}
 
 	if e.IsFutures {
-		req := e.futuresClient.NewListOpenOrdersService().Symbol(symbol)
-
-		binanceOrders, err := req.Do(ctx)
-		if err != nil {
-			return orders, err
-		}
-
-		return toGlobalFuturesOrders(binanceOrders, false)
+		return e.queryFuturesOpenOrders(ctx, symbol)
 	}
 
 	binanceOrders, err := e.client.NewListOpenOrdersService().Symbol(symbol).Do(ctx)
@@ -955,22 +948,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	}
 
 	if e.IsFutures {
-		var order *futures.Order
-		req := e.futuresClient.NewGetOrderService().Symbol(q.Symbol)
-
-		if len(q.OrderID) > 0 {
-			req.OrderID(orderID)
-		} else if len(q.ClientOrderID) > 0 {
-			req.OrigClientOrderID(q.ClientOrderID)
-		} else {
-			return nil, errors.New("empty order id")
-		}
-
-		order, err = req.Do(ctx)
-		if err != nil {
-			return nil, err
-		}
-		return toGlobalFuturesOrder(order, false)
+		return e.queryFuturesOrder(ctx, q)
 	}
 
 	var order *binance.Order

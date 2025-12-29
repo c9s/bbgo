@@ -91,23 +91,47 @@ func toLocalFuturesOrderType(orderType types.OrderType) (futures.OrderType, erro
 	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		return futures.OrderTypeLimit, nil
 
-	case types.OrderTypeStopLimit:
-		return futures.OrderTypeStop, nil
-
-	case types.OrderTypeStopMarket:
-		return futures.OrderTypeStopMarket, nil
-
 	case types.OrderTypeMarket:
 		return futures.OrderTypeMarket, nil
-
-	case types.OrderTypeTakeProfitMarket:
-		return futures.OrderTypeTakeProfitMarket, nil
 	}
 
 	return "", fmt.Errorf("can not convert to local order, order type %s not supported", orderType)
 }
 
-func toGlobalFuturesOrders(futuresOrders []*futures.Order, isIsolated bool) (orders []types.Order, err error) {
+// isAlgoOrderType checks if the order type is an Algo order type (conditional order)
+func isAlgoOrderType(orderType types.OrderType) bool {
+	switch orderType {
+	case types.OrderTypeStopLimit,
+		types.OrderTypeStopMarket,
+		types.OrderTypeTakeProfit,
+		types.OrderTypeTakeProfitMarket,
+		types.OrderTypeTrailingStopMarket:
+		return true
+	default:
+		return false
+	}
+}
+
+func toLocalFuturesAlgoOrderType(orderType types.OrderType) (futures.AlgoOrderType, error) {
+	switch orderType {
+	case types.OrderTypeStopLimit:
+		return futures.AlgoOrderTypeStop, nil
+
+	case types.OrderTypeStopMarket:
+		return futures.AlgoOrderTypeStopMarket, nil
+
+	case types.OrderTypeTakeProfit:
+		return futures.AlgoOrderTypeTakeProfit, nil
+
+	case types.OrderTypeTakeProfitMarket:
+		return futures.AlgoOrderTypeTakeProfitMarket, nil
+	}
+
+	return "", fmt.Errorf("can not convert to local order, order type %s not supported", orderType)
+}
+
+// toGlobalFuturesOrders converts a slice of futures orders (regular or algo) to global orders
+func toGlobalFuturesOrders[T FuturesOrderConstraint](futuresOrders []T, isIsolated bool) (orders []types.Order, err error) {
 	for _, futuresOrder := range futuresOrders {
 		order, err := toGlobalFuturesOrder(futuresOrder, isIsolated)
 		if err != nil {
@@ -117,34 +141,130 @@ func toGlobalFuturesOrders(futuresOrders []*futures.Order, isIsolated bool) (ord
 		orders = append(orders, *order)
 	}
 
-	return orders, err
+	return orders, nil
 }
 
-func toGlobalFuturesOrder(futuresOrder *futures.Order, isIsolated bool) (*types.Order, error) {
-	orderPrice := futuresOrder.Price
+// FuturesOrderConstraint is a type constraint that limits to *futures.Order, *futures.CreateAlgoOrderResp, or futures.GetAlgoOrderResp
+type FuturesOrderConstraint interface {
+	*futures.Order | *futures.CreateAlgoOrderResp | futures.GetAlgoOrderResp | *futures.GetAlgoOrderResp
+}
+
+// toGlobalFuturesOrder converts both *futures.Order and *futures.CreateAlgoOrderResp to types.Order
+func toGlobalFuturesOrder[T FuturesOrderConstraint](orderSource T, isIsolated bool) (*types.Order, error) {
+	var (
+		clientOrderID    string
+		symbol           string
+		side             futures.SideType
+		orderType        any
+		reduceOnly       bool
+		closePosition    bool
+		origQuantity     string
+		stopPrice        string
+		price            string
+		avgPrice         string
+		timeInForce      futures.TimeInForceType
+		orderID          int64
+		status           futures.OrderStatusType
+		executedQuantity string
+		time             int64
+		updateTime       int64
+	)
+
+	// Extract fields based on type
+	switch o := any(orderSource).(type) {
+	case *futures.Order:
+		clientOrderID = o.ClientOrderID
+		symbol = o.Symbol
+		side = o.Side
+		orderType = o.Type
+		reduceOnly = o.ReduceOnly
+		closePosition = o.ClosePosition
+		origQuantity = o.OrigQuantity
+		stopPrice = o.StopPrice
+		price = o.Price
+		avgPrice = o.AvgPrice
+		timeInForce = o.TimeInForce
+		orderID = o.OrderID
+		status = o.Status
+		executedQuantity = o.ExecutedQuantity
+		time = o.Time
+		updateTime = o.UpdateTime
+	case *futures.CreateAlgoOrderResp:
+		clientOrderID = o.ClientAlgoId
+		symbol = o.Symbol
+		side = o.Side
+		orderType = o.OrderType
+		reduceOnly = o.ReduceOnly
+		closePosition = o.ClosePosition
+		origQuantity = o.Quantity
+		stopPrice = o.TriggerPrice
+		price = o.Price
+		avgPrice = "" // CreateAlgoOrderResp doesn't have AvgPrice
+		timeInForce = o.TimeInForce
+		orderID = o.AlgoId
+		status = futures.OrderStatusType(o.AlgoStatus)
+		executedQuantity = "0" // CreateAlgoOrderResp doesn't have ExecutedQuantity
+		time = o.CreateTime
+		updateTime = o.UpdateTime
+	case futures.GetAlgoOrderResp:
+	case *futures.GetAlgoOrderResp:
+		// GetAlgoOrderResp has the same structure as CreateAlgoOrderResp
+		clientOrderID = o.ClientAlgoId
+		symbol = o.Symbol
+		side = o.Side
+		orderType = o.OrderType
+		reduceOnly = o.ReduceOnly
+		closePosition = o.ClosePosition
+		origQuantity = o.Quantity
+		stopPrice = o.TriggerPrice
+		price = o.Price
+		avgPrice = "" // GetAlgoOrderResp doesn't have AvgPrice
+		timeInForce = o.TimeInForce
+		orderID = o.AlgoId
+		status = futures.OrderStatusType(o.AlgoStatus)
+		executedQuantity = "0" // GetAlgoOrderResp doesn't have ExecutedQuantity
+		time = o.CreateTime
+		updateTime = o.UpdateTime
+	default:
+		return nil, fmt.Errorf("unsupported order source type: %T", orderSource)
+	}
+
+	// Use price or avgPrice
+	orderPrice := price
 	if orderPrice == "" {
-		orderPrice = futuresOrder.AvgPrice
+		orderPrice = avgPrice
+	}
+
+	// Convert order type using type assertion
+	var globalOrderType types.OrderType
+	switch v := orderType.(type) {
+	case futures.OrderType:
+		globalOrderType = toGlobalFuturesOrderType(v)
+	case futures.AlgoOrderType:
+		globalOrderType = toGlobalFuturesOrderType(v)
+	default:
+		return nil, fmt.Errorf("unsupported order type: %T", orderType)
 	}
 
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
-			ClientOrderID: futuresOrder.ClientOrderID,
-			Symbol:        futuresOrder.Symbol,
-			Side:          toGlobalFuturesSideType(futuresOrder.Side),
-			Type:          toGlobalFuturesOrderType(futuresOrder.Type),
-			ReduceOnly:    futuresOrder.ReduceOnly,
-			ClosePosition: futuresOrder.ClosePosition,
-			Quantity:      fixedpoint.MustNewFromString(futuresOrder.OrigQuantity),
-			StopPrice:     fixedpoint.MustNewFromString(futuresOrder.StopPrice),
+			ClientOrderID: clientOrderID,
+			Symbol:        symbol,
+			Side:          toGlobalFuturesSideType(side),
+			Type:          globalOrderType,
+			ReduceOnly:    reduceOnly,
+			ClosePosition: closePosition,
+			Quantity:      fixedpoint.MustNewFromString(origQuantity),
+			StopPrice:     fixedpoint.MustNewFromString(stopPrice),
 			Price:         fixedpoint.MustNewFromString(orderPrice),
-			TimeInForce:   types.TimeInForce(futuresOrder.TimeInForce),
+			TimeInForce:   types.TimeInForce(timeInForce),
 		},
 		Exchange:         types.ExchangeBinance,
-		OrderID:          uint64(futuresOrder.OrderID),
-		Status:           toGlobalFuturesOrderStatus(futuresOrder.Status),
-		ExecutedQuantity: fixedpoint.MustNewFromString(futuresOrder.ExecutedQuantity),
-		CreationTime:     types.Time(millisecondTime(futuresOrder.Time)),
-		UpdateTime:       types.Time(millisecondTime(futuresOrder.UpdateTime)),
+		OrderID:          uint64(orderID),
+		Status:           toGlobalFuturesOrderStatus(status),
+		ExecutedQuantity: fixedpoint.MustNewFromString(executedQuantity),
+		CreationTime:     types.Time(millisecondTime(time)),
+		UpdateTime:       types.Time(millisecondTime(updateTime)),
 		IsFutures:        true,
 		IsIsolated:       isIsolated,
 	}, nil
@@ -216,31 +336,41 @@ func toGlobalFuturesSideType(side futures.SideType) types.SideType {
 	}
 }
 
-func toGlobalFuturesOrderType(orderType futures.OrderType) types.OrderType {
-	switch orderType {
-	// FIXME: handle this order type
-	// case futures.OrderTypeTrailingStopMarket:
+// OrderTypeConstraint is a type constraint that limits to futures.OrderType or futures.AlgoOrderType
+type OrderTypeConstraint interface {
+	futures.OrderType | futures.AlgoOrderType
+}
 
-	case futures.OrderTypeTakeProfit:
-		return types.OrderTypeStopLimit
+// toGlobalFuturesOrderType converts both futures.OrderType and futures.AlgoOrderType to types.OrderType
+func toGlobalFuturesOrderType[T OrderTypeConstraint](orderType T) types.OrderType {
+	orderTypeStr := string(orderType)
 
-	case futures.OrderTypeTakeProfitMarket:
-		return types.OrderTypeTakeProfitMarket
-
-	case futures.OrderTypeStopMarket:
-		return types.OrderTypeStopMarket
-
-	case futures.OrderTypeLimit:
+	switch orderTypeStr {
+	// futures.OrderType values
+	case string(futures.OrderTypeLimit):
 		return types.OrderTypeLimit
 
-	case futures.OrderTypeStop:
-		return types.OrderTypeStopLimit
-
-	case futures.OrderTypeMarket:
+	case string(futures.OrderTypeMarket):
 		return types.OrderTypeMarket
 
+	// futures.AlgoOrderType values
+	case string(futures.AlgoOrderTypeStop):
+		return types.OrderTypeStopLimit
+
+	case string(futures.AlgoOrderTypeStopMarket):
+		return types.OrderTypeStopMarket
+
+	case string(futures.AlgoOrderTypeTakeProfit):
+		return types.OrderTypeTakeProfit
+
+	case string(futures.AlgoOrderTypeTakeProfitMarket):
+		return types.OrderTypeTakeProfitMarket
+
+	case string(futures.AlgoOrderTypeTrailingStopMarket):
+		return types.OrderTypeStopMarket
+
 	default:
-		log.Errorf("unsupported binance futures order type: %s", orderType)
+		log.Errorf("unsupported binance futures order type: %s", orderTypeStr)
 		return ""
 	}
 }

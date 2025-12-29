@@ -91,7 +91,9 @@ const (
 	OrderTypeStopLimit  OrderType = "STOP_LIMIT"
 	OrderTypeStopMarket OrderType = "STOP_MARKET"
 
-	OrderTypeTakeProfitMarket OrderType = "TAKE_PROFIT_MARKET"
+	OrderTypeTakeProfit         OrderType = "TAKE_PROFIT"
+	OrderTypeTakeProfitMarket   OrderType = "TAKE_PROFIT_MARKET"
+	OrderTypeTrailingStopMarket OrderType = "TRAILING_STOP_MARKET"
 )
 
 /*
