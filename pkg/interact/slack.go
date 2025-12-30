@@ -191,13 +191,13 @@ func (d *InteractiveMessageDispatcher) Dispatch(callback slack.InteractionCallba
 	// get the handler
 	slackEvtID, handler, found := d.getHandler(callback.Message.Blocks.BlockSet)
 	if !found {
-		log.Warnf("[interact] no handlers found for interactive message: actionID=%s, actionValue=%s", actionID, actionValue)
+		log.Debugf("[interact] no handlers found for interactive message: actionID=%s, actionValue=%s", actionID, actionValue)
 		return
 	}
-	log.Debugf("[interact] dispatching interactive message: slackEvtID=%s, actionID=%s, actionValue=%s", slackEvtID, actionID, actionValue)
+	log.Infof("[interact] dispatching interactive message: slackEvtID=%s, actionID=%s, actionValue=%s", slackEvtID, actionID, actionValue)
 	updates, err := handler(callback.User, callback.Message, actionID, actionValue)
 	if err != nil {
-		log.WithError(err).Errorf("interactive message handler error")
+		log.WithError(err).Error("[interact] message handler error")
 		return
 	}
 	for _, update := range updates {
