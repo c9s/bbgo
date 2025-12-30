@@ -309,6 +309,7 @@ func Test_align(t *testing.T) {
 			UseTakerOrder:            true,
 			SkipTransferCheck:        false,
 			ActiveTransferTimeWindow: types.Duration(48 * time.Hour),
+			InteractiveOrderDelay:    types.Duration(5 * time.Millisecond), // Short delay for test
 			DryRun:                   dryRun,
 		}
 
@@ -347,8 +348,13 @@ func Test_align(t *testing.T) {
 	t.Run("no active transfers", func(t *testing.T) {
 		baseMockEx, mockEx, account := newMockExchange([]types.Withdraw{}, []types.Deposit{})
 
+		// Create a wait channel to synchronize with the async order submission
+		orderSubmittedC := make(chan struct{})
+
 		// Mock order submission for refilling balances
 		baseMockEx.EXPECT().SubmitOrder(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
+			defer close(orderSubmittedC)
+
 			// Verify the order is for buying USDT
 			assert.Equal(t, "USDTTWD", order.Symbol)
 			assert.Equal(t, types.SideTypeBuy, order.Side)
@@ -367,6 +373,14 @@ func Test_align(t *testing.T) {
 		s := newStrategyForTest(false)
 
 		activeTransferExists := s.align(ctx, sessions)
+
+		// Wait for the async order submission to complete
+		select {
+		case <-orderSubmittedC:
+			// Order was submitted successfully
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for order submission")
+		}
 
 		// no active transfer detected
 		assert.False(t, activeTransferExists, "align should return false when there are no active transfers")

@@ -154,6 +154,92 @@ func (s *SlackSession) SetAuthorized() {
 
 type SlackSessionMap map[string]*SlackSession
 
+// InteractionMessageUpdate represents an update to be made to an interactive message
+type InteractionMessageUpdate struct {
+	Blocks       []slack.Block
+	Attachments  []slack.Attachment
+	PostInThread bool
+}
+
+// InteractiveMessageHandler defines the handler function for interactive messages
+type InteractiveMessageHandler func(user slack.User, oriMessage slack.Message, actionID string, actionValue string) ([]InteractionMessageUpdate, error)
+
+// InteractiveMessageDispatcher manages the dispatching of interactive message events to registered handlers
+// Its responsibility is to route incoming `slack.InteractionCallback` objects to the registered handlers which can process them and
+// return the necessary updates to be applied to the original message.
+// NOTE: the updates will be applied to the original message in the given order.
+type InteractiveMessageDispatcher struct {
+	slackMessenger *Slack
+
+	// slackEvtID -> handlers
+	dispatchMap map[string]InteractiveMessageHandler
+}
+
+func (d *InteractiveMessageDispatcher) Register(slackEvtID string, handler InteractiveMessageHandler) {
+	if _, exists := d.dispatchMap[slackEvtID]; exists {
+		log.Warnf("[interact] overwriting existing handler for slack event ID: %s", slackEvtID)
+	}
+	d.dispatchMap[slackEvtID] = handler
+}
+
+func (d *InteractiveMessageDispatcher) Dispatch(callback slack.InteractionCallback) {
+	if len(callback.ActionCallback.BlockActions) == 0 {
+		return
+	}
+	actionID := callback.ActionCallback.BlockActions[0].ActionID
+	actionValue := callback.ActionCallback.BlockActions[0].Value
+	// get the handler
+	slackEvtID, handler, found := d.getHandler(callback.Message.Blocks.BlockSet)
+	if !found {
+		log.Warnf("[interact] no handlers found for interactive message: actionID=%s, actionValue=%s", actionID, actionValue)
+		return
+	}
+	log.Debugf("[interact] dispatching interactive message: slackEvtID=%s, actionID=%s, actionValue=%s", slackEvtID, actionID, actionValue)
+	updates, err := handler(callback.User, callback.Message, actionID, actionValue)
+	if err != nil {
+		log.WithError(err).Errorf("interactive message handler error")
+		return
+	}
+	for _, update := range updates {
+		if update.PostInThread {
+			d.slackMessenger.PostMessage(
+				callback.Channel.ID,
+				callback.Message.Timestamp,
+				update.Blocks,
+				update.Attachments,
+			)
+		} else {
+			d.slackMessenger.UpdateMessage(
+				callback.Channel.ID,
+				callback.Message.Timestamp,
+				update.Blocks,
+				update.Attachments,
+			)
+		}
+	}
+}
+
+func (d *InteractiveMessageDispatcher) getHandler(blocks []slack.Block) (string, InteractiveMessageHandler, bool) {
+	// search through all blocks to find if there is a block with ID that matches the registered handlers
+	for _, block := range blocks {
+		blockID := block.ID()
+		handler, ok := d.dispatchMap[blockID]
+		if ok {
+			return blockID, handler, true
+		}
+	}
+	return "", nil, false
+}
+
+func NewInteractiveMessageDispatcher(slackMessenger *Slack) *InteractiveMessageDispatcher {
+	d := &InteractiveMessageDispatcher{
+		slackMessenger: slackMessenger,
+		dispatchMap:    make(map[string]InteractiveMessageHandler),
+	}
+	slackMessenger.OnInteraction(d.Dispatch)
+	return d
+}
+
 //go:generate callbackgen -type Slack
 type Slack struct {
 	client *slack.Client
@@ -170,6 +256,8 @@ type Slack struct {
 	authorizedCallbacks []func(userSession *SlackSession)
 
 	eventsApiCallbacks []func(evt slackevents.EventsAPIEvent)
+
+	interactionCallbacks []func(callback slack.InteractionCallback)
 }
 
 func NewSlack(client *slack.Client) *Slack {
@@ -204,6 +292,48 @@ func (s *Slack) AddCommand(command *Command, responder Responder) {
 
 	s.commands[command.Name] = command
 	s.commandResponders[command.Name] = responder
+}
+
+// UpdateMessage updates/edits the message, identified by channelID and msgTimestamp.
+// it will update/edits the message by the given blocks and attachments.
+func (s *Slack) UpdateMessage(channelID string, msgTimestamp string, blocks []slack.Block, attachments []slack.Attachment) {
+	var options []slack.MsgOption
+	if len(blocks) > 0 {
+		options = append(options, slack.MsgOptionBlocks(blocks...))
+	}
+	if len(attachments) > 0 {
+		options = append(options, slack.MsgOptionAttachments(attachments...))
+	}
+	_, _, _, err := s.client.UpdateMessage(
+		channelID,
+		msgTimestamp,
+		options...,
+	)
+	if err != nil {
+		log.WithError(err).Errorf("[interact] failed to update slack message")
+	}
+}
+
+// PostMessage posts a new message to the channel specified in the callback
+// If the `msgTimestamp` is not empty, it will post the new message as a thread reply to the message identified by the timestamp.
+func (s *Slack) PostMessage(channelID string, msgTimestamp string, blocks []slack.Block, attachments []slack.Attachment) {
+	var options []slack.MsgOption
+	if msgTimestamp != "" {
+		options = append(options, slack.MsgOptionTS(msgTimestamp))
+	}
+	if len(blocks) > 0 {
+		options = append(options, slack.MsgOptionBlocks(blocks...))
+	}
+	if len(attachments) > 0 {
+		options = append(options, slack.MsgOptionAttachments(attachments...))
+	}
+	_, _, err := s.client.PostMessage(
+		channelID,
+		options...,
+	)
+	if err != nil {
+		log.WithError(err).Errorf("[interact] failed to post slack message")
+	}
 }
 
 func (s *Slack) listen(ctx context.Context) {
@@ -313,7 +443,7 @@ func (s *Slack) listen(ctx context.Context) {
 			case slack.InteractionTypeBlockActions:
 				// See https://api.slack.com/apis/connections/socket-implement#button
 				log.Debugf("InteractionTypeBlockActions: %+v", callback)
-
+				s.EmitInteraction(callback)
 			case slack.InteractionTypeShortcut:
 				log.Debugf("InteractionTypeShortcut: %+v", callback)
 

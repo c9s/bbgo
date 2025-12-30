@@ -3,6 +3,7 @@
 package interact
 
 import (
+	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 )
 
@@ -23,5 +24,15 @@ func (s *Slack) OnEventsApi(cb func(evt slackevents.EventsAPIEvent)) {
 func (s *Slack) EmitEventsApi(evt slackevents.EventsAPIEvent) {
 	for _, cb := range s.eventsApiCallbacks {
 		cb(evt)
+	}
+}
+
+func (s *Slack) OnInteraction(cb func(callback slack.InteractionCallback)) {
+	s.interactionCallbacks = append(s.interactionCallbacks, cb)
+}
+
+func (s *Slack) EmitInteraction(callback slack.InteractionCallback) {
+	for _, cb := range s.interactionCallbacks {
+		cb(callback)
 	}
 }

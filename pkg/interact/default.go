@@ -12,6 +12,10 @@ func AddMessenger(messenger Messenger) {
 	defaultInteraction.AddMessenger(messenger)
 }
 
+func GetMessengers() []Messenger {
+	return defaultInteraction.GetMessengers()
+}
+
 func AddCustomInteraction(custom CustomInteraction) {
 	defaultInteraction.AddCustomInteraction(custom)
 }

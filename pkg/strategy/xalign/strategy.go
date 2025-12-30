@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
@@ -58,6 +59,8 @@ type Strategy struct {
 	Duration                 types.Duration              `json:"for"`
 	InstantAlignAmount       fixedpoint.Value            `json:"instantAlignAmount"`
 	Disabled                 bool                        `json:"disabled"`
+	// InteractiveOrderDelay is the delay duration for interactive order confirmation in Slack
+	InteractiveOrderDelay types.Duration `json:"interactiveOrderDelay"`
 
 	WarningDuration types.Duration `json:"warningFor"`
 
@@ -88,7 +91,8 @@ type Strategy struct {
 
 	deltaGaugesMap map[deltaGaugeKey]prometheus.Gauge
 
-	ticker *time.Ticker
+	ticker     *time.Ticker
+	slackEvtID string
 }
 
 func (s *Strategy) ID() string {
@@ -140,6 +144,10 @@ func (s *Strategy) Defaults() error {
 		s.InstantAlignAmount = fixedpoint.NewFromFloat(50.0)
 	}
 
+	if s.InteractiveOrderDelay == 0 {
+		s.InteractiveOrderDelay = types.Duration(5 * time.Minute)
+	}
+
 	return nil
 }
 
@@ -164,6 +172,7 @@ func (s *Strategy) Initialize() error {
 	}
 
 	s.deltaGaugesMap = make(map[deltaGaugeKey]prometheus.Gauge)
+	s.slackEvtID = uuid.NewString()
 
 	return nil
 }
@@ -434,8 +443,10 @@ func (s *Strategy) CrossRun(
 				_ = ob.GracefulCancel(ctx, session.Exchange)
 			}
 		}
+		cancelAllInteractiveOrders()
 	})
 
+	setupSlackInteractionCallback(s.slackEvtID)
 	go s.monitor(ctx)
 	return nil
 }
@@ -647,13 +658,14 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 
 		log.Debugf("checking %s fault balance records...", currency)
 
+		isInstantAmount := amount.Compare(s.InstantAlignAmount) <= 0
 		if d, ok := s.deviationDetectors[currency]; ok {
 			should, sustainedDuration := d.ShouldFix()
 			if sustainedDuration > 0 {
 				log.Infof("%s sustained deviation for %s...", currency, sustainedDuration)
 			}
 			// always adjust for small amount discrepancies
-			if amount.Compare(s.InstantAlignAmount) <= 0 {
+			if isInstantAmount {
 				should = true
 			}
 
@@ -727,27 +739,61 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 			bbgo.Notify("Aligning %s position on exchange session %s, delta: %f %s, expected balance: %f %s",
 				currency, selectedSession.Name,
 				q.Float64(), currency,
-				expectedBalance.Float64(), currency,
-				submitOrder)
+				expectedBalance.Float64(), currency)
 
 			if s.DryRun {
 				return activeTransferExists
 			}
-
-			createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
-			if err != nil {
-				log.WithError(err).WithFields(submitOrder.LogFields()).Errorf("can not place order: %+v", submitOrder)
-				return activeTransferExists
-			} else if createdOrder != nil {
-				if ob, ok := s.orderBooks[selectedSession.Name]; ok {
-					ob.Add(*createdOrder)
-				} else {
-					log.Errorf("orderbook %s not found", selectedSession.Name)
+			if isInstantAmount {
+				// place order immediately
+				createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
+				s.onSubmittedOrderCallback(selectedSession, *submitOrder, createdOrder, err)
+			} else {
+				foundDelayedOrder := false
+				interactOrderRegistry.Range(func(k any, v any) bool {
+					o, ok := v.(*InteractiveSubmitOrder)
+					if ok {
+						if o.submitOrder.Symbol == submitOrder.Symbol && o.slackEvtID == s.slackEvtID {
+							foundDelayedOrder = true
+							return false
+						}
+					}
+					return true
+				})
+				if foundDelayedOrder {
+					bbgo.Notify("found existing delayed interactive order for %s, skip placing another one", submitOrder.Symbol)
+					continue
 				}
+				// place interactive order with slack confirmation
+				// the order will be placed after confirmed in slack or after delay timeout
+				mentions := append([]string{}, s.SlackNotifyMentions...)
+				if s.LargeAmountAlert != nil && s.LargeAmountAlert.Slack != nil {
+					mentions = append(mentions, s.LargeAmountAlert.Slack.Mentions...)
+				}
+				itOrder := NewInteractiveSubmitOrder(
+					*submitOrder,
+					s.InteractiveOrderDelay.Duration(),
+					mentions,
+					s.slackEvtID,
+				)
+				itOrder.AsyncSubmit(ctx, selectedSession, s.onSubmittedOrderCallback)
 			}
 		}
 	}
 	return activeTransferExists
+}
+
+func (s *Strategy) onSubmittedOrderCallback(session *bbgo.ExchangeSession, submitOrder types.SubmitOrder, createdOrder *types.Order, err error) {
+	if err != nil {
+		log.WithError(err).WithFields(submitOrder.LogFields()).Errorf("can not place order: %+v", submitOrder)
+	} else if createdOrder != nil {
+		if ob, ok := s.orderBooks[session.Name]; ok {
+			ob.Add(*createdOrder)
+		} else {
+			log.Errorf("orderbook %s not found", session.Name)
+		}
+		bbgo.Notify("Aligning order submitted", submitOrder)
+	}
 }
 
 func (s *Strategy) calculateRefillQuantity(
