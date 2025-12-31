@@ -828,8 +828,13 @@ func (s *Strategy) allowMarginHedge(
 	// debtQuota is the quota with minimal margin level
 	var debtQuota = fixedpoint.Zero
 	if workerHandle := sessionworker.Get(session, "debt-quota"); workerHandle != nil {
-		rst := workerHandle.Value().(*DebtQuotaResult)
-		debtQuota = rst.AmountInQuote
+		if val := workerHandle.Value(); val != nil {
+			if rst, ok := val.(*DebtQuotaResult); ok {
+				debtQuota = rst.AmountInQuote
+			} else {
+				s.logger.Warnf("unable to assert debt quota result from session: %+v", val)
+			}
+		}
 	}
 
 	// if the margin level is higher than the minimal margin level,

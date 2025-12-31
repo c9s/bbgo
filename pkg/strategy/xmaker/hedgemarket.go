@@ -570,8 +570,11 @@ func (m *HedgeMarket) allowMarginHedge(
 func (m *HedgeMarket) getDebtQuota() fixedpoint.Value {
 	var debtQuota = fixedpoint.Zero
 	if workerHandle := sessionworker.Get(m.session, "debt-quota"); workerHandle != nil {
-		rst := workerHandle.Value().(*DebtQuotaResult)
-		debtQuota = rst.AmountInQuote
+		if val := workerHandle.Value(); val != nil {
+			if rst, ok := val.(*DebtQuotaResult); ok {
+				debtQuota = rst.AmountInQuote
+			}
+		}
 	}
 
 	return debtQuota
