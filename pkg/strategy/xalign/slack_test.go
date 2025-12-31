@@ -69,7 +69,7 @@ func Test_InteractiveOrderSubmit(t *testing.T) {
 		var callbackErr error
 
 		// async submit
-		itOrder.AsyncSubmit(ctx, session, func(s *bbgo.ExchangeSession, so types.SubmitOrder, order *types.Order, err error) {
+		itOrder.AsyncSubmit(ctx, session, func(s *bbgo.ExchangeSession, so *types.SubmitOrder, order *types.Order, err error) {
 			callbackOrder = order
 			callbackErr = err
 			callbackCalled <- struct{}{}
@@ -143,7 +143,7 @@ func Test_InteractiveOrderSubmit(t *testing.T) {
 		var callbackErr error
 
 		// call AsyncSubmit twice
-		var submitCallback OnSubmittedOrderCallback = func(s *bbgo.ExchangeSession, so types.SubmitOrder, order *types.Order, err error) {
+		var submitCallback OnSubmittedOrderCallback = func(s *bbgo.ExchangeSession, so *types.SubmitOrder, order *types.Order, err error) {
 			muCount.Lock()
 			defer muCount.Unlock()
 
@@ -213,7 +213,7 @@ func Test_interact(t *testing.T) {
 		session := &bbgo.ExchangeSession{}
 		var order *types.Order
 		var err error
-		itOrder.AsyncSubmit(ctx, session, func(s *bbgo.ExchangeSession, so types.SubmitOrder, o *types.Order, e error) {
+		itOrder.AsyncSubmit(ctx, session, func(s *bbgo.ExchangeSession, so *types.SubmitOrder, o *types.Order, e error) {
 			order = o
 			err = e
 			callbackCalled <- struct{}{}
@@ -319,7 +319,7 @@ func Test_interact(t *testing.T) {
 		var callbackErr error
 
 		// async submit
-		itOrder.AsyncSubmit(ctx, session, func(s *bbgo.ExchangeSession, so types.SubmitOrder, order *types.Order, err error) {
+		itOrder.AsyncSubmit(ctx, session, func(s *bbgo.ExchangeSession, so *types.SubmitOrder, order *types.Order, err error) {
 			callbackOrder = order
 			callbackErr = err
 			callbackCalled <- struct{}{}

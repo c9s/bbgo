@@ -747,7 +747,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 			if isInstantAmount {
 				// place order immediately
 				createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
-				s.onSubmittedOrderCallback(selectedSession, *submitOrder, createdOrder, err)
+				s.onSubmittedOrderCallback(selectedSession, submitOrder, createdOrder, err)
 			} else {
 				foundDelayedOrder := false
 				interactOrderRegistry.Range(func(k any, v any) bool {
@@ -783,7 +783,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 	return activeTransferExists
 }
 
-func (s *Strategy) onSubmittedOrderCallback(session *bbgo.ExchangeSession, submitOrder types.SubmitOrder, createdOrder *types.Order, err error) {
+func (s *Strategy) onSubmittedOrderCallback(session *bbgo.ExchangeSession, submitOrder *types.SubmitOrder, createdOrder *types.Order, err error) {
 	if err != nil {
 		log.WithError(err).WithFields(submitOrder.LogFields()).Errorf("can not place order: %+v", submitOrder)
 	} else if createdOrder != nil {

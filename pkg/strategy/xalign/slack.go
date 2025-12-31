@@ -128,7 +128,7 @@ func (itOrder *InteractiveSubmitOrder) buildButtonsBlock() slack.Block {
 // - submitOrder: the original submit order request
 // - order: the created order, nil if error occurs
 // - error: error if any during order submission
-type OnSubmittedOrderCallback func(*bbgo.ExchangeSession, types.SubmitOrder, *types.Order, error)
+type OnSubmittedOrderCallback func(*bbgo.ExchangeSession, *types.SubmitOrder, *types.Order, error)
 
 func (itOrder *InteractiveSubmitOrder) AsyncSubmit(ctx context.Context, session *bbgo.ExchangeSession, onSubmittedOrderCallback OnSubmittedOrderCallback) {
 	go itOrder.asyncSubmit(ctx, session, onSubmittedOrderCallback)
@@ -169,7 +169,7 @@ func (itOrder *InteractiveSubmitOrder) asyncSubmit(ctx context.Context, session 
 	// remove from registry
 	interactOrderRegistry.Delete(itOrder.id)
 	if onSubmittedOrderCallback != nil {
-		onSubmittedOrderCallback(session, itOrder.submitOrder, order, err)
+		onSubmittedOrderCallback(session, &itOrder.submitOrder, order, err)
 	}
 }
 
