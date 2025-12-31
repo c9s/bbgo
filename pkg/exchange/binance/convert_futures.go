@@ -5,8 +5,9 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2/futures"
-	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/pkg/errors"
+
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -84,10 +85,6 @@ func toGlobalFuturesUserAssets(assets []binanceapi.FuturesAccountAsset) (retAsse
 
 func toLocalFuturesOrderType(orderType types.OrderType) (futures.OrderType, error) {
 	switch orderType {
-
-	// case types.OrderTypeLimitMaker:
-	// 	return futures.OrderTypeLimitMaker, nil //TODO
-
 	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		return futures.OrderTypeLimit, nil
 
@@ -394,6 +391,72 @@ func toGlobalFuturesOrderStatus(orderStatus futures.OrderStatusType) types.Order
 	}
 
 	return types.OrderStatus(orderStatus)
+}
+
+// toGlobalFuturesAlgoOrder converts the response of CreateAlgoOrderService
+// to a generic types.Order model.
+func toGlobalFuturesAlgoOrder(resp *futures.CreateAlgoOrderResp) (*types.Order, error) {
+	// safe parser: empty string -> 0
+	parse := func(s string) fixedpoint.Value {
+		if s == "" {
+			return fixedpoint.Zero
+		}
+		v, err := fixedpoint.NewFromString(s)
+		if err != nil {
+			// be tolerant: return zero on parse error
+			return fixedpoint.Zero
+		}
+		return v
+	}
+
+	submit := types.SubmitOrder{
+		ClientOrderID: resp.ClientAlgoId,
+		Symbol:        resp.Symbol,
+		Side:          toGlobalFuturesSideType(resp.Side),
+		Type:          toGlobalFuturesAlgoOrderType(resp.OrderType),
+		Price:         parse(resp.Price),
+		Quantity:      parse(resp.Quantity),
+		StopPrice:     parse(resp.TriggerPrice),
+		TimeInForce:   types.TimeInForce(resp.TimeInForce),
+		ReduceOnly:    resp.ReduceOnly,
+		ClosePosition: resp.ClosePosition,
+	}
+
+	// Algo create response doesn’t include an actual OrderID until triggered.
+	// We construct a pending NEW order placeholder.
+	o := &types.Order{
+		SubmitOrder:      submit,
+		Exchange:         types.ExchangeBinance,
+		OrderID:          0,
+		Status:           types.OrderStatusNew,
+		ExecutedQuantity: fixedpoint.Zero,
+		CreationTime:     types.Time(millisecondTime(resp.CreateTime)),
+		UpdateTime:       types.Time(millisecondTime(resp.UpdateTime)),
+		IsFutures:        true,
+		IsIsolated:       false,
+	}
+	return o, nil
+}
+
+// toGlobalFuturesAlgoOrderType maps futures.AlgoOrderType to bbgo types.OrderType.
+func toGlobalFuturesAlgoOrderType(t futures.AlgoOrderType) types.OrderType {
+	switch t {
+	case futures.AlgoOrderTypeStopMarket:
+		return types.OrderTypeStopMarket
+	case futures.AlgoOrderTypeTakeProfitMarket:
+		return types.OrderTypeTakeProfitMarket
+	case futures.AlgoOrderTypeStop:
+		// Treat as stop-limit in our taxonomy
+		return types.OrderTypeStopLimit
+	case futures.AlgoOrderTypeTakeProfit:
+		// Treat as take-profit (limit) if ever used
+		return types.OrderType("TAKE_PROFIT")
+	case futures.AlgoOrderTypeTrailingStopMarket:
+		return types.OrderType("TRAILING_STOP_MARKET")
+	default:
+		log.Errorf("unsupported binance futures algo order type: %s", t)
+		return types.OrderType(t)
+	}
 }
 
 func convertPremiumIndex(index *futures.PremiumIndex) (*types.PremiumIndex, error) {

@@ -212,33 +212,52 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		return nil, err
 	}
 
-	req := e.futuresClient.NewCreateOrderService().
-		Symbol(order.Symbol).
-		Type(orderType).
-		Side(futures.SideType(order.Side))
-
-	if dualSidePosition {
-		setDualSidePosition(req, order)
-	} else if order.ReduceOnly {
-		req.ReduceOnly(order.ReduceOnly)
-	} else if order.ClosePosition {
-		req.ClosePosition(order.ClosePosition)
-	}
-
 	clientOrderID := newFuturesClientOrderID(order.ClientOrderID)
-	if len(clientOrderID) > 0 {
-		req.NewClientOrderID(clientOrderID)
+
+	// Select proper service: Algo for STOP_MARKET/TAKE_PROFIT_MARKET, regular otherwise
+	useAlgo := order.Type == types.OrderTypeStopMarket || order.Type == types.OrderTypeTakeProfitMarket
+
+	var (
+		r       FuturesOrderRequest
+		baseSvc *futures.CreateOrderService
+		algoSvc *futures.CreateAlgoOrderService
+	)
+
+	if useAlgo {
+		algoSvc = e.futuresClient.NewCreateAlgoOrderService()
+		r = &FuturesCreateAlgoOrderPolyFill{CreateAlgoOrderService: algoSvc}
+	} else {
+		baseSvc = e.futuresClient.NewCreateOrderService()
+		r = &FuturesCreateOrderPolyFill{CreateOrderService: baseSvc}
 	}
 
-	// use response result format
-	req.NewOrderResponseType(futures.NewOrderRespTypeRESULT)
+	// Basic identifiers
+	r.SetSymbol(order.Symbol)
+	r.SetSide(futures.SideType(order.Side))
+	r.SetTypeString(string(orderType))
+
+	// Position flags
+	if dualSidePosition {
+		setDualSidePositionUnified(r, order)
+	} else if order.ReduceOnly {
+		r.SetReduceOnly(order.ReduceOnly)
+	} else if order.ClosePosition {
+		r.SetClosePosition(order.ClosePosition)
+	}
+
+	if len(clientOrderID) > 0 {
+		r.SetNewClientOrderID(clientOrderID)
+	}
+
+	// use response result format (no-op for algo)
+	r.SetNewOrderResponseType(futures.NewOrderRespTypeRESULT)
 
 	if !order.ClosePosition {
 		if order.Market.Symbol != "" {
-			req.Quantity(order.Market.FormatQuantity(order.Quantity))
+			r.SetQuantity(order.Market.FormatQuantity(order.Quantity))
 		} else {
 			// TODO report error
-			req.Quantity(order.Quantity.FormatString(8))
+			r.SetQuantity(order.Quantity.FormatString(8))
 		}
 	}
 
@@ -246,37 +265,46 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 	switch order.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		if order.Market.Symbol != "" {
-			req.Price(order.Market.FormatPrice(order.Price))
+			r.SetPrice(order.Market.FormatPrice(order.Price))
 		} else {
 			// TODO report error
-			req.Price(order.Price.FormatString(8))
+			r.SetPrice(order.Price.FormatString(8))
 		}
 	}
 
-	// set stop price
+	// set stop/trigger price
 	switch order.Type {
-
 	case types.OrderTypeStopLimit, types.OrderTypeStopMarket, types.OrderTypeTakeProfitMarket:
 		if order.Market.Symbol != "" {
-			req.StopPrice(order.Market.FormatPrice(order.StopPrice))
+			r.SetStopPrice(order.Market.FormatPrice(order.StopPrice))
 		} else {
 			// TODO report error
-			req.StopPrice(order.StopPrice.FormatString(8))
+			r.SetStopPrice(order.StopPrice.FormatString(8))
 		}
 	}
 
 	// could be IOC or FOK
 	if len(order.TimeInForce) > 0 {
 		// TODO: check the TimeInForce value
-		req.TimeInForce(futures.TimeInForceType(order.TimeInForce))
+		r.SetTimeInForce(futures.TimeInForceType(order.TimeInForce))
 	} else {
 		switch order.Type {
 		case types.OrderTypeLimit, types.OrderTypeLimitMaker, types.OrderTypeStopLimit:
-			req.TimeInForce(futures.TimeInForceTypeGTC)
+			r.SetTimeInForce(futures.TimeInForceTypeGTC)
 		}
 	}
 
-	response, err := req.Do(ctx)
+	if useAlgo {
+		response, err := algoSvc.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+		log.Infof("futures algo order creation response: %+v", response)
+		createdOrder, err := toGlobalFuturesAlgoOrder(response)
+		return createdOrder, err
+	}
+
+	response, err := baseSvc.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -739,4 +767,157 @@ func setDualSidePosition[T OrderServiceConstraint](req T, order types.SubmitOrde
 	case *futures.CreateAlgoOrderService:
 		v.PositionSide(positionSide)
 	}
+}
+
+// setDualSidePositionUnified sets the PositionSide field through the unified
+// FuturesOrderRequest interface, mirroring the logic of setDualSidePosition.
+func setDualSidePositionUnified(req FuturesOrderRequest, order types.SubmitOrder) {
+	switch order.Side {
+	case types.SideTypeBuy:
+		if order.ReduceOnly {
+			req.SetPositionSide(futures.PositionSideTypeShort)
+		} else {
+			req.SetPositionSide(futures.PositionSideTypeLong)
+		}
+	case types.SideTypeSell:
+		if order.ReduceOnly {
+			req.SetPositionSide(futures.PositionSideTypeLong)
+		} else {
+			req.SetPositionSide(futures.PositionSideTypeShort)
+		}
+	}
+}
+
+type FuturesCreateOrderPolyFill struct {
+	*futures.CreateOrderService
+}
+
+// FuturesOrderRequest is a unified interface for configuring both standard
+// futures orders and algo futures orders. It exposes a common set of setters
+// so callers can treat both services uniformly.
+type FuturesOrderRequest interface {
+	// Core order flags
+	SetReduceOnly(bool)
+	SetSide(futures.SideType)
+	SetPositionSide(futures.PositionSideType)
+	SetClosePosition(bool)
+
+	// Identification and response
+	SetNewOrderResponseType(futures.NewOrderRespType)
+	SetNewClientOrderID(string)
+
+	// Common order fields
+	SetSymbol(string)
+	// Use string to be compatible with both regular OrderType and AlgoOrderType
+	SetTypeString(string)
+	SetQuantity(string)
+	SetPrice(string)
+	// Stop/trigger price: maps to StopPrice for regular orders and TriggerPrice for algo orders
+	SetStopPrice(string)
+
+	// Optional common extras
+	SetTimeInForce(futures.TimeInForceType)
+}
+
+func (f *FuturesCreateOrderPolyFill) SetSide(side futures.SideType) {
+	f.CreateOrderService.Side(side)
+}
+
+func (f *FuturesCreateOrderPolyFill) SetPositionSide(side futures.PositionSideType) {
+	f.CreateOrderService.PositionSide(side)
+}
+
+func (f *FuturesCreateOrderPolyFill) SetReduceOnly(reduceOnly bool) {
+	f.CreateOrderService.ReduceOnly(reduceOnly)
+}
+
+func (f *FuturesCreateOrderPolyFill) SetClosePosition(closePosition bool) {
+	f.CreateOrderService.ClosePosition(closePosition)
+}
+
+func (f *FuturesCreateOrderPolyFill) SetNewClientOrderID(clientOrderID string) {
+	f.CreateOrderService.NewClientOrderID(clientOrderID)
+}
+
+func (f *FuturesCreateOrderPolyFill) SetNewOrderResponseType(respType futures.NewOrderRespType) {
+	f.CreateOrderService.NewOrderResponseType(respType)
+}
+
+func (f *FuturesCreateOrderPolyFill) SetSymbol(symbol string) {
+	f.CreateOrderService.Symbol(symbol)
+}
+
+func (f *FuturesCreateOrderPolyFill) SetTypeString(t string) {
+	f.CreateOrderService.Type(futures.OrderType(t))
+}
+
+func (f *FuturesCreateOrderPolyFill) SetQuantity(q string) {
+	f.CreateOrderService.Quantity(q)
+}
+
+func (f *FuturesCreateOrderPolyFill) SetPrice(p string) {
+	f.CreateOrderService.Price(p)
+}
+
+func (f *FuturesCreateOrderPolyFill) SetStopPrice(sp string) {
+	f.CreateOrderService.StopPrice(sp)
+}
+
+func (f *FuturesCreateOrderPolyFill) SetTimeInForce(tif futures.TimeInForceType) {
+	f.CreateOrderService.TimeInForce(tif)
+}
+
+type FuturesCreateAlgoOrderPolyFill struct {
+	*futures.CreateAlgoOrderService
+}
+
+func (f *FuturesCreateAlgoOrderPolyFill) SetSide(side futures.SideType) {
+	f.CreateAlgoOrderService.Side(side)
+}
+
+func (f *FuturesCreateAlgoOrderPolyFill) SetReduceOnly(reduceOnly bool) {
+	f.CreateAlgoOrderService.ReduceOnly(reduceOnly)
+}
+
+func (f *FuturesCreateAlgoOrderPolyFill) SetPositionSide(side futures.PositionSideType) {
+	f.CreateAlgoOrderService.PositionSide(side)
+}
+
+func (f *FuturesCreateAlgoOrderPolyFill) SetClosePosition(closePosition bool) {
+	f.CreateAlgoOrderService.ClosePosition(closePosition)
+}
+
+// For algo orders, the client identifier is clientAlgoId
+func (f *FuturesCreateAlgoOrderPolyFill) SetNewClientOrderID(clientOrderID string) {
+	f.CreateAlgoOrderService.ClientAlgoId(clientOrderID)
+}
+
+// Algo order API does not support NewOrderResponseType; keep as no-op to satisfy the interface
+func (f *FuturesCreateAlgoOrderPolyFill) SetNewOrderResponseType(_ futures.NewOrderRespType) {
+	// no-op
+}
+
+func (f *FuturesCreateAlgoOrderPolyFill) SetSymbol(symbol string) {
+	f.CreateAlgoOrderService.Symbol(symbol)
+}
+
+func (f *FuturesCreateAlgoOrderPolyFill) SetTypeString(t string) {
+	f.CreateAlgoOrderService.Type(futures.AlgoOrderType(t))
+}
+
+func (f *FuturesCreateAlgoOrderPolyFill) SetQuantity(q string) {
+	f.CreateAlgoOrderService.Quantity(q)
+}
+
+func (f *FuturesCreateAlgoOrderPolyFill) SetPrice(p string) {
+	f.CreateAlgoOrderService.Price(p)
+}
+
+// Maps common StopPrice to TriggerPrice used by algo orders
+func (f *FuturesCreateAlgoOrderPolyFill) SetStopPrice(sp string) {
+	f.CreateAlgoOrderService.TriggerPrice(sp)
+}
+
+func (f *FuturesCreateAlgoOrderPolyFill) SetTimeInForce(tif futures.TimeInForceType) {
+	f.CreateAlgoOrderService.TimeInForce(tif)
 }
