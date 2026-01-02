@@ -17,6 +17,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/livenote"
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
@@ -61,6 +62,9 @@ type Strategy struct {
 	Disabled                 bool                        `json:"disabled"`
 	// InteractiveOrderDelay is the delay duration for interactive order confirmation in Slack
 	InteractiveOrderDelay types.Duration `json:"interactiveOrderDelay"`
+	// InteractiveOrderEnabled enables interactive order confirmation in Slack
+	InteractiveOrderEnabled   bool `json:"interactiveOrderEnabled"`
+	isInteractiveOrderEnabled bool
 
 	WarningDuration types.Duration `json:"warningFor"`
 
@@ -446,7 +450,16 @@ func (s *Strategy) CrossRun(
 		cancelAllInteractiveOrders()
 	})
 
-	setupSlackInteractionCallback(s.slackEvtID)
+	// setup interactive order
+	dispatcher, err := interact.GetDispatcher()
+	if err != nil {
+		bbgo.Notify("[xalign] interactive order is not enabled: %s", err.Error())
+	} else if s.InteractiveOrderEnabled {
+		s.isInteractiveOrderEnabled = true
+		bbgo.Notify("[xalign] interactive order is enabled: %s", s.InstanceID())
+		setupSlackInteractionCallback(s.slackEvtID, dispatcher)
+	}
+
 	go s.monitor(ctx)
 	return nil
 }
@@ -744,11 +757,15 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 			if s.DryRun {
 				return activeTransferExists
 			}
-			if isInstantAmount {
-				// place order immediately
+			if isInstantAmount || !s.isInteractiveOrderEnabled {
+				// place the order immediately if one of the conditions met:
+				// 1. the amount is small enough (<= InstantAlignAmount)
+				// 2. interactive order is not enabled
 				createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
 				s.onSubmittedOrderCallback(selectedSession, submitOrder, createdOrder, err)
 			} else {
+				// submit the order via interactive order with slack confirmation
+				// first we check if there is already a delayed interactive order for the same symbol and slack event ID
 				foundDelayedOrder := false
 				interactOrderRegistry.Range(func(k any, v any) bool {
 					o, ok := v.(*InteractiveSubmitOrder)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	stdlog "log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -169,6 +170,7 @@ type InteractiveMessageHandler func(user slack.User, oriMessage slack.Message, a
 // return the necessary updates to be applied to the original message.
 // NOTE: the updates will be applied to the original message in the given order.
 type InteractiveMessageDispatcher struct {
+	mu             sync.Mutex
 	slackMessenger *Slack
 
 	// slackEvtID -> handlers
@@ -176,6 +178,9 @@ type InteractiveMessageDispatcher struct {
 }
 
 func (d *InteractiveMessageDispatcher) Register(slackEvtID string, handler InteractiveMessageHandler) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	if _, exists := d.dispatchMap[slackEvtID]; exists {
 		log.Warnf("[interact] overwriting existing handler for slack event ID: %s", slackEvtID)
 	}

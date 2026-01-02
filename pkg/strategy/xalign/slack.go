@@ -231,75 +231,68 @@ func cancelAllInteractiveOrders() {
 	})
 }
 
-func setupSlackInteractionCallback(slackEvtID string) {
-	for _, messenger := range interact.GetMessengers() {
-		// setup the button click handler for the slack messenger
-		slackMessenger, ok := messenger.(*interact.Slack)
+func setupSlackInteractionCallback(slackEvtID string, dispatcher *interact.InteractiveMessageDispatcher) {
+	// setup the button click handler
+	handler := func(user slack.User, oriMessage slack.Message, actionID string, actionValue string) ([]interact.InteractionMessageUpdate, error) {
+		// check if the interactive order still exists
+		value, ok := interactOrderRegistry.Load(actionValue)
 		if !ok {
-			continue
+			// it's already processed
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks:       removeBlockByID(oriMessage.Blocks.BlockSet, interactiveButtonsBlockID),
+					Attachments:  nil,
+					PostInThread: false,
+				},
+				{
+					Blocks:       []slack.Block{buildTextBlock("*Order has been processed, cannot do any further actions.*")},
+					Attachments:  nil,
+					PostInThread: true,
+				},
+			}, nil
 		}
-		handler := func(user slack.User, oriMessage slack.Message, actionID string, actionValue string) ([]interact.InteractionMessageUpdate, error) {
-			// check if the interactive order still exists
-			value, ok := interactOrderRegistry.Load(actionValue)
-			if !ok {
-				// it's already processed
-				return []interact.InteractionMessageUpdate{
-					{
-						Blocks:       removeBlockByID(oriMessage.Blocks.BlockSet, interactiveButtonsBlockID),
-						Attachments:  nil,
-						PostInThread: false,
-					},
-					{
-						Blocks:       []slack.Block{buildTextBlock("*Order has been processed, cannot do any further actions.*")},
-						Attachments:  nil,
-						PostInThread: true,
-					},
-				}, nil
-			}
 
-			io, ok := value.(*InteractiveSubmitOrder)
-			if !ok {
-				// should not happen
-				return []interact.InteractionMessageUpdate{
-					{
-						Blocks:       nil,
-						Attachments:  nil,
-						PostInThread: false,
-					},
-				}, fmt.Errorf("invalid type detected for interactive order (%s): %+v", actionValue, value)
-			}
+		io, ok := value.(*InteractiveSubmitOrder)
+		if !ok {
+			// should not happen
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks:       nil,
+					Attachments:  nil,
+					PostInThread: false,
+				},
+			}, fmt.Errorf("invalid type detected for interactive order (%s): %+v", actionValue, value)
+		}
 
-			blocks := removeBlockByID(oriMessage.Blocks.BlockSet, interactiveButtonsBlockID)
-			switch actionID {
-			case cancelOrderActionID:
-				io.CancelOnce()
-				blocks = append(blocks, canceledSlackBlocks(user.Name)...)
-			case confirmOrderActionID:
-				io.ConfirmOnce()
-				blocks = append(blocks, confirmedSlackBlocks(user.Name)...)
-			default:
-				return []interact.InteractionMessageUpdate{
-					{
-						Blocks:       blocks,
-						Attachments:  nil,
-						PostInThread: false,
-					},
-					{
-						Blocks:       []slack.Block{buildTextBlock("Invalid action ID: " + actionID)},
-						Attachments:  nil,
-						PostInThread: true,
-					},
-				}, nil
-			}
+		blocks := removeBlockByID(oriMessage.Blocks.BlockSet, interactiveButtonsBlockID)
+		switch actionID {
+		case cancelOrderActionID:
+			io.CancelOnce()
+			blocks = append(blocks, canceledSlackBlocks(user.Name)...)
+		case confirmOrderActionID:
+			io.ConfirmOnce()
+			blocks = append(blocks, confirmedSlackBlocks(user.Name)...)
+		default:
 			return []interact.InteractionMessageUpdate{
 				{
 					Blocks:       blocks,
 					Attachments:  nil,
 					PostInThread: false,
 				},
+				{
+					Blocks:       []slack.Block{buildTextBlock("Invalid action ID: " + actionID)},
+					Attachments:  nil,
+					PostInThread: true,
+				},
 			}, nil
 		}
-		dispatcher := interact.NewInteractiveMessageDispatcher(slackMessenger)
-		dispatcher.Register(slackEvtID, handler)
+		return []interact.InteractionMessageUpdate{
+			{
+				Blocks:       blocks,
+				Attachments:  nil,
+				PostInThread: false,
+			},
+		}, nil
 	}
+	dispatcher.Register(slackEvtID, handler)
 }

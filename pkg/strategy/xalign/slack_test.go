@@ -179,12 +179,10 @@ func Test_interact(t *testing.T) {
 	slackClient := interact.NewSlack(
 		slack.New("test-token"),
 	)
-
-	// Create and add a Slack messenger
-	interact.AddMessenger(slackClient)
+	dispatcher := interact.NewInteractiveMessageDispatcher(slackClient)
 
 	// register the button click handler
-	setupSlackInteractionCallback("test-slack-evt-id")
+	setupSlackInteractionCallback("test-slack-evt-id", dispatcher)
 
 	t.Run("cancel order", func(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
