@@ -804,6 +804,7 @@ func (s *Strategy) onSubmittedOrderCallback(session *bbgo.ExchangeSession, submi
 	if err != nil {
 		log.WithError(err).WithFields(submitOrder.LogFields()).Errorf("can not place order: %+v", submitOrder)
 	} else if createdOrder != nil {
+		s.resetFaultBalanceRecords(createdOrder.Market.BaseCurrency)
 		if ob, ok := s.orderBooks[session.Name]; ok {
 			ob.Add(*createdOrder)
 		} else {
