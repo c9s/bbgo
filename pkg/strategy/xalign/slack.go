@@ -245,7 +245,12 @@ func setupSlackInteractionCallback(slackEvtID string, dispatcher *interact.Inter
 					PostInThread: false,
 				},
 				{
-					Blocks:       []slack.Block{buildTextBlock("*Order has been processed, cannot do any further actions.*")},
+					Blocks: []slack.Block{buildTextBlock(
+						fmt.Sprintf(
+							"*Order has been processed, cannot do any further actions.* (requested by %s at %s)",
+							user.Name,
+							time.Now().Format(time.RFC3339),
+						))},
 					Attachments:  nil,
 					PostInThread: true,
 				},
