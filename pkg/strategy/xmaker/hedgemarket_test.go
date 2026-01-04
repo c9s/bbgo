@@ -113,6 +113,65 @@ func TestHedgeMarket_Hedge(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestHedgeMarket_GetBaseQuoteAvailableBalances(t *testing.T) {
+	ctx := context.Background()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	market := Market("BTCUSDT")
+	session, _, _ := newMockSession(mockCtrl, ctx, market.Symbol)
+
+	hm := NewHedgeMarket(&HedgeMarketConfig{
+		SymbolSelector: "BTCUSDT",
+		HedgeInterval:  hedgeInterval,
+		QuotingDepth:   Number(1.0),
+	}, session, market)
+
+	// Satisfy the Connect call expectation from newMockSession
+	err := hm.stream.Connect(ctx)
+	assert.NoError(t, err)
+
+	baseAvail, quoteAvail := hm.GetBaseQuoteAvailableBalances()
+	assert.InEpsilon(t, 10.0, baseAvail.Float64(), 1e-9)
+	assert.InEpsilon(t, 200000.0, quoteAvail.Float64(), 1e-9)
+}
+
+func TestHedgeMarket_GetQuotePriceBySessionBalances(t *testing.T) {
+	ctx := context.Background()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	market := Market("BTCUSDT")
+	session, marketDataStream, _ := newMockSession(mockCtrl, ctx, market.Symbol)
+
+	hm := NewHedgeMarket(&HedgeMarketConfig{
+		SymbolSelector: "BTCUSDT",
+		HedgeInterval:  hedgeInterval,
+		QuotingDepth:   Number(1.0),
+	}, session, market)
+
+	// Connect underlying mock stream (expected by newMockSession)
+	err := hm.stream.Connect(ctx)
+	assert.NoError(t, err)
+
+	// Provide a simple order book snapshot
+	marketDataStream.EmitBookSnapshot(types.SliceOrderBook{
+		Symbol: market.Symbol,
+		Bids: types.PriceVolumeSlice{
+			{Price: Number(10000), Volume: Number(100)},
+		},
+		Asks: types.PriceVolumeSlice{
+			{Price: Number(10010), Volume: Number(100)},
+		},
+	})
+
+	bid, ask := hm.GetQuotePriceBySessionBalances()
+
+	// With zero taker fee rate by default, the prices should match raw computed levels
+	assert.InEpsilon(t, 10000.0, bid.Float64(), 1e-9)
+	assert.InEpsilon(t, 10010.0, ask.Float64(), 1e-9)
+}
+
 func TestHedgeMarket_RedispatchPositionAfterFailure(t *testing.T) {
 	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)

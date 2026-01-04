@@ -374,8 +374,6 @@ func (m *HedgeMarket) GetQuotePrice() (bid, ask fixedpoint.Value) {
 	}
 
 	// Fallback path: use best bid/ask and apply fee.
-	now := time.Now()
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -384,6 +382,7 @@ func (m *HedgeMarket) GetQuotePrice() (bid, ask fixedpoint.Value) {
 
 	// Apply fee according to PriceFeeMode
 	feeRate := m.priceFeeRate()
+	now := time.Now()
 	bid = pricer.ApplyFeeRate(types.SideTypeBuy, feeRate)(0, rawBid)
 	ask = pricer.ApplyFeeRate(types.SideTypeSell, feeRate)(0, rawAsk)
 
@@ -403,8 +402,6 @@ func (m *HedgeMarket) GetQuotePrice() (bid, ask fixedpoint.Value) {
 // adjusted by taker fee (ask: +fee, bid: -fee). This reflects the effective prices when
 // submitting taker orders crossing the spread.
 func (m *HedgeMarket) GetQuotePriceByQuoteAmount(quoteAmount fixedpoint.Value) (bid, ask fixedpoint.Value) {
-	now := time.Now()
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -412,6 +409,7 @@ func (m *HedgeMarket) GetQuotePriceByQuoteAmount(quoteAmount fixedpoint.Value) (
 
 	// Apply fee according to PriceFeeMode
 	feeRate := m.priceFeeRate()
+	now := time.Now()
 	bid = pricer.ApplyFeeRate(types.SideTypeBuy, feeRate)(0, rawBid)
 	ask = pricer.ApplyFeeRate(types.SideTypeSell, feeRate)(0, rawAsk)
 
@@ -422,8 +420,6 @@ func (m *HedgeMarket) GetQuotePriceByQuoteAmount(quoteAmount fixedpoint.Value) (
 // GetQuotePriceByBaseAmount returns bid/ask prices averaged over the given base amount,
 // adjusted by taker fee (ask: +fee, bid: -fee).
 func (m *HedgeMarket) GetQuotePriceByBaseAmount(baseAmount fixedpoint.Value) (bid, ask fixedpoint.Value) {
-	now := time.Now()
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -431,9 +427,56 @@ func (m *HedgeMarket) GetQuotePriceByBaseAmount(baseAmount fixedpoint.Value) (bi
 
 	// Apply fee according to PriceFeeMode
 	feeRate := m.priceFeeRate()
+	now := time.Now()
 	bid = pricer.ApplyFeeRate(types.SideTypeBuy, feeRate)(0, rawBid)
 	ask = pricer.ApplyFeeRate(types.SideTypeSell, feeRate)(0, rawAsk)
 
+	m.quotingPrice = &types.Ticker{Buy: bid, Sell: ask, Time: now}
+	return bid, ask
+}
+
+// GetBaseQuoteAvailableBalances returns the available balances of base and quote
+// currencies for the current market's session account in one call.
+// If a balance does not exist in the account, this method returns fixedpoint.Zero for it.
+func (m *HedgeMarket) GetBaseQuoteAvailableBalances() (baseAvailable, quoteAvailable fixedpoint.Value) {
+	account := m.session.GetAccount()
+	baseAvailable, _ = getAvailableBalance(account, m.market.BaseCurrency)
+	quoteAvailable, _ = getAvailableBalance(account, m.market.QuoteCurrency)
+	return baseAvailable, quoteAvailable
+}
+
+// GetQuotePriceBySessionBalances computes bid/ask quote prices based on the
+// current session's available balances as the depth inputs:
+//   - bid side uses base currency available balance as base depth
+//   - ask side uses quote currency available balance as quote depth
+//
+// Prices are then adjusted by the configured fee mode and stored into
+// m.quotingPrice as a snapshot.
+func (m *HedgeMarket) GetQuotePriceBySessionBalances() (bid, ask fixedpoint.Value) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// fetch available balances once
+	baseAvail, quoteAvail := m.GetBaseQuoteAvailableBalances()
+
+	// compute raw prices using side-specific depth definitions
+	rawBid := m.depthBook.PriceAtDepth(types.SideTypeBuy, baseAvail)
+	rawAsk := m.depthBook.PriceAtQuoteDepth(types.SideTypeSell, quoteAvail)
+
+	// Apply fee according to PriceFeeMode
+	feeRate := m.priceFeeRate()
+	now := time.Now()
+	bid = pricer.ApplyFeeRate(types.SideTypeBuy, feeRate)(0, rawBid)
+	ask = pricer.ApplyFeeRate(types.SideTypeSell, feeRate)(0, rawAsk)
+
+	if bid.IsZero() || ask.IsZero() {
+		bids := m.book.SideBook(types.SideTypeBuy)
+		asks := m.book.SideBook(types.SideTypeSell)
+		m.logger.Warnf("no valid bid/ask price from session balances for %s, baseAvail=%s, quoteAvail=%s, bids: %v, asks: %v",
+			m.SymbolSelector, baseAvail.String(), quoteAvail.String(), bids, asks)
+	}
+
+	// store prices as snapshot
 	m.quotingPrice = &types.Ticker{Buy: bid, Sell: ask, Time: now}
 	return bid, ask
 }
