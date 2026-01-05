@@ -24,6 +24,7 @@ const confirmOrderActionID = "confirm_order"
 const cancelOrderActionID = "cancel_order"
 
 var interactOrderRegistry sync.Map
+var submittedOrderRegistry sync.Map
 
 type InteractiveSubmitOrder struct {
 	sync.Mutex
@@ -131,10 +132,10 @@ func (itOrder *InteractiveSubmitOrder) buildButtonsBlock() slack.Block {
 type OnSubmittedOrderCallback func(*bbgo.ExchangeSession, *types.SubmitOrder, *types.Order, error)
 
 func (itOrder *InteractiveSubmitOrder) AsyncSubmit(ctx context.Context, session *bbgo.ExchangeSession, onSubmittedOrderCallback OnSubmittedOrderCallback) {
-	go itOrder.asyncSubmit(ctx, session, onSubmittedOrderCallback)
+	go itOrder.asyncSubmit(ctx, session, onSubmittedOrderCallback, time.Now())
 }
 
-func (itOrder *InteractiveSubmitOrder) asyncSubmit(ctx context.Context, session *bbgo.ExchangeSession, onSubmittedOrderCallback OnSubmittedOrderCallback) {
+func (itOrder *InteractiveSubmitOrder) asyncSubmit(ctx context.Context, session *bbgo.ExchangeSession, onSubmittedOrderCallback OnSubmittedOrderCallback, now time.Time) {
 	itOrder.Lock()
 	defer itOrder.Unlock()
 
@@ -144,9 +145,21 @@ func (itOrder *InteractiveSubmitOrder) asyncSubmit(ctx context.Context, session 
 	}
 
 	if itOrder.dueTime.IsZero() {
-		itOrder.dueTime = time.Now().Add(itOrder.delay)
+		itOrder.dueTime = now.Add(itOrder.delay)
 		bbgo.Notify(itOrder) // send interactive order notification
 	}
+
+	submittedOrderRegistry.Range(func(key, value interface{}) bool {
+		order, ok := value.(*types.Order)
+		if !ok {
+			return true
+		}
+
+		if (order == nil) || now.Sub(order.CreationTime.Time()) > 2*time.Hour {
+			submittedOrderRegistry.Delete(key)
+		}
+		return true
+	})
 
 	// execute order submission
 	timer := time.NewTimer(itOrder.delay)
@@ -168,6 +181,8 @@ func (itOrder *InteractiveSubmitOrder) asyncSubmit(ctx context.Context, session 
 	itOrder.done = true
 	// remove from registry
 	interactOrderRegistry.Delete(itOrder.id)
+	submittedOrderRegistry.Store(itOrder.id, order)
+
 	if onSubmittedOrderCallback != nil {
 		onSubmittedOrderCallback(session, &itOrder.submitOrder, order, err)
 	}
@@ -224,8 +239,8 @@ func confirmedSlackBlocks(userName string) []slack.Block {
 
 func cancelAllInteractiveOrders() {
 	interactOrderRegistry.Range(func(key, value interface{}) bool {
-		if io, ok := value.(*InteractiveSubmitOrder); ok {
-			io.CancelOnce()
+		if itOrder, ok := value.(*InteractiveSubmitOrder); ok {
+			itOrder.CancelOnce()
 		}
 		return true
 	})
@@ -238,7 +253,7 @@ func setupSlackInteractionCallback(slackEvtID string, dispatcher *interact.Inter
 		value, ok := interactOrderRegistry.Load(actionValue)
 		if !ok {
 			// it's already processed
-			return []interact.InteractionMessageUpdate{
+			blocks := []interact.InteractionMessageUpdate{
 				{
 					Blocks:       removeBlockByID(oriMessage.Blocks.BlockSet, interactiveButtonsBlockID),
 					Attachments:  nil,
@@ -254,10 +269,21 @@ func setupSlackInteractionCallback(slackEvtID string, dispatcher *interact.Inter
 					Attachments:  nil,
 					PostInThread: true,
 				},
-			}, nil
+			}
+			if value, found := submittedOrderRegistry.Load(actionValue); found {
+				order, ok := value.(*types.Order)
+				if ok && order != nil {
+					blocks = append(blocks, interact.InteractionMessageUpdate{
+						Blocks:       []slack.Block{buildTextBlock("*Created Order*")},
+						Attachments:  []slack.Attachment{order.SlackAttachment()},
+						PostInThread: true,
+					})
+				}
+			}
+			return blocks, nil
 		}
 
-		io, ok := value.(*InteractiveSubmitOrder)
+		itOrder, ok := value.(*InteractiveSubmitOrder)
 		if !ok {
 			// should not happen
 			return []interact.InteractionMessageUpdate{
@@ -272,10 +298,10 @@ func setupSlackInteractionCallback(slackEvtID string, dispatcher *interact.Inter
 		blocks := removeBlockByID(oriMessage.Blocks.BlockSet, interactiveButtonsBlockID)
 		switch actionID {
 		case cancelOrderActionID:
-			io.CancelOnce()
+			itOrder.CancelOnce()
 			blocks = append(blocks, canceledSlackBlocks(user.Name)...)
 		case confirmOrderActionID:
-			io.ConfirmOnce()
+			itOrder.ConfirmOnce()
 			blocks = append(blocks, confirmedSlackBlocks(user.Name)...)
 		default:
 			return []interact.InteractionMessageUpdate{

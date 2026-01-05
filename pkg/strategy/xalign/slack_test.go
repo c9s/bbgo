@@ -172,6 +172,90 @@ func Test_InteractiveOrderSubmit(t *testing.T) {
 		_, exists := interactOrderRegistry.Load(itOrder.id)
 		assert.False(t, exists, "Order should be removed from registry after submission")
 	})
+
+	t.Run("expired orders should be removed from registry", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+
+		ctx := context.Background()
+
+		// Create a mock exchange
+		mockEx := mocks.NewMockExchange(mockCtrl)
+
+		// Create test market
+		market := Market("BTCUSDT")
+		market.Exchange = types.ExchangeMax
+
+		// Step 1: Create itOrder1 and submit it
+		submitOrder1 := types.SubmitOrder{
+			Symbol:   "ETHUSDT",
+			Side:     types.SideTypeSell,
+			Type:     types.OrderTypeLimit,
+			Price:    Number(3000.0),
+			Quantity: Number(0.01),
+			Market:   market,
+		}
+
+		// Setup mock expectation for itOrder1
+		mockEx.EXPECT().SubmitOrder(ctx, submitOrder1).Return(&types.Order{
+			OrderID:          1,
+			SubmitOrder:      submitOrder1,
+			ExecutedQuantity: fixedpoint.Zero,
+			Status:           types.OrderStatusNew,
+			CreationTime:     types.Time(time.Now()),
+		}, nil).Times(1)
+
+		session := &bbgo.ExchangeSession{
+			Exchange: mockEx,
+		}
+
+		itOrder1 := NewInteractiveSubmitOrder(submitOrder1, 50*time.Microsecond, nil, "")
+
+		callback1Called := make(chan struct{}, 1)
+		itOrder1.AsyncSubmit(ctx, session, func(s *bbgo.ExchangeSession, so *types.SubmitOrder, order *types.Order, err error) {
+			callback1Called <- struct{}{}
+		})
+
+		// Wait for itOrder1 to complete
+		select {
+		case <-callback1Called:
+			// itOrder1 completed
+		case <-time.After(2 * time.Second):
+			t.Fatal("Timeout waiting for itOrder1 submission")
+		}
+
+		// Verify itOrder1 is removed from interactOrderRegistry and recorded as submitted
+		_, exists := interactOrderRegistry.Load(itOrder1.id)
+		assert.False(t, exists, "itOrder1 should not be in registry after submission")
+		_, exists = submittedOrderRegistry.Load(itOrder1.id)
+		assert.True(t, exists, "itOrder1 should be in submitted order registry after submission")
+
+		// Step 2: Create itOrder2 and submit it with a timestamp after the TTL of itOrder1
+		submitOrder2 := types.SubmitOrder{
+			Symbol:   "BTCUSDT",
+			Side:     types.SideTypeBuy,
+			Type:     types.OrderTypeLimit,
+			Price:    Number(50000.0),
+			Quantity: Number(0.001),
+			Market:   market,
+		}
+
+		// Setup mock expectation for itOrder2
+		mockEx.EXPECT().SubmitOrder(ctx, submitOrder2).Return(&types.Order{
+			OrderID:          2,
+			SubmitOrder:      submitOrder2,
+			ExecutedQuantity: fixedpoint.Zero,
+			Status:           types.OrderStatusNew,
+		}, nil).Times(1)
+
+		itOrder2 := NewInteractiveSubmitOrder(submitOrder2, 10*time.Millisecond, nil, "")
+		// Step 3: simulate the itOrder2 submission after 3 hours to trigger cleanup of itOrder1
+		itOrder2.asyncSubmit(ctx, session, nil, time.Now().Add(3*time.Hour))
+
+		// Step 4: Check if itOrder1 is removed from the registry
+		_, exists = submittedOrderRegistry.Load(itOrder1.id)
+		assert.False(t, exists, "itOrder1 should be removed from registry after cleanup during itOrder2 submission")
+	})
 }
 
 func Test_interact(t *testing.T) {
