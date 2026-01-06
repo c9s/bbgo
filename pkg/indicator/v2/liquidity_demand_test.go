@@ -61,52 +61,6 @@ func TestLiquidityDemand(t *testing.T) {
 		assert.True(t, netDemand < 0, "Expected negative net demand for sell-side scenario, got %f", netDemand)
 	})
 
-	t.Run("Edge Cases", func(t *testing.T) {
-		t.Run("Zero Price Range Protection", func(t *testing.T) {
-			liqDemand := newLiquidityDemandStream()
-			// Test case where open equals high (no upward price movement)
-			kline := types.KLine{
-				Open:   fixedpoint.NewFromFloat(100),
-				Close:  fixedpoint.NewFromFloat(100),
-				High:   fixedpoint.NewFromFloat(100), // Same as open
-				Low:    fixedpoint.NewFromFloat(95),
-				Volume: fixedpoint.NewFromFloat(1000),
-			}
-			liqDemand.handleKLine(kline)
-			// Should not panic and should use epsilon for buy demand calculation
-			assert.NotPanics(t, func() {
-				netDemand := liqDemand.Last(0)
-				assert.NotEqual(t, 0.0, netDemand, "Net demand should not be zero when using epsilon")
-			})
-		})
-
-		t.Run("Equal Buy and Sell Demand", func(t *testing.T) {
-			liqDemand := newLiquidityDemandStream()
-			// Test case where buy and sell pressure are roughly equal
-			for _, kline := range []types.KLine{
-				{
-					Open:   fixedpoint.NewFromFloat(100),
-					Close:  fixedpoint.NewFromFloat(100),
-					High:   fixedpoint.NewFromFloat(110), // Range above: 10
-					Low:    fixedpoint.NewFromFloat(90),  // Range below: 10
-					Volume: fixedpoint.NewFromFloat(1000),
-				},
-				{
-					Open:   fixedpoint.NewFromFloat(100),
-					Close:  fixedpoint.NewFromFloat(100),
-					High:   fixedpoint.NewFromFloat(115), // Range above: 15
-					Low:    fixedpoint.NewFromFloat(85),  // Range below: 15
-					Volume: fixedpoint.NewFromFloat(1500),
-				},
-			} {
-				liqDemand.handleKLine(kline)
-			}
-			netDemand := liqDemand.Last(0)
-			// With equal ranges, net demand should be close to zero
-			assert.InDelta(t, 0.0, netDemand, 0.1, "Net demand should be close to zero for equal buy/sell pressure")
-		})
-	})
-
 	t.Run("Constructor Function", func(t *testing.T) {
 		klineStream := &KLineStream{}
 		sellMA := &SMAStream{
@@ -126,7 +80,67 @@ func TestLiquidityDemand(t *testing.T) {
 		assert.Equal(t, sellMA, liqDemand.sellDemandMA)
 		assert.Equal(t, buyMA, liqDemand.buyDemandMA)
 		assert.Equal(t, klineStream, liqDemand.kLineStream)
-		assert.Equal(t, fixedpoint.NewFromFloat(1e-6), liqDemand.epsilon)
+		assert.Equal(t, fixedpoint.NewFromFloat(1e-5), liqDemand.epsilon)
+	})
+}
+
+func Test_EdgeCases(t *testing.T) {
+	t.Run("Zero Price Range Protection", func(t *testing.T) {
+		liqDemand := newLiquidityDemandStream()
+		// Test case where open equals high (no upward price movement)
+		kline := types.KLine{
+			Open:   fixedpoint.NewFromFloat(100),
+			Close:  fixedpoint.NewFromFloat(100),
+			High:   fixedpoint.NewFromFloat(100), // Same as open
+			Low:    fixedpoint.NewFromFloat(95),
+			Volume: fixedpoint.NewFromFloat(1000),
+		}
+		liqDemand.handleKLine(kline)
+		netDemand := liqDemand.Last(0)
+		assert.NotEqual(t, 0.0, netDemand, "Net demand should not be zero when using epsilon")
+	})
+
+	t.Run("Equal Buy and Sell Demand", func(t *testing.T) {
+		liqDemand := newLiquidityDemandStream()
+		// Test case where buy and sell pressure are roughly equal
+		for _, kline := range []types.KLine{
+			{
+				Open:   fixedpoint.NewFromFloat(100),
+				Close:  fixedpoint.NewFromFloat(100),
+				High:   fixedpoint.NewFromFloat(110), // Range above: 10
+				Low:    fixedpoint.NewFromFloat(90),  // Range below: 10
+				Volume: fixedpoint.NewFromFloat(1000),
+			},
+			{
+				Open:   fixedpoint.NewFromFloat(100),
+				Close:  fixedpoint.NewFromFloat(100),
+				High:   fixedpoint.NewFromFloat(115), // Range above: 15
+				Low:    fixedpoint.NewFromFloat(85),  // Range below: 15
+				Volume: fixedpoint.NewFromFloat(1500),
+			},
+		} {
+			liqDemand.handleKLine(kline)
+		}
+		netDemand := liqDemand.Last(0)
+		// With equal ranges, net demand should be close to zero
+		assert.InDelta(t, 0.0, netDemand, 0.1, "Net demand should be close to zero for equal buy/sell pressure")
+	})
+
+	t.Run("Both Price Ranges Below Epsilon", func(t *testing.T) {
+		liqDemand := newLiquidityDemandStream()
+		// Test case where both price ranges are extremely small (below epsilon)
+		// This simulates a candle with almost no price movement
+		kline := types.KLine{
+			Open:   fixedpoint.NewFromFloat(100.0),
+			Close:  fixedpoint.NewFromFloat(100.0),
+			High:   fixedpoint.NewFromFloat(100.0000001), // Tiny movement up (< 1e-6)
+			Low:    fixedpoint.NewFromFloat(99.9999999),  // Tiny movement down (< 1e-6)
+			Volume: fixedpoint.NewFromFloat(1000000.0),   // Large volume
+		}
+		liqDemand.handleKLine(kline)
+		netDemand := liqDemand.Last(0)
+		// Should return 0 to indicate no clear directional signal
+		assert.Equal(t, 0.0, netDemand, "Net demand should be 0 when both price ranges are below epsilon")
 	})
 }
 
