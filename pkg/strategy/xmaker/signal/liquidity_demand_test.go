@@ -65,9 +65,7 @@ func newTestLiquidityDemandSignal() (*LiquidityDemandSignal, *indicatorv2.KLineS
 
 	// Create the underlying indicator using the public constructor
 	klineStream := &indicatorv2.KLineStream{}
-	sellMA := indicatorv2.SMA(types.NewFloat64Series(), iw.Window)
-	buyMA := indicatorv2.SMA(types.NewFloat64Series(), iw.Window)
-	signal.indicator = indicatorv2.LiquidityDemand(klineStream, sellMA, buyMA)
+	signal.indicator = indicatorv2.LiquidityDemand(klineStream, iw)
 	signal.statsUpdateSampleCountf = float64(signal.StatsUpdateSampleCount)
 
 	return signal, klineStream
