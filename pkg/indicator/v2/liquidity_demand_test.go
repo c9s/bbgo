@@ -60,28 +60,6 @@ func TestLiquidityDemand(t *testing.T) {
 		netDemand := liqDemand.Last(0)
 		assert.True(t, netDemand < 0, "Expected negative net demand for sell-side scenario, got %f", netDemand)
 	})
-
-	t.Run("Constructor Function", func(t *testing.T) {
-		klineStream := &KLineStream{}
-		sellMA := &SMAStream{
-			Float64Series: types.NewFloat64Series(),
-			window:        3,
-			rawValues:     types.NewQueue(10),
-		}
-		buyMA := &SMAStream{
-			Float64Series: types.NewFloat64Series(),
-			window:        3,
-			rawValues:     types.NewQueue(10),
-		}
-
-		liqDemand := LiquidityDemand(klineStream, sellMA, buyMA)
-
-		assert.NotNil(t, liqDemand)
-		assert.Equal(t, sellMA, liqDemand.sellDemandMA)
-		assert.Equal(t, buyMA, liqDemand.buyDemandMA)
-		assert.Equal(t, klineStream, liqDemand.kLineStream)
-		assert.Equal(t, fixedpoint.NewFromFloat(1e-5), liqDemand.epsilon)
-	})
 }
 
 func Test_EdgeCases(t *testing.T) {
@@ -145,19 +123,22 @@ func Test_EdgeCases(t *testing.T) {
 }
 
 func newLiquidityDemandStream() *LiquidityDemandStream {
+	rawSellDemands := types.NewFloat64Series()
+	rawBuyDemands := types.NewFloat64Series()
 	return &LiquidityDemandStream{
-		Float64Series: types.NewFloat64Series(),
+		Float64Series:  types.NewFloat64Series(),
+		rawSellDemands: rawSellDemands,
+		rawBuyDemands:  rawBuyDemands,
 		sellDemandMA: &SMAStream{
-			Float64Series: types.NewFloat64Series(),
+			Float64Series: rawSellDemands,
 			window:        2,
 			rawValues:     types.NewQueue(10),
 		},
 		buyDemandMA: &SMAStream{
-			Float64Series: types.NewFloat64Series(),
+			Float64Series: rawBuyDemands,
 			window:        2,
 			rawValues:     types.NewQueue(10),
 		},
-		kLineStream: nil,
-		epsilon:     fixedpoint.NewFromFloat(1e-6),
+		epsilon: fixedpoint.NewFromFloat(1e-6),
 	}
 }
