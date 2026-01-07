@@ -103,6 +103,50 @@ func (c *HedgeMarketConfig) Defaults() error {
 	return nil
 }
 
+// ResolveQuotingDepthInQuote returns the quoting depth in quote currency.
+// Priority:
+//  1. If QuotingDepthInQuote is configured (> 0), return it directly.
+//  2. Else if QuotingDepth (base) is configured and latestPrice > 0, convert
+//     base depth to quote via base * latestPrice.
+//  3. Otherwise return zero.
+func (c *HedgeMarketConfig) ResolveQuotingDepthInQuote(latestPrice fixedpoint.Value) fixedpoint.Value {
+	if c == nil {
+		return fixedpoint.Zero
+	}
+
+	if c.QuotingDepthInQuote.Sign() > 0 {
+		return c.QuotingDepthInQuote
+	}
+
+	if c.QuotingDepth.Sign() > 0 && latestPrice.Sign() > 0 {
+		return c.QuotingDepth.Mul(latestPrice)
+	}
+
+	return fixedpoint.Zero
+}
+
+// ResolveQuotingDepthInBase returns the quoting depth in base currency.
+// Priority:
+//  1. If QuotingDepth (base) is configured (> 0), return it directly.
+//  2. Else if QuotingDepthInQuote is configured and latestPrice > 0, convert
+//     quote depth to base via quote / latestPrice.
+//  3. Otherwise return zero.
+func (c *HedgeMarketConfig) ResolveQuotingDepthInBase(latestPrice fixedpoint.Value) fixedpoint.Value {
+	if c == nil {
+		return fixedpoint.Zero
+	}
+
+	if c.QuotingDepth.Sign() > 0 {
+		return c.QuotingDepth
+	}
+
+	if c.QuotingDepthInQuote.Sign() > 0 && latestPrice.Sign() > 0 {
+		return c.QuotingDepthInQuote.Div(latestPrice)
+	}
+
+	return fixedpoint.Zero
+}
+
 func InitializeHedgeMarketFromConfig(
 	c *HedgeMarketConfig,
 	sessions map[string]*bbgo.ExchangeSession,
@@ -459,9 +503,44 @@ func (m *HedgeMarket) GetQuotePriceBySessionBalances() (bid, ask fixedpoint.Valu
 	// fetch available balances once
 	baseAvail, quoteAvail := m.GetBaseQuoteAvailableBalances()
 
+	// determine a latest price for converting depths between base and quote
+	bestBid := m.bidPricer(0, fixedpoint.Zero)
+	bestAsk := m.askPricer(0, fixedpoint.Zero)
+	latest := fixedpoint.Zero
+	if bestBid.Sign() > 0 && bestAsk.Sign() > 0 {
+		latest = bestBid.Add(bestAsk).Div(fixedpoint.NewFromFloat(2))
+	} else if bestBid.Sign() > 0 {
+		latest = bestBid
+	} else if bestAsk.Sign() > 0 {
+		latest = bestAsk
+	}
+
+	// resolve configured quoting depths in both currencies
+	cfgQuoteDepth := m.HedgeMarketConfig.ResolveQuotingDepthInQuote(latest)
+	cfgBaseDepth := m.HedgeMarketConfig.ResolveQuotingDepthInBase(latest)
+
+	// use min(balance, configuredDepth) per requirement
+	baseDepthToUse := baseAvail
+	if cfgBaseDepth.Sign() > 0 && baseAvail.Compare(cfgBaseDepth) > 0 {
+		baseDepthToUse = cfgBaseDepth
+	}
+
+	quoteDepthToUse := quoteAvail
+	if cfgQuoteDepth.Sign() > 0 && quoteAvail.Compare(cfgQuoteDepth) > 0 {
+		quoteDepthToUse = cfgQuoteDepth
+	}
+
 	// compute raw prices using side-specific depth definitions
-	rawBid := m.depthBook.PriceAtDepth(types.SideTypeBuy, baseAvail)
-	rawAsk := m.depthBook.PriceAtQuoteDepth(types.SideTypeSell, quoteAvail)
+	rawBid := m.depthBook.PriceAtDepth(types.SideTypeBuy, baseDepthToUse)
+	rawAsk := m.depthBook.PriceAtQuoteDepth(types.SideTypeSell, quoteDepthToUse)
+
+	// fallback to best prices if depth-based prices are not available
+	if rawBid.IsZero() {
+		rawBid = bestBid
+	}
+	if rawAsk.IsZero() {
+		rawAsk = bestAsk
+	}
 
 	// Apply fee according to PriceFeeMode
 	feeRate := m.priceFeeRate()
@@ -472,8 +551,12 @@ func (m *HedgeMarket) GetQuotePriceBySessionBalances() (bid, ask fixedpoint.Valu
 	if bid.IsZero() || ask.IsZero() {
 		bids := m.book.SideBook(types.SideTypeBuy)
 		asks := m.book.SideBook(types.SideTypeSell)
-		m.logger.Warnf("no valid bid/ask price from session balances for %s, baseAvail=%s, quoteAvail=%s, bids: %v, asks: %v",
-			m.SymbolSelector, baseAvail.String(), quoteAvail.String(), bids, asks)
+		m.logger.Warnf("no valid bid/ask price from session balances for %s, baseAvail=%s, quoteAvail=%s, cfgBaseDepth=%s, cfgQuoteDepth=%s, usedBaseDepth=%s, usedQuoteDepth=%s, bids: %v, asks: %v",
+			m.SymbolSelector,
+			baseAvail.String(), quoteAvail.String(),
+			cfgBaseDepth.String(), cfgQuoteDepth.String(),
+			baseDepthToUse.String(), quoteDepthToUse.String(),
+			bids, asks)
 	}
 
 	// store prices as snapshot
