@@ -63,7 +63,8 @@ type Strategy struct {
 	// InteractiveOrderDelay is the delay duration for interactive order confirmation in Slack
 	InteractiveOrderDelay types.Duration `json:"interactiveOrderDelay"`
 	// InteractiveOrderEnabled enables interactive order confirmation in Slack
-	InteractiveOrderEnabled   bool `json:"interactiveOrderEnabled"`
+	InteractiveOrderEnabled bool `json:"interactiveOrderEnabled"`
+	// isInteractiveOrderEnabled is true iff InteractiveOrderEnabled = true and the interactive order dispatcher is available
 	isInteractiveOrderEnabled bool
 
 	WarningDuration types.Duration `json:"warningFor"`
