@@ -577,7 +577,7 @@ func (o Order) SlackAttachment() slack.Attachment {
 	footerIcon := ExchangeFooterIcon(o.Exchange)
 	fillRatio := o.ExecutedQuantity.Div(o.Quantity)
 	orderDetail := fmt.Sprintf(
-		"%s/%s @ %s (fill ratio: %s)",
+		"%s/%s @ %s (%s)",
 		o.ExecutedQuantity.String(),
 		o.Quantity.String(),
 		o.Price.String(),
