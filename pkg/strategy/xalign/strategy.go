@@ -810,7 +810,7 @@ func (s *Strategy) onSubmittedOrderCallback(session *bbgo.ExchangeSession, submi
 		} else {
 			log.Errorf("orderbook %s not found", session.Name)
 		}
-		bbgo.Notify("Aligning order submitted", submitOrder)
+		bbgo.Notify("Aligning order submitted", createdOrder)
 	}
 }
 
