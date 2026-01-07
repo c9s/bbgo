@@ -63,7 +63,8 @@ type Strategy struct {
 	// InteractiveOrderDelay is the delay duration for interactive order confirmation in Slack
 	InteractiveOrderDelay types.Duration `json:"interactiveOrderDelay"`
 	// InteractiveOrderEnabled enables interactive order confirmation in Slack
-	InteractiveOrderEnabled   bool `json:"interactiveOrderEnabled"`
+	InteractiveOrderEnabled bool `json:"interactiveOrderEnabled"`
+	// isInteractiveOrderEnabled is true iff InteractiveOrderEnabled = true and the interactive order dispatcher is available
 	isInteractiveOrderEnabled bool
 
 	WarningDuration types.Duration `json:"warningFor"`
@@ -810,7 +811,7 @@ func (s *Strategy) onSubmittedOrderCallback(session *bbgo.ExchangeSession, submi
 		} else {
 			log.Errorf("orderbook %s not found", session.Name)
 		}
-		bbgo.Notify("Aligning order submitted", submitOrder)
+		bbgo.Notify("Aligning order submitted", createdOrder)
 	}
 }
 
