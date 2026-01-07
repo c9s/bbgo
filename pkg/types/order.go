@@ -538,22 +538,21 @@ func (o Order) PlainText() string {
 }
 
 func (o Order) SlackAttachment() slack.Attachment {
-	var fields = []slack.AttachmentField{
-		{Title: "Symbol", Value: o.Symbol, Short: true},
-		{Title: "Side", Value: string(o.Side), Short: true},
-		{Title: "Price", Value: o.Price.String(), Short: true},
-		{
-			Title: "Executed Quantity",
-			Value: o.ExecutedQuantity.String() + "/" + o.Quantity.String(),
-			Short: true,
-		},
-	}
 
-	fields = append(fields, slack.AttachmentField{
-		Title: "ID",
-		Value: strconv.FormatUint(o.OrderID, 10),
-		Short: true,
-	})
+	var fields []slack.AttachmentField
+	if o.UUID != "" {
+		fields = append(fields, slack.AttachmentField{
+			Title: "UUID",
+			Value: o.UUID + fmt.Sprintf(" (%d)", o.OrderID),
+			Short: false,
+		})
+	} else {
+		fields = append(fields, slack.AttachmentField{
+			Title: "ID",
+			Value: strconv.FormatUint(o.OrderID, 10),
+			Short: true,
+		})
+	}
 
 	orderStatusIcon := ""
 
@@ -576,11 +575,19 @@ func (o Order) SlackAttachment() slack.Attachment {
 	})
 
 	footerIcon := ExchangeFooterIcon(o.Exchange)
+	fillRatio := o.ExecutedQuantity.Div(o.Quantity)
+	orderDetail := fmt.Sprintf(
+		"%s/%s @ %s (fill ratio: %s)",
+		o.ExecutedQuantity.String(),
+		o.Quantity.String(),
+		o.Price.String(),
+		fillRatio.Percentage(),
+	)
 
 	return slack.Attachment{
-		Color: SideToColorName(o.Side),
-		Title: string(o.Type) + " Order " + string(o.Side),
-		// Text:   "",
+		Color:      SideToColorName(o.Side),
+		Title:      string(o.Type) + " Order " + string(o.Side) + " " + o.Symbol,
+		Text:       orderDetail,
 		Fields:     fields,
 		FooterIcon: footerIcon,
 		Footer:     strings.ToLower(o.Exchange.String()) + templateutil.Render(" creation time {{ . }}", o.CreationTime.Time().Format(time.StampMilli)),

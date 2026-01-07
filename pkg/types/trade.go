@@ -227,18 +227,36 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 	liquidity := trade.Liquidity()
 	text := templateutil.Render(slackTradeTextTemplate, trade)
 
+	fields := []slack.AttachmentField{
+		{Title: "QuoteQuantity", Value: trade.QuoteQuantity.String(), Short: true},
+		{Title: "Fee", Value: trade.Fee.String() + " " + trade.FeeCurrency, Short: true},
+		{Title: "Liquidity", Value: liquidity, Short: true},
+	}
+
+	if trade.OrderUUID != "" {
+		fields = append(
+			fields,
+			slack.AttachmentField{
+				Title: "Order ID",
+				Value: fmt.Sprintf("%s (%s)", trade.OrderUUID, strconv.FormatUint(trade.OrderID, 10)),
+				Short: false,
+			})
+	} else {
+		fields = append(
+			fields,
+			slack.AttachmentField{
+				Title: "Order ID",
+				Value: strconv.FormatUint(trade.OrderID, 10),
+				Short: true,
+			})
+	}
+
 	return slack.Attachment{
 		Text: text,
 		// Title: ...
 		// Pretext: pretext,
-		Color: color,
-		Fields: []slack.AttachmentField{
-			{Title: "Exchange", Value: trade.Exchange.String(), Short: true},
-			{Title: "QuoteQuantity", Value: trade.QuoteQuantity.String(), Short: true},
-			{Title: "Fee", Value: trade.Fee.String() + " " + trade.FeeCurrency, Short: true},
-			{Title: "Liquidity", Value: liquidity, Short: true},
-			{Title: "Order ID", Value: strconv.FormatUint(trade.OrderID, 10), Short: true},
-		},
+		Color:      color,
+		Fields:     fields,
 		FooterIcon: ExchangeFooterIcon(trade.Exchange),
 		Footer:     strings.ToLower(trade.Exchange.String()) + templateutil.Render(" traded at {{ . }}", trade.Time.Time().Format(time.StampMilli)),
 	}
