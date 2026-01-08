@@ -550,7 +550,7 @@ func (o Order) SlackAttachment() slack.Attachment {
 		fields = append(fields, slack.AttachmentField{
 			Title: "ID",
 			Value: strconv.FormatUint(o.OrderID, 10),
-			Short: true,
+			Short: false,
 		})
 	}
 
