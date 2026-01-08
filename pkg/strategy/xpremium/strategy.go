@@ -106,6 +106,8 @@ type Strategy struct {
 	// EngulfingTakeProfit is an optional take-profit rule triggered by 1h Engulfing pattern
 	EngulfingTakeProfit *EngulfingTakeProfitConfig `json:"engulfingTakeProfit,omitempty"`
 
+	ClosePositionOnStart bool `json:"closePositionOnStart"`
+
 	PivotStop *PivotStopConfig `json:"pivotStop,omitempty"`
 
 	BacktestConfig *BacktestConfig `json:"backtest,omitempty"`
@@ -615,18 +617,34 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
 	})
 
-	go func() {
-		s.logger.Infof("waiting for authentication of premium and base sessions...")
-		select {
-		case <-ctx.Done():
-			return
-		case <-s.premiumSession.UserDataConnectivity.AuthedC():
-		}
+	s.tradingSession.UserDataStream.OnStart(func() {
+		go func() {
+			s.logger.Infof("waiting for authentication of premium and base sessions...")
+			select {
+			case <-ctx.Done():
+				return
+			case <-s.tradingSession.UserDataConnectivity.AuthedC():
+			}
 
-		s.logger.Infof("both premium and base sessions authenticated, starting premium worker")
+			s.logger.Infof("both premium and base sessions authenticated, starting premium worker")
 
-		s.premiumWorker(ctx)
-	}()
+			if s.ClosePositionOnStart {
+				if !s.Position.GetBase().IsZero() {
+					if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
+						s.logger.WithError(err).Warnf("graceful order cancel error before closing position")
+					}
+
+					bbgo.Notify("Closing Position", s.Position)
+					s.logger.Infof("closing position: %s", s.Position.String())
+					if err := s.OrderExecutor.ClosePosition(ctx, fixedpoint.One); err != nil {
+						s.logger.WithError(err).Errorf("unable to close position")
+					}
+				}
+			}
+
+			s.premiumWorker(ctx)
+		}()
+	})
 
 	return nil
 }
@@ -1895,6 +1913,7 @@ func (s *Strategy) syncPositionRisks(ctx context.Context, riskService types.Exch
 			s.Position.Base.String(),
 			s.Position.AverageCost.String(),
 			positionRisk)
+		break
 	}
 
 	return nil
