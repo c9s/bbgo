@@ -264,20 +264,8 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 		{Title: "Quantity", Value: o.Quantity.String(), Short: true},
 	}
 
-	if o.Price.Sign() > 0 && o.Quantity.Sign() > 0 && len(o.Market.QuoteCurrency) > 0 {
-		if currency.IsFiatCurrency(o.Market.QuoteCurrency) {
-			fields = append(fields, slack.AttachmentField{
-				Title: "Amount",
-				Value: currency.USD.FormatMoney(o.Price.Mul(o.Quantity)),
-				Short: true,
-			})
-		} else {
-			fields = append(fields, slack.AttachmentField{
-				Title: "Amount",
-				Value: fmt.Sprintf("%s %s", o.Price.Mul(o.Quantity).String(), o.Market.QuoteCurrency),
-				Short: true,
-			})
-		}
+	if amountField := o.amountField(); amountField != nil {
+		fields = append(fields, *amountField)
 	}
 
 	if len(o.ClientOrderID) > 0 {
@@ -293,6 +281,24 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 		Title: string(o.Type) + " Order " + string(o.Side),
 		// Text:   "",
 		Fields: fields,
+	}
+}
+
+func (o *SubmitOrder) amountField() *slack.AttachmentField {
+	if o.Price.Sign() < 0 || o.Quantity.Sign() < 0 || len(o.Market.QuoteCurrency) == 0 {
+		return nil
+	}
+	if currency.IsFiatCurrency(o.Market.QuoteCurrency) {
+		return &slack.AttachmentField{
+			Title: "Amount",
+			Value: currency.USD.FormatMoney(o.Price.Mul(o.Quantity)),
+			Short: true,
+		}
+	}
+	return &slack.AttachmentField{
+		Title: "Amount",
+		Value: fmt.Sprintf("%s %s", o.Price.Mul(o.Quantity).String(), o.Market.QuoteCurrency),
+		Short: true,
 	}
 }
 
@@ -573,6 +579,10 @@ func (o Order) SlackAttachment() slack.Attachment {
 		Value: string(o.Status) + " " + orderStatusIcon,
 		Short: true,
 	})
+
+	if amountField := o.SubmitOrder.amountField(); amountField != nil {
+		fields = append(fields, *amountField)
+	}
 
 	footerIcon := ExchangeFooterIcon(o.Exchange)
 	fillRatio := o.ExecutedQuantity.Div(o.Quantity)
