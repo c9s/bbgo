@@ -61,7 +61,8 @@ type Strategy struct {
 	InstantAlignAmount       fixedpoint.Value            `json:"instantAlignAmount"`
 	Disabled                 bool                        `json:"disabled"`
 	// InteractiveOrderDelay is the delay duration for interactive order confirmation in Slack
-	InteractiveOrderDelay types.Duration `json:"interactiveOrderDelay"`
+	InteractiveOrderDelay     types.Duration   `json:"interactiveOrderDelay"`
+	InteractiveOrderMinAmount fixedpoint.Value `json:"interactiveOrderMinAmount"`
 	// InteractiveOrderEnabled enables interactive order confirmation in Slack
 	InteractiveOrderEnabled bool `json:"interactiveOrderEnabled"`
 	// isInteractiveOrderEnabled is true iff InteractiveOrderEnabled = true and the interactive order dispatcher is available
@@ -147,6 +148,9 @@ func (s *Strategy) Defaults() error {
 
 	if s.InstantAlignAmount.IsZero() {
 		s.InstantAlignAmount = fixedpoint.NewFromFloat(50.0)
+	}
+	if s.InteractiveOrderMinAmount.IsZero() {
+		s.InteractiveOrderMinAmount = s.InstantAlignAmount
 	}
 
 	if s.InteractiveOrderDelay == 0 {
@@ -765,36 +769,41 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 				createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
 				s.onSubmittedOrderCallback(selectedSession, submitOrder, createdOrder, err)
 			} else {
-				// submit the order via interactive order with slack confirmation
-				// first we check if there is already a delayed interactive order for the same symbol and slack event ID
-				foundDelayedOrder := false
-				interactOrderRegistry.Range(func(k any, v any) bool {
-					o, ok := v.(*InteractiveSubmitOrder)
-					if ok {
-						if o.submitOrder.Symbol == submitOrder.Symbol && o.slackEvtID == s.slackEvtID {
-							foundDelayedOrder = true
-							return false
+				if amount.Compare(s.InteractiveOrderMinAmount) >= 0 {
+					// submit the order via interactive order with slack confirmation
+					// first we check if there is already a delayed interactive order for the same symbol and slack event ID
+					foundDelayedOrder := false
+					interactOrderRegistry.Range(func(k any, v any) bool {
+						o, ok := v.(*InteractiveSubmitOrder)
+						if ok {
+							if o.submitOrder.Symbol == submitOrder.Symbol && o.slackEvtID == s.slackEvtID {
+								foundDelayedOrder = true
+								return false
+							}
 						}
+						return true
+					})
+					if foundDelayedOrder {
+						bbgo.Notify("found existing delayed interactive order for %s, skip placing another one", submitOrder.Symbol)
+						continue
 					}
-					return true
-				})
-				if foundDelayedOrder {
-					bbgo.Notify("found existing delayed interactive order for %s, skip placing another one", submitOrder.Symbol)
-					continue
+					// place interactive order with slack confirmation
+					// the order will be placed after confirmed in slack or after delay timeout
+					mentions := append([]string{}, s.SlackNotifyMentions...)
+					if s.LargeAmountAlert != nil && s.LargeAmountAlert.Slack != nil {
+						mentions = append(mentions, s.LargeAmountAlert.Slack.Mentions...)
+					}
+					itOrder := NewInteractiveSubmitOrder(
+						*submitOrder,
+						s.InteractiveOrderDelay.Duration(),
+						mentions,
+						s.slackEvtID,
+					)
+					itOrder.AsyncSubmit(ctx, selectedSession, s.onSubmittedOrderCallback)
+				} else {
+					createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
+					s.onSubmittedOrderCallback(selectedSession, submitOrder, createdOrder, err)
 				}
-				// place interactive order with slack confirmation
-				// the order will be placed after confirmed in slack or after delay timeout
-				mentions := append([]string{}, s.SlackNotifyMentions...)
-				if s.LargeAmountAlert != nil && s.LargeAmountAlert.Slack != nil {
-					mentions = append(mentions, s.LargeAmountAlert.Slack.Mentions...)
-				}
-				itOrder := NewInteractiveSubmitOrder(
-					*submitOrder,
-					s.InteractiveOrderDelay.Duration(),
-					mentions,
-					s.slackEvtID,
-				)
-				itOrder.AsyncSubmit(ctx, selectedSession, s.onSubmittedOrderCallback)
 			}
 		}
 	}
