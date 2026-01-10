@@ -309,8 +309,10 @@ func Test_align(t *testing.T) {
 			UseTakerOrder:            true,
 			SkipTransferCheck:        false,
 			ActiveTransferTimeWindow: types.Duration(48 * time.Hour),
-			InteractiveOrderDelay:    types.Duration(5 * time.Millisecond), // Short delay for test
-			DryRun:                   dryRun,
+			InterativeOrderConfig: &InterativeOrderConfig{
+				Delay: types.Duration(5 * time.Millisecond), // Short delay for test,
+			},
+			DryRun: dryRun,
 		}
 
 		// Initialize the strategy
