@@ -47,6 +47,14 @@ type LargeAmountAlertConfig struct {
 	Amount        fixedpoint.Value `json:"amount"`
 }
 
+type InterativeOrderConfig struct {
+	Enabled bool `json:"enabled"`
+	// Delay is the delay duration for interactive order confirmation in Slack
+	Delay types.Duration `json:"delay"`
+	// MinAmount is the minimum amount required for interactive order confirmation in Slack
+	MinAmount fixedpoint.Value `json:"minAmount"`
+}
+
 type Strategy struct {
 	*bbgo.Environment
 	ActiveTransferInterval   types.Duration              `json:"interval"` // keep the same tag name for backward compatibility
@@ -60,12 +68,9 @@ type Strategy struct {
 	Duration                 types.Duration              `json:"for"`
 	InstantAlignAmount       fixedpoint.Value            `json:"instantAlignAmount"`
 	Disabled                 bool                        `json:"disabled"`
-	// InteractiveOrderDelay is the delay duration for interactive order confirmation in Slack
-	InteractiveOrderDelay     types.Duration   `json:"interactiveOrderDelay"`
-	InteractiveOrderMinAmount fixedpoint.Value `json:"interactiveOrderMinAmount"`
-	// InteractiveOrderEnabled enables interactive order confirmation in Slack
-	InteractiveOrderEnabled bool `json:"interactiveOrderEnabled"`
-	// isInteractiveOrderEnabled is true iff InteractiveOrderEnabled = true and the interactive order dispatcher is available
+
+	InterativeOrderConfig *InterativeOrderConfig `json:"interactiveOrder,omitempty"`
+	// isInteractiveOrderEnabled is a internal flag to indicate if interactive order is enabled
 	isInteractiveOrderEnabled bool
 
 	WarningDuration types.Duration `json:"warningFor"`
@@ -149,12 +154,13 @@ func (s *Strategy) Defaults() error {
 	if s.InstantAlignAmount.IsZero() {
 		s.InstantAlignAmount = fixedpoint.NewFromFloat(50.0)
 	}
-	if s.InteractiveOrderMinAmount.IsZero() {
-		s.InteractiveOrderMinAmount = s.InstantAlignAmount
-	}
 
-	if s.InteractiveOrderDelay == 0 {
-		s.InteractiveOrderDelay = types.Duration(5 * time.Minute)
+	if s.InterativeOrderConfig == nil {
+		s.InterativeOrderConfig = &InterativeOrderConfig{
+			Enabled:   false,
+			Delay:     types.Duration(5 * time.Minute),
+			MinAmount: s.InstantAlignAmount,
+		}
 	}
 
 	return nil
@@ -459,7 +465,7 @@ func (s *Strategy) CrossRun(
 	dispatcher, err := interact.GetDispatcher()
 	if err != nil {
 		bbgo.Notify("[xalign] interactive order is not enabled: %s", err.Error())
-	} else if s.InteractiveOrderEnabled {
+	} else if s.InterativeOrderConfig.Enabled {
 		s.isInteractiveOrderEnabled = true
 		bbgo.Notify("[xalign] interactive order is enabled: %s", s.InstanceID())
 		setupSlackInteractionCallback(s.slackEvtID, dispatcher)
@@ -769,7 +775,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 				createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
 				s.onSubmittedOrderCallback(selectedSession, submitOrder, createdOrder, err)
 			} else {
-				if amount.Compare(s.InteractiveOrderMinAmount) >= 0 {
+				if amount.Compare(s.InterativeOrderConfig.MinAmount) >= 0 {
 					// submit the order via interactive order with slack confirmation
 					// first we check if there is already a delayed interactive order for the same symbol and slack event ID
 					foundDelayedOrder := false
@@ -795,7 +801,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 					}
 					itOrder := NewInteractiveSubmitOrder(
 						*submitOrder,
-						s.InteractiveOrderDelay.Duration(),
+						s.InterativeOrderConfig.Delay.Duration(),
 						mentions,
 						s.slackEvtID,
 					)
