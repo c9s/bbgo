@@ -768,48 +768,52 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 			if s.DryRun {
 				return activeTransferExists
 			}
+
+			// place the order immediately if one of the conditions met:
+			// 1. the amount is small enough (<= InstantAlignAmount)
+			// 2. interactive order is not enabled
 			if isInstantAmount || !s.isInteractiveOrderEnabled {
-				// place the order immediately if one of the conditions met:
-				// 1. the amount is small enough (<= InstantAlignAmount)
-				// 2. interactive order is not enabled
 				createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
 				s.onSubmittedOrderCallback(selectedSession, submitOrder, createdOrder, err)
-			} else {
-				if amount.Compare(s.InterativeOrderConfig.MinAmount) >= 0 {
-					// submit the order via interactive order with slack confirmation
-					// first we check if there is already a delayed interactive order for the same symbol and slack event ID
-					foundDelayedOrder := false
-					interactOrderRegistry.Range(func(k any, v any) bool {
-						o, ok := v.(*InteractiveSubmitOrder)
-						if ok {
-							if o.submitOrder.Symbol == submitOrder.Symbol && o.slackEvtID == s.slackEvtID {
-								foundDelayedOrder = true
-								return false
-							}
+				// continue to the next currency
+				continue
+			}
+
+			// check if we need to place interactive order
+			if amount.Compare(s.InterativeOrderConfig.MinAmount) >= 0 {
+				// submit the order via interactive order with slack confirmation
+				// first we check if there is already a delayed interactive order for the same symbol and slack event ID
+				foundDelayedOrder := false
+				interactOrderRegistry.Range(func(k any, v any) bool {
+					o, ok := v.(*InteractiveSubmitOrder)
+					if ok {
+						if o.submitOrder.Symbol == submitOrder.Symbol && o.slackEvtID == s.slackEvtID {
+							foundDelayedOrder = true
+							return false
 						}
-						return true
-					})
-					if foundDelayedOrder {
-						bbgo.Notify("found existing delayed interactive order for %s, skip placing another one", submitOrder.Symbol)
-						continue
 					}
-					// place interactive order with slack confirmation
-					// the order will be placed after confirmed in slack or after delay timeout
-					mentions := append([]string{}, s.SlackNotifyMentions...)
-					if s.LargeAmountAlert != nil && s.LargeAmountAlert.Slack != nil {
-						mentions = append(mentions, s.LargeAmountAlert.Slack.Mentions...)
-					}
-					itOrder := NewInteractiveSubmitOrder(
-						*submitOrder,
-						s.InterativeOrderConfig.Delay.Duration(),
-						mentions,
-						s.slackEvtID,
-					)
-					itOrder.AsyncSubmit(ctx, selectedSession, s.onSubmittedOrderCallback)
-				} else {
-					createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
-					s.onSubmittedOrderCallback(selectedSession, submitOrder, createdOrder, err)
+					return true
+				})
+				if foundDelayedOrder {
+					bbgo.Notify("found existing delayed interactive order for %s, skip placing another one", submitOrder.Symbol)
+					continue
 				}
+				// place interactive order with slack confirmation
+				// the order will be placed after confirmed in slack or after delay timeout
+				mentions := append([]string{}, s.SlackNotifyMentions...)
+				if s.LargeAmountAlert != nil && s.LargeAmountAlert.Slack != nil {
+					mentions = append(mentions, s.LargeAmountAlert.Slack.Mentions...)
+				}
+				itOrder := NewInteractiveSubmitOrder(
+					*submitOrder,
+					s.InterativeOrderConfig.Delay.Duration(),
+					mentions,
+					s.slackEvtID,
+				)
+				itOrder.AsyncSubmit(ctx, selectedSession, s.onSubmittedOrderCallback)
+			} else {
+				createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
+				s.onSubmittedOrderCallback(selectedSession, submitOrder, createdOrder, err)
 			}
 		}
 	}
