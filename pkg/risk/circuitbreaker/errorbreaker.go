@@ -42,6 +42,7 @@ type ErrorBreaker struct {
 	mu sync.RWMutex
 
 	// breaker configuration
+	Enabled                  bool           `json:"enabled"`
 	MaxConsecutiveErrorCount int            `json:"maxConsecutiveErrorCount"`
 	HaltDuration             types.Duration `json:"haltDuration"`
 
@@ -71,6 +72,7 @@ func NewErrorBreaker(strategy, strategyInstance string, maxErrors int, haltDurat
 		maxErrors = 5
 	}
 	b := &ErrorBreaker{
+		Enabled:                  true,
 		MaxConsecutiveErrorCount: maxErrors,
 		HaltDuration:             haltDuration,
 		errors:                   make([]ErrorRecord, 0, maxErrors),
@@ -137,6 +139,10 @@ func (b *ErrorBreaker) recordError(now time.Time, err error) {
 func (b *ErrorBreaker) IsHalted() bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	if !b.Enabled {
+		return false
+	}
 
 	isHalted := b.isHalted(time.Now())
 	b.updateMetrics()
