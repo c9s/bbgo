@@ -1077,12 +1077,6 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	s.lastPrice.Set(midPrice)
 	s.priceSolver.Update(s.Symbol, midPrice)
 
-	sourceBook := s.sourceBook.CopyDepth(10)
-	if valid, err := sourceBook.IsValid(); !valid {
-		s.logger.WithError(err).Errorf("%s invalid copied order book, skip quoting: %v", s.Symbol, err)
-		return err
-	}
-
 	var disableMakerBid = false
 	var disableMakerAsk = false
 
@@ -1304,19 +1298,29 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		}
 	}
 
+	sourceBook := s.sourceBook.CopyDepth(10)
+	if valid, err := sourceBook.IsValid(); !valid {
+		s.logger.WithError(err).Errorf("%s invalid copied order book, skip quoting: %v", s.Symbol, err)
+		return err
+	}
+
+	// get bid price from best price by default
 	bidSourcePricer := pricer.FromBestPrice(types.SideTypeBuy, s.sourceBook)
 	coverBidDepth := nopCover
+
+	// if depth price is enabled, replace the default best pricing
 	if s.UseDepthPrice {
 		bidCoveredDepth := pricer.NewCoveredDepth(s.depthSourceBook, types.SideTypeBuy, s.DepthQuantity)
 		bidSourcePricer = bidCoveredDepth.Pricer()
 		coverBidDepth = bidCoveredDepth.Cover
 	}
 
-	bidPricer := pricer.Compose(append([]pricer.Pricer{bidSourcePricer}, pricer.Compose(
+	bidPriceSpread := pricer.Compose(
 		pricer.ApplyMargin(types.SideTypeBuy, quote.BidMargin),
 		pricer.ApplyFeeRate(types.SideTypeBuy, s.makerSession.MakerFeeRate),
 		pricer.AdjustByTick(types.SideTypeBuy, quote.BidLayerPips, s.makerMarket.TickSize),
-	))...)
+	)
+	bidPricer := pricer.Compose(append([]pricer.Pricer{bidSourcePricer}, bidPriceSpread)...)
 
 	askSourcePricer := pricer.FromBestPrice(types.SideTypeSell, s.sourceBook)
 	coverAskDepth := nopCover
@@ -1326,14 +1330,144 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		askSourcePricer = askCoveredDepth.Pricer()
 	}
 
-	askPricer := pricer.Compose(append([]pricer.Pricer{askSourcePricer}, pricer.Compose(
+	askPriceSpread := pricer.Compose(
 		pricer.ApplyMargin(types.SideTypeSell, quote.AskMargin),
 		pricer.ApplyFeeRate(types.SideTypeSell, s.makerSession.MakerFeeRate),
-		pricer.AdjustByTick(types.SideTypeSell, quote.BidLayerPips, s.makerMarket.TickSize),
-	))...)
+		pricer.AdjustByTick(types.SideTypeSell, quote.AskLayerPips, s.makerMarket.TickSize),
+	)
+	askPricer := pricer.Compose(append([]pricer.Pricer{askSourcePricer}, askPriceSpread)...)
 
 	// build up maker orders
 	var submitOrders []types.SubmitOrder
+
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		bidDepthPrice, askDepthPrice := s.SplitHedge.GetBalanceWeightedQuotePrice()
+		if !disableMakerBid {
+			for i := 0; i < s.NumLayers; i++ {
+				bidQuantity, err := s.getInitialLayerQuantity(i)
+				if err != nil {
+					return err
+				}
+
+				// apply D2 size scale
+				if sizeScale < 1.0 {
+					bidQuantity = bidQuantity.Mul(fixedpoint.NewFromFloat(sizeScale))
+				}
+
+				bidPrice := bidPriceSpread(i, bidDepthPrice)
+				if bidPrice.IsZero() {
+					s.logger.Warnf("no valid bid price, skip quoting")
+					break
+				}
+
+				if i == 0 {
+					s.logger.Infof("maker best bid price %f", bidPrice.Float64())
+					makerBestBidPriceMetrics.With(s.metricsLabels).Set(bidPrice.Float64())
+				}
+
+				requiredQuote := fixedpoint.Min(
+					bidQuantity.Mul(bidPrice),
+					makerQuota.QuoteAsset.Available,
+				)
+
+				requiredQuote = s.makerMarket.TruncateQuoteQuantity(requiredQuote)
+				bidQuantity = s.makerMarket.TruncateQuantity(requiredQuote.Div(bidPrice))
+
+				if s.makerMarket.IsDustQuantity(bidQuantity, bidPrice) {
+					continue
+				}
+
+				// if we bought, then we need to sell the base from the hedge session
+				// if the hedge session is a margin session, we don't need to lock the base asset
+				if makerQuota.QuoteAsset.Lock(requiredQuote) &&
+					(s.hedgeSession.Margin || hedgeQuota.BaseAsset.Lock(bidQuantity)) {
+
+					// if we bought, then we need to sell the base from the hedge session
+					submitOrders = append(
+						submitOrders, types.SubmitOrder{
+							Symbol:      s.Symbol,
+							Market:      s.makerMarket,
+							Type:        orderType,
+							Side:        types.SideTypeBuy,
+							Price:       bidPrice,
+							Quantity:    bidQuantity,
+							TimeInForce: types.TimeInForceGTC,
+							GroupID:     s.groupID,
+						},
+					)
+
+					makerQuota.Commit()
+					hedgeQuota.Commit()
+					bidExposureInUsd = bidExposureInUsd.Add(requiredQuote)
+				} else {
+					makerQuota.Rollback()
+					hedgeQuota.Rollback()
+				}
+			}
+		}
+		if !disableMakerAsk {
+			for i := 0; i < s.NumLayers; i++ {
+				askQuantity, err := s.getInitialLayerQuantity(i)
+				if err != nil {
+					return err
+				}
+
+				// apply D2 size scale
+				if sizeScale < 1.0 {
+					askQuantity = askQuantity.Mul(fixedpoint.NewFromFloat(sizeScale))
+				}
+
+				askPrice := askPriceSpread(i, askDepthPrice)
+				if askPrice.IsZero() {
+					s.logger.Warnf("no valid ask price, skip quoting")
+					break
+				}
+
+				if i == 0 {
+					s.logger.Infof("maker best ask price %f", askPrice.Float64())
+					makerBestAskPriceMetrics.With(s.metricsLabels).Set(askPrice.Float64())
+				}
+
+				requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
+				askQuantity = s.makerMarket.TruncateQuantity(requiredBase)
+
+				if s.makerMarket.IsDustQuantity(askQuantity, askPrice) {
+					continue
+				}
+
+				if makerQuota.BaseAsset.Lock(requiredBase) &&
+					(s.hedgeSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice))) {
+
+					// if we bought, then we need to sell the base from the hedge session
+					submitOrders = append(
+						submitOrders, types.SubmitOrder{
+							Symbol:      s.Symbol,
+							Market:      s.makerMarket,
+							Type:        orderType,
+							Side:        types.SideTypeSell,
+							Price:       askPrice,
+							Quantity:    askQuantity,
+							TimeInForce: types.TimeInForceGTC,
+							GroupID:     s.groupID,
+						},
+					)
+					makerQuota.Commit()
+					hedgeQuota.Commit()
+
+					askExposureInUsd = askExposureInUsd.Add(requiredBase.Mul(askPrice))
+				} else {
+					makerQuota.Rollback()
+					hedgeQuota.Rollback()
+				}
+
+				if s.QuantityMultiplier.Sign() > 0 {
+					askQuantity = askQuantity.Mul(s.QuantityMultiplier)
+				}
+			}
+		}
+	}
+
+	// default maker order generation
 	if !disableMakerBid {
 		for i := 0; i < s.NumLayers; i++ {
 			bidQuantity, err := s.getInitialLayerQuantity(i)
