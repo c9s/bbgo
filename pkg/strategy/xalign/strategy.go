@@ -810,6 +810,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 					mentions,
 					s.slackEvtID,
 				)
+				itOrder.SetHelpMessage(s.interactiveOrderHelpMessage(submitOrder))
 				itOrder.AsyncSubmit(ctx, selectedSession, s.onSubmittedOrderCallback)
 			} else {
 				createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
@@ -832,6 +833,27 @@ func (s *Strategy) onSubmittedOrderCallback(session *bbgo.ExchangeSession, submi
 		}
 		bbgo.Notify("Aligning order submitted", createdOrder)
 	}
+}
+
+func (s *Strategy) interactiveOrderHelpMessage(submitOrder *types.SubmitOrder) string {
+	quoteCurrency := submitOrder.Market.QuoteCurrency
+	return fmt.Sprintf(`
+xalign Interactive Order Behavior Guide:
+- If the alignment amount is <= %.4f %s, it will be placed immediately.
+- If %.4f %s < alignment amount < %.4f %s, it will be placed when the deviation is larger than the configured tolerance (%s).
+- If the alignment amount >= %.4f %s, an interactive order notification will be sent to Slack for confirmation, and the order will be placed automatically after delay timeout (%s).
+`,
+		s.InstantAlignAmount.Float64(),
+		quoteCurrency,
+		s.InstantAlignAmount.Float64(),
+		quoteCurrency,
+		s.LargeAmountAlert.Amount.Float64(),
+		quoteCurrency,
+		s.BalanceToleranceRange.Percentage(),
+		s.InteractiveOrderConfig.MinAmount.Float64(),
+		quoteCurrency,
+		s.InteractiveOrderConfig.Delay.Duration().String(),
+	)
 }
 
 func (s *Strategy) calculateRefillQuantity(
