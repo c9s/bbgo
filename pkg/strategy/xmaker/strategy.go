@@ -1010,6 +1010,16 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 		bestBidPrice = bestBid
 		bestAskPrice = bestAsk
+	} else if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		bestBidPrice, bestAskPrice = s.SplitHedge.GetBalanceWeightedQuotePrice()
+
+		if bestBidPrice.Compare(bestAskPrice) > 0 {
+			s.logger.Warnf("split hedge bid price %s is higher than ask price %s, adjust bid price by tick size %s",
+				bestBidPrice.String(), bestAskPrice.String(),
+				s.makerMarket.TickSize)
+			bestBidPrice = bestAskPrice.Sub(s.makerMarket.TickSize)
+		}
+
 	} else {
 		bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
 		if !hasPrice {
@@ -1061,8 +1071,6 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		bestBidPrice = bestBid.Price
 		bestAskPrice = bestAsk.Price
 	}
-
-	s.logger.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
 
 	if bestBidPrice.Compare(bestAskPrice) > 0 {
 		return fmt.Errorf(
@@ -1341,7 +1349,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	var submitOrders []types.SubmitOrder
 
 	if s.SplitHedge != nil && s.SplitHedge.Enabled {
-		bidDepthPrice, askDepthPrice := s.SplitHedge.GetBalanceWeightedQuotePrice()
+		s.logger.Infof("%s split hedge source price ask/bid = %s/%s (%s)", s.Symbol, bestAskPrice.String(), bestBidPrice.String(), calculateSpread(bestAskPrice, bestBidPrice).Percentage())
+
 		if !disableMakerBid {
 			for i := 0; i < s.NumLayers; i++ {
 				bidQuantity, err := s.getInitialLayerQuantity(i)
@@ -1354,7 +1363,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 					bidQuantity = bidQuantity.Mul(fixedpoint.NewFromFloat(sizeScale))
 				}
 
-				bidPrice := bidPriceSpread(i, bidDepthPrice)
+				bidPrice := bidPriceSpread(i, bestBidPrice)
 				if bidPrice.IsZero() {
 					s.logger.Warnf("no valid bid price, skip quoting")
 					break
@@ -1417,7 +1426,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 					askQuantity = askQuantity.Mul(fixedpoint.NewFromFloat(sizeScale))
 				}
 
-				askPrice := askPriceSpread(i, askDepthPrice)
+				askPrice := askPriceSpread(i, bestAskPrice)
 				if askPrice.IsZero() {
 					s.logger.Warnf("no valid ask price, skip quoting")
 					break
@@ -1465,159 +1474,160 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				}
 			}
 		}
-	}
-
-	// default maker order generation
-	if !disableMakerBid {
-		for i := 0; i < s.NumLayers; i++ {
-			bidQuantity, err := s.getInitialLayerQuantity(i)
-			if err != nil {
-				return err
-			}
-
-			// apply D2 size scale
-			if sizeScale < 1.0 {
-				bidQuantity = bidQuantity.Mul(fixedpoint.NewFromFloat(sizeScale))
-			}
-
-			// for maker bid orders
-			coverBidDepth(bidQuantity)
-
-			bidPrice := fixedpoint.Zero
-			if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-				// note: the accumulativeBidQuantity is not used yet,
-				// reason: the fiat market base unit is different from the maker market.
-				if bid, _, ok := s.SyntheticHedge.GetQuotePrices(); ok {
-					bidPrice = bid
-				} else {
-					s.logger.Warnf("no valid synthetic price")
+	} else {
+		// default maker order generation
+		s.logger.Infof("%s source book ticker: ask/bid = %s/%s (%s)", s.Symbol, bestAskPrice.String(), bestBidPrice.String(), calculateSpread(bestAskPrice, bestBidPrice).Percentage())
+		if !disableMakerBid {
+			for i := 0; i < s.NumLayers; i++ {
+				bidQuantity, err := s.getInitialLayerQuantity(i)
+				if err != nil {
+					return err
 				}
-			} else {
-				bidPrice = bidPricer(i, bestBidPrice)
-			}
 
-			if bidPrice.IsZero() {
-				s.logger.Warnf("no valid bid price, skip quoting")
-				break
-			}
+				// apply D2 size scale
+				if sizeScale < 1.0 {
+					bidQuantity = bidQuantity.Mul(fixedpoint.NewFromFloat(sizeScale))
+				}
 
-			if i == 0 {
-				s.logger.Infof("maker best bid price %f", bidPrice.Float64())
-				makerBestBidPriceMetrics.With(s.metricsLabels).Set(bidPrice.Float64())
-			}
+				// for maker bid orders
+				coverBidDepth(bidQuantity)
 
-			requiredQuote := fixedpoint.Min(
-				bidQuantity.Mul(bidPrice),
-				makerQuota.QuoteAsset.Available,
-			)
+				bidPrice := fixedpoint.Zero
+				if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+					// note: the accumulativeBidQuantity is not used yet,
+					// reason: the fiat market base unit is different from the maker market.
+					if bid, _, ok := s.SyntheticHedge.GetQuotePrices(); ok {
+						bidPrice = bid
+					} else {
+						s.logger.Warnf("no valid synthetic price")
+					}
+				} else {
+					bidPrice = bidPricer(i, bestBidPrice)
+				}
 
-			requiredQuote = s.makerMarket.TruncateQuoteQuantity(requiredQuote)
-			bidQuantity = s.makerMarket.TruncateQuantity(requiredQuote.Div(bidPrice))
+				if bidPrice.IsZero() {
+					s.logger.Warnf("no valid bid price, skip quoting")
+					break
+				}
 
-			if s.makerMarket.IsDustQuantity(bidQuantity, bidPrice) {
-				continue
-			}
+				if i == 0 {
+					s.logger.Infof("maker best bid price %f", bidPrice.Float64())
+					makerBestBidPriceMetrics.With(s.metricsLabels).Set(bidPrice.Float64())
+				}
 
-			// if we bought, then we need to sell the base from the hedge session
-			// if the hedge session is a margin session, we don't need to lock the base asset
-			if makerQuota.QuoteAsset.Lock(requiredQuote) &&
-				(s.hedgeSession.Margin || hedgeQuota.BaseAsset.Lock(bidQuantity)) {
-
-				// if we bought, then we need to sell the base from the hedge session
-				submitOrders = append(
-					submitOrders, types.SubmitOrder{
-						Symbol:      s.Symbol,
-						Market:      s.makerMarket,
-						Type:        orderType,
-						Side:        types.SideTypeBuy,
-						Price:       bidPrice,
-						Quantity:    bidQuantity,
-						TimeInForce: types.TimeInForceGTC,
-						GroupID:     s.groupID,
-					},
+				requiredQuote := fixedpoint.Min(
+					bidQuantity.Mul(bidPrice),
+					makerQuota.QuoteAsset.Available,
 				)
 
-				makerQuota.Commit()
-				hedgeQuota.Commit()
-				bidExposureInUsd = bidExposureInUsd.Add(requiredQuote)
-			} else {
-				makerQuota.Rollback()
-				hedgeQuota.Rollback()
-			}
+				requiredQuote = s.makerMarket.TruncateQuoteQuantity(requiredQuote)
+				bidQuantity = s.makerMarket.TruncateQuantity(requiredQuote.Div(bidPrice))
 
+				if s.makerMarket.IsDustQuantity(bidQuantity, bidPrice) {
+					continue
+				}
+
+				// if we bought, then we need to sell the base from the hedge session
+				// if the hedge session is a margin session, we don't need to lock the base asset
+				if makerQuota.QuoteAsset.Lock(requiredQuote) &&
+					(s.hedgeSession.Margin || hedgeQuota.BaseAsset.Lock(bidQuantity)) {
+
+					// if we bought, then we need to sell the base from the hedge session
+					submitOrders = append(
+						submitOrders, types.SubmitOrder{
+							Symbol:      s.Symbol,
+							Market:      s.makerMarket,
+							Type:        orderType,
+							Side:        types.SideTypeBuy,
+							Price:       bidPrice,
+							Quantity:    bidQuantity,
+							TimeInForce: types.TimeInForceGTC,
+							GroupID:     s.groupID,
+						},
+					)
+
+					makerQuota.Commit()
+					hedgeQuota.Commit()
+					bidExposureInUsd = bidExposureInUsd.Add(requiredQuote)
+				} else {
+					makerQuota.Rollback()
+					hedgeQuota.Rollback()
+				}
+
+			}
 		}
-	}
 
-	// for maker ask orders
-	if !disableMakerAsk {
-		for i := 0; i < s.NumLayers; i++ {
-			askQuantity, err := s.getInitialLayerQuantity(i)
-			if err != nil {
-				return err
-			}
-
-			// apply D2 size scale
-			if sizeScale < 1.0 {
-				askQuantity = askQuantity.Mul(fixedpoint.NewFromFloat(sizeScale))
-			}
-
-			coverAskDepth(askQuantity)
-
-			askPrice := fixedpoint.Zero
-			if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-				if _, ask, ok := s.SyntheticHedge.GetQuotePrices(); ok {
-					askPrice = ask
-				} else {
-					s.logger.Warnf("no valid synthetic price")
+		// for maker ask orders
+		if !disableMakerAsk {
+			for i := 0; i < s.NumLayers; i++ {
+				askQuantity, err := s.getInitialLayerQuantity(i)
+				if err != nil {
+					return err
 				}
-			} else {
-				askPrice = askPricer(i, bestAskPrice)
-			}
 
-			if askPrice.IsZero() {
-				s.logger.Warnf("no valid ask price, skip quoting")
-				break
-			}
+				// apply D2 size scale
+				if sizeScale < 1.0 {
+					askQuantity = askQuantity.Mul(fixedpoint.NewFromFloat(sizeScale))
+				}
 
-			if i == 0 {
-				s.logger.Infof("maker best ask price %f", askPrice.Float64())
-				makerBestAskPriceMetrics.With(s.metricsLabels).Set(askPrice.Float64())
-			}
+				coverAskDepth(askQuantity)
 
-			requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
-			askQuantity = s.makerMarket.TruncateQuantity(requiredBase)
+				askPrice := fixedpoint.Zero
+				if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+					if _, ask, ok := s.SyntheticHedge.GetQuotePrices(); ok {
+						askPrice = ask
+					} else {
+						s.logger.Warnf("no valid synthetic price")
+					}
+				} else {
+					askPrice = askPricer(i, bestAskPrice)
+				}
 
-			if s.makerMarket.IsDustQuantity(askQuantity, askPrice) {
-				continue
-			}
+				if askPrice.IsZero() {
+					s.logger.Warnf("no valid ask price, skip quoting")
+					break
+				}
 
-			if makerQuota.BaseAsset.Lock(requiredBase) &&
-				(s.hedgeSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice))) {
+				if i == 0 {
+					s.logger.Infof("maker best ask price %f", askPrice.Float64())
+					makerBestAskPriceMetrics.With(s.metricsLabels).Set(askPrice.Float64())
+				}
 
-				// if we bought, then we need to sell the base from the hedge session
-				submitOrders = append(
-					submitOrders, types.SubmitOrder{
-						Symbol:      s.Symbol,
-						Market:      s.makerMarket,
-						Type:        orderType,
-						Side:        types.SideTypeSell,
-						Price:       askPrice,
-						Quantity:    askQuantity,
-						TimeInForce: types.TimeInForceGTC,
-						GroupID:     s.groupID,
-					},
-				)
-				makerQuota.Commit()
-				hedgeQuota.Commit()
+				requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
+				askQuantity = s.makerMarket.TruncateQuantity(requiredBase)
 
-				askExposureInUsd = askExposureInUsd.Add(requiredBase.Mul(askPrice))
-			} else {
-				makerQuota.Rollback()
-				hedgeQuota.Rollback()
-			}
+				if s.makerMarket.IsDustQuantity(askQuantity, askPrice) {
+					continue
+				}
 
-			if s.QuantityMultiplier.Sign() > 0 {
-				askQuantity = askQuantity.Mul(s.QuantityMultiplier)
+				if makerQuota.BaseAsset.Lock(requiredBase) &&
+					(s.hedgeSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice))) {
+
+					// if we bought, then we need to sell the base from the hedge session
+					submitOrders = append(
+						submitOrders, types.SubmitOrder{
+							Symbol:      s.Symbol,
+							Market:      s.makerMarket,
+							Type:        orderType,
+							Side:        types.SideTypeSell,
+							Price:       askPrice,
+							Quantity:    askQuantity,
+							TimeInForce: types.TimeInForceGTC,
+							GroupID:     s.groupID,
+						},
+					)
+					makerQuota.Commit()
+					hedgeQuota.Commit()
+
+					askExposureInUsd = askExposureInUsd.Add(requiredBase.Mul(askPrice))
+				} else {
+					makerQuota.Rollback()
+					hedgeQuota.Rollback()
+				}
+
+				if s.QuantityMultiplier.Sign() > 0 {
+					askQuantity = askQuantity.Mul(s.QuantityMultiplier)
+				}
 			}
 		}
 	}
@@ -3183,4 +3193,8 @@ func (s *Strategy) fixProfit(ctx context.Context, sessions ...*bbgo.ExchangeSess
 		s.ProfitStats.ProfitStats = profitStats
 	}
 	return nil
+}
+
+func calculateSpread(a, b fixedpoint.Value) fixedpoint.Value {
+	return a.Sub(b).Div(a)
 }
