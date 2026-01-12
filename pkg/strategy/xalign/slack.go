@@ -34,6 +34,8 @@ type InteractiveSubmitOrder struct {
 	delay       time.Duration
 	mentions    []string
 
+	helpMsg string // optional help message to show in slack
+
 	slackEvtID string
 	dueTime    time.Time
 	done       bool
@@ -60,6 +62,10 @@ func NewInteractiveSubmitOrder(order types.SubmitOrder, delay time.Duration, men
 	itOrder.ConfirmOnce = sync.OnceFunc(func() { close(itOrder.confirmC) })
 	interactOrderRegistry.Store(itOrder.id, itOrder)
 	return itOrder
+}
+
+func (itOrder *InteractiveSubmitOrder) SetHelpMessage(msg string) {
+	itOrder.helpMsg = msg
 }
 
 func (itOrder *InteractiveSubmitOrder) SlackBlocks() []slack.Block {
@@ -97,6 +103,10 @@ On %s after delay %s (due at %s)
 			dueTimeStr,
 		),
 	))
+
+	if itOrder.helpMsg != "" {
+		blocks = append(blocks, buildTextBlock(itOrder.helpMsg))
+	}
 
 	// add mention block
 	if len(itOrder.mentions) > 0 {
@@ -253,6 +263,13 @@ func setupSlackInteractionCallback(slackEvtID string, dispatcher *interact.Inter
 		value, ok := interactOrderRegistry.Load(actionValue)
 		if !ok {
 			// it's already processed
+			actionName := "unknown"
+			switch actionID {
+			case cancelOrderActionID:
+				actionName = "cancel order"
+			case confirmOrderActionID:
+				actionName = "confirm order"
+			}
 			blocks := []interact.InteractionMessageUpdate{
 				{
 					Blocks:       removeBlockByID(oriMessage.Blocks.BlockSet, interactiveButtonsBlockID),
@@ -262,7 +279,8 @@ func setupSlackInteractionCallback(slackEvtID string, dispatcher *interact.Inter
 				{
 					Blocks: []slack.Block{buildTextBlock(
 						fmt.Sprintf(
-							"*Order has been processed, cannot do any further actions.* (requested by %s at %s)",
+							"*This order has already been processed. Your action (%s) has no effect.* (requested by %s at %s)",
+							actionName,
 							user.Name,
 							time.Now().Format(time.RFC3339),
 						))},
@@ -274,7 +292,7 @@ func setupSlackInteractionCallback(slackEvtID string, dispatcher *interact.Inter
 				order, ok := value.(*types.Order)
 				if ok && order != nil {
 					blocks = append(blocks, interact.InteractionMessageUpdate{
-						Blocks:       []slack.Block{buildTextBlock("*Created Order*")},
+						Blocks:       []slack.Block{buildTextBlock("*Details of the Submitted Order*")},
 						Attachments:  []slack.Attachment{order.SlackAttachment()},
 						PostInThread: true,
 					})
