@@ -42,9 +42,14 @@ type ErrorBreaker struct {
 	mu sync.RWMutex
 
 	// breaker configuration
-	Enabled                  bool           `json:"enabled"`
-	MaxConsecutiveErrorCount int            `json:"maxConsecutiveErrorCount"`
-	HaltDuration             types.Duration `json:"haltDuration"`
+	Enabled bool `json:"enabled"`
+	// MaxConsecutiveErrorCount defines the maximum number of consecutive errors allowed before halting.
+	MaxConsecutiveErrorCount int `json:"maxConsecutiveErrorCount"`
+	// HaltDuration defines the duration for which the breaker will be halted when triggered.
+	HaltDuration types.Duration `json:"haltDuration"`
+	// ErrorWindow defines the time window for errors to be considered consecutive (inclusive).
+	// If set to 0, all errors are considered consecutive regardless of their timestamps.
+	ErrorWindow types.Duration `json:"errorWindow"`
 
 	// breaker state
 	errors   []ErrorRecord
@@ -66,7 +71,8 @@ type ErrorBreaker struct {
 // NewErrorBreaker creates a new ErrorBreaker with the given parameters.
 // maxErrors: maximum number of consecutive errors allowed
 // haltDuration: duration for which the breaker will be halted
-func NewErrorBreaker(strategy, strategyInstance string, maxErrors int, haltDuration types.Duration) *ErrorBreaker {
+// errorWindow: time window for errors to be considered consecutive (0 to disable)
+func NewErrorBreaker(strategy, strategyInstance string, maxErrors int, haltDuration, errorWindow types.Duration) *ErrorBreaker {
 	if maxErrors <= 0 {
 		log.Warnf("the maxErrors cannot be negative, fallback to 5: %d", maxErrors)
 		maxErrors = 5
@@ -75,6 +81,7 @@ func NewErrorBreaker(strategy, strategyInstance string, maxErrors int, haltDurat
 		Enabled:                  true,
 		MaxConsecutiveErrorCount: maxErrors,
 		HaltDuration:             haltDuration,
+		ErrorWindow:              errorWindow,
 		errors:                   make([]ErrorRecord, 0, maxErrors),
 	}
 	b.SetMetricsInfo(strategy, strategyInstance)
@@ -106,6 +113,14 @@ func (b *ErrorBreaker) recordError(now time.Time, err error) {
 	if err == nil {
 		b.reset()
 		return
+	}
+
+	if !b.halted && len(b.errors) > 0 && b.ErrorWindow.Duration() > 0 {
+		lastRecord := b.errors[len(b.errors)-1]
+		if now.Sub(lastRecord.timestamp) > b.ErrorWindow.Duration() {
+			// Clear old errors outside the error window
+			b.errors = b.errors[:0]
+		}
 	}
 
 	// Add the new error record
