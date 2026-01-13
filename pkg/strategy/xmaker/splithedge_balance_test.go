@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -62,6 +63,7 @@ func TestSplitHedge_BalanceWeightedQuote(t *testing.T) {
 	sh := &SplitHedge{
 		Enabled:              true,
 		hedgeMarketInstances: map[string]*HedgeMarket{"binance": hm1, "bitfinex": hm2},
+		logger:               logrus.New(),
 	}
 
 	// Compute expected weighted prices using the helper methods and balances
@@ -105,7 +107,11 @@ func TestSplitHedge_BalanceWeightedQuote_ZeroWeights(t *testing.T) {
 		Asks:   types.PriceVolumeSlice{{Price: Number(10010), Volume: Number(100)}},
 	})
 
-	sh := &SplitHedge{Enabled: true, hedgeMarketInstances: map[string]*HedgeMarket{"m": hm}}
+	sh := &SplitHedge{
+		Enabled:              true,
+		hedgeMarketInstances: map[string]*HedgeMarket{"m": hm},
+		logger:               logrus.New(),
+	}
 
 	bid, ask, _ := sh.GetBalanceWeightedQuotePrice()
 	assert.True(t, bid.IsZero())
