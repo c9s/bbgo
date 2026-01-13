@@ -143,6 +143,14 @@ var directionAlignedWeight = prometheus.NewGaugeVec(
 	[]string{"strategy_type", "strategy_id", "exchange", "symbol"},
 )
 
+var splitHedgeBidHigherThanAskCounter = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "xmaker_split_hedge_bid_higher_than_ask_total",
+		Help: "The total number of times the split hedge bid price was higher than the ask price",
+	},
+	[]string{"strategy_type", "strategy_id", "exchange", "symbol"},
+)
+
 func init() {
 	prometheus.MustRegister(
 		openOrderBidExposureInUsdMetrics,
@@ -166,5 +174,6 @@ func init() {
 		divergenceD2,
 		directionMean,
 		directionAlignedWeight,
+		splitHedgeBidHigherThanAskCounter,
 	)
 }
