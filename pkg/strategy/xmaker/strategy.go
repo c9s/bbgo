@@ -309,6 +309,8 @@ type Strategy struct {
 	directionMeanMetrics prometheus.Gauge
 	alignedWeightMetrics prometheus.Gauge
 
+	splitHedgeBidHigherThanAskCounter prometheus.Counter
+
 	simpleHedgeMode bool
 
 	connectorManager *types.ConnectorManager
@@ -458,6 +460,7 @@ func (s *Strategy) Initialize() error {
 	s.d2Metrics = divergenceD2.With(s.metricsLabels)
 	s.directionMeanMetrics = directionMean.With(s.metricsLabels)
 	s.alignedWeightMetrics = directionAlignedWeight.With(s.metricsLabels)
+	s.splitHedgeBidHigherThanAskCounter = splitHedgeBidHigherThanAskCounter.With(s.metricsLabels)
 
 	if s.SignalReverseSideMargin != nil && s.SignalReverseSideMargin.Scale != nil {
 		scale, err := s.SignalReverseSideMargin.Scale.Scale()
@@ -1015,6 +1018,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		bestBidPrice, bestAskPrice, hasPrice = s.SplitHedge.GetBalanceWeightedQuotePrice()
 		if hasPrice && !bestBidPrice.IsZero() && !bestAskPrice.IsZero() {
 			if bestBidPrice.Compare(bestAskPrice) > 0 {
+				s.splitHedgeBidHigherThanAskCounter.Inc()
 				s.logger.Warnf("split hedge bid price %s is higher than ask price %s, adjust bid price by tick size %s",
 					bestBidPrice.String(), bestAskPrice.String(),
 					s.makerMarket.TickSize)
