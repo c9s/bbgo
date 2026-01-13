@@ -362,13 +362,10 @@ func (h *SplitHedge) GetBalanceWeightedQuotePrice() (bid, ask fixedpoint.Value, 
 		return fixedpoint.Zero, fixedpoint.Zero, false
 	}
 
-	var (
-		sumWeightedAsk fixedpoint.Value
-		sumBaseWeight  fixedpoint.Value
-
-		sumWeightedBid fixedpoint.Value
-		sumQuoteWeight fixedpoint.Value
-	)
+	sumWeightedAsk := fixedpoint.Zero
+	sumBaseWeight := fixedpoint.Zero
+	sumWeightedBid := fixedpoint.Zero
+	sumQuoteWeight := fixedpoint.Zero
 
 	for name, mkt := range h.hedgeMarketInstances {
 		baseAvail, quoteAvail := mkt.GetBaseQuoteAvailableBalances()
@@ -376,19 +373,21 @@ func (h *SplitHedge) GetBalanceWeightedQuotePrice() (bid, ask fixedpoint.Value, 
 		// Skip markets that have no book-derived prices (but still allow zero balances to contribute zero weight)
 		b, a := mkt.GetQuotePriceBySessionBalances()
 
-		if h.logger != nil {
-			h.logger.Infof("splitHedge market ticker: %s ask / bid = %s / %s", name, a.String(), b.String())
-		}
+		h.logger.Infof("splitHedge: market ticker: %s ask/bid = %s/%s, balance: base/quote = %s/%s",
+			name, a.String(), b.String(),
+			baseAvail.String(), quoteAvail.String())
 
-		bidWeight := quoteAvail
-		askWeight := baseAvail
+		bidWeight := quoteAvail.Abs()
+		askWeight := baseAvail.Abs()
 
 		if mkt.session.Margin {
 			debtQuota := mkt.getDebtQuota()
 			if debtQuota.Sign() > 0 {
-				bidWeight = bidWeight.Add(debtQuota)
+				if quoteAvail.Compare(mkt.market.MinNotional) <= 0 {
+					bidWeight = bidWeight.Add(debtQuota)
+				}
 
-				if !a.IsZero() {
+				if baseAvail.Compare(mkt.market.MinQuantity) <= 0 && !a.IsZero() {
 					askWeight = askWeight.Add(debtQuota.Div(a))
 				}
 			}
@@ -399,18 +398,14 @@ func (h *SplitHedge) GetBalanceWeightedQuotePrice() (bid, ask fixedpoint.Value, 
 			sumBaseWeight = sumBaseWeight.Add(askWeight)
 		} else if askWeight.Sign() > 0 && a.IsZero() {
 			// helpful diagnostics for missing price with weight
-			if h.logger != nil {
-				h.logger.Warnf("splitHedge: zero ask price from market %s despite positive base balance %s", name, askWeight.String())
-			}
+			h.logger.Warnf("splitHedge: zero ask price from market %s despite positive base balance %s", name, askWeight.String())
 		}
 
 		if !b.IsZero() && bidWeight.Sign() > 0 {
 			sumWeightedBid = sumWeightedBid.Add(b.Mul(bidWeight))
 			sumQuoteWeight = sumQuoteWeight.Add(bidWeight)
 		} else if bidWeight.Sign() > 0 && b.IsZero() {
-			if h.logger != nil {
-				h.logger.Warnf("splitHedge: zero bid price from market %s despite positive quote balance %s", name, bidWeight.String())
-			}
+			h.logger.Warnf("splitHedge: zero bid price from market %s despite positive quote balance %s", name, bidWeight.String())
 		}
 	}
 
@@ -418,18 +413,14 @@ func (h *SplitHedge) GetBalanceWeightedQuotePrice() (bid, ask fixedpoint.Value, 
 		ask = sumWeightedAsk.Div(sumBaseWeight)
 	} else {
 		ask = fixedpoint.Zero
-		if h.logger != nil {
-			h.logger.Warnf("splitHedge: total base weight is zero; ask price returns zero")
-		}
+		h.logger.Warnf("splitHedge: total base weight is zero; ask price returns zero")
 	}
 
 	if sumQuoteWeight.Sign() > 0 {
 		bid = sumWeightedBid.Div(sumQuoteWeight)
 	} else {
 		bid = fixedpoint.Zero
-		if h.logger != nil {
-			h.logger.Warnf("splitHedge: total quote weight is zero; bid price returns zero")
-		}
+		h.logger.Warnf("splitHedge: total quote weight is zero; bid price returns zero")
 	}
 
 	return bid, ask, true

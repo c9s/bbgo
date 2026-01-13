@@ -1355,7 +1355,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	var submitOrders []types.SubmitOrder
 
 	if s.SplitHedge != nil && s.SplitHedge.Enabled {
-		s.logger.Infof("%s split hedge source price ask/bid = %s/%s (%s)", s.Symbol, bestAskPrice.String(), bestBidPrice.String(), calculateSpread(bestAskPrice, bestBidPrice).Percentage())
+		s.logger.Infof("%s splitHedge source price ask/bid = %s/%s (%s)", s.Symbol, bestAskPrice.String(), bestBidPrice.String(), calculateSpread(bestAskPrice, bestBidPrice).Percentage())
 
 		if !disableMakerBid {
 			for i := 0; i < s.NumLayers; i++ {
