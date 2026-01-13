@@ -371,6 +371,10 @@ func (h *SplitHedge) GetBalanceWeightedQuotePrice() (bid, ask fixedpoint.Value) 
 		// Skip markets that have no book-derived prices (but still allow zero balances to contribute zero weight)
 		b, a := mkt.GetQuotePriceBySessionBalances()
 
+		if h.logger != nil {
+			h.logger.Infof("splitHedge market ticker: %s ask / bid = %s / %s", name, a.String(), b.String())
+		}
+
 		if !a.IsZero() && baseAvail.Sign() > 0 {
 			sumWeightedAsk = sumWeightedAsk.Add(a.Mul(baseAvail))
 			sumBaseWeight = sumBaseWeight.Add(baseAvail)
