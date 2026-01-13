@@ -352,9 +352,9 @@ func (h *SplitHedge) Stop(shutdownCtx context.Context) error {
 //
 // If the total weight for a side is zero (e.g., no base balances for ask weighting), the
 // corresponding returned price will be zero.
-func (h *SplitHedge) GetBalanceWeightedQuotePrice() (bid, ask fixedpoint.Value) {
+func (h *SplitHedge) GetBalanceWeightedQuotePrice() (bid, ask fixedpoint.Value, ret bool) {
 	if h == nil || len(h.hedgeMarketInstances) == 0 {
-		return fixedpoint.Zero, fixedpoint.Zero
+		return fixedpoint.Zero, fixedpoint.Zero, false
 	}
 
 	var (
@@ -413,5 +413,5 @@ func (h *SplitHedge) GetBalanceWeightedQuotePrice() (bid, ask fixedpoint.Value) 
 		}
 	}
 
-	return bid, ask
+	return bid, ask, true
 }

@@ -75,7 +75,7 @@ func TestSplitHedge_BalanceWeightedQuote(t *testing.T) {
 	// Weighted bid by quote balances
 	expectedBid := b1.Mul(quote1).Add(b2.Mul(quote2)).Div(quote1.Add(quote2))
 
-	bid, ask := sh.GetBalanceWeightedQuotePrice()
+	bid, ask, _ := sh.GetBalanceWeightedQuotePrice()
 
 	assert.InEpsilon(t, expectedAsk.Float64(), ask.Float64(), 1e-9)
 	assert.InEpsilon(t, expectedBid.Float64(), bid.Float64(), 1e-9)
@@ -107,7 +107,7 @@ func TestSplitHedge_BalanceWeightedQuote_ZeroWeights(t *testing.T) {
 
 	sh := &SplitHedge{Enabled: true, hedgeMarketInstances: map[string]*HedgeMarket{"m": hm}}
 
-	bid, ask := sh.GetBalanceWeightedQuotePrice()
+	bid, ask, _ := sh.GetBalanceWeightedQuotePrice()
 	assert.True(t, bid.IsZero())
 	assert.True(t, ask.IsZero())
 }

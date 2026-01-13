@@ -1011,13 +1011,15 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		bestBidPrice = bestBid
 		bestAskPrice = bestAsk
 	} else if s.SplitHedge != nil && s.SplitHedge.Enabled {
-		bestBidPrice, bestAskPrice = s.SplitHedge.GetBalanceWeightedQuotePrice()
-
-		if bestBidPrice.Compare(bestAskPrice) > 0 {
-			s.logger.Warnf("split hedge bid price %s is higher than ask price %s, adjust bid price by tick size %s",
-				bestBidPrice.String(), bestAskPrice.String(),
-				s.makerMarket.TickSize)
-			bestBidPrice = bestAskPrice.Sub(s.makerMarket.TickSize)
+		hasPrice := false
+		bestBidPrice, bestAskPrice, hasPrice = s.SplitHedge.GetBalanceWeightedQuotePrice()
+		if hasPrice && !bestBidPrice.IsZero() && !bestAskPrice.IsZero() {
+			if bestBidPrice.Compare(bestAskPrice) > 0 {
+				s.logger.Warnf("split hedge bid price %s is higher than ask price %s, adjust bid price by tick size %s",
+					bestBidPrice.String(), bestAskPrice.String(),
+					s.makerMarket.TickSize)
+				bestBidPrice = bestAskPrice.Sub(s.makerMarket.TickSize)
+			}
 		}
 
 	} else {
@@ -1390,7 +1392,6 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				// if the hedge session is a margin session, we don't need to lock the base asset
 				if makerQuota.QuoteAsset.Lock(requiredQuote) &&
 					(s.hedgeSession.Margin || hedgeQuota.BaseAsset.Lock(bidQuantity)) {
-
 
 					submitOrders = append(
 						submitOrders, types.SubmitOrder{
