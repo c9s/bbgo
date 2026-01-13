@@ -285,7 +285,7 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 }
 
 func (o *SubmitOrder) amountField() *slack.AttachmentField {
-	if o.Price.Sign() < 0 || o.Quantity.Sign() < 0 || len(o.Market.QuoteCurrency) == 0 {
+	if o.Price.Sign() < 0 || o.Quantity.Sign() < 0 {
 		return nil
 	}
 	if currency.IsFiatCurrency(o.Market.QuoteCurrency) {
@@ -295,6 +295,8 @@ func (o *SubmitOrder) amountField() *slack.AttachmentField {
 			Short: true,
 		}
 	}
+
+	// NOTE: o.Market.QuoteCurrency might be empty
 	return &slack.AttachmentField{
 		Title: "Amount",
 		Value: fmt.Sprintf("%s %s", o.Price.Mul(o.Quantity).String(), o.Market.QuoteCurrency),
