@@ -347,6 +347,11 @@ func (h *SplitHedge) Stop(shutdownCtx context.Context) error {
 // - Ask side is weighted by base currency available balance of each hedge market session.
 // - Bid side is weighted by quote currency available balance of each hedge market session.
 //
+// For margin accounts (mkt.session.Margin is true):
+// - The debt quota (borrowing capacity) is included in the weight.
+// - Bid weight = quoteAvail + debtQuota.
+// - Ask weight = baseAvail + (debtQuota / askPrice).
+//
 // Per-market prices are obtained by calling HedgeMarket.GetQuotePriceBySessionBalances(),
 // which already considers the market's current book and the session balances as depth.
 //
@@ -375,22 +380,36 @@ func (h *SplitHedge) GetBalanceWeightedQuotePrice() (bid, ask fixedpoint.Value, 
 			h.logger.Infof("splitHedge market ticker: %s ask / bid = %s / %s", name, a.String(), b.String())
 		}
 
-		if !a.IsZero() && baseAvail.Sign() > 0 {
-			sumWeightedAsk = sumWeightedAsk.Add(a.Mul(baseAvail))
-			sumBaseWeight = sumBaseWeight.Add(baseAvail)
-		} else if baseAvail.Sign() > 0 && a.IsZero() {
-			// helpful diagnostics for missing price with weight
-			if h.logger != nil {
-				h.logger.Warnf("splitHedge: zero ask price from market %s despite positive base balance %s", name, baseAvail.String())
+		bidWeight := quoteAvail
+		askWeight := baseAvail
+
+		if mkt.session.Margin {
+			debtQuota := mkt.getDebtQuota()
+			if debtQuota.Sign() > 0 {
+				bidWeight = bidWeight.Add(debtQuota)
+
+				if !a.IsZero() {
+					askWeight = askWeight.Add(debtQuota.Div(a))
+				}
 			}
 		}
 
-		if !b.IsZero() && quoteAvail.Sign() > 0 {
-			sumWeightedBid = sumWeightedBid.Add(b.Mul(quoteAvail))
-			sumQuoteWeight = sumQuoteWeight.Add(quoteAvail)
-		} else if quoteAvail.Sign() > 0 && b.IsZero() {
+		if !a.IsZero() && askWeight.Sign() > 0 {
+			sumWeightedAsk = sumWeightedAsk.Add(a.Mul(askWeight))
+			sumBaseWeight = sumBaseWeight.Add(askWeight)
+		} else if askWeight.Sign() > 0 && a.IsZero() {
+			// helpful diagnostics for missing price with weight
 			if h.logger != nil {
-				h.logger.Warnf("splitHedge: zero bid price from market %s despite positive quote balance %s", name, quoteAvail.String())
+				h.logger.Warnf("splitHedge: zero ask price from market %s despite positive base balance %s", name, askWeight.String())
+			}
+		}
+
+		if !b.IsZero() && bidWeight.Sign() > 0 {
+			sumWeightedBid = sumWeightedBid.Add(b.Mul(bidWeight))
+			sumQuoteWeight = sumQuoteWeight.Add(bidWeight)
+		} else if bidWeight.Sign() > 0 && b.IsZero() {
+			if h.logger != nil {
+				h.logger.Warnf("splitHedge: zero bid price from market %s despite positive quote balance %s", name, bidWeight.String())
 			}
 		}
 	}
