@@ -8,6 +8,7 @@ import (
 
 type MemoryService struct {
 	Slots map[string]interface{}
+	mu    sync.Mutex
 }
 
 func NewMemoryService() *MemoryService {
@@ -27,20 +28,19 @@ func (s *MemoryService) NewStore(id string, subIDs ...string) Store {
 type MemoryStore struct {
 	Key    string
 	memory *MemoryService
-	mu     sync.Mutex
 }
 
 func (store *MemoryStore) Save(val interface{}) error {
-	store.mu.Lock()
-	defer store.mu.Unlock()
+	store.memory.mu.Lock()
+	defer store.memory.mu.Unlock()
 
 	store.memory.Slots[store.Key] = val
 	return nil
 }
 
 func (store *MemoryStore) Load(val interface{}) error {
-	store.mu.Lock()
-	defer store.mu.Unlock()
+	store.memory.mu.Lock()
+	defer store.memory.mu.Unlock()
 
 	v := reflect.ValueOf(val)
 	if data, ok := store.memory.Slots[store.Key]; ok {
@@ -54,8 +54,8 @@ func (store *MemoryStore) Load(val interface{}) error {
 }
 
 func (store *MemoryStore) Reset() error {
-	store.mu.Lock()
-	defer store.mu.Unlock()
+	store.memory.mu.Lock()
+	defer store.memory.mu.Unlock()
 
 	delete(store.memory.Slots, store.Key)
 	return nil
