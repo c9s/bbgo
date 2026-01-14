@@ -12,7 +12,7 @@ import (
 
 func TestErrorBreaker_RecordError(t *testing.T) {
 	t.Run("should not halt when errors are below threshold", func(t *testing.T) {
-		breaker := NewErrorBreaker("test", "test-instance", 3, types.Duration(time.Minute))
+		breaker := NewErrorBreaker("test", "test-instance", 3, types.Duration(time.Minute), types.Duration(0))
 		now := time.Now()
 
 		breaker.recordError(now, assert.AnError)
@@ -23,7 +23,7 @@ func TestErrorBreaker_RecordError(t *testing.T) {
 	})
 
 	t.Run("should halt when errors reach threshold", func(t *testing.T) {
-		breaker := NewErrorBreaker("test", "test-instance", 3, types.Duration(time.Minute))
+		breaker := NewErrorBreaker("test", "test-instance", 3, types.Duration(time.Minute), types.Duration(0))
 		now := time.Now()
 
 		breaker.recordError(now, assert.AnError)
@@ -34,7 +34,7 @@ func TestErrorBreaker_RecordError(t *testing.T) {
 	})
 
 	t.Run("should reset when nil error is recorded", func(t *testing.T) {
-		breaker := NewErrorBreaker("test", "test-instance", 3, types.Duration(time.Minute))
+		breaker := NewErrorBreaker("test", "test-instance", 3, types.Duration(time.Minute), types.Duration(0))
 		now := time.Now()
 
 		breaker.recordError(now, assert.AnError)
@@ -48,7 +48,7 @@ func TestErrorBreaker_RecordError(t *testing.T) {
 	})
 
 	t.Run("should auto-reset when halt duration expires", func(t *testing.T) {
-		breaker := NewErrorBreaker("test", "test-instance", 2, types.Duration(100*time.Millisecond))
+		breaker := NewErrorBreaker("test", "test-instance", 2, types.Duration(100*time.Millisecond), types.Duration(0))
 		now := time.Now()
 
 		breaker.recordError(now, assert.AnError)
@@ -64,7 +64,7 @@ func TestErrorBreaker_RecordError(t *testing.T) {
 	})
 
 	t.Run("should call halt callbacks only once when max error count is reached", func(t *testing.T) {
-		breaker := NewErrorBreaker("test", "test-instance", 2, types.Duration(time.Minute))
+		breaker := NewErrorBreaker("test", "test-instance", 2, types.Duration(time.Minute), types.Duration(0))
 		now := time.Now()
 
 		// Track callback invocations
@@ -100,7 +100,7 @@ func TestErrorBreaker_RecordError(t *testing.T) {
 }
 
 func TestErrorBreaker_Reset(t *testing.T) {
-	breaker := NewErrorBreaker("test", "test-instance", 2, types.Duration(time.Minute))
+	breaker := NewErrorBreaker("test", "test-instance", 2, types.Duration(time.Minute), types.Duration(0))
 	now := time.Now()
 
 	breaker.recordError(now, assert.AnError)
@@ -116,7 +116,7 @@ func TestErrorBreaker_Reset(t *testing.T) {
 }
 
 func TestErrorBreaker_ErrorCount(t *testing.T) {
-	breaker := NewErrorBreaker("test", "test-instance", 5, types.Duration(time.Minute))
+	breaker := NewErrorBreaker("test", "test-instance", 5, types.Duration(time.Minute), types.Duration(0))
 	now := time.Now()
 
 	assert.Equal(t, 0, breaker.ErrorCount())
@@ -134,7 +134,7 @@ func TestErrorBreaker_ErrorCount(t *testing.T) {
 }
 
 func TestErrorBreaker_ConcurrentAccess(t *testing.T) {
-	breaker := NewErrorBreaker("test", "test-instance", 20, types.Duration(time.Minute))
+	breaker := NewErrorBreaker("test", "test-instance", 20, types.Duration(time.Minute), types.Duration(0))
 
 	// Spawn multiple goroutines to record errors concurrently
 	var wg sync.WaitGroup
@@ -158,14 +158,14 @@ func TestErrorBreaker_ConcurrentAccess(t *testing.T) {
 
 func TestErrorBreaker_EdgeCases(t *testing.T) {
 	t.Run("maxErrors of 1 should halt immediately", func(t *testing.T) {
-		breaker := NewErrorBreaker("test", "test-instance", 1, types.Duration(time.Minute))
+		breaker := NewErrorBreaker("test", "test-instance", 1, types.Duration(time.Minute), types.Duration(0))
 		now := time.Now()
 		breaker.recordError(now, assert.AnError)
 		assert.True(t, breaker.isHalted(now))
 	})
 
 	t.Run("very short halt duration", func(t *testing.T) {
-		breaker := NewErrorBreaker("test", "test-instance", 2, types.Duration(time.Nanosecond))
+		breaker := NewErrorBreaker("test", "test-instance", 2, types.Duration(time.Nanosecond), types.Duration(0))
 		now := time.Now()
 		breaker.recordError(now, assert.AnError)
 		breaker.recordError(now, assert.AnError)
@@ -175,7 +175,7 @@ func TestErrorBreaker_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("recording errors after halted state", func(t *testing.T) {
-		breaker := NewErrorBreaker("test", "test-instance", 2, types.Duration(time.Minute))
+		breaker := NewErrorBreaker("test", "test-instance", 2, types.Duration(time.Minute), types.Duration(0))
 		now := time.Now()
 		breaker.recordError(now, assert.AnError)
 		breaker.recordError(now, assert.AnError)
@@ -187,7 +187,7 @@ func TestErrorBreaker_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("nil error should reset breaker", func(t *testing.T) {
-		breaker := NewErrorBreaker("test", "test-instance", 2, types.Duration(time.Minute))
+		breaker := NewErrorBreaker("test", "test-instance", 2, types.Duration(time.Minute), types.Duration(0))
 		now := time.Now()
 
 		breaker.recordError(now, nil)
@@ -205,7 +205,7 @@ func TestErrorBreaker_EdgeCases(t *testing.T) {
 
 func TestErrorBreaker_Errors(t *testing.T) {
 	t.Run("should return all recorded errors", func(t *testing.T) {
-		breaker := NewErrorBreaker("test", "test-instance", 5, types.Duration(time.Minute))
+		breaker := NewErrorBreaker("test", "test-instance", 5, types.Duration(time.Minute), types.Duration(0))
 		now := time.Now()
 
 		err1 := assert.AnError
@@ -221,13 +221,13 @@ func TestErrorBreaker_Errors(t *testing.T) {
 	})
 
 	t.Run("should return empty slice when no errors", func(t *testing.T) {
-		breaker := NewErrorBreaker("test", "test-instance", 5, types.Duration(time.Minute))
+		breaker := NewErrorBreaker("test", "test-instance", 5, types.Duration(time.Minute), types.Duration(0))
 		errors := breaker.Errors()
 		assert.Empty(t, errors)
 	})
 
 	t.Run("should return empty after reset", func(t *testing.T) {
-		breaker := NewErrorBreaker("test", "test-instance", 5, types.Duration(time.Minute))
+		breaker := NewErrorBreaker("test", "test-instance", 5, types.Duration(time.Minute), types.Duration(0))
 		now := time.Now()
 
 		breaker.recordError(now, assert.AnError)
@@ -237,10 +237,28 @@ func TestErrorBreaker_Errors(t *testing.T) {
 		breaker.recordError(now, nil) // Reset via nil error
 		assert.Empty(t, breaker.Errors())
 	})
+
+	t.Run("should not halt when error occurs outside error window", func(t *testing.T) {
+		breaker := NewErrorBreaker("test", "test-instance", 3, types.Duration(time.Minute), types.Duration(5*time.Second))
+		now := time.Now()
+
+		// Record 2 errors in a row
+		breaker.recordError(now, assert.AnError)
+		breaker.recordError(now.Add(1*time.Second), assert.AnError)
+		assert.Equal(t, 2, breaker.ErrorCount())
+		assert.False(t, breaker.isHalted(now.Add(1*time.Second)))
+
+		// Third error comes in outside the error window (6 seconds after the second error)
+		breaker.recordError(now.Add(7*time.Second), assert.AnError)
+
+		// Should have reset and only count the latest error
+		assert.Equal(t, 1, breaker.ErrorCount())
+		assert.False(t, breaker.isHalted(now.Add(7*time.Second)))
+	})
 }
 
 func TestErrorBreaker_Marshal(t *testing.T) {
-	breaker := NewErrorBreaker("test-strategy", "test-instance", 5, types.Duration(2*time.Minute))
+	breaker := NewErrorBreaker("test-strategy", "test-instance", 5, types.Duration(2*time.Minute), types.Duration(0))
 
 	data, err := json.Marshal(breaker)
 	assert.NoError(t, err)
