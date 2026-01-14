@@ -151,6 +151,22 @@ var splitHedgeBidHigherThanAskCounter = prometheus.NewCounterVec(
 	[]string{"strategy_type", "strategy_id", "exchange", "symbol"},
 )
 
+var splitHedgeWeightedBidPriceMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_split_hedge_weighted_bid_price",
+		Help: "The weighted bid price calculated by split hedge",
+	},
+	[]string{"strategy_type", "strategy_id", "exchange", "symbol"},
+)
+
+var splitHedgeWeightedAskPriceMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_split_hedge_weighted_ask_price",
+		Help: "The weighted ask price calculated by split hedge",
+	},
+	[]string{"strategy_type", "strategy_id", "exchange", "symbol"},
+)
+
 func init() {
 	prometheus.MustRegister(
 		openOrderBidExposureInUsdMetrics,
@@ -175,5 +191,7 @@ func init() {
 		directionMean,
 		directionAlignedWeight,
 		splitHedgeBidHigherThanAskCounter,
+		splitHedgeWeightedBidPriceMetrics,
+		splitHedgeWeightedAskPriceMetrics,
 	)
 }
