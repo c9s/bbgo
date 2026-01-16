@@ -1,6 +1,8 @@
 package indicatorv2
 
 import (
+	"math"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -10,9 +12,10 @@ const MaxNumOfLiquidityDemand = 3000
 type LiquidityDemandStream struct {
 	*types.Float64Series
 
-	sellDemandMA, buyDemandMA *SMAStream
-	kLineStream               KLineSubscription
-	epsilon                   fixedpoint.Value
+	rawSellDemands, rawBuyDemands *types.Float64Series
+	sellDemandMA, buyDemandMA     *SMAStream
+
+	epsilon fixedpoint.Value
 }
 
 func (s *LiquidityDemandStream) handleKLine(k types.KLine) {
@@ -52,22 +55,41 @@ func (s *LiquidityDemandStream) calculateKLine(k types.KLine) float64 {
 		sellDemand = k.Volume.Div(priceRangeSell).Float64()
 	}
 
-	s.buyDemandMA.PushAndEmit(buyDemand)
-	s.sellDemandMA.PushAndEmit(sellDemand)
+	if math.IsInf(buyDemand, 0) || math.IsNaN(buyDemand) {
+		buyDemand = 0
+	}
+	if math.IsInf(sellDemand, 0) || math.IsNaN(sellDemand) {
+		sellDemand = 0
+	}
 
-	return (s.buyDemandMA.Last(0) - s.sellDemandMA.Last(0))
+	// push raw buy/sell demands
+	s.rawBuyDemands.PushAndEmit(buyDemand)
+	s.rawSellDemands.PushAndEmit(sellDemand)
+	// get buy/sell moving averages
+	bma := s.buyDemandMA.Last(0)
+	sma := s.sellDemandMA.Last(0)
+
+	return bma - sma
 }
 
 func LiquidityDemand(
 	klineStream KLineSubscription,
-	sellDemandMA, buyDemandMA *SMAStream,
+	iw types.IntervalWindow,
 ) *LiquidityDemandStream {
+	rawSellDemands := types.NewFloat64Series()
+	rawBuyDemands := types.NewFloat64Series()
+	sellDemandMA := SMA(rawSellDemands, iw.Window)
+	buyDemandMA := SMA(rawBuyDemands, iw.Window)
+
 	s := &LiquidityDemandStream{
 		Float64Series: types.NewFloat64Series(),
-		sellDemandMA:  sellDemandMA,
-		buyDemandMA:   buyDemandMA,
-		kLineStream:   klineStream,
-		epsilon:       fixedpoint.NewFromFloat(1e-5),
+
+		rawSellDemands: rawSellDemands,
+		rawBuyDemands:  rawBuyDemands,
+		sellDemandMA:   sellDemandMA,
+		buyDemandMA:    buyDemandMA,
+
+		epsilon: fixedpoint.NewFromFloat(1e-5),
 	}
 	klineStream.AddSubscriber(s.handleKLine)
 	return s
