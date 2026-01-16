@@ -74,10 +74,18 @@ type SplitHedgeProportionAlgo struct {
 	ProportionMarkets []*SplitHedgeProportionMarket `json:"markets"`
 }
 
+type BestPriceHedge struct {
+	Enabled bool `json:"enabled"`
+
+	BelowAmount fixedpoint.Value `json:"belowAmount"`
+}
+
 type SplitHedge struct {
 	Enabled bool `json:"enabled"`
 
 	Algo SplitHedgeAlgo `json:"algo"`
+
+	BestPriceHedge *BestPriceHedge `json:"bestPriceHedge"`
 
 	ProportionAlgo *SplitHedgeProportionAlgo `json:"proportionAlgo"`
 
@@ -114,6 +122,12 @@ func (h *SplitHedge) UnmarshalJSON(data []byte) error {
 
 	// config validation
 	if h.Enabled {
+		if h.BestPriceHedge != nil && h.BestPriceHedge.Enabled {
+			if h.BestPriceHedge.BelowAmount.Sign() <= 0 {
+				return fmt.Errorf("splithedge: bestPriceHedge.belowAmount must be positive")
+			}
+		}
+
 		switch h.Algo {
 		case SplitHedgeAlgoProportion:
 			if h.ProportionAlgo == nil || len(h.ProportionAlgo.ProportionMarkets) == 0 {
@@ -296,11 +310,122 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 	return nil
 }
 
+func (h *SplitHedge) hedgeWithBestPriceAlgo(
+	ctx context.Context,
+	uncoveredPosition, hedgeDelta fixedpoint.Value,
+) (bool, error) {
+	if h.BestPriceHedge == nil || !h.BestPriceHedge.Enabled {
+		return false, nil
+	}
+
+	orderSide := deltaToSide(hedgeDelta)
+	quantity := hedgeDelta.Abs()
+
+	// get the balance weighted price to calculate the current position value
+	bid, ask, ok := h.GetBalanceWeightedQuotePrice()
+	if !ok {
+		return false, fmt.Errorf("splitHedge: failed to get weighted quote price")
+	}
+
+	price := sideTakerPrice(bid, ask, orderSide)
+	if price.IsZero() {
+		return false, fmt.Errorf("splitHedge: zero price from weighted quote price")
+	}
+
+	positionValue := quantity.Mul(price)
+	if positionValue.Compare(h.BestPriceHedge.BelowAmount) > 0 {
+		h.logger.Infof("splitHedge: position value %s exceeds belowAmount %s, fallback to split hedge", positionValue.String(), h.BestPriceHedge.BelowAmount.String())
+		return false, nil
+	}
+
+	var bestPrice fixedpoint.Value
+	var bestMarket *HedgeMarket
+
+	for _, mkt := range h.hedgeMarketInstances {
+		mktBid, mktAsk := mkt.GetQuotePrice()
+		mktPrice := sideTakerPrice(mktBid, mktAsk, orderSide)
+
+		if mktPrice.IsZero() {
+			continue
+		}
+
+		if bestMarket == nil {
+			bestPrice = mktPrice
+			bestMarket = mkt
+			continue
+		}
+
+		if orderSide == types.SideTypeBuy {
+			if mktPrice.Compare(bestPrice) < 0 {
+				bestPrice = mktPrice
+				bestMarket = mkt
+			}
+		} else {
+			if mktPrice.Compare(bestPrice) > 0 {
+				bestPrice = mktPrice
+				bestMarket = mkt
+			}
+		}
+	}
+
+	if bestMarket == nil {
+		return false, fmt.Errorf("splitHedge: no best market found")
+	}
+
+	canHedge, maxQuantity, err := bestMarket.canHedge(ctx, uncoveredPosition)
+	if err != nil {
+		return false, fmt.Errorf("splitHedge: check canHedge failed: %w", err)
+	}
+
+	if !canHedge {
+		h.logger.Infof("splitHedge: best market %s cannot hedge now", bestMarket.InstanceID())
+		return false, nil
+	}
+
+	hedgeQuantity := fixedpoint.Min(quantity, maxQuantity)
+	hedgeQuantity = bestMarket.market.TruncateQuantity(hedgeQuantity)
+	if hedgeQuantity.IsZero() {
+		h.logger.Infof("splitHedge: best market %s truncated quantity is zero", bestMarket.InstanceID())
+		return false, nil
+	}
+
+	if bestMarket.market.IsDustQuantity(hedgeQuantity, bestPrice) {
+		h.logger.Infof("splitHedge: best market %s dust quantity", bestMarket.InstanceID())
+		return false, nil
+	}
+
+	h.logger.Infof("splitHedge: best price hedging %s %s on market %s at price %s",
+		orderSide, hedgeQuantity.String(), bestMarket.InstanceID(), bestPrice.String())
+
+	coverDelta := quantityToDelta(hedgeQuantity, orderSide).Neg()
+	h.strategy.positionExposure.Cover(coverDelta)
+
+	select {
+	case <-ctx.Done():
+		h.strategy.positionExposure.Uncover(coverDelta)
+		return true, ctx.Err()
+	case bestMarket.positionDeltaC <- coverDelta:
+	}
+
+	return true, nil
+}
+
 func (h *SplitHedge) Hedge(
 	ctx context.Context,
 	uncoveredPosition, hedgeDelta fixedpoint.Value,
 ) error {
 	h.logger.Infof("splitHedge: split hedging with delta: %f", hedgeDelta.Float64())
+
+	if h.BestPriceHedge != nil && h.BestPriceHedge.Enabled {
+		handled, err := h.hedgeWithBestPriceAlgo(ctx, uncoveredPosition, hedgeDelta)
+		if err != nil {
+			return err
+		}
+
+		if handled {
+			return nil
+		}
+	}
 
 	switch h.Algo {
 	case SplitHedgeAlgoProportion:
