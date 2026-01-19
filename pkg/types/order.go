@@ -133,13 +133,23 @@ const (
 
 	// OrderStatusExpired means the order is expired, it's an end state.
 	OrderStatusExpired OrderStatus = "EXPIRED"
+
+	// OrderStatusTriggering means the algo order is triggering.
+	OrderStatusTriggering OrderStatus = "TRIGGERING"
+
+	// OrderStatusTriggered means the algo order is triggered.
+	OrderStatusTriggered OrderStatus = "TRIGGERED"
+
+	// OrderStatusFinished means the algo order is finished, it's an end state.
+	OrderStatusFinished OrderStatus = "FINISHED"
 )
 
 func (o OrderStatus) Closed() bool {
 	return o == OrderStatusFilled ||
 		o == OrderStatusCanceled ||
 		o == OrderStatusRejected ||
-		o == OrderStatusExpired
+		o == OrderStatusExpired ||
+		o == OrderStatusFinished
 }
 
 type SubmitOrder struct {

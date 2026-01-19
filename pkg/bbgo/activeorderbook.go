@@ -373,7 +373,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 	}
 
 	switch order.Status {
-	case types.OrderStatusFilled:
+	case types.OrderStatusFilled, types.OrderStatusFinished:
 		// make sure we have the order and we remove it
 		removed := b.orders.Remove(order.OrderID)
 		b.mu.Unlock()
@@ -404,6 +404,10 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 			b.EmitCanceled(order)
 		}
 		b.C.Emit()
+
+	case types.OrderStatusTriggering, types.OrderStatusTriggered:
+		b.orders.Update(order)
+		b.mu.Unlock()
 
 	default:
 		b.mu.Unlock()

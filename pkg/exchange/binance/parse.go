@@ -494,6 +494,11 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
+	case "ALGO_UPDATE":
+		var event AlgoOrderUpdateEvent
+		err = json.Unmarshal([]byte(message), &event)
+		return &event, err
+
 	default:
 		id := val.GetInt("id")
 		if id > 0 {
@@ -1265,4 +1270,100 @@ type OrderTradeLiteUpdateEvent struct {
 	OrderLastFilledQuantity fixedpoint.Value `json:"l"`
 	TradeID                 int64            `json:"t"`
 	OrderID                 int64            `json:"i"`
+}
+
+/*
+	{
+	  "e":"ALGO_UPDATE",  // Event Type
+	  "T":1750515742297,  // Transaction Time
+	  "E":1750515742303,  // Event Time
+	  "o":{
+	    "caid":"Q5xaq5EGKgXXa0fD7fs0Ip",  // Client Algo Id
+	    "aid":2148719,  // Algo Id
+	    "at":"CONDITIONAL",  // Algo Type
+	    "o":"TAKE_PROFIT",  //Order Type
+	    "s":"BNBUSDT",  //Symbol
+	    "S":"SELL",  //Side
+	    "ps":"BOTH",  //Position Side
+	    "f":"GTC",  //Time in force
+	    "q":"0.01",  //quantity
+	    "X":"CANCELED",  //Algo status
+	    "ai":"",  // order id
+	    "ap": "0.00000", // avg fill price in matching engine, only display when order is triggered and placed in matching engine
+	    "aq": "0.00000", // execuated quantity in matching engine, only display when order is triggered and placed in matching engine
+	    "act": "0", // actual order type in matching engine, only display when order is triggered and placed in matching engine
+	    "tp":"750",  //Trigger price
+	    "p":"750", //Order Price
+	    "V":"EXPIRE_MAKER",  //STP mode
+	    "wt":"CONTRACT_PRICE", //Working type
+	    "pm":"NONE",  // Price match mode
+	    "cp":false,  //If Close-All
+	    "pP":false, //If price protection is turned on
+	    "R":false,  // Is this reduce only
+	    "tt":0,  //Trigger time
+	    "gtd":0,  // good till time for GTD time in force
+	    "rm": "Reduce Only reject"  // algo order failed reason
+	  }
+	}
+*/
+type AlgoOrderUpdateEvent struct {
+	EventBase
+
+	TransactionTime types.MillisecondTimestamp `json:"T"`
+	AlgoOrder       AlgoOrder                  `json:"o"`
+}
+
+type AlgoOrder struct {
+	ClientAlgoId     string           `json:"caid"`
+	AlgoId           int              `json:"aid"`
+	AlgoType         string           `json:"at"`
+	OrderType        string           `json:"o"`
+	Symbol           string           `json:"s"`
+	Side             string           `json:"S"`
+	PositionSide     string           `json:"ps"`
+	TimeInForce      string           `json:"f"`
+	Quantity         fixedpoint.Value `json:"q"`
+	Price            fixedpoint.Value `json:"p"`
+	TriggerPrice     fixedpoint.Value `json:"tp"`
+	StopPrice        fixedpoint.Value `json:"sp"`
+	Status           string           `json:"X"`
+	OrderId          string           `json:"ai"`
+	AvgFillPrice     fixedpoint.Value `json:"ap"`
+	ExecutedQuantity fixedpoint.Value `json:"aq"`
+	ActualOrderType  string           `json:"act"`
+	STPMode          string           `json:"V"`
+	WorkingType      string           `json:"wt"`
+	PriceMatchMode   string           `json:"pm"`
+	CloseAll         bool             `json:"cp"`
+	PriceProtection  bool             `json:"pP"`
+	TriggerTime      int64            `json:"tt"`
+	GoodTillTime     int64            `json:"gtd"`
+	ReduceOnly       bool             `json:"R"`
+	FailedReason     string           `json:"rm"`
+}
+
+func (e *AlgoOrderUpdateEvent) OrderFutures() (*types.Order, error) {
+	switch e.AlgoOrder.Status {
+	case "NEW", "CANCELED", "EXPIRED", "REJECTED", "TRIGGERING", "TRIGGERED", "FINISHED":
+	default:
+		return nil, errors.New("algo update event type is not for futures order")
+	}
+
+	return &types.Order{
+		Exchange: types.ExchangeBinance,
+		SubmitOrder: types.SubmitOrder{
+			Symbol:        e.AlgoOrder.Symbol,
+			ClientOrderID: e.AlgoOrder.ClientAlgoId,
+			Side:          toGlobalFuturesSideType(futures.SideType(e.AlgoOrder.Side)),
+			Type:          toGlobalFuturesOrderType(futures.AlgoOrderType(e.AlgoOrder.OrderType)),
+			Quantity:      e.AlgoOrder.Quantity,
+			Price:         e.AlgoOrder.Price,
+			StopPrice:     e.AlgoOrder.TriggerPrice,
+			TimeInForce:   types.TimeInForce(e.AlgoOrder.TimeInForce),
+		},
+		OrderID:          uint64(e.AlgoOrder.AlgoId),
+		Status:           toGlobalFuturesOrderStatus(futures.OrderStatusType(e.AlgoOrder.Status)),
+		ExecutedQuantity: e.AlgoOrder.ExecutedQuantity,
+		UpdateTime:       types.Time(e.TransactionTime.Time()),
+	}, nil
 }
