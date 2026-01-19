@@ -136,12 +136,31 @@ func (m *CriticalBalanceDiscrepancyAlert) ObjectID() string {
 }
 
 func (m *CriticalBalanceDiscrepancyAlert) Comment() *livenote.OptionComment {
+	startTime := time.Now().Add(-m.SustainedDuration)
 	return livenote.Comment(
 		fmt.Sprintf(
-			"%s %s sustained for %s (~= %f %s > %f %s)",
+			"%s %s sustained for %s, starting from %s (~= %f %s > %f %s)",
 			m.BaseCurrency,
 			m.Delta,
 			m.SustainedDuration,
+			startTime.Format(time.RFC3339),
+			m.Amount.Float64(),
+			m.QuoteCurrency,
+			m.AlertAmount.Float64(),
+			m.QuoteCurrency,
+		),
+	)
+}
+
+func (m *CriticalBalanceDiscrepancyAlert) WarnComment() *livenote.OptionComment {
+	startTime := time.Now().Add(-m.SustainedDuration)
+	return livenote.Comment(
+		fmt.Sprintf(
+			"[Critical Balance Warn] %s %s sustained for %s, starting from %s (~= %f %s > %f %s)",
+			m.BaseCurrency,
+			m.Delta,
+			m.SustainedDuration,
+			startTime.Format(time.RFC3339),
 			m.Amount.Float64(),
 			m.QuoteCurrency,
 			m.AlertAmount.Float64(),
