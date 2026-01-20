@@ -429,3 +429,331 @@ func TestParseOrderFuturesUpdate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, orderUpdate)
 }
+
+func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
+	transactionTime := types.MillisecondTimestamp(time.UnixMilli(1750515742297))
+
+	t.Run("valid status NEW", func(t *testing.T) {
+		event := &AlgoOrderUpdateEvent{
+			TransactionTime: transactionTime,
+			AlgoOrder: AlgoOrder{
+				ClientAlgoId:     "Q5xaq5EGKgXXa0fD7fs0Ip",
+				AlgoId:           2148719,
+				AlgoType:         "CONDITIONAL",
+				OrderType:        "TAKE_PROFIT",
+				Symbol:           "BNBUSDT",
+				Side:             "SELL",
+				PositionSide:     "BOTH",
+				TimeInForce:      "GTC",
+				Quantity:         fixedpoint.MustNewFromString("0.01"),
+				Price:            fixedpoint.MustNewFromString("750"),
+				TriggerPrice:     fixedpoint.MustNewFromString("750"),
+				Status:           "NEW",
+				OrderId:          "",
+				AvgFillPrice:     fixedpoint.MustNewFromString("0.00000"),
+				ExecutedQuantity: fixedpoint.MustNewFromString("0.00000"),
+				ActualOrderType:  "0",
+				STPMode:          "EXPIRE_MAKER",
+				WorkingType:      "CONTRACT_PRICE",
+				PriceMatchMode:   "NONE",
+				CloseAll:         false,
+				PriceProtection:  false,
+				TriggerTime:      0,
+				GoodTillTime:     0,
+				ReduceOnly:       false,
+				FailedReason:     "",
+			},
+		}
+
+		order, err := event.OrderFutures()
+		assert.NoError(t, err)
+		assert.NotNil(t, order)
+		assert.Equal(t, types.ExchangeBinance, order.Exchange)
+		assert.Equal(t, "BNBUSDT", order.Symbol)
+		assert.Equal(t, "Q5xaq5EGKgXXa0fD7fs0Ip", order.ClientOrderID)
+		assert.Equal(t, types.SideTypeSell, order.Side)
+		assert.Equal(t, types.OrderTypeTakeProfit, order.Type)
+		assert.Equal(t, fixedpoint.MustNewFromString("0.01"), order.Quantity)
+		assert.Equal(t, fixedpoint.MustNewFromString("750"), order.Price)
+		assert.Equal(t, fixedpoint.MustNewFromString("750"), order.StopPrice)
+		assert.Equal(t, types.TimeInForce("GTC"), order.TimeInForce)
+		assert.Equal(t, uint64(2148719), order.OrderID)
+		assert.Equal(t, types.OrderStatusNew, order.Status)
+		assert.Equal(t, fixedpoint.MustNewFromString("0.00000"), order.ExecutedQuantity)
+		assert.Equal(t, transactionTime.Time(), order.UpdateTime.Time())
+	})
+
+	t.Run("valid status CANCELED", func(t *testing.T) {
+		event := &AlgoOrderUpdateEvent{
+			TransactionTime: transactionTime,
+			AlgoOrder: AlgoOrder{
+				ClientAlgoId:     "test-client-id",
+				AlgoId:           123456,
+				OrderType:        "STOP",
+				Symbol:           "BTCUSDT",
+				Side:             "BUY",
+				TimeInForce:      "GTC",
+				Quantity:         fixedpoint.MustNewFromString("1.0"),
+				Price:            fixedpoint.MustNewFromString("50000"),
+				TriggerPrice:     fixedpoint.MustNewFromString("49000"),
+				Status:           "CANCELED",
+				ExecutedQuantity: fixedpoint.MustNewFromString("0"),
+			},
+		}
+
+		order, err := event.OrderFutures()
+		assert.NoError(t, err)
+		assert.NotNil(t, order)
+		assert.Equal(t, types.OrderStatusCanceled, order.Status)
+	})
+
+	t.Run("valid status EXPIRED", func(t *testing.T) {
+		event := &AlgoOrderUpdateEvent{
+			TransactionTime: transactionTime,
+			AlgoOrder: AlgoOrder{
+				ClientAlgoId:     "test-expired",
+				AlgoId:           789012,
+				OrderType:        "TAKE_PROFIT_MARKET",
+				Symbol:           "ETHUSDT",
+				Side:             "SELL",
+				TimeInForce:      "GTC",
+				Quantity:         fixedpoint.MustNewFromString("5.0"),
+				Price:            fixedpoint.MustNewFromString("3000"),
+				TriggerPrice:     fixedpoint.MustNewFromString("3200"),
+				Status:           "EXPIRED",
+				ExecutedQuantity: fixedpoint.MustNewFromString("0"),
+			},
+		}
+
+		order, err := event.OrderFutures()
+		assert.NoError(t, err)
+		assert.NotNil(t, order)
+		assert.Equal(t, types.OrderStatusExpired, order.Status)
+	})
+
+	t.Run("valid status REJECTED", func(t *testing.T) {
+		event := &AlgoOrderUpdateEvent{
+			TransactionTime: transactionTime,
+			AlgoOrder: AlgoOrder{
+				ClientAlgoId:     "test-rejected",
+				AlgoId:           345678,
+				OrderType:        "STOP_MARKET",
+				Symbol:           "SOLUSDT",
+				Side:             "BUY",
+				TimeInForce:      "GTC",
+				Quantity:         fixedpoint.MustNewFromString("10.0"),
+				Price:            fixedpoint.MustNewFromString("100"),
+				TriggerPrice:     fixedpoint.MustNewFromString("95"),
+				Status:           "REJECTED",
+				FailedReason:     "Insufficient balance",
+				ExecutedQuantity: fixedpoint.MustNewFromString("0"),
+			},
+		}
+
+		order, err := event.OrderFutures()
+		assert.NoError(t, err)
+		assert.NotNil(t, order)
+		assert.Equal(t, types.OrderStatusRejected, order.Status)
+	})
+
+	t.Run("valid status TRIGGERING", func(t *testing.T) {
+		event := &AlgoOrderUpdateEvent{
+			TransactionTime: transactionTime,
+			AlgoOrder: AlgoOrder{
+				ClientAlgoId:     "test-triggering",
+				AlgoId:           456789,
+				OrderType:        "STOP",
+				Symbol:           "ADAUSDT",
+				Side:             "SELL",
+				TimeInForce:      "GTC",
+				Quantity:         fixedpoint.MustNewFromString("1000.0"),
+				Price:            fixedpoint.MustNewFromString("0.5"),
+				TriggerPrice:     fixedpoint.MustNewFromString("0.48"),
+				Status:           "TRIGGERING",
+				ExecutedQuantity: fixedpoint.MustNewFromString("0"),
+			},
+		}
+
+		order, err := event.OrderFutures()
+		assert.NoError(t, err)
+		assert.NotNil(t, order)
+		assert.Equal(t, uint64(456789), order.OrderID)
+	})
+
+	t.Run("valid status TRIGGERED", func(t *testing.T) {
+		event := &AlgoOrderUpdateEvent{
+			TransactionTime: transactionTime,
+			AlgoOrder: AlgoOrder{
+				ClientAlgoId:     "test-triggered",
+				AlgoId:           567890,
+				OrderType:        "TAKE_PROFIT_MARKET",
+				Symbol:           "DOGEUSDT",
+				Side:             "BUY",
+				TimeInForce:      "GTC",
+				Quantity:         fixedpoint.MustNewFromString("10000.0"),
+				Price:            fixedpoint.MustNewFromString("0.1"),
+				TriggerPrice:     fixedpoint.MustNewFromString("0.12"),
+				Status:           "TRIGGERED",
+				OrderId:          "12345",
+				AvgFillPrice:     fixedpoint.MustNewFromString("0.11"),
+				ExecutedQuantity: fixedpoint.MustNewFromString("5000.0"),
+				ActualOrderType:  "MARKET",
+			},
+		}
+
+		order, err := event.OrderFutures()
+		assert.NoError(t, err)
+		assert.NotNil(t, order)
+		assert.Equal(t, fixedpoint.MustNewFromString("5000.0"), order.ExecutedQuantity)
+	})
+
+	t.Run("valid status FINISHED", func(t *testing.T) {
+		event := &AlgoOrderUpdateEvent{
+			TransactionTime: transactionTime,
+			AlgoOrder: AlgoOrder{
+				ClientAlgoId:     "test-finished",
+				AlgoId:           678901,
+				OrderType:        "TRAILING_STOP_MARKET",
+				Symbol:           "XRPUSDT",
+				Side:             "SELL",
+				TimeInForce:      "GTC",
+				Quantity:         fixedpoint.MustNewFromString("500.0"),
+				Price:            fixedpoint.MustNewFromString("0.6"),
+				TriggerPrice:     fixedpoint.MustNewFromString("0.58"),
+				Status:           "FINISHED",
+				OrderId:          "67890",
+				AvgFillPrice:     fixedpoint.MustNewFromString("0.59"),
+				ExecutedQuantity: fixedpoint.MustNewFromString("500.0"),
+				ActualOrderType:  "MARKET",
+			},
+		}
+
+		order, err := event.OrderFutures()
+		assert.NoError(t, err)
+		assert.NotNil(t, order)
+		assert.Equal(t, fixedpoint.MustNewFromString("500.0"), order.ExecutedQuantity)
+	})
+
+	t.Run("invalid status returns error", func(t *testing.T) {
+		event := &AlgoOrderUpdateEvent{
+			TransactionTime: transactionTime,
+			AlgoOrder: AlgoOrder{
+				ClientAlgoId: "test-invalid",
+				AlgoId:       999999,
+				OrderType:    "STOP",
+				Symbol:       "BTCUSDT",
+				Side:         "BUY",
+				Status:       "INVALID_STATUS",
+			},
+		}
+
+		order, err := event.OrderFutures()
+		assert.Error(t, err)
+		assert.Nil(t, order)
+		assert.Contains(t, err.Error(), "algo update event type is not for futures order")
+	})
+
+	t.Run("with executed quantity and avg fill price", func(t *testing.T) {
+		event := &AlgoOrderUpdateEvent{
+			TransactionTime: transactionTime,
+			AlgoOrder: AlgoOrder{
+				ClientAlgoId:     "test-executed",
+				AlgoId:           111222,
+				OrderType:        "TAKE_PROFIT",
+				Symbol:           "LTCUSDT",
+				Side:             "BUY",
+				TimeInForce:      "GTC",
+				Quantity:         fixedpoint.MustNewFromString("2.0"),
+				Price:            fixedpoint.MustNewFromString("100"),
+				TriggerPrice:     fixedpoint.MustNewFromString("95"),
+				Status:           "TRIGGERED",
+				OrderId:          "99999",
+				AvgFillPrice:     fixedpoint.MustNewFromString("97.5"),
+				ExecutedQuantity: fixedpoint.MustNewFromString("1.5"),
+				ActualOrderType:  "LIMIT",
+			},
+		}
+
+		order, err := event.OrderFutures()
+		assert.NoError(t, err)
+		assert.NotNil(t, order)
+		assert.Equal(t, fixedpoint.MustNewFromString("1.5"), order.ExecutedQuantity)
+	})
+
+	t.Run("different order types", func(t *testing.T) {
+		testCases := []struct {
+			name      string
+			orderType string
+			expected  types.OrderType
+		}{
+			{"STOP", "STOP", types.OrderTypeStopLimit},
+			{"STOP_MARKET", "STOP_MARKET", types.OrderTypeStopMarket},
+			{"TAKE_PROFIT", "TAKE_PROFIT", types.OrderTypeTakeProfit},
+			{"TAKE_PROFIT_MARKET", "TAKE_PROFIT_MARKET", types.OrderTypeTakeProfitMarket},
+			{"TRAILING_STOP_MARKET", "TRAILING_STOP_MARKET", types.OrderTypeStopMarket},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				event := &AlgoOrderUpdateEvent{
+					TransactionTime: transactionTime,
+					AlgoOrder: AlgoOrder{
+						ClientAlgoId:     "test-" + tc.name,
+						AlgoId:           111111,
+						OrderType:        tc.orderType,
+						Symbol:           "BTCUSDT",
+						Side:             "BUY",
+						TimeInForce:      "GTC",
+						Quantity:         fixedpoint.MustNewFromString("1.0"),
+						Price:            fixedpoint.MustNewFromString("50000"),
+						TriggerPrice:     fixedpoint.MustNewFromString("49000"),
+						Status:           "NEW",
+						ExecutedQuantity: fixedpoint.MustNewFromString("0"),
+					},
+				}
+
+				order, err := event.OrderFutures()
+				assert.NoError(t, err)
+				assert.NotNil(t, order)
+				assert.Equal(t, tc.expected, order.Type)
+			})
+		}
+	})
+
+	t.Run("different sides", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			side     string
+			expected types.SideType
+		}{
+			{"BUY", "BUY", types.SideTypeBuy},
+			{"SELL", "SELL", types.SideTypeSell},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				event := &AlgoOrderUpdateEvent{
+					TransactionTime: transactionTime,
+					AlgoOrder: AlgoOrder{
+						ClientAlgoId:     "test-side-" + tc.name,
+						AlgoId:           222222,
+						OrderType:        "STOP",
+						Symbol:           "BTCUSDT",
+						Side:             tc.side,
+						TimeInForce:      "GTC",
+						Quantity:         fixedpoint.MustNewFromString("1.0"),
+						Price:            fixedpoint.MustNewFromString("50000"),
+						TriggerPrice:     fixedpoint.MustNewFromString("49000"),
+						Status:           "NEW",
+						ExecutedQuantity: fixedpoint.MustNewFromString("0"),
+					},
+				}
+
+				order, err := event.OrderFutures()
+				assert.NoError(t, err)
+				assert.NotNil(t, order)
+				assert.Equal(t, tc.expected, order.Side)
+			})
+		}
+	})
+}

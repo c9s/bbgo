@@ -105,6 +105,7 @@ type Stream struct {
 	accountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
 	marginCallEventCallbacks          []func(e *MarginCallEvent)
 	listenKeyExpiredCallbacks         []func(e *ListenKeyExpired)
+	algoOrderUpdateEventCallbacks     []func(e *AlgoOrderUpdateEvent)
 
 	errorCallbacks []func(e *ErrorEvent)
 
@@ -190,6 +191,8 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	// ===================================
 	// Event type ACCOUNT_UPDATE from user data stream updates Balance and FuturesPosition.
 	stream.OnOrderTradeUpdateEvent(stream.handleOrderTradeUpdateEvent)
+	// Event type ALGO_UPDATE from user data stream updates AlgoOrder.
+	stream.OnAlgoOrderUpdateEvent(stream.handleAlgoOrderUpdateEvent)
 	// ===================================
 
 	if debugMode {
@@ -653,6 +656,8 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *ForceOrderEvent:
 		s.EmitForceOrderEvent(e)
+	case *AlgoOrderUpdateEvent:
+		s.EmitAlgoOrderUpdateEvent(e)
 
 	case *MarginCallEvent:
 	}
@@ -863,4 +868,14 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 
 		}
 	}
+}
+
+func (s *Stream) handleAlgoOrderUpdateEvent(e *AlgoOrderUpdateEvent) {
+	order, err := e.OrderFutures()
+	if err != nil {
+		log.WithError(err).Error("algo order convert error")
+		return
+	}
+
+	s.EmitOrderUpdate(*order)
 }

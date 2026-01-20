@@ -2,8 +2,6 @@
 
 package binance
 
-import ()
-
 func (s *Stream) OnDepthEvent(cb func(e *DepthEvent)) {
 	s.depthEventCallbacks = append(s.depthEventCallbacks, cb)
 }
@@ -200,6 +198,16 @@ func (s *Stream) OnError(cb func(e *ErrorEvent)) {
 
 func (s *Stream) EmitError(e *ErrorEvent) {
 	for _, cb := range s.errorCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnAlgoOrderUpdateEvent(cb func(e *AlgoOrderUpdateEvent)) {
+	s.algoOrderUpdateEventCallbacks = append(s.algoOrderUpdateEventCallbacks, cb)
+}
+
+func (s *Stream) EmitAlgoOrderUpdateEvent(e *AlgoOrderUpdateEvent) {
+	for _, cb := range s.algoOrderUpdateEventCallbacks {
 		cb(e)
 	}
 }
