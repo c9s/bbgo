@@ -24,6 +24,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/envvar"
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
+	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 	"github.com/c9s/bbgo/pkg/util/apikey"
 	"github.com/c9s/bbgo/pkg/version"
 	"github.com/c9s/requestgen"
@@ -375,4 +376,12 @@ func buildPayloads(nonce int64, apiPath string, params url.Values, data interfac
 	}
 
 	return payload, payloadToSign
+}
+
+func (c *Client) SendRequest(req *http.Request) (*requestgen.Response, error) {
+	prof := timeprofile.Start()
+	resp, err := c.BaseAPIClient.SendRequest(req)
+	latencyMs := float64(prof.Stop().Milliseconds())
+	recordLatencyMetrics(req, latencyMs, err)
+	return resp, err
 }
