@@ -43,13 +43,13 @@ type Exchange struct {
 func New(key, secret, subAccount string) *Exchange {
 	client := maxapi.NewRestClientDefault()
 	client.Auth(key, secret)
+	v3client := v3.NewClient(client)
 
 	if subAccount != "" {
 		log.Infof("using MAX sub-account %s", subAccount)
-		client.SetSubAccount(subAccount)
+		v3client.SetSubAccount(subAccount)
 	}
 
-	v3client := v3.NewClient(client)
 	return &Exchange{
 		client: client,
 		key:    key,

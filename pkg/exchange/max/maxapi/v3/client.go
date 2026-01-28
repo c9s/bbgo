@@ -14,13 +14,17 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
+	"github.com/c9s/bbgo/pkg/util/apikey"
 	"github.com/c9s/bbgo/pkg/version"
+	"github.com/c9s/requestgen"
 )
 
 var log = logrus.WithFields(logrus.Fields{
@@ -52,6 +56,9 @@ var ServerTimestamp = time.Now().Unix()
 
 // reqCount is used for nonce, this variable counts the API request count.
 var reqCount uint64 = 1
+
+// globalTimeOffset is used for nonce
+var globalTimeOffset int64 = 0
 
 var disableUserAgentHeader = false
 
@@ -116,7 +123,17 @@ func UpdateServerTimeAndOffset(baseCtx context.Context) {
 }
 
 type Client struct {
-	*maxapi.RestClient
+	requestgen.BaseAPIClient
+
+	APIKey, APISecret string
+
+	SubAccount string
+
+	ApiKeyRotator *apikey.RoundTripBalancer
+
+	apiKeyNonce map[string]int64
+
+	mu sync.Mutex
 
 	MarginService     *MarginService
 	SubAccountService *SubAccountService
@@ -124,9 +141,32 @@ type Client struct {
 
 func NewClient(legacyClient *maxapi.RestClient) *Client {
 	client := &Client{
-		RestClient:        legacyClient,
+		BaseAPIClient: legacyClient.BaseAPIClient,
+
+		APIKey:    legacyClient.APIKey,
+		APISecret: legacyClient.APISecret,
+
 		MarginService:     &MarginService{Client: legacyClient},
 		SubAccountService: &SubAccountService{Client: legacyClient},
+
+		apiKeyNonce: make(map[string]int64),
+	}
+
+	if v, ok := envvar.Bool("MAX_ENABLE_API_KEY_ROTATION"); v && ok {
+		loader := apikey.NewEnvKeyLoader("MAX_API_", "", "KEY", "SECRET")
+
+		// this loads MAX_API_KEY_1, MAX_API_KEY_2, MAX_API_KEY_3, ...
+		source, err := loader.Load(os.Environ())
+		if err != nil {
+			log.Panic(err)
+		}
+
+		// load the original one as index 0
+		if client.APIKey != "" && client.APISecret != "" {
+			source.Add(apikey.Entry{Index: 0, Key: client.APIKey, Secret: client.APISecret})
+		}
+
+		client.ApiKeyRotator = apikey.NewRoundTripBalancer(source)
 	}
 
 	return client
@@ -136,7 +176,7 @@ func NewClient(legacyClient *maxapi.RestClient) *Client {
 func (c *Client) NewAuthenticatedRequest(
 	ctx context.Context, m string, refURL string, params url.Values, data interface{},
 ) (*http.Request, error) {
-	apiKey, apiSecret := c.RestClient.SelectApiKey()
+	apiKey, apiSecret := c.SelectApiKey()
 
 	if len(apiKey) == 0 {
 		return nil, errors.New("empty api key")
@@ -151,7 +191,7 @@ func (c *Client) NewAuthenticatedRequest(
 		return nil, err
 	}
 
-	n := c.RestClient.GetNonce(apiKey)
+	n := c.GetNonce(apiKey)
 	payload := map[string]interface{}{
 		"nonce": n,
 		"path":  c.RestClient.BaseURL.ResolveReference(rel).Path,
@@ -180,7 +220,7 @@ func (c *Client) NewAuthenticatedRequest(
 		return nil, err
 	}
 
-	req, err := c.RestClient.NewRequest(ctx, m, refURL, params, p)
+	req, err := c.NewRequest(ctx, m, refURL, params, p)
 	if err != nil {
 		return nil, err
 	}
@@ -191,8 +231,8 @@ func (c *Client) NewAuthenticatedRequest(
 	req.Header.Add("X-MAX-ACCESSKEY", apiKey)
 	req.Header.Add("X-MAX-PAYLOAD", encoded)
 	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, apiSecret))
-	if c.RestClient.SubAccount != "" {
-		req.Header.Add("X-Sub-Account", c.RestClient.SubAccount)
+	if c.SubAccount != "" {
+		req.Header.Add("X-Sub-Account", c.SubAccount)
 	}
 
 	if disableUserAgentHeader {
@@ -208,6 +248,43 @@ func (c *Client) NewAuthenticatedRequest(
 	}
 
 	return req, nil
+}
+
+func (c *Client) SelectApiKey() (string, string) {
+	apiKey := c.APIKey
+	apiSecret := c.APISecret
+
+	if c.ApiKeyRotator != nil {
+		apiKey, apiSecret = c.ApiKeyRotator.Next().GetKeySecret()
+	}
+
+	return apiKey, apiSecret
+}
+
+func (c *Client) GetNonce(apiKey string) int64 {
+	// nonce 是以正整數表示的時間戳記，代表了從 Unix epoch 到當前時間所經過的毫秒數(ms)。
+	// nonce 與伺服器的時間差不得超過正負30秒，每個 nonce 只能使用一次。
+	c.mu.Lock()
+	now := time.Now()
+	seconds := now.Unix()
+	offset := atomic.LoadInt64(&globalTimeOffset)
+	next := (seconds + offset) * 1000
+	if last, ok := c.apiKeyNonce[apiKey]; ok {
+		if next <= last {
+			next = last + 1
+		}
+	}
+
+	c.apiKeyNonce[apiKey] = next
+	c.mu.Unlock()
+
+	// (seconds+offset)*1000 -> convert seconds to milliseconds
+	return next
+}
+
+func (c *Client) SetSubAccount(subAccount string) *Client {
+	c.SubAccount = subAccount
+	return c
 }
 
 func castPayload(payload interface{}) ([]byte, error) {
