@@ -964,12 +964,12 @@ func (e *Exchange) QueryDepositHistory(
 		}
 	}
 
-	toRawStatusStr := func(d maxapi.Deposit) string {
+	toRawStatusStr := func(d v3.Deposit) string {
 		if len(d.StateReason) > 0 {
-			return fmt.Sprintf("%s (%s: %s)", d.Status, d.State, d.StateReason)
+			return fmt.Sprintf("%s: %s", d.State, d.StateReason)
 		}
 
-		return fmt.Sprintf("%s (%s)", d.Status, d.State)
+		return string(d.State)
 	}
 
 	for startTime.Before(until) {
@@ -981,7 +981,7 @@ func (e *Exchange) QueryDepositHistory(
 
 		log.Infof("querying deposit history %s: %s <=> %s", asset, startTime, endTime)
 
-		req := e.client.NewGetDepositHistoryRequest()
+		req := e.v3client.NewGetDepositHistoryRequest()
 		if len(asset) > 0 {
 			req.Currency(toLocalCurrency(asset))
 		}
