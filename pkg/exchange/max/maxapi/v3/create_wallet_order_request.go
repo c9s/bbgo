@@ -23,5 +23,5 @@ type CreateWalletOrderRequest struct {
 }
 
 func (c *Client) NewCreateWalletOrderRequest(walletType WalletType) *CreateWalletOrderRequest {
-	return &CreateWalletOrderRequest{client: c.RestClient, walletType: walletType}
+	return &CreateWalletOrderRequest{client: c, walletType: walletType}
 }
