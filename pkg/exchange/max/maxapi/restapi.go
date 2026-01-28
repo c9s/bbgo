@@ -26,6 +26,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/envvar"
+	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 	"github.com/c9s/bbgo/pkg/util/apikey"
 	"github.com/c9s/bbgo/pkg/version"
 )
@@ -399,4 +400,11 @@ func signPayload(payload string, secret string) string {
 		return ""
 	}
 	return hex.EncodeToString(sig.Sum(nil))
+}
+
+func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error) {
+	prof := timeprofile.Start()
+	resp, err := c.BaseAPIClient.SendRequest(req)
+	recordLatencyMetrics(req, prof.Stop().Seconds(), err)
+	return resp, err
 }
