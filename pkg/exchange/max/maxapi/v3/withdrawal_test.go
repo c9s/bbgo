@@ -1,4 +1,4 @@
-package maxapi
+package v3
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
@@ -16,10 +17,11 @@ func TestWithdrawal(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	client := NewRestClientDefault()
-	client.Auth(key, secret)
+	legecyClient := maxapi.NewRestClientDefault()
+	legecyClient.Auth(key, secret)
+	client := NewClient(legecyClient)
 
-	t.Run("v2/withdrawals", func(t *testing.T) {
+	t.Run("v3/withdrawals", func(t *testing.T) {
 		req := client.NewGetWithdrawalHistoryRequest()
 		req.Currency("usdt")
 		withdrawals, err := req.Do(ctx)

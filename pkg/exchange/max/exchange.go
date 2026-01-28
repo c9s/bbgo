@@ -530,7 +530,7 @@ func (e *Exchange) Withdraw(
 ) error {
 	asset = toLocalCurrency(asset)
 
-	addresses, err := e.client.WithdrawalService.NewGetWithdrawalAddressesRequest().
+	addresses, err := e.v3client.NewGetWithdrawalAddressesRequest().
 		Currency(asset).
 		Do(ctx)
 
@@ -538,7 +538,7 @@ func (e *Exchange) Withdraw(
 		return err
 	}
 
-	var whitelistAddress maxapi.WithdrawalAddress
+	var whitelistAddress v3.WithdrawalAddress
 	for _, a := range addresses {
 		if a.Address == address {
 			whitelistAddress = a
@@ -554,7 +554,7 @@ func (e *Exchange) Withdraw(
 		return errors.New("address UUID can not be empty")
 	}
 
-	response, err := e.client.WithdrawalService.NewWithdrawalRequest().
+	response, err := e.v3client.NewWithdrawalRequest().
 		Currency(asset).
 		Amount(amount.Float64()).
 		AddressUUID(whitelistAddress.UUID).
@@ -892,7 +892,7 @@ func (e *Exchange) QueryWithdrawHistory(
 		}
 
 		log.Infof("querying withdraw %s: %s <=> %s", asset, startTime, endTime)
-		req := e.client.NewGetWithdrawalHistoryRequest()
+		req := e.v3client.NewGetWithdrawalHistoryRequest()
 		if len(asset) > 0 {
 			req.Currency(toLocalCurrency(asset))
 		}
@@ -917,7 +917,7 @@ func (e *Exchange) QueryWithdrawHistory(
 				continue
 			}
 
-			status := convertWithdrawStatusV2(d.State)
+			status := convertWithdrawStatusV3(d.State)
 
 			txIDs[d.TxID] = struct{}{}
 			withdraw := types.Withdraw{
