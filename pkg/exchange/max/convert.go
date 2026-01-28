@@ -260,34 +260,19 @@ func toGlobalTradeV3(t v3.Trade) ([]types.Trade, error) {
 	return trades, nil
 }
 
-func toGlobalDepositStatus(a max.DepositState) types.DepositStatus {
+func toGlobalDepositStatus(a v3.DepositState) types.DepositStatus {
 	switch a {
-
-	case max.DepositStateSubmitting, max.DepositStateSubmitted, max.DepositStatePending, max.DepositStateChecking:
-		return types.DepositPending
-
-	case max.DepositStateRejected:
+	case v3.DepositStateFailed: // v3 state
 		return types.DepositRejected
-
-	case max.DepositStateCancelled:
+	case v3.DepositStateProcessing: // v3 states
+		return types.DepositPending
+	case v3.DepositStateDone: // v3 states
+		return types.DepositSuccess
+	case v3.DepositStateCanceled:
 		return types.DepositCancelled
-
-	case max.DepositStateAccepted:
-		return types.DepositSuccess
-
-	case max.DepositStateFailed: // v3 state
-		return types.DepositRejected
-
-	case max.DepositStateProcessing: // v3 states
-		return types.DepositPending
-
-	case max.DepositStateDone: // v3 states
-		return types.DepositSuccess
-
 	}
 
 	// other states goes to this
-	// max.DepositStateSuspect, max.DepositStateSuspended
 	log.Errorf("unsupported deposit state %q from max exchange", a)
 	return types.DepositStatus(a)
 }

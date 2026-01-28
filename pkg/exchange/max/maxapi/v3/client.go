@@ -13,14 +13,19 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
+	"github.com/c9s/bbgo/pkg/util/apikey"
 	"github.com/c9s/bbgo/pkg/version"
+	"github.com/c9s/requestgen"
 )
 
 var log = logrus.WithFields(logrus.Fields{
@@ -52,6 +57,9 @@ var ServerTimestamp = time.Now().Unix()
 
 // reqCount is used for nonce, this variable counts the API request count.
 var reqCount uint64 = 1
+
+// globalTimeOffset is used for nonce
+var globalTimeOffset int64 = 0
 
 var disableUserAgentHeader = false
 
@@ -116,7 +124,17 @@ func UpdateServerTimeAndOffset(baseCtx context.Context) {
 }
 
 type Client struct {
-	*maxapi.RestClient
+	requestgen.BaseAPIClient
+
+	APIKey, APISecret string
+
+	SubAccount string
+
+	ApiKeyRotator *apikey.RoundTripBalancer
+
+	apiKeyNonce map[string]int64
+
+	mu sync.Mutex
 
 	MarginService     *MarginService
 	SubAccountService *SubAccountService
@@ -124,9 +142,32 @@ type Client struct {
 
 func NewClient(legacyClient *maxapi.RestClient) *Client {
 	client := &Client{
-		RestClient:        legacyClient,
+		BaseAPIClient: legacyClient.BaseAPIClient,
+
+		APIKey:    legacyClient.APIKey,
+		APISecret: legacyClient.APISecret,
+
 		MarginService:     &MarginService{Client: legacyClient},
 		SubAccountService: &SubAccountService{Client: legacyClient},
+
+		apiKeyNonce: make(map[string]int64),
+	}
+
+	if v, ok := envvar.Bool("MAX_ENABLE_API_KEY_ROTATION"); v && ok {
+		loader := apikey.NewEnvKeyLoader("MAX_API_", "", "KEY", "SECRET")
+
+		// this loads MAX_API_KEY_1, MAX_API_KEY_2, MAX_API_KEY_3, ...
+		source, err := loader.Load(os.Environ())
+		if err != nil {
+			log.Panic(err)
+		}
+
+		// load the original one as index 0
+		if client.APIKey != "" && client.APISecret != "" {
+			source.Add(apikey.Entry{Index: 0, Key: client.APIKey, Secret: client.APISecret})
+		}
+
+		client.ApiKeyRotator = apikey.NewRoundTripBalancer(source)
 	}
 
 	return client
@@ -136,7 +177,7 @@ func NewClient(legacyClient *maxapi.RestClient) *Client {
 func (c *Client) NewAuthenticatedRequest(
 	ctx context.Context, m string, refURL string, params url.Values, data interface{},
 ) (*http.Request, error) {
-	apiKey, apiSecret := c.RestClient.SelectApiKey()
+	apiKey, apiSecret := c.SelectApiKey()
 
 	if len(apiKey) == 0 {
 		return nil, errors.New("empty api key")
@@ -151,48 +192,50 @@ func (c *Client) NewAuthenticatedRequest(
 		return nil, err
 	}
 
-	n := c.RestClient.GetNonce(apiKey)
-	payload := map[string]interface{}{
-		"nonce": n,
-		"path":  c.RestClient.BaseURL.ResolveReference(rel).Path,
-	}
+	nonce := c.GetNonce(apiKey)
+	apiPath := c.BaseURL.ResolveReference(rel).Path
 
-	switch d := data.(type) {
-	case map[string]interface{}:
-		for k, v := range d {
-			payload[k] = v
-		}
-	default:
-		log.Warnf("unsupported payload type: %T", d)
-	}
+	// build query params (always include nonce)
+	queryParams := url.Values{}
+	queryParams.Add("nonce", strconv.FormatInt(nonce, 10))
+	addValuesToQuery(queryParams, params)
 
-	for k, vs := range params {
-		k = strings.TrimSuffix(k, "[]")
-		if len(vs) == 1 {
-			payload[k] = vs[0]
-		} else {
-			payload[k] = vs
+	// for GET requests, move data map into query parameters
+	if m == "GET" {
+		if d, ok := data.(map[string]interface{}); ok {
+			for k, v := range d {
+				queryParams.Add(k, fmt.Sprintf("%v", v))
+			}
 		}
 	}
 
-	p, err := castPayload(payload)
+	payload, payloadToSign := buildPayloads(nonce, apiPath, params, data, m)
+
+	// encode and sign payloadToSign
+	payloadToSignBytes, err := json.Marshal(payloadToSign)
+	if err != nil {
+		return nil, err
+	}
+	encoded := base64.StdEncoding.EncodeToString(payloadToSignBytes)
+	signature := signPayload(encoded, apiSecret)
+
+	// marshal actual request body payload
+	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := c.RestClient.NewRequest(ctx, m, refURL, params, p)
+	req, err := c.NewRequest(ctx, m, refURL, queryParams, payloadBytes)
 	if err != nil {
 		return nil, err
 	}
-
-	encoded := base64.StdEncoding.EncodeToString(p)
 
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-MAX-ACCESSKEY", apiKey)
 	req.Header.Add("X-MAX-PAYLOAD", encoded)
-	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, apiSecret))
-	if c.RestClient.SubAccount != "" {
-		req.Header.Add("X-Sub-Account", c.RestClient.SubAccount)
+	req.Header.Add("X-MAX-SIGNATURE", signature)
+	if c.SubAccount != "" {
+		req.Header.Add("X-Sub-Account", c.SubAccount)
 	}
 
 	if disableUserAgentHeader {
@@ -208,6 +251,43 @@ func (c *Client) NewAuthenticatedRequest(
 	}
 
 	return req, nil
+}
+
+func (c *Client) SelectApiKey() (string, string) {
+	apiKey := c.APIKey
+	apiSecret := c.APISecret
+
+	if c.ApiKeyRotator != nil {
+		apiKey, apiSecret = c.ApiKeyRotator.Next().GetKeySecret()
+	}
+
+	return apiKey, apiSecret
+}
+
+func (c *Client) GetNonce(apiKey string) int64 {
+	// nonce 是以正整數表示的時間戳記，代表了從 Unix epoch 到當前時間所經過的毫秒數(ms)。
+	// nonce 與伺服器的時間差不得超過正負30秒，每個 nonce 只能使用一次。
+	c.mu.Lock()
+	now := time.Now()
+	seconds := now.Unix()
+	offset := atomic.LoadInt64(&globalTimeOffset)
+	next := (seconds + offset) * 1000
+	if last, ok := c.apiKeyNonce[apiKey]; ok {
+		if next <= last {
+			next = last + 1
+		}
+	}
+
+	c.apiKeyNonce[apiKey] = next
+	c.mu.Unlock()
+
+	// (seconds+offset)*1000 -> convert seconds to milliseconds
+	return next
+}
+
+func (c *Client) SetSubAccount(subAccount string) *Client {
+	c.SubAccount = subAccount
+	return c
 }
 
 func castPayload(payload interface{}) ([]byte, error) {
@@ -234,4 +314,43 @@ func signPayload(payload string, secret string) string {
 		return ""
 	}
 	return hex.EncodeToString(sig.Sum(nil))
+}
+
+// addValuesToQuery appends all params into a query url.Values object.
+func addValuesToQuery(dst url.Values, src url.Values) {
+	for k, vs := range src {
+		for _, v := range vs {
+			dst.Add(k, v)
+		}
+	}
+}
+
+// buildPayloads constructs the payload and payloadToSign maps according to MAX API rules.
+// payload contains the actual request body (nonce + post-params for non-GET).
+// payloadToSign contains fields used for signature (nonce, path and params).
+func buildPayloads(nonce int64, apiPath string, params url.Values, data interface{}, method string) (map[string]interface{}, map[string]interface{}) {
+	payload := map[string]interface{}{}
+	payloadToSign := map[string]interface{}{"nonce": nonce, "path": apiPath}
+
+	// include params (query) into payloadToSign; trim array suffix for signing key
+	for k, vs := range params {
+		kTrim := strings.TrimSuffix(k, "[]")
+		if len(vs) == 1 {
+			payloadToSign[kTrim] = vs[0]
+		} else {
+			payloadToSign[kTrim] = vs
+		}
+	}
+
+	// for non-GET requests, include post-parameters into both payload and payloadToSign
+	if method != "GET" {
+		if d, ok := data.(map[string]interface{}); ok {
+			for k, v := range d {
+				payload[k] = v
+				payloadToSign[k] = v
+			}
+		}
+	}
+
+	return payload, payloadToSign
 }

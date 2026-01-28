@@ -23,5 +23,5 @@ type GetKLinesRequest struct {
 }
 
 func (c *Client) NewGetKLinesRequest() *GetKLinesRequest {
-	return &GetKLinesRequest{client: c.RestClient}
+	return &GetKLinesRequest{client: c}
 }

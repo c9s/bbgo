@@ -16,5 +16,5 @@ type GetUserInfoRequest struct {
 }
 
 func (c *Client) NewGetUserInfoRequest() *GetUserInfoRequest {
-	return &GetUserInfoRequest{client: c.RestClient}
+	return &GetUserInfoRequest{client: c}
 }

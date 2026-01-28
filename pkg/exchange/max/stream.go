@@ -177,8 +177,8 @@ func (s *Stream) handleConnect() {
 
 		log.Debugf("user data websocket filters: %v", filters)
 
-		apiKey, apiSecret := s.exchange.client.SelectApiKey()
-		nonce := s.exchange.client.GetNonce(apiKey)
+		apiKey, apiSecret := s.exchange.v3client.SelectApiKey()
+		nonce := s.exchange.v3client.GetNonce(apiKey)
 		auth := &maxapi.AuthMessage{
 			Action: "auth",
 			// pragma: allowlist nextline secret
@@ -190,7 +190,7 @@ func (s *Stream) handleConnect() {
 			ID: uuid.New().String(),
 
 			Filters:    filters,
-			SubAccount: s.exchange.client.SubAccount,
+			SubAccount: s.exchange.v3client.SubAccount,
 		}
 
 		if err := s.Conn.WriteJSON(auth); err != nil {

@@ -11,7 +11,7 @@ import (
 //go:generate -command DeleteRequest requestgen -method DELETE
 
 func (c *Client) NewGetWalletClosedOrdersRequest(walletType WalletType) *GetWalletClosedOrdersRequest {
-	return &GetWalletClosedOrdersRequest{client: c.RestClient, walletType: walletType}
+	return &GetWalletClosedOrdersRequest{client: c, walletType: walletType}
 }
 
 //go:generate GetRequest -url "/api/v3/wallet/:walletType/orders/closed" -type GetWalletClosedOrdersRequest -responseType []Order
