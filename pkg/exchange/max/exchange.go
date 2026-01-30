@@ -1171,7 +1171,7 @@ func (e *Exchange) queryTradesByID(ctx context.Context, symbol string, tradeID u
 
 func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]types.Reward, error) {
 	if startTime.IsZero() {
-		startTime = time.Unix(maxapi.TimestampSince, 0)
+		startTime = time.Unix(v3.TimestampSince, 0)
 	}
 
 	req := e.v3client.NewGetRewardsRequest()
