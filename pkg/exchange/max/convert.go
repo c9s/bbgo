@@ -326,7 +326,7 @@ func convertWebSocketOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 	}, nil
 }
 
-func convertWithdrawStatusV3(state v3.WithdrawState) types.WithdrawStatus {
+func convertWithdrawStatus(state v3.WithdrawState) types.WithdrawStatus {
 	switch state {
 
 	case v3.WithdrawStateProcessing:
@@ -344,30 +344,6 @@ func convertWithdrawStatusV3(state v3.WithdrawState) types.WithdrawStatus {
 	}
 
 	return types.WithdrawStatus(state)
-}
-
-func convertWithdrawStatusV2(state max.WithdrawState) types.WithdrawStatus {
-	switch state {
-
-	case max.WithdrawStateSent, max.WithdrawStateSubmitting, max.WithdrawStatePending, "accepted", "approved":
-		return types.WithdrawStatusSent
-
-	case max.WithdrawStateProcessing, "delisted_processing", "kgi_manually_processing", "kgi_manually_confirmed", "sygna_verifying":
-		return types.WithdrawStatusProcessing
-
-	case max.WithdrawStateFailed, "kgi_possible_failed", "rejected", "suspect", "retryable":
-		return types.WithdrawStatusFailed
-
-	case max.WithdrawStateCanceled:
-		return types.WithdrawStatusCancelled
-
-	case "confirmed":
-		// make it compatible with binance
-		return types.WithdrawStatusCompleted
-
-	default:
-		return types.WithdrawStatus(state)
-	}
 }
 
 func convertDepth(symbol string, depth *v3.Depth) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {

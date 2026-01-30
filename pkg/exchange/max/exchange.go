@@ -31,19 +31,14 @@ func init() {
 type Exchange struct {
 	types.MarginSettings
 
-	key, secret string
-
-	client *maxapi.RestClient
-
 	v3client *v3.Client
 
 	submitOrderLimiter, queryTradeLimiter, accountQueryLimiter, closedOrderQueryLimiter, marketDataLimiter *rate.Limiter
 }
 
 func New(key, secret, subAccount string) *Exchange {
-	client := maxapi.NewRestClientDefault()
-	client.Auth(key, secret)
-	v3client := v3.NewClient(client)
+	v3client := v3.NewClient()
+	v3client.Auth(key, secret)
 
 	if subAccount != "" {
 		log.Infof("using MAX sub-account %s", subAccount)
@@ -51,10 +46,6 @@ func New(key, secret, subAccount string) *Exchange {
 	}
 
 	return &Exchange{
-		client: client,
-		key:    key,
-		// pragma: allowlist nextline secret
-		secret:   secret,
 		v3client: v3client,
 
 		queryTradeLimiter: rate.NewLimiter(rate.Every(250*time.Millisecond), 2),
@@ -917,7 +908,7 @@ func (e *Exchange) QueryWithdrawHistory(
 				continue
 			}
 
-			status := convertWithdrawStatusV3(d.State)
+			status := convertWithdrawStatus(d.State)
 
 			txIDs[d.TxID] = struct{}{}
 			withdraw := types.Withdraw{

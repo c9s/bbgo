@@ -7,12 +7,11 @@ package v3
 import (
 	"github.com/c9s/requestgen"
 
-	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type MarginService struct {
-	Client *maxapi.RestClient
+	Client *Client
 }
 
 func (c *Client) NewGetMarginBorrowingLimitsRequest() *GetMarginBorrowingLimitsRequest {
