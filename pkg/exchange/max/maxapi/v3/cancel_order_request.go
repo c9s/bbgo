@@ -15,5 +15,5 @@ type CancelOrderRequest struct {
 }
 
 func (c *Client) NewCancelOrderRequest() *CancelOrderRequest {
-	return &CancelOrderRequest{client: c.RestClient}
+	return &CancelOrderRequest{client: c}
 }

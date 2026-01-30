@@ -25,5 +25,5 @@ type GetDepthRequest struct {
 }
 
 func (c *Client) NewGetDepthRequest() *GetDepthRequest {
-	return &GetDepthRequest{client: c.RestClient}
+	return &GetDepthRequest{client: c}
 }

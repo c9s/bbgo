@@ -22,5 +22,5 @@ type GetMarginADRatioRequest struct {
 }
 
 func (c *Client) NewGetMarginADRatioRequest() *GetMarginADRatioRequest {
-	return &GetMarginADRatioRequest{client: c.RestClient}
+	return &GetMarginADRatioRequest{client: c}
 }

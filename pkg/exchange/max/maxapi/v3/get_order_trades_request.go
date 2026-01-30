@@ -7,7 +7,7 @@ package v3
 import "github.com/c9s/requestgen"
 
 func (c *Client) NewGetOrderTradesRequest() *GetOrderTradesRequest {
-	return &GetOrderTradesRequest{client: c.RestClient}
+	return &GetOrderTradesRequest{client: c}
 }
 
 //go:generate GetRequest -url "/api/v3/order/trades" -type GetOrderTradesRequest -responseType []Trade

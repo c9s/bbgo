@@ -18,5 +18,5 @@ type GetTimestampRequest struct {
 }
 
 func (c *Client) NewGetTimestampRequest() *GetTimestampRequest {
-	return &GetTimestampRequest{client: c.RestClient}
+	return &GetTimestampRequest{client: c}
 }

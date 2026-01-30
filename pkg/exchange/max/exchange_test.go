@@ -76,12 +76,8 @@ func TestExchange_submitOrderAndCancel(t *testing.T) {
 
 	ex := New(key, secret, "")
 
-	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, ex.client.HttpClient, "testdata/"+t.Name()+".json")
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, ex.v3client.HttpClient, "testdata/"+t.Name()+".json")
 	defer saveRecord()
-
-	// patch client
-	restClient := ex.v3client.RestClient
-	restClient.HttpClient = ex.client.HttpClient
 
 	if isRecording && !ok {
 		t.Skipf("MAX api key is not configured, skipping integration test")

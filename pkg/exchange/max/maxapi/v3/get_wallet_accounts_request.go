@@ -15,5 +15,5 @@ type GetWalletAccountsRequest struct {
 }
 
 func (c *Client) NewGetWalletAccountsRequest(walletType WalletType) *GetWalletAccountsRequest {
-	return &GetWalletAccountsRequest{client: c.RestClient, walletType: walletType}
+	return &GetWalletAccountsRequest{client: c, walletType: walletType}
 }

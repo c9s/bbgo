@@ -22,5 +22,5 @@ type OrderCancelResponse struct {
 }
 
 func (c *Client) NewCancelWalletOrderAllRequest(walletType WalletType) *CancelWalletOrderAllRequest {
-	return &CancelWalletOrderAllRequest{client: c.RestClient, walletType: walletType}
+	return &CancelWalletOrderAllRequest{client: c, walletType: walletType}
 }
