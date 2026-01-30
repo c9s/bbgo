@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	v3 "github.com/c9s/bbgo/pkg/exchange/max/maxapi/v3"
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
@@ -17,7 +18,7 @@ func TestAccountService_GetWithdrawHistoryRequest(t *testing.T) {
 
 	ctx := context.Background()
 
-	client := NewRestClientDefault()
+	client := v3.NewClient()
 	client.Auth(key, secret)
 
 	req := client.NewGetWithdrawalHistoryRequest()
@@ -37,7 +38,7 @@ func TestAccountService_NewGetDepositHistoryRequest(t *testing.T) {
 
 	ctx := context.Background()
 
-	client := NewRestClientDefault()
+	client := v3.NewClient()
 	client.Auth(key, secret)
 
 	req := client.NewGetDepositHistoryRequest()

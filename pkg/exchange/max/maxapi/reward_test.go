@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	v3 "github.com/c9s/bbgo/pkg/exchange/max/maxapi/v3"
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
@@ -17,7 +18,7 @@ func TestRewards(t *testing.T) {
 
 	ctx := context.Background()
 
-	client := NewRestClientDefault()
+	client := v3.NewClient()
 	client.Auth(key, secret)
 
 	t.Run("v2/rewards", func(t *testing.T) {
