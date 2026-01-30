@@ -40,14 +40,14 @@ type Withdrawal struct {
 }
 
 type WithdrawalAddress struct {
-	UUID            string                     `json:"uuid"`
-	Currency        string                     `json:"currency"`
-	NetworkProtocol string                     `json:"network_protocol"`
-	Address         string                     `json:"address"`
-	ExtraLabel      string                     `json:"extra_label"`
-	CreatedAt       types.MillisecondTimestamp `json:"created_at"`
-	ActivatedAt     types.MillisecondTimestamp `json:"activated_at"`
-	IsInternal      bool                       `json:"is_internal"`
+	UUID            string                      `json:"uuid"`
+	Currency        string                      `json:"currency"`
+	NetworkProtocol string                      `json:"network_protocol"`
+	Address         string                      `json:"address"`
+	ExtraLabel      string                      `json:"extra_label"`
+	CreatedAt       types.MillisecondTimestamp  `json:"created_at"`
+	ActivatedAt     *types.MillisecondTimestamp `json:"activated_at"`
+	IsInternal      bool                        `json:"is_internal"`
 }
 
 //go:generate requestgen -method GET -url "/api/v3/withdraw_addresses" -type GetWithdrawalAddressesRequest -responseType []WithdrawalAddress
