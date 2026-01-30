@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
 // GetQueryParameters builds and checks the query parameters and returns url.Values
@@ -17,7 +18,13 @@ func (g *GetMarginBorrowingLimitsRequest) GetQueryParameters() (url.Values, erro
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -69,9 +76,19 @@ func (g *GetMarginBorrowingLimitsRequest) GetSlugParameters() (map[string]interf
 	return params, nil
 }
 
+var GetMarginBorrowingLimitsRequestSlugReCache sync.Map
+
 func (g *GetMarginBorrowingLimitsRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetMarginBorrowingLimitsRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetMarginBorrowingLimitsRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 

@@ -9,18 +9,28 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
+/*
+ * Currency sets
+ */
 func (m *MarginTransferRequest) Currency(currency string) *MarginTransferRequest {
 	m.currency = currency
 	return m
 }
 
+/*
+ * Amount sets
+ */
 func (m *MarginTransferRequest) Amount(amount string) *MarginTransferRequest {
 	m.amount = amount
 	return m
 }
 
+/*
+ * Side sets
+ */
 func (m *MarginTransferRequest) Side(side MarginTransferSide) *MarginTransferRequest {
 	m.side = side
 	return m
@@ -32,7 +42,13 @@ func (m *MarginTransferRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if m.isVarSlice(_v) {
+			m.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -55,10 +71,20 @@ func (m *MarginTransferRequest) GetParameters() (map[string]interface{}, error) 
 	// check amount field -> json key amount
 	amount := m.amount
 
+	// TEMPLATE check-required
+	if len(amount) == 0 {
+	}
+	// END TEMPLATE check-required
+
 	// assign parameter of amount
 	params["amount"] = amount
 	// check side field -> json key side
 	side := m.side
+
+	// TEMPLATE check-required
+	if len(side) == 0 {
+	}
+	// END TEMPLATE check-required
 
 	// TEMPLATE check-valid-values
 	switch side {
@@ -116,9 +142,19 @@ func (m *MarginTransferRequest) GetSlugParameters() (map[string]interface{}, err
 	return params, nil
 }
 
+var MarginTransferRequestSlugReCache sync.Map
+
 func (m *MarginTransferRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := MarginTransferRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			MarginTransferRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
