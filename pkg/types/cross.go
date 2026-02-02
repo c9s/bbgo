@@ -42,7 +42,7 @@ func (c *CrossResult) Length() int {
 // a series cross above b series.
 // If in current KLine, a is higher than b, and in previous KLine, a is lower than b, then return true.
 // Otherwise return false.
-// If accessing index <= length, will always return false
+// If accessing index >= length, will always return false
 func CrossOver(a Series, b Series) BoolSeries {
 	return &CrossResult{a, b, true}
 }
@@ -50,7 +50,7 @@ func CrossOver(a Series, b Series) BoolSeries {
 // a series cross under b series.
 // If in current KLine, a is lower than b, and in previous KLine, a is higher than b, then return true.
 // Otherwise return false.
-// If accessing index <= length, will always return false
+// If accessing index >= length, will always return false
 func CrossUnder(a Series, b Series) BoolSeries {
 	return &CrossResult{a, b, false}
 }

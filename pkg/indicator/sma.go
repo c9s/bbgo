@@ -35,7 +35,7 @@ func (inc *SMA) Length() int {
 
 func (inc *SMA) Clone() types.UpdatableSeriesExtend {
 	out := &SMA{
-		Values:    inc.Values[:],
+		Values:    append(floats.New(), inc.Values...),
 		rawValues: inc.rawValues.Clone(),
 		EndTime:   inc.EndTime,
 	}

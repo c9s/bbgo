@@ -702,7 +702,7 @@ func (inc *ShiftResult) Last(i int) float64 {
 	if inc.offset+i < 0 {
 		return 0
 	}
-	if inc.offset+i > inc.a.Length() {
+	if inc.offset+i >= inc.a.Length() {
 		return 0
 	}
 

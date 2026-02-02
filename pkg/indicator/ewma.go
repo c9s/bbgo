@@ -27,7 +27,7 @@ var _ types.SeriesExtend = &EWMA{}
 func (inc *EWMA) Clone() *EWMA {
 	out := &EWMA{
 		IntervalWindow: inc.IntervalWindow,
-		Values:         inc.Values[:],
+		Values:         append(floats.New(), inc.Values...),
 	}
 	out.SeriesBase.Series = out
 	return out
