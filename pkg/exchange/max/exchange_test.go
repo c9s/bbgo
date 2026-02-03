@@ -718,3 +718,96 @@ func TestExchange_QueryAccount(t *testing.T) {
 		}
 	})
 }
+
+func TestExchange_QueryKLines(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	e := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, e.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	since, err := time.Parse(time.RFC3339, "2026-02-01T00:00:00Z")
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	klines, err := e.QueryKLines(context.Background(), "BTCUSDT", types.Interval1h, types.KLineQueryOptions{
+		StartTime: &since,
+		Limit:     100,
+	})
+
+	if assert.NoError(t, err) {
+		assert.NotNil(t, klines)
+		assert.NotEmpty(t, klines)
+		t.Logf("found %d klines", len(klines))
+
+		for _, kline := range klines {
+			assert.Equal(t, "BTCUSDT", kline.Symbol)
+			assert.Equal(t, types.Interval1h, kline.Interval)
+			assert.False(t, kline.Open.IsZero())
+			assert.False(t, kline.Close.IsZero())
+			assert.False(t, kline.High.IsZero())
+			assert.False(t, kline.Low.IsZero())
+			assert.False(t, kline.StartTime.Time().IsZero())
+			assert.False(t, kline.EndTime.Time().IsZero())
+			assert.True(t, kline.StartTime.Time().Equal(since) || kline.StartTime.Time().After(since))
+			t.Logf("kline: Symbol=%s Interval=%s Open=%s Close=%s High=%s Low=%s Volume=%s StartTime=%s",
+				kline.Symbol, kline.Interval, kline.Open, kline.Close, kline.High, kline.Low, kline.Volume, kline.StartTime)
+		}
+	}
+}
+
+func TestExchange_QueryDepth(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	e := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, e.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	orderBook, updateID, err := e.QueryDepth(context.Background(), "BTCUSDT", 50)
+
+	if assert.NoError(t, err) {
+		assert.Equal(t, "BTCUSDT", orderBook.Symbol)
+		assert.NotEmpty(t, orderBook.Bids)
+		assert.NotEmpty(t, orderBook.Asks)
+		assert.NotZero(t, updateID)
+		t.Logf("orderBook: Symbol=%s Bids=%d Asks=%d UpdateID=%d",
+			orderBook.Symbol, len(orderBook.Bids), len(orderBook.Asks), updateID)
+
+		// Verify bids are sorted in descending order (highest price first)
+		for i := 0; i < len(orderBook.Bids)-1; i++ {
+			assert.True(t, orderBook.Bids[i].Price.Compare(orderBook.Bids[i+1].Price) >= 0,
+				"bids should be sorted in descending order")
+		}
+
+		// Verify asks are sorted in ascending order (lowest price first)
+		for i := 0; i < len(orderBook.Asks)-1; i++ {
+			assert.True(t, orderBook.Asks[i].Price.Compare(orderBook.Asks[i+1].Price) <= 0,
+				"asks should be sorted in ascending order")
+		}
+
+		// Log first few bids and asks
+		for i := 0; i < 5 && i < len(orderBook.Bids); i++ {
+			t.Logf("bid[%d]: Price=%s Volume=%s", i, orderBook.Bids[i].Price, orderBook.Bids[i].Volume)
+		}
+		for i := 0; i < 5 && i < len(orderBook.Asks); i++ {
+			t.Logf("ask[%d]: Price=%s Volume=%s", i, orderBook.Asks[i].Price, orderBook.Asks[i].Volume)
+		}
+	}
+}

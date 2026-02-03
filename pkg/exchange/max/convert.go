@@ -2,6 +2,7 @@ package max
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -355,10 +356,22 @@ func convertDepth(symbol string, depth *v3.Depth) (snapshot types.SliceOrderBook
 	for _, entry := range depth.Bids {
 		snapshot.Bids = append(snapshot.Bids, types.PriceVolume{Price: entry[0], Volume: entry[1]})
 	}
+	sort.Slice(
+		snapshot.Bids,
+		func(i, j int) bool {
+			return snapshot.Bids[i].Price.Compare(snapshot.Bids[j].Price) > 0
+		},
+	)
 
 	for _, entry := range depth.Asks {
 		snapshot.Asks = append(snapshot.Asks, types.PriceVolume{Price: entry[0], Volume: entry[1]})
 	}
+	sort.Slice(
+		snapshot.Asks,
+		func(i, j int) bool {
+			return snapshot.Asks[i].Price.Compare(snapshot.Asks[j].Price) < 0
+		},
+	)
 
 	return snapshot, finalUpdateID, err
 }
