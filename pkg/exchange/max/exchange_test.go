@@ -2,6 +2,7 @@ package max
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -485,6 +486,136 @@ func TestExchange_QueryDepositHistory(t *testing.T) {
 			assert.NotEmpty(t, deposit.Asset)
 			assert.NotEmpty(t, deposit.Status)
 			t.Logf("deposit: %+v", deposit)
+		}
+	}
+}
+
+func TestExchange_QueryClosedOrders(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	e := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, e.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	since, err := time.Parse(time.RFC3339, "2026-02-01T00:00:00Z")
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	until, err := time.Parse(time.RFC3339, "2026-02-10T00:00:00Z")
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	ctx := context.Background()
+	orders, err := e.QueryClosedOrders(ctx, "BTCUSDT", since, until, 0)
+	assert.NoError(t, err)
+	assert.NotNil(t, orders)
+	t.Logf("found %d closed orders", len(orders))
+
+	for _, order := range orders {
+		assert.NotEmpty(t, order.Symbol)
+		assert.NotZero(t, order.OrderID)
+		assert.NotEmpty(t, order.Status)
+		assert.True(t, !order.CreationTime.Time().Before(since))
+		assert.True(t, !order.CreationTime.Time().After(until))
+		t.Logf("closed order: OrderID=%d Symbol=%s Status=%s Side=%s Price=%s Quantity=%s CreationTime=%s",
+			order.OrderID, order.Symbol, order.Status, order.Side, order.Price, order.Quantity, order.CreationTime)
+	}
+
+	sort.Slice(orders, func(i, j int) bool {
+		return orders[i].OrderID < orders[j].OrderID
+	})
+	lastOrderID := orders[len(orders)-1].OrderID
+	orders, err = e.QueryClosedOrders(
+		ctx,
+		"BTCUSDT",
+		time.Time{},
+		time.Time{},
+		lastOrderID,
+	)
+	assert.NoError(t, err)
+}
+
+func TestExchange_QueryOrder(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	e := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, e.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	orderID := uint64(2492647274)
+
+	order, err := e.QueryOrder(context.Background(), types.OrderQuery{
+		OrderID: strconv.FormatUint(orderID, 10),
+	})
+
+	if assert.NoError(t, err) {
+		assert.NotNil(t, order)
+		assert.Equal(t, orderID, order.OrderID)
+		assert.NotEmpty(t, order.Symbol)
+		assert.NotEmpty(t, order.Status)
+		assert.NotEmpty(t, order.Side)
+		assert.False(t, order.Price.IsZero())
+		assert.False(t, order.Quantity.IsZero())
+		assert.False(t, order.CreationTime.Time().IsZero())
+		t.Logf("order: OrderID=%d Symbol=%s Status=%s Side=%s Type=%s Price=%s Quantity=%s ExecutedQuantity=%s CreationTime=%s",
+			order.OrderID, order.Symbol, order.Status, order.Side, order.Type, order.Price, order.Quantity, order.ExecutedQuantity, order.CreationTime)
+	}
+}
+
+func TestExchange_QueryOrderTrades(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	e := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, e.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	orderID := uint64(2492647274)
+
+	trades, err := e.QueryOrderTrades(context.Background(), types.OrderQuery{
+		OrderID: strconv.FormatUint(orderID, 10),
+	})
+
+	if assert.NoError(t, err) {
+		assert.NotNil(t, trades)
+		t.Logf("found %d trades for order %d", len(trades), orderID)
+
+		for _, trade := range trades {
+			assert.Equal(t, orderID, trade.OrderID)
+			assert.NotEmpty(t, trade.Symbol)
+			assert.NotZero(t, trade.ID)
+			assert.NotEmpty(t, trade.Side)
+			assert.False(t, trade.Price.IsZero())
+			assert.False(t, trade.Quantity.IsZero())
+			assert.False(t, trade.QuoteQuantity.IsZero())
+			assert.False(t, trade.Time.Time().IsZero())
+			t.Logf("trade: TradeID=%d OrderID=%d Symbol=%s Side=%s Price=%s Quantity=%s QuoteQuantity=%s Fee=%s FeeCurrency=%s Time=%s",
+				trade.ID, trade.OrderID, trade.Symbol, trade.Side, trade.Price, trade.Quantity, trade.QuoteQuantity, trade.Fee, trade.FeeCurrency, trade.Time)
 		}
 	}
 }

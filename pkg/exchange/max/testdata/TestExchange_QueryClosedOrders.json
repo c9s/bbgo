@@ -1,0 +1,124 @@
+[
+  {
+    "timestamp": "2026-02-03T20:41:58.33305+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://test-api/api/v3/wallet/spot/orders/closed?limit=1000\u0026market=btcusdt\u0026nonce=1770122517000\u0026order_by=asc\u0026timestamp=1769904000000",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "<max-payload>"
+        ],
+        "X-Max-Signature": [
+          "<signature>"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "5088"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 12:41:58 GMT"
+        ],
+        "Etag": [
+          "W/\"2e21ce19328860af4dafbc6b22ab47e3\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.077787"
+        ]
+      },
+      "body": "[{\"id\":2492647274,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"test1770089804398\",\"group_id\":null,\"side\":\"buy\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"90000.0\",\"stop_price\":null,\"avg_price\":\"78845.32\",\"volume\":\"0.001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.001\",\"trades_count\":1,\"created_at\":1770089830162,\"updated_at\":1770089830270},{\"id\":2492665741,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-1>\",\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"78415.91\",\"stop_price\":null,\"avg_price\":\"78433.19\",\"volume\":\"0.000255\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.000255\",\"trades_count\":1,\"created_at\":1770095257180,\"updated_at\":1770095257332},{\"id\":2492708156,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-2>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770107207308,\"updated_at\":1770107207569},{\"id\":2492709208,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-3>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770107504505,\"updated_at\":1770107506995},{\"id\":2492711229,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-4>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770108105082,\"updated_at\":1770108137744},{\"id\":2492711901,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-5>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770108361203,\"updated_at\":1770108362663},{\"id\":2492712521,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-6>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770108611055,\"updated_at\":1770108613361},{\"id\":2492712623,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-7>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770108657586,\"updated_at\":1770108658338},{\"id\":2492712709,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-8>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770108699607,\"updated_at\":1770108700789},{\"id\":2492713059,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-9>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770108823037,\"updated_at\":1770108824028},{\"id\":2492713199,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-10>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770108858187,\"updated_at\":1770108859060},{\"id\":2492713214,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-11>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770108864899,\"updated_at\":1770108865910},{\"id\":2492713228,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-12>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770108871932,\"updated_at\":1770108872740},{\"id\":2492713281,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-13>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770108900549,\"updated_at\":1770108901424}]"
+    }
+  },
+  {
+    "timestamp": "2026-02-03T20:41:59.069912+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://test-api/api/v3/wallet/spot/orders/history?from_id=2492713281\u0026limit=1000\u0026market=btcusdt\u0026nonce=1770122518000",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "<max-payload>"
+        ],
+        "X-Max-Signature": [
+          "<signature>"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "364"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 12:41:59 GMT"
+        ],
+        "Etag": [
+          "W/\"4e9c2ca0d67fe76cc0408076b838aba0\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.112319"
+        ]
+      },
+      "body": "[{\"id\":2492713281,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-13>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770108900549,\"updated_at\":1770108901424}]"
+    }
+  }
+]

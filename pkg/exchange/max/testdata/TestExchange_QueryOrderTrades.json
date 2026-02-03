@@ -1,0 +1,63 @@
+[
+  {
+    "timestamp": "2026-02-03T14:57:56.188708+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://stag-max-api.maicoin.com/api/v3/order/trades?nonce=1770101875000\u0026order_id=2492647274",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJub25jZSI6MTc3MDEwMTg3NTAwMCwib3JkZXJfaWQiOiIyNDkyNjQ3Mjc0IiwicGF0aCI6Ii9hcGkvdjMvb3JkZXIvdHJhZGVzIn0="
+        ],
+        "X-Max-Signature": [
+          "cdeaa263a83b6f9a32ec5c46268ebdae4431fbdc7c55486d12088979f5987580"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "281"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 06:57:56 GMT"
+        ],
+        "Etag": [
+          "W/\"0806164555ba4255ceea6327102d773c\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-69819c74-14d52b0d1339235d60889ed8"
+        ],
+        "X-Runtime": [
+          "0.072402"
+        ]
+      },
+      "body": "[{\"id\":12328549,\"order_id\":2492647274,\"wallet_type\":\"spot\",\"price\":\"78845.32\",\"volume\":\"0.001\",\"funds\":\"78.84532\",\"market\":\"btcusdt\",\"market_name\":\"BTC/USDT\",\"side\":\"bid\",\"fee\":\"0.0000016\",\"fee_currency\":\"btc\",\"fee_discounted\":false,\"liquidity\":\"taker\",\"created_at\":1770089830214}]"
+    }
+  }
+]
