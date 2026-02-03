@@ -1082,3 +1082,38 @@ func TestExchange_CancelAllOrders(t *testing.T) {
 	_, err := ex.CancelAllOrders(ctx)
 	assert.NoError(t, err)
 }
+
+func TestExchange_QueryMarginAssetMaxBorrowable(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	e := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, e.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	maxBorrowable, err := e.QueryMarginAssetMaxBorrowable(context.Background(), "USDT")
+	if assert.NoError(t, err) {
+		assert.NotNil(t, maxBorrowable)
+		assert.False(t, maxBorrowable.IsZero())
+		t.Logf("max borrowable USDT: %s", maxBorrowable.String())
+	}
+
+	// Test with another asset
+	maxBorrowableBTC, err := e.QueryMarginAssetMaxBorrowable(context.Background(), "BTC")
+	if assert.NoError(t, err) {
+		assert.NotNil(t, maxBorrowableBTC)
+		assert.False(t, maxBorrowableBTC.IsZero())
+		t.Logf("max borrowable BTC: %s", maxBorrowableBTC.String())
+	}
+
+	// Test with non-existent asset - should return error
+	_, err = e.QueryMarginAssetMaxBorrowable(context.Background(), "NONEXISTENT")
+	assert.Error(t, err)
+}
