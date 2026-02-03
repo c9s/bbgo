@@ -1,0 +1,63 @@
+[
+  {
+    "timestamp": "2026-02-03T14:22:38.787699+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://dev-api.com/api/v3/withdrawals?limit=1000\u0026nonce=1770099758000\u0026order=asc\u0026timestamp=1767225600000",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "<max-payload>"
+        ],
+        "X-Max-Signature": [
+          "<signature>"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "352"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 06:22:38 GMT"
+        ],
+        "Etag": [
+          "W/\"606fa5338a48729d10ce9071c5b9591d\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.214821"
+        ]
+      },
+      "body": "[{\"uuid\":\"260130051100394364\",\"currency\":\"eth\",\"network_protocol\":\"ethereum\",\"amount\":\"0.05\",\"fee\":\"0.0\",\"fee_currency\":\"eth\",\"to_address\":\"0xd9dF4210E3cD9A777814F3d7D066A37c6fF3582b\",\"label\":\"MetaMask\",\"txid\":\"0x9df38b4ba0fc6ec610046cee3321c6c4d2d4dfe78498bf3199462a59b4319397\",\"created_at\":1769749912651,\"state\":\"done\",\"transaction_type\":\"external\"}]"
+    }
+  }
+]

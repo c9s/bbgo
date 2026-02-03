@@ -426,3 +426,65 @@ func TestExchange_buildFromIdTradesRequest(t *testing.T) {
 		assert.Equal(t, "m", string(slugParams["walletType"].(maxapi.WalletType)))
 	})
 }
+
+func TestExchange_QueryWithdrawHistory(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	e := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, e.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	since, _ := time.Parse(time.RFC3339, "2026-01-01T00:00:00Z")
+	until, err := time.Parse(time.RFC3339, "2026-02-28T00:00:00Z")
+
+	withdraws, err := e.QueryWithdrawHistory(context.Background(), "", since, until)
+	if assert.NoError(t, err) {
+		assert.NotNil(t, withdraws)
+		t.Logf("found %d withdraws", len(withdraws))
+
+		for _, withdraw := range withdraws {
+			assert.NotEmpty(t, withdraw.Asset)
+			assert.NotEmpty(t, withdraw.Status)
+			t.Logf("withdraw: %+v", withdraw)
+		}
+	}
+}
+
+func TestExchange_QueryDepositHistory(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	e := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, e.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	since, _ := time.Parse(time.RFC3339, "2026-01-01T00:00:00Z")
+	until, err := time.Parse(time.RFC3339, "2026-02-28T00:00:00Z")
+
+	deposits, err := e.QueryDepositHistory(context.Background(), "", since, until)
+	if assert.NoError(t, err) {
+		assert.NotNil(t, deposits)
+		t.Logf("found %d deposits", len(deposits))
+
+		for _, deposit := range deposits {
+			assert.NotEmpty(t, deposit.Asset)
+			assert.NotEmpty(t, deposit.Status)
+			t.Logf("deposit: %+v", deposit)
+		}
+	}
+}
