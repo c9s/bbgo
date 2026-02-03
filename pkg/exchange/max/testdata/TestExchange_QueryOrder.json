@@ -3,7 +3,7 @@
     "timestamp": "2026-02-03T14:51:48.940886+08:00",
     "request": {
       "method": "GET",
-      "url": "https://stag-api.com/api/v3/order?id=2492647274\u0026nonce=1770101508000",
+      "url": "https://test-api.com/api/v3/order?id=2492647274&nonce=1770101508000",
       "header": {
         "Content-Type": [
           "application/json"

@@ -3,7 +3,7 @@
     "timestamp": "2026-02-03T13:06:01.438661+08:00",
     "request": {
       "method": "GET",
-      "url": "https://stag-api.com/api/v3/markets",
+      "url": "https://test-api.com/api/v3/markets",
       "header": {}
     },
     "response": {
@@ -49,7 +49,7 @@
     "timestamp": "2026-02-03T13:06:39.70928+08:00",
     "request": {
       "method": "GET",
-      "url": "https://stag-api.com/api/v3/wallet/spot/accounts?nonce=1770095199000",
+      "url": "https://test-api.com/api/v3/wallet/spot/accounts?nonce=1770095199000",
       "header": {
         "Content-Type": [
           "application/json"
@@ -110,7 +110,7 @@
     "timestamp": "2026-02-03T13:07:02.625611+08:00",
     "request": {
       "method": "GET",
-      "url": "https://stag-api.com/api/v3/ticker?market=btcusdt",
+      "url": "https://test-api.com/api/v3/ticker?market=btcusdt",
       "header": {}
     },
     "response": {
@@ -158,7 +158,7 @@
     "timestamp": "2026-02-03T13:07:37.240818+08:00",
     "request": {
       "method": "POST",
-      "url": "https://stag-api.com/api/v3/wallet/spot/order?nonce=1770095257000",
+      "url": "https://test-api.com/api/v3/wallet/spot/order?nonce=1770095257000",
       "header": {
         "Content-Type": [
           "application/json"
@@ -212,14 +212,14 @@
           "0.140430"
         ]
       },
-      "body": "{\"id\":2492665741,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"x-bbgo-490f6c57-d54b-4a1c-9727-4af6a\",\"group_id\":null,\"side\":\"sell\",\"state\":\"wait\",\"ord_type\":\"limit\",\"price\":\"78415.91\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.000255\",\"remaining_volume\":\"0.000255\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770095257180,\"updated_at\":1770095257180}"
+      "body": "{\"id\":2492665741,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-1>\",\"group_id\":null,\"side\":\"sell\",\"state\":\"wait\",\"ord_type\":\"limit\",\"price\":\"78415.91\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.000255\",\"remaining_volume\":\"0.000255\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770095257180,\"updated_at\":1770095257180}"
     }
   },
   {
     "timestamp": "2026-02-03T13:07:50.237939+08:00",
     "request": {
       "method": "GET",
-      "url": "https://stag-api.com/api/v3/order?id=2492665741\u0026nonce=1770095270000",
+      "url": "https://test-api.com/api/v3/order?id=2492665741&nonce=1770095270000",
       "header": {
         "Content-Type": [
           "application/json"
@@ -273,14 +273,14 @@
           "0.086157"
         ]
       },
-      "body": "{\"id\":2492665741,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"x-bbgo-490f6c57-d54b-4a1c-9727-4af6a\",\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"78415.91\",\"stop_price\":null,\"avg_price\":\"78433.19\",\"volume\":\"0.000255\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.000255\",\"trades_count\":1,\"created_at\":1770095257180,\"updated_at\":1770095257332}"
+      "body": "{\"id\":2492665741,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-1>\",\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"78415.91\",\"stop_price\":null,\"avg_price\":\"78433.19\",\"volume\":\"0.000255\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.000255\",\"trades_count\":1,\"created_at\":1770095257180,\"updated_at\":1770095257332}"
     }
   },
   {
     "timestamp": "2026-02-03T13:07:58.999957+08:00",
     "request": {
       "method": "GET",
-      "url": "https://stag-api.com/api/v3/order/trades?nonce=1770095278000\u0026order_id=2492665741",
+      "url": "https://test-api.com/api/v3/order/trades?nonce=1770095278000&order_id=2492665741",
       "header": {
         "Content-Type": [
           "application/json"

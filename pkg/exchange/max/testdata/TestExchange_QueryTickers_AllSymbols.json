@@ -3,7 +3,7 @@
     "timestamp": "2026-02-03T13:40:17.985166+08:00",
     "request": {
       "method": "GET",
-      "url": "https://stag-api.com/api/v3/markets",
+      "url": "https://test-api.com/api/v3/markets",
       "header": {}
     },
     "response": {
@@ -49,7 +49,7 @@
     "timestamp": "2026-02-03T13:40:18.136239+08:00",
     "request": {
       "method": "GET",
-      "url": "https://stag-api.com/api/v3/tickers?markets%5B%5D=maxtwd\u0026markets%5B%5D=btctwd\u0026markets%5B%5D=ethtwd\u0026markets%5B%5D=ltctwd\u0026markets%5B%5D=bchtwd\u0026markets%5B%5D=usdttwd\u0026markets%5B%5D=ethbtc\u0026markets%5B%5D=maxusdt\u0026markets%5B%5D=btcusdt\u0026markets%5B%5D=ethusdt\u0026markets%5B%5D=bchusdt\u0026markets%5B%5D=ltcusdt\u0026markets%5B%5D=xrptwd\u0026markets%5B%5D=xrpusdt\u0026markets%5B%5D=usdctwd\u0026markets%5B%5D=linktwd\u0026markets%5B%5D=comptwd\u0026markets%5B%5D=sandusdt\u0026markets%5B%5D=usdcusdt\u0026markets%5B%5D=linkusdt\u0026markets%5B%5D=grttwd\u0026markets%5B%5D=yfitwd\u0026markets%5B%5D=dogetwd\u0026markets%5B%5D=dogeusdt\u0026markets%5B%5D=adatwd\u0026markets%5B%5D=compusdt\u0026markets%5B%5D=dottwd\u0026markets%5B%5D=dotusdt\u0026markets%5B%5D=poltwd\u0026markets%5B%5D=polusdt\u0026markets%5B%5D=adausdt\u0026markets%5B%5D=soltwd\u0026markets%5B%5D=solusdt\u0026markets%5B%5D=shibtwd\u0026markets%5B%5D=shibusdt\u0026markets%5B%5D=sandtwd\u0026markets%5B%5D=galatwd\u0026markets%5B%5D=manatwd\u0026markets%5B%5D=alicetwd\u0026markets%5B%5D=maskusdt\u0026markets%5B%5D=apetwd\u0026markets%5B%5D=apeusdt\u0026markets%5B%5D=xtztwd\u0026markets%5B%5D=gmttwd\u0026markets%5B%5D=gsttwd\u0026markets%5B%5D=bnbtwd\u0026markets%5B%5D=bnbusdt\u0026markets%5B%5D=enstwd\u0026markets%5B%5D=etctwd\u0026markets%5B%5D=etcusdt\u0026markets%5B%5D=arbtwd\u0026markets%5B%5D=arbusdt\u0026markets%5B%5D=avaxtwd\u0026markets%5B%5D=avaxusdt",
+      "url": "https://test-api.com/api/v3/tickers?markets%5B%5D=maxtwd&markets%5B%5D=btctwd&markets%5B%5D=ethtwd&markets%5B%5D=ltctwd&markets%5B%5D=bchtwd&markets%5B%5D=usdttwd&markets%5B%5D=ethbtc&markets%5B%5D=maxusdt&markets%5B%5D=btcusdt&markets%5B%5D=ethusdt&markets%5B%5D=bchusdt&markets%5B%5D=ltcusdt&markets%5B%5D=xrptwd&markets%5B%5D=xrpusdt&markets%5B%5D=usdctwd&markets%5B%5D=linktwd&markets%5B%5D=comptwd&markets%5B%5D=sandusdt&markets%5B%5D=usdcusdt&markets%5B%5D=linkusdt&markets%5B%5D=grttwd&markets%5B%5D=yfitwd&markets%5B%5D=dogetwd&markets%5B%5D=dogeusdt&markets%5B%5D=adatwd&markets%5B%5D=compusdt&markets%5B%5D=dottwd&markets%5B%5D=dotusdt&markets%5B%5D=poltwd&markets%5B%5D=polusdt&markets%5B%5D=adausdt&markets%5B%5D=soltwd&markets%5B%5D=solusdt&markets%5B%5D=shibtwd&markets%5B%5D=shibusdt&markets%5B%5D=sandtwd&markets%5B%5D=galatwd&markets%5B%5D=manatwd&markets%5B%5D=alicetwd&markets%5B%5D=maskusdt&markets%5B%5D=apetwd&markets%5B%5D=apeusdt&markets%5B%5D=xtztwd&markets%5B%5D=gmttwd&markets%5B%5D=gsttwd&markets%5B%5D=bnbtwd&markets%5B%5D=bnbusdt&markets%5B%5D=enstwd&markets%5B%5D=etctwd&markets%5B%5D=etcusdt&markets%5B%5D=arbtwd&markets%5B%5D=arbusdt&markets%5B%5D=avaxtwd&markets%5B%5D=avaxusdt",
       "header": {}
     },
     "response": {

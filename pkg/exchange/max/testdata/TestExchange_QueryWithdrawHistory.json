@@ -3,7 +3,7 @@
     "timestamp": "2026-02-03T14:22:38.787699+08:00",
     "request": {
       "method": "GET",
-      "url": "https://dev-api.com/api/v3/withdrawals?limit=1000\u0026nonce=1770099758000\u0026order=asc\u0026timestamp=1767225600000",
+      "url": "https://test-api.com/api/v3/withdrawals?limit=1000&nonce=1770099758000&order=asc&timestamp=1767225600000",
       "header": {
         "Content-Type": [
           "application/json"
@@ -57,7 +57,7 @@
           "0.214821"
         ]
       },
-      "body": "[{\"uuid\":\"260130051100394364\",\"currency\":\"eth\",\"network_protocol\":\"ethereum\",\"amount\":\"0.05\",\"fee\":\"0.0\",\"fee_currency\":\"eth\",\"to_address\":\"0xd9dF4210E3cD9A777814F3d7D066A37c6fF3582b\",\"label\":\"MetaMask\",\"txid\":\"0x9df38b4ba0fc6ec610046cee3321c6c4d2d4dfe78498bf3199462a59b4319397\",\"created_at\":1769749912651,\"state\":\"done\",\"transaction_type\":\"external\"}]"
+      "body": "[{\"uuid\":\"<uuid-1>\",\"currency\":\"eth\",\"network_protocol\":\"ethereum\",\"amount\":\"0.05\",\"fee\":\"0.0\",\"fee_currency\":\"eth\",\"to_address\":\"<address>\",\"label\":\"MetaMask\",\"txid\":\"<txid-1>\",\"created_at\":1769749912651,\"state\":\"done\",\"transaction_type\":\"external\"}]"
     }
   }
 ]

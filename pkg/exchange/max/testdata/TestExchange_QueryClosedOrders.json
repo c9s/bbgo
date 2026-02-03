@@ -3,7 +3,7 @@
     "timestamp": "2026-02-03T20:41:58.33305+08:00",
     "request": {
       "method": "GET",
-      "url": "https://test-api/api/v3/wallet/spot/orders/closed?limit=1000\u0026market=btcusdt\u0026nonce=1770122517000\u0026order_by=asc\u0026timestamp=1769904000000",
+      "url": "https://test-api.com/api/v3/wallet/spot/orders/closed?limit=1000&market=btcusdt&nonce=1770101481000&order_by=asc&timestamp=1769904000000",
       "header": {
         "Content-Type": [
           "application/json"

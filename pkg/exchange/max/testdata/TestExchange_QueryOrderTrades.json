@@ -3,7 +3,7 @@
     "timestamp": "2026-02-03T14:57:56.188708+08:00",
     "request": {
       "method": "GET",
-      "url": "https://stag-max-api.maicoin.com/api/v3/order/trades?nonce=1770101875000\u0026order_id=2492647274",
+      "url": "https://test-api.com/api/v3/order/trades?nonce=1770101875000&order_id=2492647274",
       "header": {
         "Content-Type": [
           "application/json"
@@ -12,10 +12,10 @@
           "bbgo/v1.63.0-4b92891e1-dev"
         ],
         "X-Max-Payload": [
-          "eyJub25jZSI6MTc3MDEwMTg3NTAwMCwib3JkZXJfaWQiOiIyNDkyNjQ3Mjc0IiwicGF0aCI6Ii9hcGkvdjMvb3JkZXIvdHJhZGVzIn0="
+          "<max-payload>"
         ],
         "X-Max-Signature": [
-          "cdeaa263a83b6f9a32ec5c46268ebdae4431fbdc7c55486d12088979f5987580"
+          "<signature>"
         ]
       }
     },
@@ -51,7 +51,7 @@
           "Origin"
         ],
         "X-Request-Id": [
-          "1-69819c74-14d52b0d1339235d60889ed8"
+          "<request-id>"
         ],
         "X-Runtime": [
           "0.072402"

@@ -3,7 +3,7 @@
     "timestamp": "2026-02-03T13:41:21.410538+08:00",
     "request": {
       "method": "GET",
-      "url": "https://stag-api.com/api/v3/ticker?market=btcusdt",
+      "url": "https://test-api.com/api/v3/ticker?market=btcusdt",
       "header": {}
     },
     "response": {

@@ -3,7 +3,7 @@
     "timestamp": "2025-09-01T20:39:18.178363+08:00",
     "request": {
       "method": "GET",
-      "url": "https://stag-api.com/api/v3/sub_accounts",
+      "url": "https://test-api.com/api/v3/sub_accounts",
       "header": {
         "Content-Type": [
           "application/json"
@@ -64,7 +64,7 @@
     "timestamp": "2025-09-01T20:39:18.199031+08:00",
     "request": {
       "method": "GET",
-      "url": "https://stag-api.com/api/v2/timestamp",
+      "url": "https://test-api.com/api/v2/timestamp",
       "header": {}
     },
     "response": {
@@ -112,7 +112,7 @@
     "timestamp": "2025-09-01T20:39:18.384185+08:00",
     "request": {
       "method": "POST",
-      "url": "https://stag-api.com/api/v3/sub_accounts",
+      "url": "https://test-api.com/api/v3/sub_accounts",
       "header": {
         "Content-Type": [
           "application/json"
@@ -173,7 +173,7 @@
     "timestamp": "2025-09-01T20:39:18.751937+08:00",
     "request": {
       "method": "POST",
-      "url": "https://stag-api.com/api/v3/sub_account/transfer",
+      "url": "https://test-api.com/api/v3/sub_account/transfer",
       "header": {
         "Content-Type": [
           "application/json"
@@ -234,7 +234,7 @@
     "timestamp": "2025-09-01T20:39:20.031217+08:00",
     "request": {
       "method": "POST",
-      "url": "https://stag-api.com/api/v3/sub_account/transfer",
+      "url": "https://test-api.com/api/v3/sub_account/transfer",
       "header": {
         "Content-Type": [
           "application/json"
@@ -298,7 +298,7 @@
     "timestamp": "2025-09-01T20:39:21.196663+08:00",
     "request": {
       "method": "DELETE",
-      "url": "https://stag-api.com/api/v3/sub_account",
+      "url": "https://test-api.com/api/v3/sub_account",
       "header": {
         "Content-Type": [
           "application/json"
