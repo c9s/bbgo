@@ -1030,3 +1030,35 @@ func TestExchange_CancelOrdersBySymbol(t *testing.T) {
 
 	assert.True(t, found, "canceled order should be in the response")
 }
+
+func TestExchange_QueryOpenOrders(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ex := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, ex.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	// Call QueryOpenOrders
+	openOrders, err := ex.QueryOpenOrders(ctx, "BTCUSDT")
+	assert.NoError(t, err)
+	t.Logf("open orders count: %d", len(openOrders))
+
+	// Verify each order if there are any
+	for _, order := range openOrders {
+		assert.NotZero(t, order.OrderID)
+		assert.Equal(t, "BTCUSDT", order.Symbol)
+		assert.True(t, order.Status == types.OrderStatusNew || order.Status == types.OrderStatusPartiallyFilled)
+		t.Logf("open order: %+v", order)
+	}
+}

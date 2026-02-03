@@ -1,0 +1,63 @@
+[
+  {
+    "timestamp": "2026-02-03T17:03:21.987585+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://stag-max-api.maicoin.com/api/v3/wallet/spot/orders/open?limit=1000\u0026market=btcusdt\u0026nonce=1770109401000\u0026order_by=asc\u0026timestamp=1529510400000",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "eyJsaW1pdCI6IjEwMDAiLCJtYXJrZXQiOiJidGN1c2R0Iiwibm9uY2UiOjE3NzAxMDk0MDEwMDAsIm9yZGVyX2J5IjoiYXNjIiwicGF0aCI6Ii9hcGkvdjMvd2FsbGV0L3Nwb3Qvb3JkZXJzL29wZW4iLCJ0aW1lc3RhbXAiOiIxNTI5NTEwNDAwMDAwIn0="
+        ],
+        "X-Max-Signature": [
+          "8f09c66b9440d54364d599cb60ea621c0247c502e44c14b257d217577ddfff23"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "2"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 09:03:21 GMT"
+        ],
+        "Etag": [
+          "W/\"4f53cda18c2baa0c0354bb5f9a3ecbe5\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "1-6981b9d9-0e2d81b64cad57bb7a78bff4"
+        ],
+        "X-Runtime": [
+          "0.084712"
+        ]
+      },
+      "body": "[]"
+    }
+  }
+]
