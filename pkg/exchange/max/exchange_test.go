@@ -1062,3 +1062,23 @@ func TestExchange_QueryOpenOrders(t *testing.T) {
 		t.Logf("open order: %+v", order)
 	}
 }
+
+func TestExchange_CancelAllOrders(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	ctx := context.Background()
+	ex := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, ex.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	_, err := ex.CancelAllOrders(ctx)
+	assert.NoError(t, err)
+}
