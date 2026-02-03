@@ -876,3 +876,157 @@ func TestExchange_QueryTrades(t *testing.T) {
 	assert.NotEmpty(t, trades)
 	assert.NoError(t, err)
 }
+
+func TestExchange_CancelOrdersBySymbolSide(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	ctx := context.Background()
+	ex := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, ex.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	// Query markets to get market info
+	markets, err := ex.QueryMarkets(ctx)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	market, ok := markets["BTCUSDT"]
+	if !assert.True(t, ok, "BTCUSDT market not found") {
+		return
+	}
+
+	// Create a limit order to buy 0.1 BTC at the price of 1000 USDT
+	submitOrder := types.SubmitOrder{
+		Symbol:   "BTCUSDT",
+		Side:     types.SideTypeBuy,
+		Type:     types.OrderTypeLimit,
+		Price:    Number(1000),
+		Quantity: Number(0.1),
+		Market:   market,
+	}
+
+	order, err := ex.SubmitOrder(ctx, submitOrder)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.NotNil(t, order)
+	assert.Equal(t, "BTCUSDT", order.Symbol)
+	assert.Equal(t, types.SideTypeBuy, order.Side)
+	assert.Equal(t, types.OrderTypeLimit, order.Type)
+	assert.Equal(t, Number(1000), order.Price)
+	assert.Equal(t, Number(0.1), order.Quantity)
+	assert.NotZero(t, order.OrderID)
+	t.Logf("created order: %+v", order)
+
+	// Cancel the order by CancelOrdersBySymbolSide
+	canceledOrders, err := ex.CancelOrdersBySymbolSide(ctx, "BTCUSDT", types.SideTypeBuy)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	// Verify the response
+	assert.NotEmpty(t, canceledOrders)
+	t.Logf("canceled %d orders", len(canceledOrders))
+
+	// Verify that our order is in the canceled orders
+	found := false
+	for _, canceledOrder := range canceledOrders {
+		if canceledOrder.OrderID == order.OrderID {
+			found = true
+			assert.Equal(t, "BTCUSDT", canceledOrder.Symbol)
+			assert.Equal(t, types.SideTypeBuy, canceledOrder.Side)
+			assert.Equal(t, types.OrderTypeLimit, canceledOrder.Type)
+			t.Logf("found canceled order: %+v", canceledOrder)
+			break
+		}
+	}
+
+	assert.True(t, found, "canceled order should be in the response")
+}
+
+func TestExchange_CancelOrdersBySymbol(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	ctx := context.Background()
+	ex := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, ex.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	// Query markets to get market info
+	markets, err := ex.QueryMarkets(ctx)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	market, ok := markets["BTCUSDT"]
+	if !assert.True(t, ok, "BTCUSDT market not found") {
+		return
+	}
+
+	// Create a limit order to buy 0.1 BTC at the price of 1000 USDT
+	submitOrder := types.SubmitOrder{
+		Symbol:   "BTCUSDT",
+		Side:     types.SideTypeBuy,
+		Type:     types.OrderTypeLimit,
+		Price:    Number(1000),
+		Quantity: Number(0.1),
+		Market:   market,
+	}
+
+	order, err := ex.SubmitOrder(ctx, submitOrder)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.NotNil(t, order)
+	assert.Equal(t, "BTCUSDT", order.Symbol)
+	assert.Equal(t, types.SideTypeBuy, order.Side)
+	assert.Equal(t, types.OrderTypeLimit, order.Type)
+	assert.Equal(t, Number(1000), order.Price)
+	assert.Equal(t, Number(0.1), order.Quantity)
+	assert.NotZero(t, order.OrderID)
+	t.Logf("created order: %+v", order)
+
+	// Cancel all orders by symbol
+	canceledOrders, err := ex.CancelOrdersBySymbol(ctx, "BTCUSDT")
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	// Verify the response
+	assert.NotEmpty(t, canceledOrders)
+	t.Logf("canceled %d orders", len(canceledOrders))
+
+	// Verify that our order is in the canceled orders
+	found := false
+	for _, canceledOrder := range canceledOrders {
+		if canceledOrder.OrderID == order.OrderID {
+			found = true
+			assert.Equal(t, "BTCUSDT", canceledOrder.Symbol)
+			assert.Equal(t, types.SideTypeBuy, canceledOrder.Side)
+			assert.Equal(t, types.OrderTypeLimit, canceledOrder.Type)
+			t.Logf("found canceled order: %+v", canceledOrder)
+			break
+		}
+	}
+
+	assert.True(t, found, "canceled order should be in the response")
+}
