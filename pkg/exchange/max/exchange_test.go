@@ -811,3 +811,68 @@ func TestExchange_QueryDepth(t *testing.T) {
 		}
 	}
 }
+
+func TestExchange_QueryTrades(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	e := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, e.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	startTime, err := time.Parse("2006-01-02", "2026-02-01")
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	endTime, err := time.Parse("2006-01-02", "2026-02-10")
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	ctx := context.Background()
+	trades, err := e.QueryTrades(ctx, "BTCUSDT", &types.TradeQueryOptions{
+		StartTime: &startTime,
+		EndTime:   &endTime,
+		Limit:     100,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, trades)
+	t.Logf("found %d trades", len(trades))
+
+	for _, trade := range trades {
+		assert.Equal(t, "BTCUSDT", trade.Symbol)
+		assert.Equal(t, types.ExchangeMax, trade.Exchange)
+		assert.False(t, trade.Price.IsZero())
+		assert.False(t, trade.Quantity.IsZero())
+		assert.NotZero(t, trade.ID)
+		assert.NotZero(t, trade.OrderID)
+		assert.True(t, trade.Time.Time().Equal(startTime) || trade.Time.Time().After(startTime))
+		assert.True(t, trade.Time.Time().Equal(endTime) || trade.Time.Time().Before(endTime))
+		assert.Contains(t, []types.SideType{types.SideTypeBuy, types.SideTypeSell}, trade.Side)
+
+		t.Logf("trade: ID=%d OrderID=%d Symbol=%s Side=%s Price=%s Quantity=%s Time=%s Fee=%s FeeCurrency=%s",
+			trade.ID, trade.OrderID, trade.Symbol, trade.Side, trade.Price, trade.Quantity, trade.Time, trade.Fee, trade.FeeCurrency)
+	}
+
+	// Verify trades are sorted in ascending order by time
+	for i := 0; i < len(trades)-1; i++ {
+		assert.True(t, trades[i].Time.Time().Before(trades[i+1].Time.Time()) ||
+			trades[i].Time.Time().Equal(trades[i+1].Time.Time()),
+			"trades should be sorted in ascending order by time")
+	}
+
+	lastTradeID := trades[len(trades)-1].ID
+	trades, err = e.QueryTrades(ctx, "BTCUSDT", &types.TradeQueryOptions{
+		LastTradeID: lastTradeID,
+	})
+	assert.NotEmpty(t, trades)
+	assert.NoError(t, err)
+}
