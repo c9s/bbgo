@@ -545,6 +545,48 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestExchange_QueryClosedOrdersDesc(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	e := New(key, secret, "")
+
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, e.v3client.HttpClient, "testdata/"+t.Name()+".json")
+	defer saveRecord()
+
+	if isRecording && !ok {
+		t.Skipf("MAX api key is not configured, skipping integration test")
+	}
+
+	since, err := time.Parse(time.RFC3339, "2026-02-01T00:00:00Z")
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	until, err := time.Parse(time.RFC3339, "2026-02-10T00:00:00Z")
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	orders, err := e.QueryClosedOrdersDesc(context.Background(), "BTCUSDT", since, until, 0)
+	if assert.NoError(t, err) {
+		assert.NotNil(t, orders)
+		t.Logf("found %d closed orders (desc)", len(orders))
+
+		for _, order := range orders {
+			assert.NotEmpty(t, order.Symbol)
+			assert.NotZero(t, order.OrderID)
+			assert.NotEmpty(t, order.Status)
+			assert.True(t, !order.CreationTime.Time().Before(since))
+			assert.True(t, !order.CreationTime.Time().After(until))
+			t.Logf("closed order (desc): OrderID=%d Symbol=%s Status=%s Side=%s Price=%s Quantity=%s CreationTime=%s",
+				order.OrderID, order.Symbol, order.Status, order.Side, order.Price, order.Quantity, order.CreationTime)
+		}
+	}
+}
+
 func TestExchange_QueryOrder(t *testing.T) {
 	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
 	if !ok {
