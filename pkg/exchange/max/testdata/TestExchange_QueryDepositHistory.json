@@ -1,0 +1,63 @@
+[
+  {
+    "timestamp": "2026-02-03T15:08:31.598848+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://dev-api.come/api/v3/deposits?limit=1000\u0026nonce=1770102510000\u0026order=asc\u0026timestamp=1767225600000",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "<max-payload>"
+        ],
+        "X-Max-Signature": [
+          "<signature>"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "923"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 07:08:31 GMT"
+        ],
+        "Etag": [
+          "W/\"75106cce17615114114b1d4539258e1d\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.385609"
+        ]
+      },
+      "body": "[{\"uuid\":\"<uuid-1>\",\"currency\":\"eth\",\"network_protocol\":\"ethereum\",\"amount\":\"0.04997169\",\"to_address\":\"<address>\",\"txid\":\"<txid-1>\",\"created_at\":1769750522780,\"confirmations\":11,\"state\":\"done\",\"state_reason\":\"\"},{\"uuid\":\"<uuid-2>\",\"currency\":\"eth\",\"network_protocol\":\"ethereum\",\"amount\":\"1.0\",\"to_address\":\"<address>\",\"txid\":\"<txid-2>\",\"created_at\":1769743057889,\"confirmations\":11,\"state\":\"done\",\"state_reason\":\"\"},{\"uuid\":\"<uuid-3>\",\"currency\":\"eth\",\"network_protocol\":\"ethereum\",\"amount\":\"0.1\",\"to_address\":\"<address>\",\"txid\":\"<txid-3>\",\"created_at\":1769742999720,\"confirmations\":11,\"state\":\"done\",\"state_reason\":\"\"}]"
+    }
+  }
+]

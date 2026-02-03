@@ -1,0 +1,63 @@
+[
+  {
+    "timestamp": "2026-02-03T20:49:50.701037+08:00",
+    "request": {
+      "method": "DELETE",
+      "url": "https://test-api/api/v3/wallet/spot/orders?nonce=1770122990000",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "<max-payload>"
+        ],
+        "X-Max-Signature": [
+          "<signature>"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "2"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 12:49:50 GMT"
+        ],
+        "Etag": [
+          "W/\"4f53cda18c2baa0c0354bb5f9a3ecbe5\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.060253"
+        ]
+      },
+      "body": "[]"
+    }
+  }
+]

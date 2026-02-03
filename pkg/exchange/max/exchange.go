@@ -116,8 +116,16 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 			return nil, err
 		}
 
+		symbolsSet := make(map[string]struct{})
+		for _, s := range symbol {
+			symbolsSet[s] = struct{}{}
+		}
+		allMarkets := len(symbolsSet) == 0
 		for _, v := range maxTickers {
 			marketId := toGlobalSymbol(v.Market)
+			if _, found := symbolsSet[marketId]; !allMarkets && !found {
+				continue
+			}
 			tickers[marketId] = types.Ticker{
 				Time:   v.At.Time(),
 				Volume: v.Volume,
