@@ -661,3 +661,60 @@ func TestExchange_QueryOrderTrades(t *testing.T) {
 		}
 	}
 }
+
+func TestExchange_QueryAccount(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	t.Run("QueryAccount", func(t *testing.T) {
+		e := New(key, secret, "")
+
+		isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, e.v3client.HttpClient, "testdata/"+t.Name()+".json")
+		defer saveRecord()
+
+		if isRecording && !ok {
+			t.Skipf("MAX api key is not configured, skipping integration test")
+		}
+
+		account, err := e.QueryAccount(context.Background())
+		if assert.NoError(t, err) {
+			assert.NotNil(t, account)
+			assert.Equal(t, types.AccountTypeSpot, account.AccountType)
+			assert.True(t, account.HasFeeRate)
+			assert.False(t, account.MakerFeeRate.IsZero())
+			assert.False(t, account.TakerFeeRate.IsZero())
+			balance, ok := account.Balance("USDT")
+			assert.True(t, ok)
+			assert.NotNil(t, balance)
+			t.Logf("account: AccountType=%s MakerFeeRate=%s TakerFeeRate=%s",
+				account.AccountType, account.MakerFeeRate, account.TakerFeeRate)
+		}
+	})
+
+	t.Run("QuerySpotAccount", func(t *testing.T) {
+		e := New(key, secret, "")
+
+		isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, e.v3client.HttpClient, "testdata/"+t.Name()+".json")
+		defer saveRecord()
+
+		if isRecording && !ok {
+			t.Skipf("MAX api key is not configured, skipping integration test")
+		}
+
+		account, err := e.QuerySpotAccount(context.Background())
+		if assert.NoError(t, err) {
+			assert.NotNil(t, account)
+			assert.Equal(t, types.AccountTypeSpot, account.AccountType)
+			assert.True(t, account.HasFeeRate)
+			assert.False(t, account.MakerFeeRate.IsZero())
+			assert.False(t, account.TakerFeeRate.IsZero())
+			balance, ok := account.Balance("USDT")
+			assert.True(t, ok)
+			assert.NotNil(t, balance)
+			t.Logf("account: AccountType=%s MakerFeeRate=%s TakerFeeRate=%s",
+				account.AccountType, account.MakerFeeRate, account.TakerFeeRate)
+		}
+	})
+}
