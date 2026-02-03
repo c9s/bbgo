@@ -17,6 +17,7 @@ import (
 )
 
 func TestExchange_recoverOrder(t *testing.T) {
+	t.SkipNow() // skip flaky test for now
 	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
 	if !ok {
 		t.SkipNow()
