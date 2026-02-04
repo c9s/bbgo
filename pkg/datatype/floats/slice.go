@@ -257,7 +257,11 @@ func (s Slice) Dot(other Slice) float64 {
 }
 
 func (s Slice) Normalize() Slice {
-	return s.DivScalar(s.Sum())
+	sum := s.Sum()
+	if sum == 0 {
+		return make(Slice, len(s))
+	}
+	return s.DivScalar(sum)
 }
 
 func (s Slice) Addr() *Slice {

@@ -18,7 +18,7 @@ func (s *SigmoidResult) Length() int {
 	return s.a.Length()
 }
 
-// Sigmoid returns the input values in range of -1 to 1
+// Sigmoid returns the input values in the range of 0 to 1
 // along the sigmoid or s-shaped curve.
 // Commonly used in machine learning while training neural networks
 // as an activation function.

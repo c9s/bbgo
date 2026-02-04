@@ -61,8 +61,10 @@ func (inc *Queue) Length() int {
 }
 
 func (inc *Queue) Clone() *Queue {
+	arrCopy := make([]float64, len(inc.arr), cap(inc.arr))
+	copy(arrCopy, inc.arr)
 	out := &Queue{
-		arr:      inc.arr[:],
+		arr:      arrCopy,
 		size:     inc.size,
 		start:    inc.start,
 		last:     inc.last,
