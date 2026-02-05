@@ -2,6 +2,7 @@ package circuitbreaker
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -15,8 +16,8 @@ import (
 
 var errorCntMetric = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "bbgo_error_breaker_consecutive_error_count",
-		Help: "Current count of consecutive errors tracked by the error breaker",
+		Name: "bbgo_error_breaker_error_count",
+		Help: "Current count of errors within the time window tracked by the error breaker",
 	},
 	[]string{"strategy", "strategyInstance"},
 )
@@ -34,7 +35,7 @@ type ErrorRecord struct {
 	err       error
 }
 
-// ErrorBreaker is a circuit breaker that tracks consecutive errors
+// ErrorBreaker is a circuit breaker that tracks errors within a time window
 // and halts operations if the error count exceeds the threshold.
 //
 //go:generate callbackgen -type ErrorBreaker
@@ -43,12 +44,12 @@ type ErrorBreaker struct {
 
 	// breaker configuration
 	Enabled bool `json:"enabled"`
-	// MaxConsecutiveErrorCount defines the maximum number of consecutive errors allowed before halting.
-	MaxConsecutiveErrorCount int `json:"maxConsecutiveErrorCount"`
+	// MaxErrorCount defines the maximum number of errors allowed within the time window before halting.
+	MaxErrorCount int `json:"maxErrorCount"`
 	// HaltDuration defines the duration for which the breaker will be halted when triggered.
 	HaltDuration types.Duration `json:"haltDuration"`
-	// ErrorWindow defines the time window for errors to be considered consecutive (inclusive).
-	// If set to 0, all errors are considered consecutive regardless of their timestamps.
+	// ErrorWindow defines the time window for counting errors.
+	// If set to 0, all errors are counted regardless of their timestamps.
 	ErrorWindow types.Duration `json:"errorWindow"`
 
 	// breaker state
@@ -69,20 +70,20 @@ type ErrorBreaker struct {
 }
 
 // NewErrorBreaker creates a new ErrorBreaker with the given parameters.
-// maxErrors: maximum number of consecutive errors allowed
+// maxErrors: maximum number of errors allowed within the time window
 // haltDuration: duration for which the breaker will be halted
-// errorWindow: time window for errors to be considered consecutive (0 to disable)
+// errorWindow: time window for counting errors (0 to disable window-based filtering)
 func NewErrorBreaker(strategy, strategyInstance string, maxErrors int, haltDuration, errorWindow types.Duration) *ErrorBreaker {
 	if maxErrors <= 0 {
 		log.Warnf("the maxErrors cannot be negative, fallback to 5: %d", maxErrors)
 		maxErrors = 5
 	}
 	b := &ErrorBreaker{
-		Enabled:                  true,
-		MaxConsecutiveErrorCount: maxErrors,
-		HaltDuration:             haltDuration,
-		ErrorWindow:              errorWindow,
-		errors:                   make([]ErrorRecord, 0, maxErrors),
+		Enabled:       true,
+		MaxErrorCount: maxErrors,
+		HaltDuration:  haltDuration,
+		ErrorWindow:   errorWindow,
+		errors:        make([]ErrorRecord, 0, maxErrors),
 	}
 	b.SetMetricsInfo(strategy, strategyInstance)
 	b.updateMetrics()
@@ -98,8 +99,8 @@ func (b *ErrorBreaker) SetMetricsInfo(strategy, strategyInstance string) {
 }
 
 // RecordError records a critical error and updates the circuit breaker state.
-// If err is nil, the breaker is reset.
-// err: the error that occurred (if nil, the breaker is reset)
+// If err is nil, it is ignored (filtered out).
+// err: the error that occurred (if nil, it is ignored)
 func (b *ErrorBreaker) RecordError(err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -109,39 +110,42 @@ func (b *ErrorBreaker) RecordError(err error) {
 }
 
 func (b *ErrorBreaker) recordError(now time.Time, err error) {
-	// If no error occurred, reset the breaker
-	if err == nil {
-		b.reset()
+	if !b.Enabled {
 		return
 	}
-
-	if !b.halted && len(b.errors) > 0 && b.ErrorWindow.Duration() > 0 {
-		lastRecord := b.errors[len(b.errors)-1]
-		if now.Sub(lastRecord.timestamp) > b.ErrorWindow.Duration() {
-			// Clear old errors outside the error window
-			b.errors = b.errors[:0]
+	windowStart := now.Add(-b.ErrorWindow.Duration())
+	b.errors = slices.DeleteFunc(b.errors, func(r ErrorRecord) bool {
+		// remove nil errors
+		if r.err == nil {
+			return true
 		}
-	}
+		// remove errors outside the error window
+		if b.ErrorWindow.Duration() > 0 {
+			return r.timestamp.Before(windowStart)
+		}
+		return false
+	})
 
-	// Add the new error record
+	// Add the new error record (even if nil, it will be cleaned up on next call)
 	b.errors = append(b.errors, ErrorRecord{
 		timestamp: now,
 		err:       err,
 	})
 
+	// prevent unbounded growth by dropping oldest errors
+	if len(b.errors) > b.MaxErrorCount*2 {
+		b.errors = b.errors[len(b.errors)-b.MaxErrorCount:]
+	}
+
 	// the breaker is already halted
 	// keep halted until the duration expires
 	if b.halted {
-		if len(b.errors) > b.MaxConsecutiveErrorCount {
-			// drop the oldest error record to prevent unbounded growth
-			b.errors = b.errors[1:]
-		}
 		return
 	}
 
 	// the breaker is not halted yet
 	// check if we've exceeded the max errors threshold
-	if len(b.errors) >= b.MaxConsecutiveErrorCount {
+	if len(b.errors) >= b.MaxErrorCount {
 		// trigger halt
 		b.EmitHalt(now, b.errors)
 		b.halted = true
@@ -192,7 +196,7 @@ func (b *ErrorBreaker) reset() {
 	if b.errors != nil {
 		b.errors = b.errors[:0]
 	} else {
-		b.errors = make([]ErrorRecord, 0, b.MaxConsecutiveErrorCount)
+		b.errors = make([]ErrorRecord, 0, b.MaxErrorCount)
 	}
 	b.halted = false
 	b.haltedAt = time.Time{}
@@ -203,8 +207,13 @@ func (b *ErrorBreaker) reset() {
 func (b *ErrorBreaker) ErrorCount() int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-
-	return len(b.errors)
+	cnt := 0
+	for _, record := range b.errors {
+		if record.err != nil {
+			cnt++
+		}
+	}
+	return cnt
 }
 
 // Errors returns a copy of all errors currently tracked.
@@ -214,6 +223,9 @@ func (b *ErrorBreaker) Errors() []error {
 
 	var result []error
 	for _, record := range b.errors {
+		if record.err == nil {
+			continue
+		}
 		result = append(result, record.err)
 	}
 
@@ -250,7 +262,7 @@ func (b *ErrorBreaker) SlackAttachment() slack.Attachment {
 
 	fields := []slack.AttachmentField{
 		{Title: "Status", Value: status, Short: true},
-		{Title: "Error Count", Value: fmt.Sprintf("%d / %d", errorCount, b.MaxConsecutiveErrorCount), Short: true},
+		{Title: "Error Count", Value: fmt.Sprintf("%d / %d", errorCount, b.MaxErrorCount), Short: true},
 	}
 
 	if len(b.errors) > 0 {
