@@ -13,10 +13,10 @@ import (
 func TestErrorBreaker_RecordError(t *testing.T) {
 	t.Run("should not halt when errors are below threshold", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 3,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(0),
+			Enabled:      true,
+			MaxErrors:    3,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(0),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		now := time.Now()
@@ -30,10 +30,10 @@ func TestErrorBreaker_RecordError(t *testing.T) {
 
 	t.Run("should halt when errors reach threshold", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 3,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(0),
+			Enabled:      true,
+			MaxErrors:    3,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(0),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		breaker.SetMetricsInfo("test", "test-instance")
@@ -48,10 +48,10 @@ func TestErrorBreaker_RecordError(t *testing.T) {
 
 	t.Run("should auto-reset when halt duration expires", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 2,
-			HaltDuration:  types.Duration(100 * time.Millisecond),
-			ErrorWindow:   types.Duration(0),
+			Enabled:      true,
+			MaxErrors:    2,
+			HaltDuration: types.Duration(100 * time.Millisecond),
+			Window:       types.Duration(0),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		breaker.SetMetricsInfo("test", "test-instance")
@@ -72,10 +72,10 @@ func TestErrorBreaker_RecordError(t *testing.T) {
 
 	t.Run("should call halt callbacks only once when max error count is reached", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 2,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(0),
+			Enabled:      true,
+			MaxErrors:    2,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(0),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		breaker.SetMetricsInfo("test", "test-instance")
@@ -115,10 +115,10 @@ func TestErrorBreaker_RecordError(t *testing.T) {
 
 func TestErrorBreaker_Reset(t *testing.T) {
 	breaker := &ErrorBreaker{
-		Enabled:       true,
-		MaxErrorCount: 2,
-		HaltDuration:  types.Duration(time.Minute),
-		ErrorWindow:   types.Duration(0),
+		Enabled:      true,
+		MaxErrors:    2,
+		HaltDuration: types.Duration(time.Minute),
+		Window:       types.Duration(0),
 	}
 	breaker.SetMetricsInfo("test", "test-instance")
 	breaker.SetMetricsInfo("test", "test-instance")
@@ -138,10 +138,10 @@ func TestErrorBreaker_Reset(t *testing.T) {
 
 func TestErrorBreaker_ErrorCount(t *testing.T) {
 	breaker := &ErrorBreaker{
-		Enabled:       true,
-		MaxErrorCount: 5,
-		HaltDuration:  types.Duration(time.Minute),
-		ErrorWindow:   types.Duration(0),
+		Enabled:      true,
+		MaxErrors:    5,
+		HaltDuration: types.Duration(time.Minute),
+		Window:       types.Duration(0),
 	}
 	breaker.SetMetricsInfo("test", "test-instance")
 	breaker.SetMetricsInfo("test", "test-instance")
@@ -163,10 +163,10 @@ func TestErrorBreaker_ErrorCount(t *testing.T) {
 
 func TestErrorBreaker_ConcurrentAccess(t *testing.T) {
 	breaker := &ErrorBreaker{
-		Enabled:       true,
-		MaxErrorCount: 20,
-		HaltDuration:  types.Duration(time.Minute),
-		ErrorWindow:   types.Duration(0),
+		Enabled:      true,
+		MaxErrors:    20,
+		HaltDuration: types.Duration(time.Minute),
+		Window:       types.Duration(0),
 	}
 	breaker.SetMetricsInfo("test", "test-instance")
 	breaker.SetMetricsInfo("test", "test-instance")
@@ -194,10 +194,10 @@ func TestErrorBreaker_ConcurrentAccess(t *testing.T) {
 func TestErrorBreaker_EdgeCases(t *testing.T) {
 	t.Run("maxErrors of 1 should halt immediately", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 1,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(0),
+			Enabled:      true,
+			MaxErrors:    1,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(0),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		breaker.SetMetricsInfo("test", "test-instance")
@@ -208,10 +208,10 @@ func TestErrorBreaker_EdgeCases(t *testing.T) {
 
 	t.Run("very short halt duration", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 2,
-			HaltDuration:  types.Duration(time.Nanosecond),
-			ErrorWindow:   types.Duration(0),
+			Enabled:      true,
+			MaxErrors:    2,
+			HaltDuration: types.Duration(time.Nanosecond),
+			Window:       types.Duration(0),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		breaker.SetMetricsInfo("test", "test-instance")
@@ -225,10 +225,10 @@ func TestErrorBreaker_EdgeCases(t *testing.T) {
 
 	t.Run("recording errors after halted state", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 2,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(0),
+			Enabled:      true,
+			MaxErrors:    2,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(0),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		breaker.SetMetricsInfo("test", "test-instance")
@@ -244,10 +244,10 @@ func TestErrorBreaker_EdgeCases(t *testing.T) {
 
 	t.Run("nil error should be ignored", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 2,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(0),
+			Enabled:      true,
+			MaxErrors:    2,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(0),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		now := time.Now()
@@ -274,10 +274,10 @@ func TestErrorBreaker_EdgeCases(t *testing.T) {
 func TestErrorBreaker_Errors(t *testing.T) {
 	t.Run("should return all recorded errors", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 5,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(0),
+			Enabled:      true,
+			MaxErrors:    5,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(0),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		now := time.Now()
@@ -296,10 +296,10 @@ func TestErrorBreaker_Errors(t *testing.T) {
 
 	t.Run("should return empty slice when no errors", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 5,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(0),
+			Enabled:      true,
+			MaxErrors:    5,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(0),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		errors := breaker.Errors()
@@ -308,10 +308,10 @@ func TestErrorBreaker_Errors(t *testing.T) {
 
 	t.Run("should return empty after reset", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 5,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(0),
+			Enabled:      true,
+			MaxErrors:    5,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(0),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		now := time.Now()
@@ -326,10 +326,10 @@ func TestErrorBreaker_Errors(t *testing.T) {
 
 	t.Run("should not halt when error occurs outside error window", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 3,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(5 * time.Second),
+			Enabled:      true,
+			MaxErrors:    3,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(5 * time.Second),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		now := time.Now()
@@ -350,10 +350,10 @@ func TestErrorBreaker_Errors(t *testing.T) {
 
 	t.Run("should halt when errors within window exceed threshold", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 3,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(10 * time.Second),
+			Enabled:      true,
+			MaxErrors:    3,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(10 * time.Second),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		now := time.Now()
@@ -371,10 +371,10 @@ func TestErrorBreaker_Errors(t *testing.T) {
 
 func TestErrorBreaker_Marshal(t *testing.T) {
 	breaker := &ErrorBreaker{
-		Enabled:       true,
-		MaxErrorCount: 5,
-		HaltDuration:  types.Duration(2 * time.Minute),
-		ErrorWindow:   types.Duration(0),
+		Enabled:      true,
+		MaxErrors:    5,
+		HaltDuration: types.Duration(2 * time.Minute),
+		Window:       types.Duration(0),
 	}
 	breaker.SetMetricsInfo("test", "test-instance")
 
@@ -391,7 +391,7 @@ func TestErrorBreaker_Marshal(t *testing.T) {
 
 	// The unmarshaled breaker should be treated as reset
 	t.Run("verify configuration is preserved", func(t *testing.T) {
-		assert.Equal(t, breaker.MaxErrorCount, unmarshaledBreaker.MaxErrorCount)
+		assert.Equal(t, breaker.MaxErrors, unmarshaledBreaker.MaxErrors)
 		assert.Equal(t, breaker.HaltDuration, unmarshaledBreaker.HaltDuration)
 		assert.Equal(t, breaker.strategyInstance, unmarshaledBreaker.strategyInstance)
 	})
@@ -440,10 +440,10 @@ func TestErrorBreaker_Marshal(t *testing.T) {
 func TestErrorBreaker_WindowBasedCounting(t *testing.T) {
 	t.Run("should track errors within window regardless of success between them", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 3,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(10 * time.Second),
+			Enabled:      true,
+			MaxErrors:    3,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(10 * time.Second),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		now := time.Now()
@@ -468,10 +468,10 @@ func TestErrorBreaker_WindowBasedCounting(t *testing.T) {
 
 	t.Run("should remove errors outside window before counting", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 3,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(5 * time.Second),
+			Enabled:      true,
+			MaxErrors:    3,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(5 * time.Second),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		now := time.Now()
@@ -508,10 +508,10 @@ func TestErrorBreaker_WindowBasedCounting(t *testing.T) {
 
 	t.Run("should halt when threshold errors occur within window", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 3,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(5 * time.Second),
+			Enabled:      true,
+			MaxErrors:    3,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(5 * time.Second),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		now := time.Now()
@@ -527,10 +527,10 @@ func TestErrorBreaker_WindowBasedCounting(t *testing.T) {
 
 	t.Run("should work with zero window (all errors counted)", func(t *testing.T) {
 		breaker := &ErrorBreaker{
-			Enabled:       true,
-			MaxErrorCount: 3,
-			HaltDuration:  types.Duration(time.Minute),
-			ErrorWindow:   types.Duration(0),
+			Enabled:      true,
+			MaxErrors:    3,
+			HaltDuration: types.Duration(time.Minute),
+			Window:       types.Duration(0),
 		}
 		breaker.SetMetricsInfo("test", "test-instance")
 		now := time.Now()

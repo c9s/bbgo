@@ -44,13 +44,13 @@ type ErrorBreaker struct {
 
 	// breaker configuration
 	Enabled bool `json:"enabled"`
-	// MaxErrorCount defines the maximum number of errors allowed within the time window before halting.
-	MaxErrorCount int `json:"maxErrorCount"`
+	// MaxErrors defines the maximum number of errors allowed within the time window before halting.
+	MaxErrors int `json:"maxErrors"`
 	// HaltDuration defines the duration for which the breaker will be halted when triggered.
 	HaltDuration types.Duration `json:"haltDuration"`
-	// ErrorWindow defines the time window for counting errors.
+	// Window defines the time window for counting errors.
 	// If set to 0, all errors are counted regardless of their timestamps.
-	ErrorWindow types.Duration `json:"errorWindow"`
+	Window types.Duration `json:"window"`
 
 	// breaker state
 	errors   []ErrorRecord
@@ -79,11 +79,11 @@ func NewErrorBreaker(strategy, strategyInstance string, maxErrors int, haltDurat
 		maxErrors = 5
 	}
 	b := &ErrorBreaker{
-		Enabled:       true,
-		MaxErrorCount: maxErrors,
-		HaltDuration:  haltDuration,
-		ErrorWindow:   errorWindow,
-		errors:        make([]ErrorRecord, 0, maxErrors),
+		Enabled:      true,
+		MaxErrors:    maxErrors,
+		HaltDuration: haltDuration,
+		Window:       errorWindow,
+		errors:       make([]ErrorRecord, 0, maxErrors),
 	}
 	b.SetMetricsInfo(strategy, strategyInstance)
 	b.updateMetrics()
@@ -113,14 +113,14 @@ func (b *ErrorBreaker) recordError(now time.Time, err error) {
 	if !b.Enabled {
 		return
 	}
-	windowStart := now.Add(-b.ErrorWindow.Duration())
+	windowStart := now.Add(-b.Window.Duration())
 	b.errors = slices.DeleteFunc(b.errors, func(r ErrorRecord) bool {
 		// remove nil errors
 		if r.err == nil {
 			return true
 		}
 		// remove errors outside the error window
-		if b.ErrorWindow.Duration() > 0 {
+		if b.Window.Duration() > 0 {
 			return r.timestamp.Before(windowStart)
 		}
 		return false
@@ -133,8 +133,8 @@ func (b *ErrorBreaker) recordError(now time.Time, err error) {
 	})
 
 	// prevent unbounded growth by dropping oldest errors
-	if len(b.errors) > b.MaxErrorCount*2 {
-		b.errors = b.errors[len(b.errors)-b.MaxErrorCount:]
+	if len(b.errors) > b.MaxErrors*2 {
+		b.errors = b.errors[len(b.errors)-b.MaxErrors:]
 	}
 
 	// the breaker is already halted
@@ -145,7 +145,7 @@ func (b *ErrorBreaker) recordError(now time.Time, err error) {
 
 	// the breaker is not halted yet
 	// check if we've exceeded the max errors threshold
-	if len(b.errors) >= b.MaxErrorCount {
+	if len(b.errors) >= b.MaxErrors {
 		// trigger halt
 		b.EmitHalt(now, b.errors)
 		b.halted = true
@@ -196,7 +196,7 @@ func (b *ErrorBreaker) reset() {
 	if b.errors != nil {
 		b.errors = b.errors[:0]
 	} else {
-		b.errors = make([]ErrorRecord, 0, b.MaxErrorCount)
+		b.errors = make([]ErrorRecord, 0, b.MaxErrors)
 	}
 	b.halted = false
 	b.haltedAt = time.Time{}
@@ -262,7 +262,7 @@ func (b *ErrorBreaker) SlackAttachment() slack.Attachment {
 
 	fields := []slack.AttachmentField{
 		{Title: "Status", Value: status, Short: true},
-		{Title: "Error Count", Value: fmt.Sprintf("%d / %d", errorCount, b.MaxErrorCount), Short: true},
+		{Title: "Error Count", Value: fmt.Sprintf("%d / %d", errorCount, b.MaxErrors), Short: true},
 	}
 
 	if len(b.errors) > 0 {
