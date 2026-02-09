@@ -567,7 +567,7 @@ func (m *HedgeMarket) GetQuotePriceBySessionBalances() (bid, ask fixedpoint.Valu
 func (m *HedgeMarket) canHedge(
 	ctx context.Context, uncoveredPosition fixedpoint.Value,
 ) (bool, fixedpoint.Value, error) {
-	hedgeDelta := uncoveredPosition.Neg()
+	hedgeDelta := uncoveredToDelta(uncoveredPosition)
 	quantity := hedgeDelta.Abs()
 	side := deltaToSide(hedgeDelta)
 
@@ -577,34 +577,6 @@ func (m *HedgeMarket) canHedge(
 
 	if price.IsZero() {
 		return false, fixedpoint.Zero, fmt.Errorf("canHedge: no valid price found for %s", m.SymbolSelector)
-	}
-
-	account := m.session.GetAccount()
-
-	// required is the required amount of quote, or base currency depending on the side
-	currency, required := determineRequiredCurrencyAndAmount(m.market, side, quantity, price)
-	available, hasBalance := getAvailableBalance(account, currency)
-	maxQuantity := quantity
-	amt := available
-	if amt.IsZero() || m.session.Margin {
-		amt = required
-	}
-
-	if !amt.IsZero() {
-		if side == types.SideTypeBuy {
-			// for buy, we need to check if we have enough quote currency
-			maxQuantity = fixedpoint.Min(maxQuantity, amt.Div(price))
-		} else {
-			// for sell, we need to check if we have enough base currency
-			maxQuantity = fixedpoint.Min(maxQuantity, amt)
-		}
-	}
-
-	quantity = fixedpoint.Min(quantity, maxQuantity)
-
-	if m.market.IsDustQuantity(quantity, price) {
-		log.Warnf("canHedge: skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
-		return false, fixedpoint.Zero, nil
 	}
 
 	// for margin account, we need to check if the margin level is sufficient
@@ -628,7 +600,34 @@ func (m *HedgeMarket) canHedge(
 		return true, fixedpoint.Min(quota, quantity), nil
 	}
 
-	// spot mode
+	// FOR SPOT MODE
+	account := m.session.GetAccount()
+
+	// "required" can be the required amount of quote, or base currency depending on the side
+	currency, required := determineRequiredCurrencyAndAmount(m.market, side, quantity, price)
+
+	// be careful, just like "required", "available" can be in base unit or quote unit
+	available, hasBalance := getAvailableBalance(account, currency)
+
+	using := fixedpoint.Min(required, available)
+
+	maxQuantity := quantity
+
+	if side == types.SideTypeBuy {
+		// for buy, we need to check if we have enough quote currency
+		maxQuantity = fixedpoint.Min(maxQuantity, using.Div(price))
+	} else {
+		// for sell, we need to check if we have enough base currency
+		maxQuantity = fixedpoint.Min(maxQuantity, using)
+	}
+
+	quantity = fixedpoint.Min(quantity, maxQuantity)
+
+	if m.market.IsDustQuantity(quantity, price) {
+		log.Warnf("canHedge: skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
+		return false, fixedpoint.Zero, nil
+	}
+
 	if !hasBalance {
 		m.logger.Warnf("canHedge: cannot find balance for currency: %s", currency)
 		return false, fixedpoint.Zero, nil
