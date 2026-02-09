@@ -712,6 +712,7 @@ func (m *HedgeMarket) getDebtQuota() fixedpoint.Value {
 	}
 
 	if rst, ok := val.(*DebtQuotaResult); ok {
+		m.logger.Infof("debtQuota: %+v", rst)
 		debtQuota = rst.AmountInQuote
 	} else {
 		m.logger.Warnf("debt quota worker value is not type DebtQuotaResult, return zero debt quota")
