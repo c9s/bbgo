@@ -288,6 +288,7 @@ func getAvailableBalance(account *types.Account, currency string) (fixedpoint.Va
 	if !ok {
 		return fixedpoint.Zero, false
 	}
+
 	return balance.Available, true
 }
 

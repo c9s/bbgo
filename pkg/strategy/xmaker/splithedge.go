@@ -124,45 +124,45 @@ func (h *SplitHedge) UnmarshalJSON(data []byte) error {
 	if h.Enabled {
 		if h.BestPriceHedge != nil && h.BestPriceHedge.Enabled {
 			if h.BestPriceHedge.BelowAmount.Sign() <= 0 {
-				return fmt.Errorf("splithedge: bestPriceHedge.belowAmount must be positive")
+				return fmt.Errorf("splitHedge: bestPriceHedge.belowAmount must be positive")
 			}
 		}
 
 		switch h.Algo {
 		case SplitHedgeAlgoProportion:
 			if h.ProportionAlgo == nil || len(h.ProportionAlgo.ProportionMarkets) == 0 {
-				return fmt.Errorf("splithedge: proportionAlgo.markets must not be empty when enabled and algo=proportion")
+				return fmt.Errorf("splitHedge: proportionAlgo.markets must not be empty when enabled and algo=proportion")
 			}
 
 			// default and validate ratioBase
 			if h.ProportionAlgo.RatioBase == "" {
 				h.ProportionAlgo.RatioBase = RatioBaseTotal
 			} else if h.ProportionAlgo.RatioBase != RatioBaseRemaining && h.ProportionAlgo.RatioBase != RatioBaseTotal {
-				return fmt.Errorf("splithedge: invalid proportionAlgo.ratioBase: %s (expected 'remaining' or 'total')", h.ProportionAlgo.RatioBase)
+				return fmt.Errorf("splitHedge: invalid proportionAlgo.ratioBase: %s (expected 'remaining' or 'total')", h.ProportionAlgo.RatioBase)
 			}
 
 			for i, m := range h.ProportionAlgo.ProportionMarkets {
 				if m.Name == "" {
-					return fmt.Errorf("splithedge: market at index %d missing name", i)
+					return fmt.Errorf("splitHedge: market at index %d missing name", i)
 				}
 
 				// ensure the hedge market config exists
 				if _, exists := h.HedgeMarkets[m.Name]; !exists {
-					return fmt.Errorf("splithedge: market %s not found in hedgeMarkets", m.Name)
+					return fmt.Errorf("splitHedge: market %s not found in hedgeMarkets", m.Name)
 				}
 
 				if i != len(h.ProportionAlgo.ProportionMarkets)-1 {
 					if m.Ratio.Sign() <= 0 {
-						return fmt.Errorf("splithedge: prior market %s ratio must be positive and can not be zero", m.Name)
+						return fmt.Errorf("splitHedge: prior market %s ratio must be positive and can not be zero", m.Name)
 					}
 					// enforce upper bound ratio <= 1 for non-last entries
 					if m.Ratio.Compare(fixedpoint.One) > 0 {
-						return fmt.Errorf("splithedge: prior market %s ratio must be <= 1.0", m.Name)
+						return fmt.Errorf("splitHedge: prior market %s ratio must be <= 1.0", m.Name)
 					}
 				}
 			}
 		default:
-			return fmt.Errorf("splithedge: invalid algo: %s", h.Algo)
+			return fmt.Errorf("splitHedge: invalid algo: %s", h.Algo)
 		}
 	}
 
@@ -189,7 +189,7 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 
 		// ensure the hedge market base currency matches the maker market base currency
 		if h.strategy.makerMarket.BaseCurrency != hedgeMarket.market.BaseCurrency {
-			return fmt.Errorf("splithedge: hedge market %q base currency %s does not match maker market base currency %s",
+			return fmt.Errorf("splitHedge: hedge market %q base currency %s does not match maker market base currency %s",
 				name, hedgeMarket.market.BaseCurrency, h.strategy.makerMarket.BaseCurrency)
 		}
 
@@ -320,25 +320,8 @@ func (h *SplitHedge) hedgeWithBestPriceAlgo(
 
 	orderSide := deltaToSide(hedgeDelta)
 	quantity := hedgeDelta.Abs()
+	bestPrice := fixedpoint.Zero
 
-	// get the balance weighted price to calculate the current position value
-	bid, ask, ok := h.GetBalanceWeightedQuotePrice()
-	if !ok {
-		return false, fmt.Errorf("splitHedge: failed to get weighted quote price")
-	}
-
-	price := sideTakerPrice(bid, ask, orderSide)
-	if price.IsZero() {
-		return false, fmt.Errorf("splitHedge: zero price from weighted quote price")
-	}
-
-	positionValue := quantity.Mul(price)
-	if positionValue.Compare(h.BestPriceHedge.BelowAmount) > 0 {
-		h.logger.Infof("splitHedge: position value %s exceeds belowAmount %s, fallback to split hedge", positionValue.String(), h.BestPriceHedge.BelowAmount.String())
-		return false, nil
-	}
-
-	var bestPrice fixedpoint.Value
 	var bestMarket *HedgeMarket
 
 	for _, mkt := range h.hedgeMarketInstances {
@@ -366,6 +349,12 @@ func (h *SplitHedge) hedgeWithBestPriceAlgo(
 				bestMarket = mkt
 			}
 		}
+	}
+
+	positionValue := quantity.Mul(bestPrice)
+	if positionValue.Compare(h.BestPriceHedge.BelowAmount) > 0 {
+		h.logger.Infof("splitHedge: position value %s exceeds belowAmount %s, fallback to split hedge", positionValue.String(), h.BestPriceHedge.BelowAmount.String())
+		return false, nil
 	}
 
 	if bestMarket == nil {

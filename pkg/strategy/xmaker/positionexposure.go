@@ -5,6 +5,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
@@ -56,11 +57,14 @@ type PositionExposure struct {
 	positionExposureNetMetrics,
 	positionExposureUncoveredMetrics prometheus.Gauge
 	positionExposureSizeMetrics prometheus.Observer
+
+	logger logrus.FieldLogger
 }
 
 func NewPositionExposure(symbol string) *PositionExposure {
 	return &PositionExposure{
 		symbol: symbol,
+		logger: log,
 	}
 }
 

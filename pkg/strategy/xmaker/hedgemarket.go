@@ -579,11 +579,10 @@ func (m *HedgeMarket) canHedge(
 		return false, fixedpoint.Zero, fmt.Errorf("canHedge: no valid price found for %s", m.SymbolSelector)
 	}
 
-	currency, required := determineRequiredCurrencyAndAmount(m.market, side, quantity, price)
-	// required = required amount of quote, or base currency depending on the side
-	_ = required
-
 	account := m.session.GetAccount()
+
+	// required is the required amount of quote, or base currency depending on the side
+	currency, required := determineRequiredCurrencyAndAmount(m.market, side, quantity, price)
 	available, hasBalance := getAvailableBalance(account, currency)
 	maxQuantity := quantity
 	amt := available
@@ -613,11 +612,15 @@ func (m *HedgeMarket) canHedge(
 		// a simple check to ensure the account is not in danger of liquidation
 		minMarginLevel := m.MinMarginLevel
 		if minMarginLevel.IsZero() {
-			// default to 150% margin level
-			minMarginLevel = fixedpoint.NewFromFloat(1.1) // 110%
+			minMarginLevel = defaultMinMarginLevel
 		}
 
-		canHedge, quota := m.allowMarginHedge(m.session, minMarginLevel, m.MaxLeverage, side, price)
+		maxLeverage := m.MaxLeverage
+		if maxLeverage.IsZero() {
+			maxLeverage = defaultMaxLeverage
+		}
+
+		canHedge, quota := m.allowMarginHedge(m.session, minMarginLevel, maxLeverage, side, price)
 		if !canHedge {
 			return false, fixedpoint.Zero, nil
 		}
@@ -695,12 +698,24 @@ func (m *HedgeMarket) allowMarginHedge(
 // - MMR with 3x leverage = 10%
 func (m *HedgeMarket) getDebtQuota() fixedpoint.Value {
 	var debtQuota = fixedpoint.Zero
-	if workerHandle := sessionworker.Get(m.session, "debt-quota"); workerHandle != nil {
-		if val := workerHandle.Value(); val != nil {
-			if rst, ok := val.(*DebtQuotaResult); ok {
-				debtQuota = rst.AmountInQuote
-			}
-		}
+
+	wh := sessionworker.Get(m.session, "debt-quota")
+	if wh == nil {
+		m.logger.Warnf("debt quota worker handle is nil, return zero debt quota")
+		return debtQuota
+	}
+
+	val := wh.Value()
+	if val == nil {
+		m.logger.Warnf("debt quota worker value is nil, return zero debt quota")
+		return debtQuota
+	}
+
+	if rst, ok := val.(*DebtQuotaResult); ok {
+		debtQuota = rst.AmountInQuote
+	} else {
+		m.logger.Warnf("debt quota worker value is not type DebtQuotaResult, return zero debt quota")
+		return debtQuota
 	}
 
 	return debtQuota
