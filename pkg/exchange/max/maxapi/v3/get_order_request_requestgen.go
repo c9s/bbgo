@@ -6,17 +6,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
+/*
+ * Id sets
+ */
 func (g *GetOrderRequest) Id(id uint64) *GetOrderRequest {
 	g.id = &id
 	return g
 }
 
+/*
+ * ClientOrderID sets
+ */
 func (g *GetOrderRequest) ClientOrderID(clientOrderID string) *GetOrderRequest {
 	g.clientOrderID = &clientOrderID
 	return g
@@ -28,7 +34,13 @@ func (g *GetOrderRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -41,6 +53,9 @@ func (g *GetOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if g.id != nil {
 		id := *g.id
 
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
+
 		// assign parameter of id
 		params["id"] = id
 	} else {
@@ -48,6 +63,11 @@ func (g *GetOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check clientOrderID field -> json key client_oid
 	if g.clientOrderID != nil {
 		clientOrderID := *g.clientOrderID
+
+		// TEMPLATE check-required
+		if len(clientOrderID) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of clientOrderID
 		params["client_oid"] = clientOrderID
@@ -96,9 +116,19 @@ func (g *GetOrderRequest) GetSlugParameters() (map[string]interface{}, error) {
 	return params, nil
 }
 
+var GetOrderRequestSlugReCache sync.Map
+
 func (g *GetOrderRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetOrderRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetOrderRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
@@ -142,7 +172,7 @@ func (g *GetOrderRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (g *GetOrderRequest) Do(ctx context.Context) (*maxapi.Order, error) {
+func (g *GetOrderRequest) Do(ctx context.Context) (*Order, error) {
 
 	// empty params for GET operation
 	var params interface{}
@@ -165,7 +195,7 @@ func (g *GetOrderRequest) Do(ctx context.Context) (*maxapi.Order, error) {
 		return nil, err
 	}
 
-	var apiResponse maxapi.Order
+	var apiResponse Order
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error

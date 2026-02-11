@@ -9,13 +9,20 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
+/*
+ * Currency sets
+ */
 func (m *MarginRepayRequest) Currency(currency string) *MarginRepayRequest {
 	m.currency = currency
 	return m
 }
 
+/*
+ * Amount sets
+ */
 func (m *MarginRepayRequest) Amount(amount string) *MarginRepayRequest {
 	m.amount = amount
 	return m
@@ -27,7 +34,13 @@ func (m *MarginRepayRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if m.isVarSlice(_v) {
+			m.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -49,6 +62,11 @@ func (m *MarginRepayRequest) GetParameters() (map[string]interface{}, error) {
 	params["currency"] = currency
 	// check amount field -> json key amount
 	amount := m.amount
+
+	// TEMPLATE check-required
+	if len(amount) == 0 {
+	}
+	// END TEMPLATE check-required
 
 	// assign parameter of amount
 	params["amount"] = amount
@@ -95,9 +113,19 @@ func (m *MarginRepayRequest) GetSlugParameters() (map[string]interface{}, error)
 	return params, nil
 }
 
+var MarginRepayRequestSlugReCache sync.Map
+
 func (m *MarginRepayRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := MarginRepayRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			MarginRepayRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 

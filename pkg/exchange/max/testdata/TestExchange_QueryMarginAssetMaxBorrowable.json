@@ -1,0 +1,155 @@
+[
+  {
+    "timestamp": "2026-02-03T21:06:31.988391+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://test-api.com/api/v3/wallet/m/limits",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Cf-Cache-Status": [
+          "MISS"
+        ],
+        "Cf-Ray": [
+          "9c8225650b09f067-KHH"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 13:06:31 GMT"
+        ],
+        "Etag": [
+          "W/\"cf720e471d01b686451187f6e7e1fc42\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin, Accept-Encoding"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.001963"
+        ]
+      },
+      "body": "{\"btc\":\"13.25214662\",\"eth\":\"339.6239766\",\"usdt\":\"327598.81240557\",\"link\":\"0.0\",\"doge\":\"0.0\",\"ltc\":\"0.0\"}"
+    }
+  },
+  {
+    "timestamp": "2026-02-03T21:07:02.414119+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://test-api.com/api/v3/wallet/m/limits",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Cf-Cache-Status": [
+          "MISS"
+        ],
+        "Cf-Ray": [
+          "9c8226231e87f067-KHH"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 13:07:02 GMT"
+        ],
+        "Etag": [
+          "W/\"cf720e471d01b686451187f6e7e1fc42\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin, Accept-Encoding"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.002012"
+        ]
+      },
+      "body": "{\"btc\":\"13.25214662\",\"eth\":\"339.6239766\",\"usdt\":\"327598.81240557\",\"link\":\"0.0\",\"doge\":\"0.0\",\"ltc\":\"0.0\"}"
+    }
+  },
+  {
+    "timestamp": "2026-02-03T21:07:08.426092+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://test-api.com/api/v3/wallet/m/limits",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Cf-Cache-Status": [
+          "MISS"
+        ],
+        "Cf-Ray": [
+          "9c8226487fe9f067-KHH"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 13:07:08 GMT"
+        ],
+        "Etag": [
+          "W/\"cf720e471d01b686451187f6e7e1fc42\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin, Accept-Encoding"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.003107"
+        ]
+      },
+      "body": "{\"btc\":\"13.25214662\",\"eth\":\"339.6239766\",\"usdt\":\"327598.81240557\",\"link\":\"0.0\",\"doge\":\"0.0\",\"ltc\":\"0.0\"}"
+    }
+  }
+]

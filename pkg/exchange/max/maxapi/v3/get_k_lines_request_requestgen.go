@@ -10,24 +10,37 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
+/*
+ * Market sets
+ */
 func (g *GetKLinesRequest) Market(market string) *GetKLinesRequest {
 	g.market = market
 	return g
 }
 
+/*
+ * Limit sets
+ */
 func (g *GetKLinesRequest) Limit(limit int) *GetKLinesRequest {
 	g.limit = &limit
 	return g
 }
 
+/*
+ * Period sets
+ */
 func (g *GetKLinesRequest) Period(period int) *GetKLinesRequest {
 	g.period = &period
 	return g
 }
 
+/*
+ * Timestamp sets
+ */
 func (g *GetKLinesRequest) Timestamp(timestamp time.Time) *GetKLinesRequest {
 	g.timestamp = timestamp
 	return g
@@ -39,7 +52,13 @@ func (g *GetKLinesRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -63,6 +82,12 @@ func (g *GetKLinesRequest) GetParameters() (map[string]interface{}, error) {
 	if g.limit != nil {
 		limit := *g.limit
 
+		// TEMPLATE check-required
+
+		if limit == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of limit
 		params["limit"] = limit
 	} else {
@@ -71,12 +96,24 @@ func (g *GetKLinesRequest) GetParameters() (map[string]interface{}, error) {
 	if g.period != nil {
 		period := *g.period
 
+		// TEMPLATE check-required
+
+		if period == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of period
 		params["period"] = period
 	} else {
 	}
 	// check timestamp field -> json key timestamp
 	timestamp := g.timestamp
+
+	// TEMPLATE check-required
+
+	if timestamp.IsZero() {
+	}
+	// END TEMPLATE check-required
 
 	// assign parameter of timestamp
 	// convert time.Time to seconds time stamp
@@ -124,9 +161,19 @@ func (g *GetKLinesRequest) GetSlugParameters() (map[string]interface{}, error) {
 	return params, nil
 }
 
+var GetKLinesRequestSlugReCache sync.Map
+
 func (g *GetKLinesRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetKLinesRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetKLinesRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 

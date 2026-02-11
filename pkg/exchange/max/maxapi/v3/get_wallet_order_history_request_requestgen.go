@@ -6,28 +6,40 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
+/*
+ * Market sets
+ */
 func (g *GetWalletOrderHistoryRequest) Market(market string) *GetWalletOrderHistoryRequest {
 	g.market = market
 	return g
 }
 
+/*
+ * FromID sets
+ */
 func (g *GetWalletOrderHistoryRequest) FromID(fromID uint64) *GetWalletOrderHistoryRequest {
 	g.fromID = &fromID
 	return g
 }
 
+/*
+ * Limit sets
+ */
 func (g *GetWalletOrderHistoryRequest) Limit(limit uint) *GetWalletOrderHistoryRequest {
 	g.limit = &limit
 	return g
 }
 
-func (g *GetWalletOrderHistoryRequest) WalletType(walletType maxapi.WalletType) *GetWalletOrderHistoryRequest {
+/*
+ * WalletType sets
+ */
+func (g *GetWalletOrderHistoryRequest) WalletType(walletType WalletType) *GetWalletOrderHistoryRequest {
 	g.walletType = walletType
 	return g
 }
@@ -38,7 +50,13 @@ func (g *GetWalletOrderHistoryRequest) GetQueryParameters() (url.Values, error) 
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -62,6 +80,9 @@ func (g *GetWalletOrderHistoryRequest) GetParameters() (map[string]interface{}, 
 	if g.fromID != nil {
 		fromID := *g.fromID
 
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
+
 		// assign parameter of fromID
 		params["from_id"] = fromID
 	} else {
@@ -69,6 +90,9 @@ func (g *GetWalletOrderHistoryRequest) GetParameters() (map[string]interface{}, 
 	// check limit field -> json key limit
 	if g.limit != nil {
 		limit := *g.limit
+
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
 
 		// assign parameter of limit
 		params["limit"] = limit
@@ -117,9 +141,6 @@ func (g *GetWalletOrderHistoryRequest) GetSlugParameters() (map[string]interface
 	walletType := g.walletType
 
 	// TEMPLATE check-required
-	if len(walletType) == 0 {
-		return nil, fmt.Errorf("walletType is required, empty string given")
-	}
 	// END TEMPLATE check-required
 
 	// assign parameter of walletType
@@ -128,9 +149,19 @@ func (g *GetWalletOrderHistoryRequest) GetSlugParameters() (map[string]interface
 	return params, nil
 }
 
+var GetWalletOrderHistoryRequestSlugReCache sync.Map
+
 func (g *GetWalletOrderHistoryRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetWalletOrderHistoryRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetWalletOrderHistoryRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
@@ -174,7 +205,7 @@ func (g *GetWalletOrderHistoryRequest) GetPath() string {
 }
 
 // Do generates the request object and send the request object to the API endpoint
-func (g *GetWalletOrderHistoryRequest) Do(ctx context.Context) ([]maxapi.Order, error) {
+func (g *GetWalletOrderHistoryRequest) Do(ctx context.Context) ([]Order, error) {
 
 	// empty params for GET operation
 	var params interface{}
@@ -203,7 +234,7 @@ func (g *GetWalletOrderHistoryRequest) Do(ctx context.Context) ([]maxapi.Order, 
 		return nil, err
 	}
 
-	var apiResponse []maxapi.Order
+	var apiResponse []Order
 
 	type responseUnmarshaler interface {
 		Unmarshal(data []byte) error

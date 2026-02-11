@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
 // GetQueryParameters builds and checks the query parameters and returns url.Values
@@ -75,9 +76,19 @@ func (g *GetUserInfoRequest) GetSlugParameters() (map[string]interface{}, error)
 	return params, nil
 }
 
+var GetUserInfoRequestSlugReCache sync.Map
+
 func (g *GetUserInfoRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetUserInfoRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetUserInfoRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 

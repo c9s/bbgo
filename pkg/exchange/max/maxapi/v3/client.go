@@ -21,6 +21,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/envvar"
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/util/apikey"
@@ -83,8 +84,7 @@ func init() {
 // by querying the MAX server timestamp API endpoint.
 // This function will keep retrying until it succeeds or the context is done.
 func UpdateServerTimeAndOffset(baseCtx context.Context) {
-	client := maxapi.NewRestClientDefault()
-	v3client := NewClient(client)
+	v3client := NewClient()
 	ctx, cancel := context.WithTimeout(baseCtx, time.Minute)
 	defer cancel()
 
@@ -140,18 +140,30 @@ type Client struct {
 	SubAccountService *SubAccountService
 }
 
-func NewClient(legacyClient *maxapi.RestClient) *Client {
+func NewClient() *Client {
+	baseURL := ProductionAPIURL
+	if override := os.Getenv("MAX_API_BASE_URL"); len(override) > 0 {
+		baseURL = override
+	}
+	client := newClient(baseURL)
+	return client
+}
+
+func newClient(baseURL string) *Client {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		panic(err)
+	}
 	client := &Client{
-		BaseAPIClient: legacyClient.BaseAPIClient,
-
-		APIKey:    legacyClient.APIKey,
-		APISecret: legacyClient.APISecret,
-
-		MarginService:     &MarginService{Client: legacyClient},
-		SubAccountService: &SubAccountService{Client: legacyClient},
+		BaseAPIClient: requestgen.BaseAPIClient{
+			HttpClient: core.HttpClient,
+			BaseURL:    u,
+		},
 
 		apiKeyNonce: make(map[string]int64),
 	}
+	client.MarginService = &MarginService{Client: client}
+	client.SubAccountService = &SubAccountService{Client: client}
 
 	if v, ok := envvar.Bool("MAX_ENABLE_API_KEY_ROTATION"); v && ok {
 		loader := apikey.NewEnvKeyLoader("MAX_API_", "", "KEY", "SECRET")
@@ -171,6 +183,16 @@ func NewClient(legacyClient *maxapi.RestClient) *Client {
 	}
 
 	return client
+}
+
+// Auth sets api key and secret for usage is requests that requires authentication.
+func (c *Client) Auth(key string, secret string) *Client {
+	// pragma: allowlist nextline secret
+	c.APIKey = key
+	// pragma: allowlist nextline secret
+	c.APISecret = secret
+
+	return c
 }
 
 // NewAuthenticatedRequest creates new http request for authenticated routes.

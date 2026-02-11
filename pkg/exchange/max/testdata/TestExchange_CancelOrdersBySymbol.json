@@ -1,6 +1,6 @@
 [
   {
-    "timestamp": "2026-02-03T13:06:01.438661+08:00",
+    "timestamp": "2026-02-03T16:31:44.071643+08:00",
     "request": {
       "method": "GET",
       "url": "https://test-api.com/api/v3/markets",
@@ -17,7 +17,7 @@
           "application/json"
         ],
         "Date": [
-          "Tue, 03 Feb 2026 05:06:01 GMT"
+          "Tue, 03 Feb 2026 08:31:44 GMT"
         ],
         "Etag": [
           "W/\"569de30a0eb0be726adcf2d01c914f48\""
@@ -39,126 +39,17 @@
           "<request-id>"
         ],
         "X-Runtime": [
-          "0.009157"
+          "0.018010"
         ]
       },
       "body": "[{\"id\":\"maxtwd\",\"status\":\"active\",\"base_unit\":\"max\",\"base_unit_precision\":2,\"min_base_amount\":25.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":4,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"btctwd\",\"status\":\"active\",\"base_unit\":\"btc\",\"base_unit_precision\":8,\"min_base_amount\":8.0e-05,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":true},{\"id\":\"ethtwd\",\"status\":\"active\",\"base_unit\":\"eth\",\"base_unit_precision\":6,\"min_base_amount\":0.001,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":true},{\"id\":\"ltctwd\",\"status\":\"active\",\"base_unit\":\"ltc\",\"base_unit_precision\":4,\"min_base_amount\":0.1,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":true},{\"id\":\"bchtwd\",\"status\":\"active\",\"base_unit\":\"bch\",\"base_unit_precision\":6,\"min_base_amount\":0.024,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"usdttwd\",\"status\":\"active\",\"base_unit\":\"usdt\",\"base_unit_precision\":2,\"min_base_amount\":8.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":true},{\"id\":\"ethbtc\",\"status\":\"active\",\"base_unit\":\"eth\",\"base_unit_precision\":4,\"min_base_amount\":0.001,\"quote_unit\":\"btc\",\"quote_unit_precision\":6,\"min_quote_amount\":8.0e-05,\"m_wallet_supported\":true},{\"id\":\"maxusdt\",\"status\":\"active\",\"base_unit\":\"max\",\"base_unit_precision\":2,\"min_base_amount\":25.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"btcusdt\",\"status\":\"active\",\"base_unit\":\"btc\",\"base_unit_precision\":6,\"min_base_amount\":8.0e-05,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":true},{\"id\":\"ethusdt\",\"status\":\"active\",\"base_unit\":\"eth\",\"base_unit_precision\":5,\"min_base_amount\":0.001,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":true},{\"id\":\"bchusdt\",\"status\":\"active\",\"base_unit\":\"bch\",\"base_unit_precision\":5,\"min_base_amount\":0.024,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"ltcusdt\",\"status\":\"active\",\"base_unit\":\"ltc\",\"base_unit_precision\":5,\"min_base_amount\":0.1,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":true},{\"id\":\"xrptwd\",\"status\":\"active\",\"base_unit\":\"xrp\",\"base_unit_precision\":2,\"min_base_amount\":3.7,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"xrpusdt\",\"status\":\"active\",\"base_unit\":\"xrp\",\"base_unit_precision\":2,\"min_base_amount\":3.7,\"quote_unit\":\"usdt\",\"quote_unit_precision\":5,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"usdctwd\",\"status\":\"active\",\"base_unit\":\"usdc\",\"base_unit_precision\":2,\"min_base_amount\":8.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"linktwd\",\"status\":\"active\",\"base_unit\":\"link\",\"base_unit_precision\":2,\"min_base_amount\":0.6,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":true},{\"id\":\"comptwd\",\"status\":\"active\",\"base_unit\":\"comp\",\"base_unit_precision\":3,\"min_base_amount\":0.19,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"sandusdt\",\"status\":\"active\",\"base_unit\":\"sand\",\"base_unit_precision\":1,\"min_base_amount\":29.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":5,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"usdcusdt\",\"status\":\"active\",\"base_unit\":\"usdc\",\"base_unit_precision\":2,\"min_base_amount\":8.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"linkusdt\",\"status\":\"active\",\"base_unit\":\"link\",\"base_unit_precision\":2,\"min_base_amount\":0.6,\"quote_unit\":\"usdt\",\"quote_unit_precision\":3,\"min_quote_amount\":8.0,\"m_wallet_supported\":true},{\"id\":\"grttwd\",\"status\":\"active\",\"base_unit\":\"grt\",\"base_unit_precision\":1,\"min_base_amount\":95.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"yfitwd\",\"status\":\"active\",\"base_unit\":\"yfi\",\"base_unit_precision\":5,\"min_base_amount\":0.0016,\"quote_unit\":\"twd\",\"quote_unit_precision\":0,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"dogetwd\",\"status\":\"active\",\"base_unit\":\"doge\",\"base_unit_precision\":1,\"min_base_amount\":47.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":4,\"min_quote_amount\":250.0,\"m_wallet_supported\":true},{\"id\":\"dogeusdt\",\"status\":\"active\",\"base_unit\":\"doge\",\"base_unit_precision\":0,\"min_base_amount\":47.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":true},{\"id\":\"adatwd\",\"status\":\"active\",\"base_unit\":\"ada\",\"base_unit_precision\":1,\"min_base_amount\":12.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"compusdt\",\"status\":\"active\",\"base_unit\":\"comp\",\"base_unit_precision\":3,\"min_base_amount\":0.19,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"dottwd\",\"status\":\"active\",\"base_unit\":\"dot\",\"base_unit_precision\":2,\"min_base_amount\":2.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"dotusdt\",\"status\":\"active\",\"base_unit\":\"dot\",\"base_unit_precision\":2,\"min_base_amount\":2.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":3,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"poltwd\",\"status\":\"active\",\"base_unit\":\"pol\",\"base_unit_precision\":1,\"min_base_amount\":0.1,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"polusdt\",\"status\":\"active\",\"base_unit\":\"pol\",\"base_unit_precision\":1,\"min_base_amount\":0.1,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"adausdt\",\"status\":\"active\",\"base_unit\":\"ada\",\"base_unit_precision\":1,\"min_base_amount\":12.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"soltwd\",\"status\":\"active\",\"base_unit\":\"sol\",\"base_unit_precision\":3,\"min_base_amount\":0.063,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"solusdt\",\"status\":\"active\",\"base_unit\":\"sol\",\"base_unit_precision\":3,\"min_base_amount\":0.063,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"shibtwd\",\"status\":\"active\",\"base_unit\":\"shib\",\"base_unit_precision\":-3,\"min_base_amount\":500.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":7,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"shibusdt\",\"status\":\"active\",\"base_unit\":\"shib\",\"base_unit_precision\":-3,\"min_base_amount\":500.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":8,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"sandtwd\",\"status\":\"active\",\"base_unit\":\"sand\",\"base_unit_precision\":1,\"min_base_amount\":29.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":4,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"galatwd\",\"status\":\"active\",\"base_unit\":\"gala\",\"base_unit_precision\":1,\"min_base_amount\":540.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"manatwd\",\"status\":\"active\",\"base_unit\":\"mana\",\"base_unit_precision\":1,\"min_base_amount\":33.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"alicetwd\",\"status\":\"active\",\"base_unit\":\"alice\",\"base_unit_precision\":2,\"min_base_amount\":19.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"maskusdt\",\"status\":\"active\",\"base_unit\":\"mask\",\"base_unit_precision\":1,\"min_base_amount\":7.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"apetwd\",\"status\":\"active\",\"base_unit\":\"ape\",\"base_unit_precision\":2,\"min_base_amount\":18.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"apeusdt\",\"status\":\"active\",\"base_unit\":\"ape\",\"base_unit_precision\":1,\"min_base_amount\":18.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"xtztwd\",\"status\":\"active\",\"base_unit\":\"xtz\",\"base_unit_precision\":1,\"min_base_amount\":13.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"gmttwd\",\"status\":\"active\",\"base_unit\":\"gmt\",\"base_unit_precision\":2,\"min_base_amount\":172.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"gsttwd\",\"status\":\"active\",\"base_unit\":\"gst\",\"base_unit_precision\":1,\"min_base_amount\":1150.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"bnbtwd\",\"status\":\"active\",\"base_unit\":\"bnb\",\"base_unit_precision\":3,\"min_base_amount\":0.013,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"bnbusdt\",\"status\":\"active\",\"base_unit\":\"bnb\",\"base_unit_precision\":3,\"min_base_amount\":0.013,\"quote_unit\":\"usdt\",\"quote_unit_precision\":2,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"enstwd\",\"status\":\"active\",\"base_unit\":\"ens\",\"base_unit_precision\":2,\"min_base_amount\":0.01,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"etctwd\",\"status\":\"active\",\"base_unit\":\"etc\",\"base_unit_precision\":2,\"min_base_amount\":0.5,\"quote_unit\":\"twd\",\"quote_unit_precision\":1,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"etcusdt\",\"status\":\"active\",\"base_unit\":\"etc\",\"base_unit_precision\":2,\"min_base_amount\":0.5,\"quote_unit\":\"usdt\",\"quote_unit_precision\":3,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"arbtwd\",\"status\":\"active\",\"base_unit\":\"arb\",\"base_unit_precision\":1,\"min_base_amount\":26.0,\"quote_unit\":\"twd\",\"quote_unit_precision\":3,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"arbusdt\",\"status\":\"active\",\"base_unit\":\"arb\",\"base_unit_precision\":1,\"min_base_amount\":26.0,\"quote_unit\":\"usdt\",\"quote_unit_precision\":4,\"min_quote_amount\":8.0,\"m_wallet_supported\":false},{\"id\":\"avaxtwd\",\"status\":\"active\",\"base_unit\":\"avax\",\"base_unit_precision\":2,\"min_base_amount\":0.4,\"quote_unit\":\"twd\",\"quote_unit_precision\":2,\"min_quote_amount\":250.0,\"m_wallet_supported\":false},{\"id\":\"avaxusdt\",\"status\":\"active\",\"base_unit\":\"avax\",\"base_unit_precision\":2,\"min_base_amount\":0.4,\"quote_unit\":\"usdt\",\"quote_unit_precision\":3,\"min_quote_amount\":8.0,\"m_wallet_supported\":false}]"
     }
   },
   {
-    "timestamp": "2026-02-03T13:06:39.70928+08:00",
-    "request": {
-      "method": "GET",
-      "url": "https://test-api.com/api/v3/wallet/spot/accounts?nonce=1770095199000",
-      "header": {
-        "Content-Type": [
-          "application/json"
-        ],
-        "User-Agent": [
-          "bbgo/v1.63.0-4b92891e1-dev"
-        ],
-        "X-Max-Payload": [
-          "<max-payload>"
-        ],
-        "X-Max-Signature": [
-          "<signature>"
-        ]
-      }
-    },
-    "response": {
-      "status": "200 OK",
-      "status_code": 200,
-      "header": {
-        "Cache-Control": [
-          "max-age=0, private, must-revalidate"
-        ],
-        "Content-Length": [
-          "3421"
-        ],
-        "Content-Type": [
-          "application/json"
-        ],
-        "Date": [
-          "Tue, 03 Feb 2026 05:06:39 GMT"
-        ],
-        "Etag": [
-          "W/\"36b0aee40dcfad059f0596f9ad923c0c\""
-        ],
-        "Referrer-Policy": [
-          "strict-origin-when-cross-origin"
-        ],
-        "Server": [
-          "nginx"
-        ],
-        "Strict-Transport-Security": [
-          "max-age=63072000; includeSubDomains"
-        ],
-        "Vary": [
-          "Origin"
-        ],
-        "X-Request-Id": [
-          "<request-id>"
-        ],
-        "X-Runtime": [
-          "0.083016"
-        ]
-      },
-      "body": "[{\"currency\":\"twd\",\"balance\":\"99997978.4796\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"btc\",\"balance\":\"1008.71962402\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"eth\",\"balance\":\"1005.47880316\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"ltc\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"bch\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"mith\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"usdt\",\"balance\":\"1076.50411911\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"xrp\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"max\",\"balance\":\"1000.0179721\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"bcnt\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"sand\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"usdc\",\"balance\":\"1022.96966211\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"link\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"grt\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"yfi\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"doge\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"comp\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"dot\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"ada\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"sol\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"shib\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"gala\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"mana\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"alice\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"pol\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"looks\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"rly\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"loot\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"mask\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"ape\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"xtz\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"gmt\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"gst\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"bnb\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"ens\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"etc\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"arb\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"avax\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"trx\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"cccx\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"pal\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"eos\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"bat\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"zrx\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"gnt\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"omg\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"knc\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"twdt\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"fmf\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"seele\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null}]"
-    }
-  },
-  {
-    "timestamp": "2026-02-03T13:07:02.625611+08:00",
-    "request": {
-      "method": "GET",
-      "url": "https://test-api.com/api/v3/ticker?market=btcusdt",
-      "header": {}
-    },
-    "response": {
-      "status": "200 OK",
-      "status_code": 200,
-      "header": {
-        "Cache-Control": [
-          "max-age=0, private, must-revalidate"
-        ],
-        "Content-Length": [
-          "265"
-        ],
-        "Content-Type": [
-          "application/json"
-        ],
-        "Date": [
-          "Tue, 03 Feb 2026 05:07:02 GMT"
-        ],
-        "Etag": [
-          "W/\"9e467ab8821153b8dfb59d17b50d3220\""
-        ],
-        "Referrer-Policy": [
-          "strict-origin-when-cross-origin"
-        ],
-        "Server": [
-          "nginx"
-        ],
-        "Strict-Transport-Security": [
-          "max-age=63072000; includeSubDomains"
-        ],
-        "Vary": [
-          "Origin"
-        ],
-        "X-Request-Id": [
-          "<request-id>"
-        ],
-        "X-Runtime": [
-          "0.003584"
-        ]
-      },
-      "body": "{\"market\":\"btcusdt\",\"at\":1770095222,\"buy\":\"78415.91\",\"buy_vol\":\"0.514993\",\"sell\":\"79069.45\",\"sell_vol\":\"1.151598\",\"open\":\"76341.05\",\"low\":\"76044.74\",\"high\":\"79179.49\",\"last\":\"78474.36\",\"vol\":\"0.0479\",\"vol_in_btc\":\"0.0479\",\"vol_in_quote\":\"3770.55867059534493699663\"}"
-    }
-  },
-  {
-    "timestamp": "2026-02-03T13:07:37.240818+08:00",
+    "timestamp": "2026-02-03T16:31:44.642077+08:00",
     "request": {
       "method": "POST",
-      "url": "https://test-api.com/api/v3/wallet/spot/order?nonce=1770095257000",
+      "url": "https://test-api.com/api/v3/wallet/spot/order?nonce=1770107504000",
       "header": {
         "Content-Type": [
           "application/json"
@@ -182,16 +73,16 @@
           "max-age=0, private, must-revalidate"
         ],
         "Content-Length": [
-          "373"
+          "360"
         ],
         "Content-Type": [
           "application/json"
         ],
         "Date": [
-          "Tue, 03 Feb 2026 05:07:37 GMT"
+          "Tue, 03 Feb 2026 08:31:44 GMT"
         ],
         "Etag": [
-          "W/\"4dfa0b7b15fca0fa4adb987673a59e4d\""
+          "W/\"6ad34717bc63b66c6af4c942e1621ec0\""
         ],
         "Referrer-Policy": [
           "strict-origin-when-cross-origin"
@@ -209,17 +100,17 @@
           "<request-id>"
         ],
         "X-Runtime": [
-          "0.140430"
+          "0.478522"
         ]
       },
-      "body": "{\"id\":2492665741,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-1>\",\"group_id\":null,\"side\":\"sell\",\"state\":\"wait\",\"ord_type\":\"limit\",\"price\":\"78415.91\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.000255\",\"remaining_volume\":\"0.000255\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770095257180,\"updated_at\":1770095257180}"
+      "body": "{\"id\":2492709208,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-1>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"wait\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770107504505,\"updated_at\":1770107504505}"
     }
   },
   {
-    "timestamp": "2026-02-03T13:07:50.237939+08:00",
+    "timestamp": "2026-02-03T16:31:47.050396+08:00",
     "request": {
-      "method": "GET",
-      "url": "https://test-api.com/api/v3/order?id=2492665741&nonce=1770095270000",
+      "method": "DELETE",
+      "url": "https://test-api.com/api/v3/wallet/spot/orders?nonce=1770107504001",
       "header": {
         "Content-Type": [
           "application/json"
@@ -243,16 +134,16 @@
           "max-age=0, private, must-revalidate"
         ],
         "Content-Length": [
-          "378"
+          "385"
         ],
         "Content-Type": [
           "application/json"
         ],
         "Date": [
-          "Tue, 03 Feb 2026 05:07:50 GMT"
+          "Tue, 03 Feb 2026 08:31:47 GMT"
         ],
         "Etag": [
-          "W/\"aeb0061a58a9675b6c9ba49a02dc100c\""
+          "W/\"567c7d8e836403b911cb0bba1c93e80b\""
         ],
         "Referrer-Policy": [
           "strict-origin-when-cross-origin"
@@ -270,71 +161,10 @@
           "<request-id>"
         ],
         "X-Runtime": [
-          "0.086157"
+          "2.243045"
         ]
       },
-      "body": "{\"id\":2492665741,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-1>\",\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"78415.91\",\"stop_price\":null,\"avg_price\":\"78433.19\",\"volume\":\"0.000255\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.000255\",\"trades_count\":1,\"created_at\":1770095257180,\"updated_at\":1770095257332}"
-    }
-  },
-  {
-    "timestamp": "2026-02-03T13:07:58.999957+08:00",
-    "request": {
-      "method": "GET",
-      "url": "https://test-api.com/api/v3/order/trades?nonce=1770095278000&order_id=2492665741",
-      "header": {
-        "Content-Type": [
-          "application/json"
-        ],
-        "User-Agent": [
-          "bbgo/v1.63.0-4b92891e1-dev"
-        ],
-        "X-Max-Payload": [
-          "<max-payload>"
-        ],
-        "X-Max-Signature": [
-          "<signature>"
-        ]
-      }
-    },
-    "response": {
-      "status": "200 OK",
-      "status_code": 200,
-      "header": {
-        "Cache-Control": [
-          "max-age=0, private, must-revalidate"
-        ],
-        "Content-Length": [
-          "289"
-        ],
-        "Content-Type": [
-          "application/json"
-        ],
-        "Date": [
-          "Tue, 03 Feb 2026 05:07:58 GMT"
-        ],
-        "Etag": [
-          "W/\"14c62184cac8efbb3f2fa2129f3160a8\""
-        ],
-        "Referrer-Policy": [
-          "strict-origin-when-cross-origin"
-        ],
-        "Server": [
-          "nginx"
-        ],
-        "Strict-Transport-Security": [
-          "max-age=63072000; includeSubDomains"
-        ],
-        "Vary": [
-          "Origin"
-        ],
-        "X-Request-Id": [
-          "<request-id>"
-        ],
-        "X-Runtime": [
-          "0.057982"
-        ]
-      },
-      "body": "[{\"id\":12328658,\"order_id\":2492665741,\"wallet_type\":\"spot\",\"price\":\"78433.19\",\"volume\":\"0.000255\",\"funds\":\"20.00046345\",\"market\":\"btcusdt\",\"market_name\":\"BTC/USDT\",\"side\":\"ask\",\"fee\":\"0.03200075\",\"fee_currency\":\"usdt\",\"fee_discounted\":false,\"liquidity\":\"taker\",\"created_at\":1770095257229}]"
+      "body": "[{\"error\":null,\"order\":{\"id\":2492709208,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-1>\",\"group_id\":null,\"side\":\"buy\",\"state\":\"wait\",\"ord_type\":\"limit\",\"price\":\"1000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.1\",\"remaining_volume\":\"0.1\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1770107504505,\"updated_at\":1770107504505}}]"
     }
   }
 ]

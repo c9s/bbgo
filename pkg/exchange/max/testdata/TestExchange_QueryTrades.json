@@ -1,0 +1,185 @@
+[
+  {
+    "timestamp": "2026-02-03T20:54:47.376504+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://test-api/api/v3/wallet/spot/trades?limit=100\u0026market=btcusdt\u0026nonce=1770123286000\u0026order=asc\u0026timestamp=1769904000000",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "<max-payload>"
+        ],
+        "X-Max-Signature": [
+          "<signature>"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "569"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 12:54:47 GMT"
+        ],
+        "Etag": [
+          "W/\"5752f6a3f44deb174f204783888e993c\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.088835"
+        ]
+      },
+      "body": "[{\"id\":12328549,\"order_id\":2492647274,\"wallet_type\":\"spot\",\"price\":\"78845.32\",\"volume\":\"0.001\",\"funds\":\"78.84532\",\"market\":\"btcusdt\",\"market_name\":\"BTC/USDT\",\"side\":\"bid\",\"fee\":\"0.0000016\",\"fee_currency\":\"btc\",\"fee_discounted\":false,\"liquidity\":\"taker\",\"created_at\":1770089830214},{\"id\":12328658,\"order_id\":2492665741,\"wallet_type\":\"spot\",\"price\":\"78433.19\",\"volume\":\"0.000255\",\"funds\":\"20.00046345\",\"market\":\"btcusdt\",\"market_name\":\"BTC/USDT\",\"side\":\"ask\",\"fee\":\"0.03200075\",\"fee_currency\":\"usdt\",\"fee_discounted\":false,\"liquidity\":\"taker\",\"created_at\":1770095257229}]"
+    }
+  },
+  {
+    "timestamp": "2026-02-03T20:54:47.509033+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://test-api/api/v3/wallet/spot/trades?from_id=12328658\u0026limit=1\u0026market=btcusdt\u0026nonce=1770123287000\u0026order=asc",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "<max-payload>"
+        ],
+        "X-Max-Signature": [
+          "<signature>"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "289"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 12:54:47 GMT"
+        ],
+        "Etag": [
+          "W/\"14c62184cac8efbb3f2fa2129f3160a8\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.048359"
+        ]
+      },
+      "body": "[{\"id\":12328658,\"order_id\":2492665741,\"wallet_type\":\"spot\",\"price\":\"78433.19\",\"volume\":\"0.000255\",\"funds\":\"20.00046345\",\"market\":\"btcusdt\",\"market_name\":\"BTC/USDT\",\"side\":\"ask\",\"fee\":\"0.03200075\",\"fee_currency\":\"usdt\",\"fee_discounted\":false,\"liquidity\":\"taker\",\"created_at\":1770095257229}]"
+    }
+  },
+  {
+    "timestamp": "2026-02-03T20:54:47.651634+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://test-api/api/v3/wallet/spot/trades?from_id=12328658\u0026limit=1000\u0026market=btcusdt\u0026nonce=1770123287001\u0026order=asc",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "<max-payload>"
+        ],
+        "X-Max-Signature": [
+          "<signature>"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "289"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 12:54:47 GMT"
+        ],
+        "Etag": [
+          "W/\"14c62184cac8efbb3f2fa2129f3160a8\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.061244"
+        ]
+      },
+      "body": "[{\"id\":12328658,\"order_id\":2492665741,\"wallet_type\":\"spot\",\"price\":\"78433.19\",\"volume\":\"0.000255\",\"funds\":\"20.00046345\",\"market\":\"btcusdt\",\"market_name\":\"BTC/USDT\",\"side\":\"ask\",\"fee\":\"0.03200075\",\"fee_currency\":\"usdt\",\"fee_discounted\":false,\"liquidity\":\"taker\",\"created_at\":1770095257229}]"
+    }
+  }
+]

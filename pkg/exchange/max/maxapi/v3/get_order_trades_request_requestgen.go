@@ -9,13 +9,20 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
+/*
+ * OrderID sets
+ */
 func (g *GetOrderTradesRequest) OrderID(orderID uint64) *GetOrderTradesRequest {
 	g.orderID = &orderID
 	return g
 }
 
+/*
+ * ClientOrderID sets
+ */
 func (g *GetOrderTradesRequest) ClientOrderID(clientOrderID string) *GetOrderTradesRequest {
 	g.clientOrderID = &clientOrderID
 	return g
@@ -27,7 +34,13 @@ func (g *GetOrderTradesRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -40,6 +53,9 @@ func (g *GetOrderTradesRequest) GetParameters() (map[string]interface{}, error) 
 	if g.orderID != nil {
 		orderID := *g.orderID
 
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
+
 		// assign parameter of orderID
 		params["order_id"] = orderID
 	} else {
@@ -47,6 +63,11 @@ func (g *GetOrderTradesRequest) GetParameters() (map[string]interface{}, error) 
 	// check clientOrderID field -> json key client_oid
 	if g.clientOrderID != nil {
 		clientOrderID := *g.clientOrderID
+
+		// TEMPLATE check-required
+		if len(clientOrderID) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of clientOrderID
 		params["client_oid"] = clientOrderID
@@ -95,9 +116,19 @@ func (g *GetOrderTradesRequest) GetSlugParameters() (map[string]interface{}, err
 	return params, nil
 }
 
+var GetOrderTradesRequestSlugReCache sync.Map
+
 func (g *GetOrderTradesRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetOrderTradesRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetOrderTradesRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
