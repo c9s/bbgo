@@ -282,6 +282,8 @@ func NewHedgeMarket(
 		logger: logger,
 	}
 
+	m.positionExposure.SetLogger(logger)
+
 	m.bidPricer = pricer.FromBestPrice(types.SideTypeBuy, m.book)
 
 	m.askPricer = pricer.FromBestPrice(types.SideTypeSell, m.book)

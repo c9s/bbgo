@@ -497,6 +497,7 @@ func (s *Strategy) Initialize() error {
 	}
 
 	s.positionExposure = NewPositionExposure(s.Symbol)
+	s.positionExposure.SetLogger(s.logger)
 	s.positionExposure.SetMetricsLabels(ID, s.InstanceID(), s.MakerExchange, s.Symbol)
 	for _, sig := range s.SignalConfigList.Signals {
 		s.logger.Infof("using signal provider: %s", sig)
@@ -2857,7 +2858,7 @@ func (s *Strategy) CrossRun(
 		if setter, ok := sigProvider.(interface {
 			SetLogger(logger logrus.FieldLogger)
 		}); ok {
-			setter.SetLogger(s.logger)
+			setter.SetLogger(s.logger.WithField("component", "signal"))
 		}
 
 		s.logger.Infof("binding session on signal %T", sigProvider)

@@ -68,6 +68,10 @@ func NewPositionExposure(symbol string) *PositionExposure {
 	}
 }
 
+func (m *PositionExposure) SetLogger(logger logrus.FieldLogger) {
+	m.logger = logger
+}
+
 func (m *PositionExposure) Open(delta fixedpoint.Value) {
 	m.net.Add(delta)
 
