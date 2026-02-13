@@ -75,7 +75,7 @@ func (m *PositionExposure) SetLogger(logger logrus.FieldLogger) {
 func (m *PositionExposure) Open(delta fixedpoint.Value) {
 	m.net.Add(delta)
 
-	log.Infof(
+	m.logger.Infof(
 		"%s opened:%f netPosition:%f coveredPosition: %f",
 		m.symbol,
 		delta.Float64(),
@@ -91,7 +91,7 @@ func (m *PositionExposure) Uncover(delta fixedpoint.Value) {
 
 	m.pending.Add(delta)
 
-	log.Infof(
+	m.logger.Infof(
 		"%s uncovered:%f netPosition:%f coveredPosition: %f",
 		m.symbol,
 		delta.Float64(),
@@ -105,7 +105,7 @@ func (m *PositionExposure) Uncover(delta fixedpoint.Value) {
 func (m *PositionExposure) Cover(delta fixedpoint.Value) {
 	m.pending.Add(delta)
 
-	log.Infof(
+	m.logger.Infof(
 		"%s covered:%f netPosition:%f coveredPosition: %f",
 		m.symbol,
 		delta.Float64(),
@@ -120,7 +120,7 @@ func (m *PositionExposure) Close(delta fixedpoint.Value) {
 	m.pending.Add(delta)
 	m.net.Add(delta)
 
-	log.Infof(
+	m.logger.Infof(
 		"%s closed:%f netPosition:%f coveredPosition: %f",
 		m.symbol,
 		delta.Float64(),
