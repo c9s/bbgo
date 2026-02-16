@@ -748,7 +748,7 @@ func (m *HedgeMarket) hedge(ctx context.Context) error {
 	if !can {
 		m.logger.Infof("insufficient balance/credit to hedge on %s, redispatching position %s", m.InstanceID(), uncoveredPosition.String())
 		// give the whole position back to parent SplitHedge for re-dispatching
-		if err := m.RedispatchPosition(uncoveredPosition); err != nil {
+		if err := m.RedispatchUncoveredPosition(uncoveredPosition); err != nil {
 			m.logger.WithError(err).Errorf("failed to redispatch position")
 		}
 		return nil
@@ -759,7 +759,7 @@ func (m *HedgeMarket) hedge(ctx context.Context) error {
 		hedgeQty := m.market.TruncateQuantity(maxQty)
 		if hedgeQty.IsZero() {
 			m.logger.Infof("can hedge only %s < required %s on %s, but hedgeable qty is zero after truncation; redispatching full position", maxQty.String(), quantity.String(), m.InstanceID())
-			if err := m.RedispatchPosition(uncoveredPosition); err != nil {
+			if err := m.RedispatchUncoveredPosition(uncoveredPosition); err != nil {
 				m.logger.WithError(err).Errorf("failed to redispatch position")
 			}
 			return nil
@@ -779,7 +779,7 @@ func (m *HedgeMarket) hedge(ctx context.Context) error {
 			m.logger.Infof("can hedge only %s < required %s on %s, redispatching exceeded %s and hedging %s",
 				hedgeQty.String(), quantity.String(), m.InstanceID(), remainderPos.Abs().String(), hedgeQty.String())
 
-			if err := m.RedispatchPosition(remainderPos); err != nil {
+			if err := m.RedispatchUncoveredPosition(remainderPos); err != nil {
 				m.logger.WithError(err).Errorf("failed to redispatch exceeded position")
 			}
 
@@ -879,18 +879,34 @@ func (m *HedgeMarket) Sync(ctx context.Context, namespace string) {
 	}
 }
 
-func (m *HedgeMarket) RedispatchPosition(uncoveredPosition fixedpoint.Value) error {
+// RedispatchUncoveredPosition redispatches the uncovered position to the parent SplitHedge
+func (m *HedgeMarket) RedispatchUncoveredPosition(uncoveredPosition fixedpoint.Value) error {
 	if m.redispatchCallback == nil {
 		return fmt.Errorf("HedgeMarket: redispatch callback is not set, can't redispatch position")
 	}
 
 	// This Close could trigger the strategy's position close callback,
-	// which in turn could call RedispatchPosition again, so we need to be careful
+	// which in turn could call RedispatchCoveredPosition again, so we need to be careful
 	// to avoid deadlock or infinite recursion.
-	// Here we assume that the position close callback will not call RedispatchPosition again.
+	// Here we assume that the position close callback will not call RedispatchCoveredPosition again.
 	// If it does, it should be handled gracefully by the strategy.
-	m.positionExposure.Close(uncoveredPosition.Neg())
+	m.positionExposure.Open(uncoveredPosition.Neg())
 	m.redispatchCallback(uncoveredPosition)
+	return nil
+}
+
+func (m *HedgeMarket) RedispatchCoveredPosition(coveredPosition fixedpoint.Value) error {
+	if m.redispatchCallback == nil {
+		return fmt.Errorf("HedgeMarket: redispatch callback is not set, can't redispatch position")
+	}
+
+	// This Close could trigger the strategy's position close callback,
+	// which in turn could call RedispatchCoveredPosition again, so we need to be careful
+	// to avoid deadlock or infinite recursion.
+	// Here we assume that the position close callback will not call RedispatchCoveredPosition again.
+	// If it does, it should be handled gracefully by the strategy.
+	m.positionExposure.Close(coveredPosition.Neg())
+	m.redispatchCallback(coveredPosition)
 	return nil
 }
 

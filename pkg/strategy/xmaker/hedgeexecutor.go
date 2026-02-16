@@ -113,7 +113,7 @@ func (m *MarketOrderHedgeExecutor) Hedge(
 	hedgeOrder, err := m.submitOrder(ctx, orderForm)
 	if err != nil {
 		// if error occurs, revert the covered position
-		if dispatchErr := m.HedgeMarket.RedispatchPosition(coverDelta); dispatchErr != nil {
+		if dispatchErr := m.HedgeMarket.RedispatchCoveredPosition(coverDelta); dispatchErr != nil {
 			m.logger.WithError(dispatchErr).
 				Errorf("failed to redispatch position after hedge order failure: delta=%s", coverDelta.String())
 		}
