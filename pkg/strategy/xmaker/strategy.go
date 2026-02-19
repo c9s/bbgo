@@ -2918,6 +2918,16 @@ func (s *Strategy) CrossRun(
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
 		if profit.Compare(fixedpoint.Zero) == 0 {
 			s.Environment.RecordPosition(s.Position, trade, nil)
+		} else {
+			log.Infof("%s generated profit: %v", s.Symbol, profit)
+
+			p := s.Position.NewProfit(trade, profit, netProfit)
+			p.Strategy = ID
+			p.StrategyInstanceID = instanceID
+			bbgo.Notify(&p)
+			s.ProfitStats.AddProfit(&p)
+
+			s.Environment.RecordPosition(s.Position, trade, &p)
 		}
 	})
 
