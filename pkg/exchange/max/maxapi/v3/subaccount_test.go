@@ -21,22 +21,21 @@ func TestSubAccount(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	baseClient := maxapi.NewRestClientDefault()
-	client := NewClient(baseClient)
+	client := NewClient()
 
-	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, baseClient.HttpClient, "testdata/"+t.Name()+".json")
+	isRecording, saveRecord := httptesting.RunHttpTestWithRecorder(t, client.HttpClient, "testdata/"+t.Name()+".json")
 	defer saveRecord()
 
 	key, secret, ok := testutil.IntegrationTestConfigured(t, "MAX")
 	if ok {
-		baseClient.Auth(key, secret)
+		client.Auth(key, secret)
 	} else {
-		baseClient.Auth("foo", "bar")
+		client.Auth("foo", "bar")
 	}
 
 	subAccount := os.Getenv("MAX_API_SUB_ACCOUNT")
 	if subAccount != "" {
-		baseClient.SetSubAccount(subAccount)
+		client.SetSubAccount(subAccount)
 	}
 
 	if isRecording && !ok {
@@ -52,7 +51,7 @@ func TestSubAccount(t *testing.T) {
 		// clean up sub-accounts
 		if len(subAccounts) > 2 {
 			for _, sa := range subAccounts[1:] {
-				baseClient.SetSubAccount(sa.SN)
+				client.SetSubAccount(sa.SN)
 
 				bals, err := client.NewGetWalletAccountsRequest(maxapi.WalletTypeSpot).Do(ctx)
 				if assert.NoError(t, err) {
@@ -75,7 +74,7 @@ func TestSubAccount(t *testing.T) {
 					}
 				}
 
-				baseClient.SetSubAccount("")
+				client.SetSubAccount("")
 				t.Logf("deleting sub-account %s", sa.SN)
 				delReq := client.SubAccountService.NewDeleteSubAccountRequest()
 				delReq.Sn(sa.SN)
@@ -88,7 +87,7 @@ func TestSubAccount(t *testing.T) {
 	})
 
 	t.Run("CreateSubAccountRequest", func(t *testing.T) {
-		baseClient.SetSubAccount("")
+		client.SetSubAccount("")
 
 		req := client.SubAccountService.NewCreateSubAccountRequest()
 		req.Name(uuid.New().String())
@@ -107,7 +106,7 @@ func TestSubAccount(t *testing.T) {
 		}
 
 		if assert.NotNil(t, createdSubAccount) {
-			baseClient.SetSubAccount(createdSubAccount.SN)
+			client.SetSubAccount(createdSubAccount.SN)
 
 			if isRecording {
 				time.Sleep(1 * time.Second)
@@ -126,7 +125,7 @@ func TestSubAccount(t *testing.T) {
 				time.Sleep(1 * time.Second)
 			}
 
-			baseClient.SetSubAccount("")
+			client.SetSubAccount("")
 			delReq := client.SubAccountService.NewDeleteSubAccountRequest()
 			delReq.Sn(createdSubAccount.SN)
 			resp, err := delReq.Do(ctx)

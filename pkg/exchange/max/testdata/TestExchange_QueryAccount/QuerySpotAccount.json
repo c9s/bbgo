@@ -1,0 +1,124 @@
+[
+  {
+    "timestamp": "2026-02-03T15:46:32.237089+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://test-api.com/api/v3/info?nonce=1770104791000",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "<max-payload>"
+        ],
+        "X-Max-Signature": [
+          "<signature>"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "317"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 07:46:32 GMT"
+        ],
+        "Etag": [
+          "W/\"90e3766b68f934c6f663cc0bbb556a40\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.097926"
+        ]
+      },
+      "body": "{\"email\":\"user@example.com\",\"level\":2,\"m_wallet_enabled\":false,\"current_vip_level\":{\"level\":0,\"minimum_trading_volume\":0,\"minimum_staking_volume\":0,\"maker_fee\":0.0008,\"taker_fee\":0.0016},\"next_vip_level\":{\"level\":1,\"minimum_trading_volume\":3000000,\"minimum_staking_volume\":500,\"maker_fee\":0.00045,\"taker_fee\":0.0014}}"
+    }
+  },
+  {
+    "timestamp": "2026-02-03T15:46:32.778239+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://test-api.com/api/v3/wallet/spot/accounts?nonce=1770104792000",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "<max-payload>"
+        ],
+        "X-Max-Signature": [
+          "<signature>"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "3421"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 07:46:32 GMT"
+        ],
+        "Etag": [
+          "W/\"1075cffe16c8a23aa52c84935162d646\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.394736"
+        ]
+      },
+      "body": "[{\"currency\":\"twd\",\"balance\":\"99997978.4796\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"btc\",\"balance\":\"1008.71936902\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"eth\",\"balance\":\"1005.47880316\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"ltc\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"bch\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"mith\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"usdt\",\"balance\":\"1096.47258181\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"xrp\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"max\",\"balance\":\"1000.0179721\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"bcnt\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"sand\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"usdc\",\"balance\":\"1022.96966211\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"link\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"grt\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"yfi\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"doge\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"comp\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"dot\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"ada\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"sol\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"shib\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"gala\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"mana\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"alice\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"pol\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"looks\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"rly\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"loot\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"mask\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"ape\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"xtz\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"gmt\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"gst\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"bnb\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"ens\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"etc\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"arb\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"avax\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":\"0.0\"},{\"currency\":\"trx\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"cccx\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"pal\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"eos\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"bat\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"zrx\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"gnt\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"omg\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"knc\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"twdt\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"fmf\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null},{\"currency\":\"seele\",\"balance\":\"1000.0\",\"locked\":\"0.0\",\"staked\":null}]"
+    }
+  }
+]

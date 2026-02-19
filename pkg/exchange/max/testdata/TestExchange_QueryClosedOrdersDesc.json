@@ -1,0 +1,63 @@
+[
+  {
+    "timestamp": "2026-02-03T15:26:14.655546+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://test-api.com/api/v3/wallet/spot/orders/closed?limit=1000\u0026market=btcusdt\u0026nonce=1770103574000\u0026order_by=desc\u0026timestamp=1770681600000",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "User-Agent": [
+          "bbgo/v1.63.0-4b92891e1-dev"
+        ],
+        "X-Max-Payload": [
+          "<max-payload>"
+        ],
+        "X-Max-Signature": [
+          "<signature>"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "7950"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 07:26:14 GMT"
+        ],
+        "Etag": [
+          "W/\"3d2bace9a49701521f2b9c295d8b2cc8\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.115940"
+        ]
+      },
+      "body": "[{\"id\":2492665741,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-1>\",\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"78415.91\",\"stop_price\":null,\"avg_price\":\"78433.19\",\"volume\":\"0.000255\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.000255\",\"trades_count\":1,\"created_at\":1770095257180,\"updated_at\":1770095257332},{\"id\":2492647274,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"test1770089804398\",\"group_id\":null,\"side\":\"buy\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"90000.0\",\"stop_price\":null,\"avg_price\":\"78845.32\",\"volume\":\"0.001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.001\",\"trades_count\":1,\"created_at\":1770089830162,\"updated_at\":1770089830270},{\"id\":2485612822,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-2>\",\"group_id\":null,\"side\":\"sell\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.01\",\"remaining_volume\":\"0.01\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1768232068911,\"updated_at\":1768232129053},{\"id\":2485612192,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-3>\",\"group_id\":null,\"side\":\"sell\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.01\",\"remaining_volume\":\"0.01\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1768231969202,\"updated_at\":1768232030603},{\"id\":2485610922,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-4>\",\"group_id\":null,\"side\":\"sell\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.01\",\"remaining_volume\":\"0.01\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1768231769369,\"updated_at\":1768232032827},{\"id\":2485610549,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":\"<uuid-5>\",\"group_id\":null,\"side\":\"sell\",\"state\":\"cancel\",\"ord_type\":\"limit\",\"price\":\"1000000.0\",\"stop_price\":null,\"avg_price\":\"0.0\",\"volume\":\"0.01\",\"remaining_volume\":\"0.01\",\"executed_volume\":\"0.0\",\"trades_count\":0,\"created_at\":1768231716311,\"updated_at\":1768231757230},{\"id\":2391693754,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"market\",\"price\":null,\"stop_price\":null,\"avg_price\":\"85555.55\",\"volume\":\"0.0001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.0001\",\"trades_count\":1,\"created_at\":1742183240002,\"updated_at\":1742183240081},{\"id\":2391693753,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"buy\",\"state\":\"done\",\"ord_type\":\"market\",\"price\":null,\"stop_price\":null,\"avg_price\":\"90000.0\",\"volume\":\"0.0001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.0001\",\"trades_count\":1,\"created_at\":1742183237188,\"updated_at\":1742183237288},{\"id\":2391693750,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"market\",\"price\":null,\"stop_price\":null,\"avg_price\":\"86977.7708\",\"volume\":\"0.0001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.0001\",\"trades_count\":2,\"created_at\":1742183231587,\"updated_at\":1742183231704},{\"id\":2391693749,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"buy\",\"state\":\"done\",\"ord_type\":\"market\",\"price\":null,\"stop_price\":null,\"avg_price\":\"153063.09\",\"volume\":\"0.0001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.0001\",\"trades_count\":1,\"created_at\":1742183228505,\"updated_at\":1742183228636},{\"id\":2391693748,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"market\",\"price\":null,\"stop_price\":null,\"avg_price\":\"87777.77\",\"volume\":\"0.0001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.0001\",\"trades_count\":1,\"created_at\":1742183224085,\"updated_at\":1742183224161},{\"id\":2391693743,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"buy\",\"state\":\"done\",\"ord_type\":\"market\",\"price\":null,\"stop_price\":null,\"avg_price\":\"153063.1\",\"volume\":\"0.0001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.0001\",\"trades_count\":1,\"created_at\":1742183220820,\"updated_at\":1742183220905},{\"id\":2391693740,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"market\",\"price\":null,\"stop_price\":null,\"avg_price\":\"87777.77\",\"volume\":\"0.0001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.0001\",\"trades_count\":1,\"created_at\":1742183216601,\"updated_at\":1742183216735},{\"id\":2391693738,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"buy\",\"state\":\"done\",\"ord_type\":\"market\",\"price\":null,\"stop_price\":null,\"avg_price\":\"153063.09\",\"volume\":\"0.0001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.0001\",\"trades_count\":1,\"created_at\":1742183211291,\"updated_at\":1742183211381},{\"id\":2391557041,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"152800.0\",\"stop_price\":null,\"avg_price\":\"152800.0\",\"volume\":\"0.001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.001\",\"trades_count\":1,\"created_at\":1741879908971,\"updated_at\":1741879909043},{\"id\":2391557040,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"buy\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"152800.0\",\"stop_price\":null,\"avg_price\":\"152800.0\",\"volume\":\"0.001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.001\",\"trades_count\":1,\"created_at\":1741879907849,\"updated_at\":1741879909044},{\"id\":2391556924,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"market\",\"price\":null,\"stop_price\":null,\"avg_price\":\"139482.84\",\"volume\":\"0.001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.001\",\"trades_count\":1,\"created_at\":1741879456732,\"updated_at\":1741879456804},{\"id\":2391556923,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"buy\",\"state\":\"done\",\"ord_type\":\"market\",\"price\":null,\"stop_price\":null,\"avg_price\":\"141097.86195\",\"volume\":\"0.001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.001\",\"trades_count\":2,\"created_at\":1741879455862,\"updated_at\":1741879456030},{\"id\":2391556915,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"139482.83\",\"stop_price\":null,\"avg_price\":\"139482.84\",\"volume\":\"0.001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.001\",\"trades_count\":1,\"created_at\":1741879426600,\"updated_at\":1741879426729},{\"id\":2391556914,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"139482.84\",\"stop_price\":null,\"avg_price\":\"139482.84\",\"volume\":\"0.001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.001\",\"trades_count\":1,\"created_at\":1741879411744,\"updated_at\":1741879411879},{\"id\":2391556898,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"sell\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"139482.84\",\"stop_price\":null,\"avg_price\":\"139482.84\",\"volume\":\"0.001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.001\",\"trades_count\":2,\"created_at\":1741879298162,\"updated_at\":1741879380989},{\"id\":2391556896,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"buy\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"139482.84\",\"stop_price\":null,\"avg_price\":\"139482.83348\",\"volume\":\"0.001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.001\",\"trades_count\":2,\"created_at\":1741879281133,\"updated_at\":1741879298294},{\"id\":2391556876,\"wallet_type\":\"spot\",\"market\":\"btcusdt\",\"client_oid\":null,\"group_id\":null,\"side\":\"buy\",\"state\":\"done\",\"ord_type\":\"limit\",\"price\":\"139482.84\",\"stop_price\":null,\"avg_price\":\"139482.83\",\"volume\":\"0.001\",\"remaining_volume\":\"0.0\",\"executed_volume\":\"0.001\",\"trades_count\":1,\"created_at\":1741879132648,\"updated_at\":1741879132917}]"
+    }
+  }
+]

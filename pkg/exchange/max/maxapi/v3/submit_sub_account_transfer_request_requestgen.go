@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
 /*
@@ -153,9 +154,19 @@ func (s *SubmitSubAccountTransferRequest) GetSlugParameters() (map[string]interf
 	return params, nil
 }
 
+var SubmitSubAccountTransferRequestSlugReCache sync.Map
+
 func (s *SubmitSubAccountTransferRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := SubmitSubAccountTransferRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			SubmitSubAccountTransferRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 

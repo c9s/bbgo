@@ -10,24 +10,37 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
+/*
+ * Currency sets
+ */
 func (g *GetMarginInterestHistoryRequest) Currency(currency string) *GetMarginInterestHistoryRequest {
 	g.currency = currency
 	return g
 }
 
+/*
+ * StartTime sets
+ */
 func (g *GetMarginInterestHistoryRequest) StartTime(startTime time.Time) *GetMarginInterestHistoryRequest {
 	g.startTime = &startTime
 	return g
 }
 
+/*
+ * EndTime sets
+ */
 func (g *GetMarginInterestHistoryRequest) EndTime(endTime time.Time) *GetMarginInterestHistoryRequest {
 	g.endTime = &endTime
 	return g
 }
 
+/*
+ * Limit sets
+ */
 func (g *GetMarginInterestHistoryRequest) Limit(limit int) *GetMarginInterestHistoryRequest {
 	g.limit = &limit
 	return g
@@ -39,7 +52,13 @@ func (g *GetMarginInterestHistoryRequest) GetQueryParameters() (url.Values, erro
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -63,6 +82,12 @@ func (g *GetMarginInterestHistoryRequest) GetParameters() (map[string]interface{
 	if g.startTime != nil {
 		startTime := *g.startTime
 
+		// TEMPLATE check-required
+
+		if startTime.IsZero() {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of startTime
 		// convert time.Time to milliseconds time stamp
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
@@ -72,6 +97,12 @@ func (g *GetMarginInterestHistoryRequest) GetParameters() (map[string]interface{
 	if g.endTime != nil {
 		endTime := *g.endTime
 
+		// TEMPLATE check-required
+
+		if endTime.IsZero() {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of endTime
 		// convert time.Time to milliseconds time stamp
 		params["endTime"] = strconv.FormatInt(endTime.UnixNano()/int64(time.Millisecond), 10)
@@ -80,6 +111,12 @@ func (g *GetMarginInterestHistoryRequest) GetParameters() (map[string]interface{
 	// check limit field -> json key limit
 	if g.limit != nil {
 		limit := *g.limit
+
+		// TEMPLATE check-required
+
+		if limit == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of limit
 		params["limit"] = limit
@@ -128,9 +165,19 @@ func (g *GetMarginInterestHistoryRequest) GetSlugParameters() (map[string]interf
 	return params, nil
 }
 
+var GetMarginInterestHistoryRequestSlugReCache sync.Map
+
 func (g *GetMarginInterestHistoryRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetMarginInterestHistoryRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetMarginInterestHistoryRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 

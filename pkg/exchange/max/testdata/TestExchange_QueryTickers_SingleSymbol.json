@@ -1,0 +1,50 @@
+[
+  {
+    "timestamp": "2026-02-03T13:41:21.410538+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://test-api.com/api/v3/ticker?market=btcusdt",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "max-age=0, private, must-revalidate"
+        ],
+        "Content-Length": [
+          "265"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Tue, 03 Feb 2026 05:41:21 GMT"
+        ],
+        "Etag": [
+          "W/\"b7c3fe0fea2401122191a9d31631ee3f\""
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Server": [
+          "nginx"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=63072000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "X-Request-Id": [
+          "<request-id>"
+        ],
+        "X-Runtime": [
+          "0.014858"
+        ]
+      },
+      "body": "{\"market\":\"btcusdt\",\"at\":1770097281,\"buy\":\"78340.82\",\"buy_vol\":\"0.000206\",\"sell\":\"78693.08\",\"sell_vol\":\"0.082838\",\"open\":\"76341.05\",\"low\":\"76044.74\",\"high\":\"79179.49\",\"last\":\"78433.19\",\"vol\":\"0.0482\",\"vol_in_btc\":\"0.0482\",\"vol_in_quote\":\"3777.64457533173841111042\"}"
+    }
+  }
+]

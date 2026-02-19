@@ -9,18 +9,28 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
+/*
+ * Market sets
+ */
 func (g *GetDepthRequest) Market(market string) *GetDepthRequest {
 	g.market = market
 	return g
 }
 
+/*
+ * Limit sets
+ */
 func (g *GetDepthRequest) Limit(limit int) *GetDepthRequest {
 	g.limit = &limit
 	return g
 }
 
+/*
+ * SortByPrice sets
+ */
 func (g *GetDepthRequest) SortByPrice(sortByPrice bool) *GetDepthRequest {
 	g.sortByPrice = &sortByPrice
 	return g
@@ -32,7 +42,13 @@ func (g *GetDepthRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -56,6 +72,12 @@ func (g *GetDepthRequest) GetParameters() (map[string]interface{}, error) {
 	if g.limit != nil {
 		limit := *g.limit
 
+		// TEMPLATE check-required
+
+		if limit == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of limit
 		params["limit"] = limit
 	} else {
@@ -63,6 +85,9 @@ func (g *GetDepthRequest) GetParameters() (map[string]interface{}, error) {
 	// check sortByPrice field -> json key sort_by_price
 	if g.sortByPrice != nil {
 		sortByPrice := *g.sortByPrice
+
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
 
 		// assign parameter of sortByPrice
 		params["sort_by_price"] = sortByPrice
@@ -111,9 +136,19 @@ func (g *GetDepthRequest) GetSlugParameters() (map[string]interface{}, error) {
 	return params, nil
 }
 
+var GetDepthRequestSlugReCache sync.Map
+
 func (g *GetDepthRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetDepthRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetDepthRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 

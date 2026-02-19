@@ -1,16 +1,7 @@
 package maxapi
 
-//go:generate -command GetRequest requestgen -method GET
-//go:generate -command PostRequest requestgen -method POST
-//go:generate -command DeleteRequest requestgen -method DELETE
-
 import (
-	"time"
-
-	"github.com/c9s/requestgen"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 // Account is for max rest api v2, Balance and Type will be conflict with types.PrivateBalanceUpdate
@@ -55,76 +46,4 @@ type VipLevelSettings struct {
 type VipLevel struct {
 	Current VipLevelSettings `json:"current_vip_level"`
 	Next    VipLevelSettings `json:"next_vip_level"`
-}
-
-// submitted -> accepted -> processing -> sent -> confirmed
-type WithdrawState string
-
-const (
-	WithdrawStateSubmitting WithdrawState = "submitting"
-	WithdrawStateSubmitted  WithdrawState = "submitted"
-	WithdrawStateConfirmed  WithdrawState = "confirmed"
-	WithdrawStatePending    WithdrawState = "pending"
-	WithdrawStateProcessing WithdrawState = "processing"
-	WithdrawStateCanceled   WithdrawState = "canceled"
-	WithdrawStateFailed     WithdrawState = "failed"
-	WithdrawStateSent       WithdrawState = "sent"
-	WithdrawStateRejected   WithdrawState = "rejected"
-)
-
-type WithdrawStatus string
-
-const (
-	WithdrawStatusPending   WithdrawStatus = "pending"
-	WithdrawStatusCancelled WithdrawStatus = "cancelled"
-	WithdrawStatusFailed    WithdrawStatus = "failed"
-	WithdrawStatusOK        WithdrawStatus = "ok"
-)
-
-type Withdraw struct {
-	UUID            string           `json:"uuid"`
-	Currency        string           `json:"currency"`
-	CurrencyVersion string           `json:"currency_version"` // "eth"
-	Amount          fixedpoint.Value `json:"amount"`
-	Fee             fixedpoint.Value `json:"fee"`
-	FeeCurrency     string           `json:"fee_currency"`
-	TxID            string           `json:"txid"`
-
-	NetworkProtocol string `json:"network_protocol"`
-	Address         string `json:"to_address"`
-
-	// State can be "submitting", "submitted",
-	//     "rejected", "accepted", "suspect", "approved", "delisted_processing",
-	//     "processing", "retryable", "sent", "canceled",
-	//     "failed", "pending", "confirmed",
-	//     "kgi_manually_processing", "kgi_manually_confirmed", "kgi_possible_failed",
-	//     "sygna_verifying"
-	State WithdrawState `json:"state"`
-
-	// Status WithdrawStatus `json:"status,omitempty"`
-
-	CreatedAt types.MillisecondTimestamp `json:"created_at"`
-	UpdatedAt types.MillisecondTimestamp `json:"updated_at"`
-	Notes     string                     `json:"notes"`
-}
-
-//go:generate GetRequest -url "v3/withdrawals" -type GetWithdrawHistoryRequest -responseType []Withdraw
-type GetWithdrawHistoryRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	currency  *string    `param:"currency"`
-	state     *string    `param:"state"`                  // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	timestamp *time.Time `param:"timestamp,milliseconds"` // milli-seconds
-
-	// order could be desc or asc
-	order *string `param:"order"`
-
-	// limit's default = 50
-	limit *int `param:"limit"`
-}
-
-func (c *RestClient) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
-	return &GetWithdrawHistoryRequest{
-		client: c,
-	}
 }

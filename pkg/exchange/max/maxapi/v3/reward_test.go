@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
@@ -17,11 +16,9 @@ func TestReward(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	restClient := maxapi.NewRestClientDefault()
-	restClient.Auth(key, secret)
-	assert.NotNil(t, restClient)
+	client := NewClient()
+	client.Auth(key, secret)
 
-	client := NewClient(restClient)
 	req := client.NewGetRewardsRequest()
 	rewards, err := req.Do(ctx)
 	assert.NoError(t, err)

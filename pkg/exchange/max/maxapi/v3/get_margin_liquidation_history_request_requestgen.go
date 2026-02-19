@@ -10,19 +10,29 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
+/*
+ * StartTime sets
+ */
 func (g *GetMarginLiquidationHistoryRequest) StartTime(startTime time.Time) *GetMarginLiquidationHistoryRequest {
 	g.startTime = &startTime
 	return g
 }
 
+/*
+ * EndTime sets
+ */
 func (g *GetMarginLiquidationHistoryRequest) EndTime(endTime time.Time) *GetMarginLiquidationHistoryRequest {
 	g.endTime = &endTime
 	return g
 }
 
+/*
+ * Limit sets
+ */
 func (g *GetMarginLiquidationHistoryRequest) Limit(limit int) *GetMarginLiquidationHistoryRequest {
 	g.limit = &limit
 	return g
@@ -34,7 +44,13 @@ func (g *GetMarginLiquidationHistoryRequest) GetQueryParameters() (url.Values, e
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -47,6 +63,12 @@ func (g *GetMarginLiquidationHistoryRequest) GetParameters() (map[string]interfa
 	if g.startTime != nil {
 		startTime := *g.startTime
 
+		// TEMPLATE check-required
+
+		if startTime.IsZero() {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of startTime
 		// convert time.Time to milliseconds time stamp
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
@@ -56,6 +78,12 @@ func (g *GetMarginLiquidationHistoryRequest) GetParameters() (map[string]interfa
 	if g.endTime != nil {
 		endTime := *g.endTime
 
+		// TEMPLATE check-required
+
+		if endTime.IsZero() {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of endTime
 		// convert time.Time to milliseconds time stamp
 		params["endTime"] = strconv.FormatInt(endTime.UnixNano()/int64(time.Millisecond), 10)
@@ -64,6 +92,12 @@ func (g *GetMarginLiquidationHistoryRequest) GetParameters() (map[string]interfa
 	// check limit field -> json key limit
 	if g.limit != nil {
 		limit := *g.limit
+
+		// TEMPLATE check-required
+
+		if limit == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of limit
 		params["limit"] = limit
@@ -112,9 +146,19 @@ func (g *GetMarginLiquidationHistoryRequest) GetSlugParameters() (map[string]int
 	return params, nil
 }
 
+var GetMarginLiquidationHistoryRequestSlugReCache sync.Map
+
 func (g *GetMarginLiquidationHistoryRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetMarginLiquidationHistoryRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetMarginLiquidationHistoryRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
