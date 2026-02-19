@@ -126,3 +126,15 @@ func (i *IndicatorSet) LiquidityDemand(
 		i.SMA(iw),
 	)
 }
+
+func (i *IndicatorSet) SuperTrend(
+	interval types.Interval,
+	atrPeriod int,
+	multiplier float64,
+) *indicatorv2.SuperTrendStream {
+	return indicatorv2.SuperTrend(
+		i.KLines(interval),
+		atrPeriod,
+		multiplier,
+	)
+}
