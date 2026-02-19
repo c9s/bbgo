@@ -10,6 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/bitget"
 	"github.com/c9s/bbgo/pkg/exchange/bybit"
 	"github.com/c9s/bbgo/pkg/exchange/coinbase"
+	"github.com/c9s/bbgo/pkg/exchange/hyperliquid"
 	"github.com/c9s/bbgo/pkg/exchange/kucoin"
 	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/exchange/okex"
@@ -17,11 +18,13 @@ import (
 )
 
 const (
-	OptionKeyAPIKey        = "API_KEY"
-	OptionKeyAPISecret     = "API_SECRET"
-	OptionKeyAPIPassphrase = "API_PASSPHRASE"
-	OptionKeyAPIPrivateKey = "API_PRIVATE_KEy"
-	OptionKeyAPISubAccount = "API_SUB_ACCOUNT" // for exchanges like Coinbase Pro which support sub accounts
+	OptionKeyAPIKey          = "API_KEY"
+	OptionKeyAPISecret       = "API_SECRET"
+	OptionKeyAPIPassphrase   = "API_PASSPHRASE"
+	OptionKeyAPIPrivateKey   = "API_PRIVATE_KEY"
+	OptionKeyAPISubAccount   = "API_SUB_ACCOUNT"   // for exchanges like Coinbase Pro which support sub accounts
+	OptionKeyAPIMainAccount  = "API_MAIN_ACCOUNT"  // for exchanges like hyperliquid which main accounts
+	OptionKeyAPIVaultAccount = "API_VAULT_ACCOUNT" // for exchanges like hyperliquid which support vault accounts
 )
 
 // Options is a map of exchange options used to initialize an exchange
@@ -86,6 +89,12 @@ var factories = map[types.ExchangeName]Factory{
 		EnvLoader: DefaultEnvVarLoader,
 		Constructor: func(options Options) (types.Exchange, error) {
 			return coinbase.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret], options[OptionKeyAPIPassphrase], 0), nil
+		},
+	},
+	types.ExchangeHyperliquid: {
+		EnvLoader: DefaultEnvVarLoader,
+		Constructor: func(options Options) (types.Exchange, error) {
+			return hyperliquid.New(options[OptionKeyAPIPrivateKey], options[OptionKeyAPIMainAccount], options[OptionKeyAPIVaultAccount]), nil
 		},
 	},
 }
