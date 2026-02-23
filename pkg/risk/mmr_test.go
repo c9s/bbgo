@@ -29,7 +29,6 @@ func TestDefaultMaintenanceMarginRatio_Table(t *testing.T) {
 
 	for _, tc := range cases {
 		// capture range variable
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			got := DefaultMaintenanceMarginRatio(tc.leverage)
 			if got.Compare(tc.want) != 0 {

@@ -352,7 +352,6 @@ func BatchPlaceOrder(
 	if batchOrderConcurrent {
 		g, gCtx := errgroup.WithContext(ctx)
 		for i, order := range submitOrders {
-			i, order := i, order
 			g.Go(func() error {
 				submitOrder(i, order, gCtx)
 				return nil
