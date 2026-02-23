@@ -31,19 +31,14 @@ func init() {
 type Exchange struct {
 	types.MarginSettings
 
-	key, secret string
-
-	client *maxapi.RestClient
-
 	v3client *v3.Client
 
 	submitOrderLimiter, queryTradeLimiter, accountQueryLimiter, closedOrderQueryLimiter, marketDataLimiter *rate.Limiter
 }
 
 func New(key, secret, subAccount string) *Exchange {
-	client := maxapi.NewRestClientDefault()
-	client.Auth(key, secret)
-	v3client := v3.NewClient(client)
+	v3client := v3.NewClient()
+	v3client.Auth(key, secret)
 
 	if subAccount != "" {
 		log.Infof("using MAX sub-account %s", subAccount)
@@ -51,10 +46,6 @@ func New(key, secret, subAccount string) *Exchange {
 	}
 
 	return &Exchange{
-		client: client,
-		key:    key,
-		// pragma: allowlist nextline secret
-		secret:   secret,
 		v3client: v3client,
 
 		queryTradeLimiter: rate.NewLimiter(rate.Every(250*time.Millisecond), 2),
@@ -125,8 +116,16 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 			return nil, err
 		}
 
+		symbolsSet := make(map[string]struct{})
+		for _, s := range symbol {
+			symbolsSet[s] = struct{}{}
+		}
+		allMarkets := len(symbolsSet) == 0
 		for _, v := range maxTickers {
 			marketId := toGlobalSymbol(v.Market)
+			if _, found := symbolsSet[marketId]; !allMarkets && !found {
+				continue
+			}
 			tickers[marketId] = types.Ticker{
 				Time:   v.At.Time(),
 				Volume: v.Volume,
@@ -917,7 +916,7 @@ func (e *Exchange) QueryWithdrawHistory(
 				continue
 			}
 
-			status := convertWithdrawStatusV3(d.State)
+			status := convertWithdrawStatus(d.State)
 
 			txIDs[d.TxID] = struct{}{}
 			withdraw := types.Withdraw{
@@ -1180,7 +1179,7 @@ func (e *Exchange) queryTradesByID(ctx context.Context, symbol string, tradeID u
 
 func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]types.Reward, error) {
 	if startTime.IsZero() {
-		startTime = time.Unix(maxapi.TimestampSince, 0)
+		startTime = time.Unix(v3.TimestampSince, 0)
 	}
 
 	req := e.v3client.NewGetRewardsRequest()

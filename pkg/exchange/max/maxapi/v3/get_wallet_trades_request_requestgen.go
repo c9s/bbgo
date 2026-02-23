@@ -6,40 +6,58 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
+/*
+ * Market sets
+ */
 func (g *GetWalletTradesRequest) Market(market string) *GetWalletTradesRequest {
 	g.market = market
 	return g
 }
 
+/*
+ * Timestamp sets
+ */
 func (g *GetWalletTradesRequest) Timestamp(timestamp time.Time) *GetWalletTradesRequest {
 	g.timestamp = &timestamp
 	return g
 }
 
+/*
+ * FromID sets
+ */
 func (g *GetWalletTradesRequest) FromID(fromID uint64) *GetWalletTradesRequest {
 	g.fromID = &fromID
 	return g
 }
 
+/*
+ * Order sets
+ */
 func (g *GetWalletTradesRequest) Order(order string) *GetWalletTradesRequest {
 	g.order = &order
 	return g
 }
 
+/*
+ * Limit sets
+ */
 func (g *GetWalletTradesRequest) Limit(limit uint64) *GetWalletTradesRequest {
 	g.limit = &limit
 	return g
 }
 
-func (g *GetWalletTradesRequest) WalletType(walletType maxapi.WalletType) *GetWalletTradesRequest {
+/*
+ * WalletType sets
+ */
+func (g *GetWalletTradesRequest) WalletType(walletType WalletType) *GetWalletTradesRequest {
 	g.walletType = walletType
 	return g
 }
@@ -50,7 +68,13 @@ func (g *GetWalletTradesRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -74,6 +98,12 @@ func (g *GetWalletTradesRequest) GetParameters() (map[string]interface{}, error)
 	if g.timestamp != nil {
 		timestamp := *g.timestamp
 
+		// TEMPLATE check-required
+
+		if timestamp.IsZero() {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of timestamp
 		// convert time.Time to milliseconds time stamp
 		params["timestamp"] = strconv.FormatInt(timestamp.UnixNano()/int64(time.Millisecond), 10)
@@ -83,6 +113,9 @@ func (g *GetWalletTradesRequest) GetParameters() (map[string]interface{}, error)
 	if g.fromID != nil {
 		fromID := *g.fromID
 
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
+
 		// assign parameter of fromID
 		params["from_id"] = fromID
 	} else {
@@ -90,6 +123,11 @@ func (g *GetWalletTradesRequest) GetParameters() (map[string]interface{}, error)
 	// check order field -> json key order
 	if g.order != nil {
 		order := *g.order
+
+		// TEMPLATE check-required
+		if len(order) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// TEMPLATE check-valid-values
 		switch order {
@@ -109,6 +147,9 @@ func (g *GetWalletTradesRequest) GetParameters() (map[string]interface{}, error)
 	// check limit field -> json key limit
 	if g.limit != nil {
 		limit := *g.limit
+
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
 
 		// assign parameter of limit
 		params["limit"] = limit
@@ -157,9 +198,6 @@ func (g *GetWalletTradesRequest) GetSlugParameters() (map[string]interface{}, er
 	walletType := g.walletType
 
 	// TEMPLATE check-required
-	if len(walletType) == 0 {
-		return nil, fmt.Errorf("walletType is required, empty string given")
-	}
 	// END TEMPLATE check-required
 
 	// assign parameter of walletType
@@ -168,9 +206,19 @@ func (g *GetWalletTradesRequest) GetSlugParameters() (map[string]interface{}, er
 	return params, nil
 }
 
+var GetWalletTradesRequestSlugReCache sync.Map
+
 func (g *GetWalletTradesRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetWalletTradesRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetWalletTradesRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
