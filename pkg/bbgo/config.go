@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
+	bbgochart "github.com/c9s/bbgo/pkg/chart/v1"
 	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -389,6 +390,8 @@ type Config struct {
 	PnLReporters []PnLReporterConfig `json:"reportPnL,omitempty" yaml:"reportPnL,omitempty"`
 
 	ProfilingConfig *ProfilingConfig `json:"profiling,omitempty" yaml:"profiling,omitempty"`
+
+	ChartConfig *bbgochart.CandleChartOptions `json:"chart,omitempty" yaml:"chart,omitempty"`
 }
 
 func (c *Config) Map() (map[string]interface{}, error) {
