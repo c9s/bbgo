@@ -12,7 +12,8 @@ import (
 type Chart struct {
 	*chart.Chart
 
-	klines []types.KLine
+	klines     []types.KLine
+	indicators []Indicator
 }
 
 func NewChart() *Chart {
@@ -82,12 +83,16 @@ func (c *Chart) DrawCandles(klines []types.KLine, options *CandleChartOptions) {
 			Candles: candles,
 		},
 	}
-	for _, s := range c.Series {
-		_, ok := s.(CandlestickSeries)
-		if ok {
-			continue
-		}
-		series = append(series, s)
+	for _, ind := range c.indicators {
+		series = append(
+			series,
+			NewIndicatorSeries(
+				klines,
+				ind.Name,
+				ind.AnnotationProvider,
+				ind.Options,
+			),
+		)
 	}
 	c.Series = series
 
@@ -104,6 +109,14 @@ func (c *Chart) DrawCandles(klines []types.KLine, options *CandleChartOptions) {
 			},
 		}
 	}
+}
+
+func (c *Chart) AddIndicator(name string, provider AnnotationProvider, options AnnotationOptions) {
+	c.indicators = append(c.indicators, Indicator{
+		Name:               name,
+		Options:            options,
+		AnnotationProvider: provider,
+	})
 }
 
 func Save(graph *Chart, filename string) error {
