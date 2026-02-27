@@ -122,7 +122,6 @@ func (i *IndicatorSet) LiquidityDemand(
 ) *indicatorv2.LiquidityDemandStream {
 	return indicatorv2.LiquidityDemand(
 		i.KLines(iw.Interval),
-		i.SMA(iw),
-		i.SMA(iw),
+		iw,
 	)
 }
