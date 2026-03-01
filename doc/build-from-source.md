@@ -101,6 +101,13 @@ cd apps/frontend && yarn install
 make bbgo
 ```
 
+NOTE: The above command will build the full version of bbgo, which includes the web interface. The web interface is test and build with node 22. If you have node 22 installed, you can run `node -v` to check the version. If you have an older version of node, you can use `nvm` to install node 22:
+
+```shell
+nvm install 22
+nvm use 22
+```
+
 If you don't need the web interface, you can build the slim version of bbgo:
 
 ```shell
