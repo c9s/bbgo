@@ -154,7 +154,7 @@ func TestStrategy(t *testing.T) {
 		sessions := map[string]*bbgo.ExchangeSession{}
 		sessions["max"] = session
 
-		_, submitOrder := s.selectSessionForCurrency(ctx, sessions, "TWD", Number(70_000))
+		_, submitOrder := s.selectSessionForCurrency(ctx, sessions, "", "TWD", Number(70_000))
 		assert.NotNil(t, submitOrder)
 		assert.Equal(t, types.SideTypeSell, submitOrder.Side)
 		assert.Equal(t, Number(32).String(), submitOrder.Price.String())
@@ -181,7 +181,7 @@ func TestStrategy(t *testing.T) {
 		sessions := map[string]*bbgo.ExchangeSession{}
 		sessions["max"] = session
 
-		_, submitOrder := s.selectSessionForCurrency(ctx, sessions, "TWD", Number(-10_000))
+		_, submitOrder := s.selectSessionForCurrency(ctx, sessions, "", "TWD", Number(-10_000))
 		assert.NotNil(t, submitOrder)
 		assert.Equal(t, types.SideTypeBuy, submitOrder.Side)
 		assert.Equal(t, Number(33).String(), submitOrder.Price.String())
@@ -218,7 +218,7 @@ func TestStrategy(t *testing.T) {
 		sessions := map[string]*bbgo.ExchangeSession{}
 		sessions["max"] = session
 
-		_, submitOrder := s.selectSessionForCurrency(ctx, sessions, "BTC", Number(0.045))
+		_, submitOrder := s.selectSessionForCurrency(ctx, sessions, "", "BTC", Number(0.045))
 		assert.NotNil(t, submitOrder)
 		assert.Equal(t, types.SideTypeBuy, submitOrder.Side)
 		assert.Equal(t, "36000", submitOrder.Price.String())

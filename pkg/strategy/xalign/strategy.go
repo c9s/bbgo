@@ -222,7 +222,7 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) selectSessionForCurrency(
-	ctx context.Context, sessions map[string]*bbgo.ExchangeSession, currency string, changeQuantity fixedpoint.Value,
+	ctx context.Context, sessions map[string]*bbgo.ExchangeSession, excludeSession, currency string, changeQuantity fixedpoint.Value,
 ) (*bbgo.ExchangeSession, *types.SubmitOrder) {
 	var taker = s.UseTakerOrder
 	var side = s.selectAdjustmentOrderSide(changeQuantity)
@@ -234,6 +234,9 @@ func (s *Strategy) selectSessionForCurrency(
 	}
 
 	for _, sessionName := range s.PreferredSessions {
+		if sessionName == excludeSession {
+			continue
+		}
 		session, ok := sessions[sessionName]
 		if !ok {
 			log.Errorf("session %s not found, please check the preferredSessions settings", sessionName)
@@ -745,7 +748,8 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 			)
 		}
 
-		selectedSession, submitOrder := s.selectSessionForCurrency(ctx, sessions, currency, q)
+		selectedSession, submitOrder := s.selectSessionForCurrency(ctx, sessions, "", currency, q)
+		onSubmittedOrderCallback := s.asyncOrderCallbackWithRetry(ctx, sessions, currency, q)
 		if selectedSession != nil && submitOrder != nil {
 			if market, hasMarket := selectedSession.Market(submitOrder.Symbol); hasMarket && submitOrder.Price.Sign() > 0 {
 				if market.IsDustQuantity(q.Abs(), submitOrder.Price) {
@@ -770,7 +774,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 			// 2. interactive order is not enabled
 			if isInstantAmount || !s.isInteractiveOrderEnabled {
 				createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
-				s.onSubmittedOrderCallback(selectedSession, submitOrder, createdOrder, err)
+				onSubmittedOrderCallback(selectedSession, submitOrder, createdOrder, err)
 				// continue to the next currency
 				continue
 			}
@@ -807,10 +811,10 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 					s.slackEvtID,
 				)
 				itOrder.SetHelpMessage(s.interactiveOrderHelpMessage(submitOrder))
-				itOrder.AsyncSubmit(ctx, selectedSession, s.onSubmittedOrderCallback)
+				itOrder.AsyncSubmit(ctx, selectedSession, onSubmittedOrderCallback)
 			} else {
 				createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
-				s.onSubmittedOrderCallback(selectedSession, submitOrder, createdOrder, err)
+				onSubmittedOrderCallback(selectedSession, submitOrder, createdOrder, err)
 			}
 		}
 	}
@@ -828,6 +832,26 @@ func (s *Strategy) onSubmittedOrderCallback(session *bbgo.ExchangeSession, submi
 			log.Errorf("orderbook %s not found", session.Name)
 		}
 		bbgo.Notify("Aligning order submitted", createdOrder)
+	}
+}
+
+func (s *Strategy) asyncOrderCallbackWithRetry(ctx context.Context, sessions bbgo.ExchangeSessionMap, currency string, changeQuantity fixedpoint.Value) OnSubmittedOrderCallback {
+	return func(session *bbgo.ExchangeSession, submitOrder *types.SubmitOrder, createdOrder *types.Order, err error) {
+		if err != nil {
+			// select another session and retry once
+			log.WithError(err).Infof("select new session to retry for %s: %s %s", session.Name, changeQuantity, currency)
+			// keep the original session and order for later
+			oriSession := session
+			oriOrder := submitOrder
+			session, submitOrder = s.selectSessionForCurrency(ctx, sessions, session.Name, currency, changeQuantity)
+			if session != nil && submitOrder != nil {
+				createdOrder, err = session.Exchange.SubmitOrder(ctx, *submitOrder)
+			} else {
+				session = oriSession
+				submitOrder = oriOrder
+			}
+		}
+		s.onSubmittedOrderCallback(session, submitOrder, createdOrder, err)
 	}
 }
 
