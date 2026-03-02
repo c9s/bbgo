@@ -3104,6 +3104,7 @@ func (s *Strategy) gracefulShutDown(shutdownCtx context.Context) {
 	s.wg.Wait()
 
 	bbgo.Sync(shutdownCtx, s)
+	s.logger.Infof("xmaker strategy synced: %s", s.InstanceID())
 }
 
 func isSignalSidePosition(signal float64, side types.SideType) bool {
