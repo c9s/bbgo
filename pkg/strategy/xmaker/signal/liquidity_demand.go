@@ -34,7 +34,7 @@ func (s *LiquidityDemandSignal) ID() string {
 func (s *LiquidityDemandSignal) Subscribe(session *bbgo.ExchangeSession, symbol string) {
 	s.Symbol = symbol
 	if s.Threshold == 0 {
-		s.Threshold = 0.5
+		s.Threshold = 0.25
 	}
 	if s.WarmUpSampleCount == 0 {
 		s.WarmUpSampleCount = 30
