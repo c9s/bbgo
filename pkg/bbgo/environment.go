@@ -507,7 +507,18 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 
 	environ.SetSyncStartTime(since)
 
+	// syncSymbolMap is a map of session name to the symbols that need to be synced for that session.
 	syncSymbolMap, restSymbols := categorizeSyncSymbol(userConfig.Sync.Symbols)
+	for name := range syncSymbolMap {
+		if _, ok := sessions[name]; !ok {
+			log.Warnf("adding not selected session %s since it has symbols defined for sync", name)
+			if sess, exists := environ.Session(name); exists {
+				sessions[name] = sess
+			} else {
+				log.Warnf("session %s is not defined but has symbols defined for sync, skipping...", name)
+			}
+		}
+	}
 	for _, session := range sessions {
 		syncSymbols := restSymbols
 		if ss, ok := syncSymbolMap[session.Name]; ok {
