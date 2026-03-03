@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -20,6 +20,8 @@ import (
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var logger = logrus.WithField("component", "profitFixer")
 
 type StrategyProfitFixer struct {
 	LastProfitFixConfig *ProfitFixerConfig `persistence:"last_profit_fix_config"`
@@ -33,6 +35,7 @@ func (s *StrategyProfitFixer) NeedsProfitFixing() bool {
 	if !s.ProfitFixerConfig.Enabled {
 		return false
 	}
+	logger.Infof("last profit fix config: %+v", s.LastProfitFixConfig)
 	if s.LastProfitFixConfig != nil && s.LastProfitFixConfig.Equal(*s.ProfitFixerConfig) {
 		return false
 	}
@@ -190,7 +193,7 @@ func (f *ProfitFixer) queryTradesRestful(ctx context.Context, symbol string, sin
 		sessionName := n
 		service := s
 		g.Go(func() error {
-			log.Infof("batch querying %s trade history from %s since %s until %s", symbol, sessionName, since.String(), until.String())
+			logger.Infof("batch querying %s trade history from %s since %s until %s", symbol, sessionName, since.String(), until.String())
 			tradeC, errC := f.batchQueryTrades(subCtx, service, symbol, since, until)
 
 			for {
@@ -248,7 +251,7 @@ func (f *ProfitFixer) buildTokenFeeDatePrices(ctx context.Context, trades []type
 				markets[ex.Name()] = mm
 			}
 		} else {
-			log.Warnf("session does not implement types.Exchange: %s", sessionName)
+			logger.Warnf("session does not implement types.Exchange: %s", sessionName)
 		}
 	}
 
@@ -299,7 +302,7 @@ func (f *ProfitFixer) buildTokenFeeDatePrices(ctx context.Context, trades []type
 							date:         date,
 						}] = feePrice
 					} else {
-						log.Warnf(
+						logger.Warnf(
 							"cannot resolve fee price for %s on %s at date %s",
 							token, exName, date,
 						)
@@ -339,7 +342,7 @@ func (f *ProfitFixer) Fix(
 	if f.profitCurrency == "" {
 		return fmt.Errorf("quote currency is empty for profit fixing")
 	}
-	log.Infof("start profit fixing with time range %s <=> %s", since, until)
+	logger.Infof("start profit fixing with time range %s <=> %s", since, until)
 	var allTrades []types.Trade
 	var err error
 	queryFunc := f.queryTradesRestful
@@ -362,7 +365,7 @@ func (f *ProfitFixer) Fix(
 		return err
 	}
 	if len(allTrades) == 0 {
-		log.Warnf("[%s] no trades found between %s and %s, skip profit fixing", symbol, since.String(), until.String())
+		logger.Warnf("[%s] no trades found between %s and %s, skip profit fixing", symbol, since.String(), until.String())
 		return nil
 	}
 	fm, err := f.buildTokenFeeDatePrices(ctx, allTrades, since, until)
@@ -380,7 +383,7 @@ func (f *ProfitFixer) fixFromTrades(
 	if len(allTrades) == 0 {
 		return nil
 	}
-	log.Infof("fixing profitStats and position from %d trades: %s", len(allTrades), position.Symbol)
+	logger.Infof("fixing profitStats and position from %d trades: %s", len(allTrades), position.Symbol)
 	trades := types.SortTradesAscending(allTrades)
 	oldestTrade := trades[0]
 	lastTrade := trades[len(trades)-1]
@@ -395,7 +398,7 @@ func (f *ProfitFixer) fixFromTrades(
 		if err != nil {
 			return fmt.Errorf("failed to delete existing position records: %w", err)
 		}
-		log.Infof("successfully cleared existing position records: %s (%s <==> %s)",
+		logger.Infof("successfully cleared existing position records: %s (%s <==> %s)",
 			position.Symbol, oldestTrade.Time.String(), lastTrade.Time.String())
 	}
 	if f.Environment.ProfitService != nil {
@@ -408,7 +411,7 @@ func (f *ProfitFixer) fixFromTrades(
 		if err != nil {
 			return fmt.Errorf("failed to delete existing profit records: %w", err)
 		}
-		log.Infof("successfully cleared existing profit records: %s (%s <==> %s)",
+		logger.Infof("successfully cleared existing profit records: %s (%s <==> %s)",
 			position.Symbol, oldestTrade.Time.String(), lastTrade.Time.String())
 	}
 	// do fixing from trades
@@ -433,7 +436,7 @@ func (f *ProfitFixer) fixFromTrades(
 		}
 	}
 
-	log.Infof("profitFixer fix finished: profitStats and position are updated from %d trades", len(allTrades))
+	logger.Infof("profitFixer fix finished: profitStats and position are updated from %d trades", len(allTrades))
 	return nil
 }
 
@@ -455,7 +458,7 @@ func (f *ProfitFixerBundle) Fix(
 	}
 	bbgo.Notify("Fixing %s profitStats and position...", symbol)
 
-	log.Infof("profitFixer is enabled, checking checkpoint: %+v", f.ProfitFixerConfig.TradesSince)
+	logger.Infof("profitFixer is enabled, checking checkpoint: %+v", f.ProfitFixerConfig.TradesSince)
 
 	if f.ProfitFixerConfig.TradesSince.Time().IsZero() {
 		return fmt.Errorf("tradesSince time can not be zero")
@@ -464,7 +467,7 @@ func (f *ProfitFixerBundle) Fix(
 	fixer := NewProfitFixer(*f.ProfitFixerConfig, f.Environment)
 	for _, session := range sessions {
 		if ss, ok := session.Exchange.(types.ExchangeTradeHistoryService); ok {
-			log.Infof("adding makerSession %s to profitFixer", session.Name)
+			logger.Infof("adding makerSession %s to profitFixer", session.Name)
 			fixer.AddExchange(session.Name, ss)
 		}
 	}
@@ -497,7 +500,7 @@ func (f *ProfitFixer) queryTradesFromDB(ctx context.Context, symbol string, sinc
 		if ex, ok := s.(types.Exchange); ok {
 			exchangeName := ex.Name()
 			if exchangeName == "" {
-				log.Warnf("skip empty exchange name for session: %s", sessionName)
+				logger.Warnf("skip empty exchange name for session: %s", sessionName)
 				continue
 			}
 			options.Exchange = exchangeName
@@ -508,7 +511,7 @@ func (f *ProfitFixer) queryTradesFromDB(ctx context.Context, symbol string, sinc
 				options.IsIsolated = &isIsolated
 			}
 		} else {
-			log.Warnf("session does not implement types.Exchange, skipping: %s", sessionName)
+			logger.Warnf("session does not implement types.Exchange, skipping: %s", sessionName)
 			continue
 		}
 
