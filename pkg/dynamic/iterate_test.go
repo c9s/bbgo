@@ -128,4 +128,26 @@ func TestIterateFieldsByTag(t *testing.T) {
 		assert.Equal(t, 3, cnt)
 		assert.Equal(t, []string{"foo", "bar", "outer"}, collectedTags)
 	})
+
+	t.Run("value-type embedded", func(t *testing.T) {
+		type TestValueEmbedded struct {
+			TestEmbedded     // embedded as value, not pointer
+			Outer        int `persistence:"outer"`
+		}
+		a := &TestValueEmbedded{
+			TestEmbedded: TestEmbedded{Foo: 1, Bar: 2},
+			Outer:        3,
+		}
+
+		collectedTags := []string{}
+		cnt := 0
+		err := IterateFieldsByTag(a, "persistence", true, func(tag string, ft reflect.StructField, fv reflect.Value) error {
+			cnt++
+			collectedTags = append(collectedTags, tag)
+			return nil
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, 3, cnt)
+		assert.Equal(t, []string{"foo", "bar", "outer"}, collectedTags)
+	})
 }
