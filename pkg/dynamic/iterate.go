@@ -86,10 +86,17 @@ func IterateFieldsByTag(obj interface{}, tagName string, children bool, cb Struc
 			continue
 		}
 
-		if children && isStructPtr(ft.Type) && !fv.IsNil() {
-			// recursive iterate the struct field
-			if err := IterateFieldsByTag(fv.Interface(), tagName, false, cb); err != nil {
-				return fmt.Errorf("unable to iterate struct fields over the type %v: %v", ft, err)
+		if children {
+			if ft.Type.Kind() == reflect.Struct && fv.CanAddr() {
+				// recursive iterate value-type struct fields (including embedded structs)
+				if err := IterateFieldsByTag(fv.Addr().Interface(), tagName, false, cb); err != nil {
+					return fmt.Errorf("unable to iterate struct fields over the type %v: %v", ft, err)
+				}
+			} else if isStructPtr(ft.Type) && !fv.IsNil() {
+				// recursive iterate pointer-to-struct fields
+				if err := IterateFieldsByTag(fv.Interface(), tagName, false, cb); err != nil {
+					return fmt.Errorf("unable to iterate struct fields over the type %v: %v", ft, err)
+				}
 			}
 		}
 
