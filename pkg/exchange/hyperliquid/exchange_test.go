@@ -464,6 +464,78 @@ func TestMockExchange_SubmitOrder(t *testing.T) {
 	})
 }
 
+func TestMockExchange_CancelOrders(t *testing.T) {
+	t.Run("succeeds cancelling order and returns no error", func(t *testing.T) {
+		ex, transport := newMockTestExchange(t, true)
+		ctx := context.Background()
+		orderID := uint64(123456)
+
+		transport.POST("/exchange", func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+
+			var payload struct {
+				Action struct {
+					Type    string `json:"type"`
+					Cancels []struct {
+						Asset   int `json:"a"`
+						OrderId int `json:"o"`
+					} `json:"cancels"`
+				} `json:"action"`
+			}
+			require.NoError(t, json.Unmarshal(body, &payload))
+			assert.Equal(t, "cancel", payload.Action.Type)
+			require.Len(t, payload.Action.Cancels, 1)
+			assert.Equal(t, 0, payload.Action.Cancels[0].Asset)
+			assert.Equal(t, int(orderID), payload.Action.Cancels[0].OrderId)
+
+			return httptesting.BuildResponseJson(http.StatusOK, map[string]any{
+				"status": "ok",
+				"response": map[string]any{
+					"type": "cancel",
+					"data": map[string]any{
+						"statuses": []any{},
+					},
+				},
+			}), nil
+		})
+
+		order := types.Order{
+			SubmitOrder: types.SubmitOrder{Symbol: "BTCUSDC"},
+			OrderID:     orderID,
+		}
+		err := ex.CancelOrders(ctx, order)
+		assert.NoError(t, err)
+	})
+
+	t.Run("returns error when exchange returns error status", func(t *testing.T) {
+		ex, transport := newMockTestExchange(t, true)
+		ctx := context.Background()
+
+		transport.POST("/exchange", func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseJson(http.StatusOK, map[string]any{
+				"status": "ok",
+				"response": map[string]any{
+					"type": "cancel",
+					"data": map[string]any{
+						"statuses": []any{
+							map[string]any{"error": "Order not found"},
+						},
+					},
+				},
+			}), nil
+		})
+
+		order := types.Order{
+			SubmitOrder: types.SubmitOrder{Symbol: "BTCUSDC"},
+			OrderID:     999999,
+		}
+		err := ex.CancelOrders(ctx, order)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Order not found")
+	})
+}
+
 func TestExchange_SubmitOrder(t *testing.T) {
 	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
 		t.Skip("skip test for CI")
@@ -506,4 +578,46 @@ func TestExchange_SubmitOrder(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+}
+
+func TestExchange_CancelOrder(t *testing.T) {
+	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
+		t.Skip("skip test for CI")
+	}
+
+	privateKey, mainAccount, vaultAccount, ok := testutil.IntegrationTestWithPrivateKeyConfigured(t, "HYPERLIQUID")
+	if !ok {
+		t.SkipNow()
+	}
+
+	hyperapi.TestNet = true
+
+	ctx := context.Background()
+	ex := New(privateKey, mainAccount, vaultAccount)
+	ex.IsFutures = true
+
+	markets, err := ex.QueryMarkets(ctx)
+	require.NoError(t, err)
+	market, ok := markets["BTCUSDC"]
+	require.True(t, ok, "BTCUSDC market should exist")
+
+	createdOrder, err := ex.SubmitOrder(ctx, types.SubmitOrder{
+		Symbol:   "BTCUSDC",
+		Type:     types.OrderTypeLimit,
+		Price:    Number(90000),
+		Quantity: fixedpoint.MustNewFromString("0.001"),
+		Side:     types.SideTypeSell,
+		Market:   market,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, createdOrder)
+	t.Logf("createdOrder: %+v", createdOrder)
+
+	// Cancel the order using the exchange API
+	orderToCancel := types.Order{
+		SubmitOrder: types.SubmitOrder{Symbol: "BTCUSDC"},
+		OrderID:     createdOrder.OrderID,
+	}
+	err = ex.CancelOrders(ctx, orderToCancel)
+	assert.NoError(t, err)
 }

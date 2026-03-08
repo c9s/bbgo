@@ -375,7 +375,7 @@ func TestConvertToAction(t *testing.T) {
 		}
 
 		// Verify it's valid msgpack
-		var decoded OrderAction
+		var decoded SubmitOrderAction
 		err = msgpack.Unmarshal(packed, &decoded)
 		if err != nil {
 			t.Fatalf("Failed to unmarshal packed data: %v", err)

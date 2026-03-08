@@ -252,12 +252,11 @@ func (c *Client) convertToAction(action any) ([]byte, error) {
 
 	switch reqType {
 	case ReqSubmitOrder:
-		var orderAction OrderAction
+		var orderAction SubmitOrderAction
 		return encodeActionToMsgpack(actionMap, &orderAction)
-	// Add more action types here as needed
-	// case "usdClassTransfer":
-	// 	var transferAction TransferAction
-	// 	return encodeActionToMsgpack(actionMap, &transferAction)
+	case ReqCancelOrder:
+		var cancelAction CancelOrderAction
+		return encodeActionToMsgpack(actionMap, &cancelAction)
 	default:
 		return nil, fmt.Errorf("action type %v is not supported", actionType)
 	}
@@ -313,11 +312,15 @@ func encodeActionToMsgpack(actionMap map[string]any, target any) ([]byte, error)
 		return nil, fmt.Errorf("failed to decode action: %w", err)
 	}
 
-	data, err = msgpack.Marshal(target)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := msgpack.NewEncoder(&buf)
+	enc.UseCompactInts(true)
+
+	if err := enc.Encode(target); err != nil {
 		return nil, fmt.Errorf("failed to marshal action to msgpack: %w", err)
 	}
-	return data, nil
+
+	return buf.Bytes(), nil
 }
 
 // appendUint64 appends a uint64 as 8 bytes in big-endian format

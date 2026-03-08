@@ -30,9 +30,19 @@ type OrderWireBuilderInfo struct {
 	Fee     int    `mapstructure:"f" msgpack:"f"`
 }
 
-type OrderAction struct {
+type SubmitOrderAction struct {
 	Type     string                `mapstructure:"type"              msgpack:"type"`
 	Orders   []OrderWire           `mapstructure:"orders"            msgpack:"orders"`
 	Grouping string                `mapstructure:"grouping"          msgpack:"grouping"`
 	Builder  *OrderWireBuilderInfo `mapstructure:"builder,omitempty" msgpack:"builder,omitempty"`
+}
+
+type CancelOrderWire struct {
+	Asset   int   `mapstructure:"a" msgpack:"a"`
+	OrderID int64 `mapstructure:"o" msgpack:"o"`
+}
+
+type CancelOrderAction struct {
+	Type    string            `mapstructure:"type"          msgpack:"type"`
+	Cancels []CancelOrderWire `mapstructure:"cancels"       msgpack:"cancels"`
 }
