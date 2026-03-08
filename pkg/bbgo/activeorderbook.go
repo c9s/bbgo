@@ -409,6 +409,8 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 		b.orders.Update(order)
 		b.mu.Unlock()
 
+		b.C.Emit()
+
 	default:
 		b.mu.Unlock()
 		b.logger.Warnf("[ActiveOrderBook] unhandled order status: %s", order.Status)
@@ -459,6 +461,12 @@ func isNewerOrderUpdate(a, b types.Order) bool {
 	case types.OrderStatusFilled:
 		switch b.Status {
 		case types.OrderStatusFilled, types.OrderStatusPartiallyFilled, types.OrderStatusNew:
+			return true
+		}
+
+	case types.OrderStatusFinished:
+		switch b.Status {
+		case types.OrderStatusTriggering, types.OrderStatusTriggered, types.OrderStatusNew:
 			return true
 		}
 	}

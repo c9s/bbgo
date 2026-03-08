@@ -154,6 +154,41 @@ func Test_isNewerUpdateTime(t *testing.T) {
 	assert.True(t, ret)
 }
 
+// Test_isNewerOrderUpdate_OrderStatusFinished covers the branch when a.Status is OrderStatusFinished.
+// When order a is Finished, it is considered newer than b when b is Triggering, Triggered, or New.
+func Test_isNewerOrderUpdate_OrderStatusFinished(t *testing.T) {
+	baseOrderA := types.Order{
+		OrderID:   1,
+		Status:    types.OrderStatusFinished,
+		UpdateTime: types.NewTimeFromUnix(100, 0),
+	}
+
+	t.Run("b is Triggering -> true", func(t *testing.T) {
+		b := types.Order{OrderID: 1, Status: types.OrderStatusTriggering, UpdateTime: types.NewTimeFromUnix(50, 0)}
+		assert.True(t, isNewerOrderUpdate(baseOrderA, b))
+	})
+	t.Run("b is Triggered -> true", func(t *testing.T) {
+		b := types.Order{OrderID: 1, Status: types.OrderStatusTriggered, UpdateTime: types.NewTimeFromUnix(50, 0)}
+		assert.True(t, isNewerOrderUpdate(baseOrderA, b))
+	})
+	t.Run("b is New -> true", func(t *testing.T) {
+		b := types.Order{OrderID: 1, Status: types.OrderStatusNew, UpdateTime: types.NewTimeFromUnix(50, 0)}
+		assert.True(t, isNewerOrderUpdate(baseOrderA, b))
+	})
+	t.Run("b is Filled -> fallback to time", func(t *testing.T) {
+		// When b is not Triggering/Triggered/New, falls through to isNewerOrderUpdateTime.
+		// a has UpdateTime 100, b has 50 -> a is newer -> true
+		b := types.Order{OrderID: 1, Status: types.OrderStatusFilled, UpdateTime: types.NewTimeFromUnix(50, 0)}
+		assert.True(t, isNewerOrderUpdate(baseOrderA, b))
+	})
+	t.Run("b is Canceled and newer time -> false", func(t *testing.T) {
+		// b has status not in [Triggering, Triggered, New], so compare by time. b is newer -> false
+		a := types.Order{OrderID: 1, Status: types.OrderStatusFinished, UpdateTime: types.NewTimeFromUnix(50, 0)}
+		b := types.Order{OrderID: 1, Status: types.OrderStatusCanceled, UpdateTime: types.NewTimeFromUnix(100, 0)}
+		assert.False(t, isNewerOrderUpdate(a, b))
+	})
+}
+
 // TestActiveOrderBook_PendingOrderUpdatesMemoryLeak tests for memory leaks in pending order updates
 // === RUN   TestActiveOrderBook_PendingOrderUpdatesMemoryLeak
 // [Before] Alloc: 1921160 bytes (bytes of allocated heap objects)
