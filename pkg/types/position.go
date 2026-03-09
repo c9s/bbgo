@@ -766,9 +766,9 @@ func (p *Position) updateMetrics(price *fixedpoint.Value) {
 	}
 	positionAverageCostMetrics.With(labels).Set(p.AverageCost.Float64())
 	positionBaseQuantityMetrics.With(labels).Set(p.Base.Float64())
-	positionQuoteQuantityMetrics.With(labels).Set(p.Quote.Float64())
 
 	if price != nil {
+		positionQuoteQuantityMetrics.With(labels).Set(p.Base.Mul(*price).Float64())
 		unrealizedProfit := p.unrealizedProfit(*price)
 		positionUnrealizedProfitMetrics.With(labels).Set(unrealizedProfit.Float64())
 	}
