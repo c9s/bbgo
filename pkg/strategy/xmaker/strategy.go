@@ -219,6 +219,8 @@ type Strategy struct {
 
 	SyntheticHedge *SyntheticHedge `json:"syntheticHedge,omitempty"`
 
+	AuthTimeout types.Duration `json:"authTimeout,omitempty"`
+
 	// --------------------------------
 	// private field
 
@@ -2384,6 +2386,10 @@ func (s *Strategy) Defaults() error {
 		}
 	}
 
+	if s.AuthTimeout.Duration() == 0 {
+		s.AuthTimeout = types.Duration(3 * time.Minute)
+	}
+
 	return nil
 }
 
@@ -3017,7 +3023,7 @@ func (s *Strategy) CrossRun(
 		select {
 		case <-ctx.Done():
 
-		case <-time.After(3 * time.Minute):
+		case <-time.After(s.AuthTimeout.Duration()):
 			s.connectivityGroup.DebugStates()
 			s.logger.Panicf("authentication timeout, exiting...")
 
