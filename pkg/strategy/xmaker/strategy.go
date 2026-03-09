@@ -3208,6 +3208,7 @@ func (s *Strategy) fixProfit(ctx context.Context, sessions ...*bbgo.ExchangeSess
 	if s.StrategyProfitFixer.ProfitFixerConfig.Apply {
 		s.Position = position
 		s.ProfitStats.ProfitStats = profitStats
+		s.Position.UpdateMetrics(nil)
 	}
 	return nil
 }
