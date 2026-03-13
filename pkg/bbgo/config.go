@@ -359,6 +359,10 @@ type EnvironmentConfig struct {
 	SyncBufferPeriod *types.Duration `json:"syncBufferPeriod"`
 }
 
+type ChartConfig struct {
+	Kind    string                 `json:"kind" yaml:"kind"` // kline, supertrend, etc
+	Options bbgochart.PanelOptions `json:"options" yaml:"options"`
+}
 type Config struct {
 	Build *BuildConfig `json:"build,omitempty" yaml:"build,omitempty"`
 
@@ -391,7 +395,7 @@ type Config struct {
 
 	ProfilingConfig *ProfilingConfig `json:"profiling,omitempty" yaml:"profiling,omitempty"`
 
-	ChartConfig *bbgochart.PanelOptions `json:"chart,omitempty" yaml:"chart,omitempty"`
+	ChartConfig []ChartConfig `json:"chart,omitempty" yaml:"chart,omitempty"`
 }
 
 func (c *Config) Map() (map[string]interface{}, error) {
