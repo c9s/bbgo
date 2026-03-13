@@ -132,7 +132,7 @@ func (p *Panel) draw() {
 
 	// add series
 	if len(p.klines) > 0 {
-		p.Series = append(p.Series, CandlestickSeries{Candles: candles})
+		p.Series = append(p.Series, &CandlestickSeries{Candles: candles})
 		if p.Options != nil && p.Options.IncludeVolume {
 			// draw volume
 			minVolume, maxVolume := FindVolumeRange(candles)
@@ -146,7 +146,7 @@ func (p *Panel) draw() {
 					Max: maxVolume,
 				},
 			}
-			p.Series = append(p.Series, VolumeSeries{Candles: candles})
+			p.Series = append(p.Series, &VolumeSeries{Candles: candles})
 		}
 	}
 	for _, ind := range p.indicators {

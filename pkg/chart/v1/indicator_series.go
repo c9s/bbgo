@@ -15,7 +15,7 @@ var (
 
 type LegendKind string
 
-var (
+const (
 	LegendTop  = LegendKind("top")
 	LegendThin = LegendKind("thin")
 	LegendLeft = LegendKind("left")

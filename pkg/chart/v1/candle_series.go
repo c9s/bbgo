@@ -44,23 +44,23 @@ func XValueToCanvas(r chart.Range, b chart.Box, v float64) int {
 	return b.Left + int(percent*float64(b.Width()))
 }
 
-func (cs CandlestickSeries) Len() int {
+func (cs *CandlestickSeries) Len() int {
 	return len(cs.Candles)
 }
 
-func (ts CandlestickSeries) GetFirstValues() (x, y float64) {
+func (ts *CandlestickSeries) GetFirstValues() (x, y float64) {
 	x = chart.TimeToFloat64(ts.Candles[0].Time)
 	y = ts.Candles[0].Close
 	return
 }
 
-func (ts CandlestickSeries) GetLastValues() (x, y float64) {
+func (ts *CandlestickSeries) GetLastValues() (x, y float64) {
 	x = chart.TimeToFloat64(ts.Candles[len(ts.Candles)-1].Time)
 	y = ts.Candles[len(ts.Candles)-1].Close
 	return
 }
 
-func (cs CandlestickSeries) GetValue(index int) float64 {
+func (cs *CandlestickSeries) GetValue(index int) float64 {
 	return cs.Candles[index].Close
 }
 
@@ -77,29 +77,29 @@ func (cs CandlestickSeries) GetValueFormatters() (x, y chart.ValueFormatter) {
 /*
 Implement chart.Series interface for CandlestickSeries.
 */
-func (cs CandlestickSeries) GetName() string {
+func (cs *CandlestickSeries) GetName() string {
 	return "KLine"
 }
 
-func (cs CandlestickSeries) GetYAxis() chart.YAxisType {
+func (cs *CandlestickSeries) GetYAxis() chart.YAxisType {
 	return chart.YAxisPrimary
 }
 
-func (cs CandlestickSeries) GetStyle() chart.Style {
+func (cs *CandlestickSeries) GetStyle() chart.Style {
 	return chart.Style{
 		StrokeWidth: 1.0,
 	}
 }
 
 // Validate implements chart.Series interface for CandlestickSeries.
-func (cs CandlestickSeries) Validate() error {
+func (cs *CandlestickSeries) Validate() error {
 	if len(cs.Candles) == 0 {
 		return nil
 	}
 	return nil
 }
 
-func (cs CandlestickSeries) Render(
+func (cs *CandlestickSeries) Render(
 	r chart.Renderer, canvasBox chart.Box, xrange, yrange chart.Range, style chart.Style,
 ) {
 	totalWidth := canvasBox.Width()
@@ -183,7 +183,7 @@ func addLabels(r chart.Renderer, canvasBox chart.Box, xrange, yrange chart.Range
 }
 
 // XValues returns all X axis values for the series.
-func (cs CandlestickSeries) XValues() []float64 {
+func (cs *CandlestickSeries) XValues() []float64 {
 	values := make([]float64, len(cs.Candles))
 	for i, c := range cs.Candles {
 		values[i] = chart.TimeToFloat64(c.Time)

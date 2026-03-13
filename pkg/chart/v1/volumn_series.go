@@ -6,19 +6,19 @@ type VolumeSeries struct {
 	Candles []Candle
 }
 
-func (vs VolumeSeries) Len() int {
+func (vs *VolumeSeries) Len() int {
 	return len(vs.Candles)
 }
 
-func (vs VolumeSeries) GetValue(index int) float64 {
+func (vs *VolumeSeries) GetValue(index int) float64 {
 	return vs.Candles[index].Volume
 }
 
-func (vs VolumeSeries) GetXAxisValue(index int) float64 {
+func (vs *VolumeSeries) GetXAxisValue(index int) float64 {
 	return chart.TimeToFloat64(vs.Candles[index].Time)
 }
 
-func (vs VolumeSeries) GetFirstValues() (x, y float64) {
+func (vs *VolumeSeries) GetFirstValues() (x, y float64) {
 	if len(vs.Candles) == 0 {
 		return 0, 0
 	}
@@ -27,7 +27,7 @@ func (vs VolumeSeries) GetFirstValues() (x, y float64) {
 	return
 }
 
-func (vs VolumeSeries) GetLastValues() (x, y float64) {
+func (vs *VolumeSeries) GetLastValues() (x, y float64) {
 	if len(vs.Candles) == 0 {
 		return 0, 0
 	}
@@ -36,28 +36,28 @@ func (vs VolumeSeries) GetLastValues() (x, y float64) {
 	return
 }
 
-func (vs VolumeSeries) GetValueFormatters() (x, y chart.ValueFormatter) {
+func (vs *VolumeSeries) GetValueFormatters() (x, y chart.ValueFormatter) {
 	x = chart.TimeValueFormatter
 	y = chart.FloatValueFormatter
 	return
 }
 
-func (vs VolumeSeries) GetName() string {
+func (vs *VolumeSeries) GetName() string {
 	return "Volume"
 }
 
-func (vs VolumeSeries) GetStyle() chart.Style {
+func (vs *VolumeSeries) GetStyle() chart.Style {
 	return chart.Style{
 		StrokeWidth: 1.0,
 		FillColor:   chart.ColorBlue.WithAlpha(50),
 	}
 }
 
-func (vs VolumeSeries) GetYAxis() chart.YAxisType {
+func (vs *VolumeSeries) GetYAxis() chart.YAxisType {
 	return chart.YAxisSecondary
 }
 
-func (vs VolumeSeries) Render(r chart.Renderer, canvasBox chart.Box, xrange, yrange chart.Range, style chart.Style) {
+func (vs *VolumeSeries) Render(r chart.Renderer, canvasBox chart.Box, xrange, yrange chart.Range, style chart.Style) {
 	if len(vs.Candles) == 0 {
 		return
 	}
@@ -88,7 +88,7 @@ func (vs VolumeSeries) Render(r chart.Renderer, canvasBox chart.Box, xrange, yra
 }
 
 // XValues returns all X axis values for the series.
-func (vs VolumeSeries) XValues() []float64 {
+func (vs *VolumeSeries) XValues() []float64 {
 	values := make([]float64, len(vs.Candles))
 	for i, c := range vs.Candles {
 		values[i] = chart.TimeToFloat64(c.Time)
@@ -96,7 +96,7 @@ func (vs VolumeSeries) XValues() []float64 {
 	return values
 }
 
-func (vs VolumeSeries) Validate() error {
+func (vs *VolumeSeries) Validate() error {
 	if len(vs.Candles) == 0 {
 		return nil
 	}
