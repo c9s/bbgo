@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	bbgochart "github.com/c9s/bbgo/pkg/chart/v1"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -97,22 +99,160 @@ func chart(cmd *cobra.Command, args []string) error {
 			EndTime:   &endTime,
 		},
 	)
+	// sort klines by start time, old -> new
+	sort.Slice(klines, func(i, j int) bool {
+		return klines[i].StartTime.Before(klines[j].StartTime.Time())
+	})
+
 	if err != nil {
 		return fmt.Errorf("query klines error: %w", err)
 	}
 
-	f, err := os.Create("klines.png")
+	var errDraw error
+	for _, chartConfig := range userConfig.ChartConfig {
+		switch chartConfig.Kind {
+		case "kline":
+			errDraw = drawKLineChart(klines, &chartConfig)
+		case "supertrend":
+			errDraw = drawSuperTrendChart(klines, &chartConfig)
+		case "atr":
+			errDraw = drawAtrChar(klines, &chartConfig)
+		}
+		if errDraw != nil {
+			return errDraw
+		}
+	}
+	return nil
+}
+
+func drawKLineChart(klines []types.KLine, config *bbgo.ChartConfig) error {
+	panel := bbgochart.NewPanel(&config.Options)
+	panel.AddKLines(klines)
+
+	var fname string
+	if config.Options.Title != "" {
+		fname = config.Options.Title + ".png"
+	} else {
+		fname = fmt.Sprintf("%s_%s_%s.png",
+			klines[0].Symbol,
+			klines[0].Interval,
+			time.Now().Format("2006-01-02_150405"),
+		)
+	}
+	f, err := os.Create(fname)
 	defer func() {
 		if cerr := f.Close(); cerr != nil {
 			fmt.Printf("failed to close file: %v\n", cerr)
 		}
 	}()
-
 	if err != nil {
 		return err
 	}
 
-	graph := bbgochart.NewPanel("klines", userConfig.ChartConfig)
-	graph.AddKLines(klines)
-	return graph.Write(f)
+	return panel.Write(f)
+}
+
+func drawSuperTrendChart(klines []types.KLine, config *bbgo.ChartConfig) error {
+	klineStream := indicatorv2.KLineStream{}
+	superTrendStream := indicatorv2.SuperTrend(
+		&klineStream,
+		config.Options.Window,
+		config.Options.Multiplier,
+	)
+	klineStream.BackFill(klines)
+
+	var samples []bbgochart.BandSample
+	for _, e := range superTrendStream.Entities() {
+		sample := bbgochart.BandSample{
+			Time:  e.Time,
+			Value: nil,
+		}
+		v := e.Value()
+		if e.Direction == 1 {
+			sample.LowerBound = &v
+		} else {
+			sample.UpperBound = &v
+		}
+		samples = append(samples, sample)
+	}
+	series := bbgochart.NewBandIndicatorSeries(
+		fmt.Sprintf(
+			"SuperTrend(w%d, m%.2f)",
+			config.Options.Window, config.Options.Multiplier),
+		samples,
+		&config.Options,
+	)
+
+	panel := bbgochart.NewPanel(&config.Options)
+	panel.AddKLines(klines)
+	panel.AddIndicator(series)
+
+	var fname string
+	if config.Options.Title != "" {
+		fname = config.Options.Title + ".png"
+	} else {
+		fname = fmt.Sprintf("%s_%s_%s.png",
+			klines[0].Symbol,
+			klines[0].Interval,
+			time.Now().Format("2006-01-02_150405"),
+		)
+	}
+	f, err := os.Create(fname)
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			fmt.Printf("failed to close file: %v\n", cerr)
+		}
+	}()
+	if err != nil {
+		return err
+	}
+
+	return panel.Write(f)
+}
+
+func drawAtrChar(klines []types.KLine, config *bbgo.ChartConfig) error {
+	klineStream := indicatorv2.KLineStream{}
+	atrStream := indicatorv2.ATR2(
+		&klineStream, config.Options.Window,
+	)
+	klineStream.BackFill(klines)
+
+	var points []bbgochart.PointSample
+	for i, v := range atrStream.Slice {
+		startTime := klines[i].StartTime
+		points = append(points, bbgochart.PointSample{
+			Time:  startTime.Time(),
+			Value: &v,
+		})
+	}
+	series := bbgochart.NewLineIndicatorSeries(
+		fmt.Sprintf("ATR(w%d)", config.Options.Window),
+		points,
+		&config.Options,
+	)
+
+	panel := bbgochart.NewPanel(&config.Options)
+	panel.AddIndicator(series)
+
+	var fname string
+	if config.Options.Title != "" {
+		fname = config.Options.Title + ".png"
+	} else {
+		fname = fmt.Sprintf("ATR_%s_%s_w%d_%s.png",
+			klines[0].Symbol,
+			klines[0].Interval,
+			config.Options.Window,
+			time.Now().Format("2006-01-02_150405"),
+		)
+	}
+	f, err := os.Create(fname)
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			fmt.Printf("failed to close file: %v\n", cerr)
+		}
+	}()
+	if err != nil {
+		return err
+	}
+	return panel.Write(f)
 }
