@@ -16,15 +16,15 @@ var (
 type LegendKind string
 
 var (
-	LegendTop  = LegendKind("legend_top")
-	LegendThin = LegendKind("legend_thin")
-	LegendLeft = LegendKind("legend_left")
+	LegendTop  = LegendKind("top")
+	LegendThin = LegendKind("thin")
+	LegendLeft = LegendKind("left")
 )
 
 type IndicatorSeries interface {
 	chart.Series
-	SetLegend(kind LegendKind)
-	GetLegend() *LegendKind
+	GetTimeRange() (time.Time, time.Time)
+	GetValueRange() (float64, float64)
 }
 
 type BandSample struct {
@@ -35,16 +35,34 @@ type BandIndicatorSeries struct {
 	Name    string
 	Options *PanelOptions
 
-	samples    []BandSample
-	legendKind *LegendKind
+	samples []BandSample
 }
 
-func (bs *BandIndicatorSeries) SetLegend(kind LegendKind) {
-	bs.legendKind = &kind
+func (bs *BandIndicatorSeries) GetTimeRange() (time.Time, time.Time) {
+	if len(bs.samples) == 0 {
+		return time.Time{}, time.Time{}
+	}
+	return bs.samples[0].Time, bs.samples[len(bs.samples)-1].Time
 }
 
-func (bs *BandIndicatorSeries) GetLegend() *LegendKind {
-	return bs.legendKind
+func (bs *BandIndicatorSeries) GetValueRange() (float64, float64) {
+	if len(bs.samples) == 0 {
+		return 0., 0.
+	}
+	minValue, maxValue := 0.0, 0.0
+	for _, s := range bs.samples {
+		if s.Value == nil {
+			continue
+		}
+		if minValue == 0.0 && maxValue == 0.0 {
+			minValue = *s.Value
+			maxValue = *s.Value
+		} else if s.Value != nil {
+			minValue = min(minValue, *s.Value)
+			maxValue = max(maxValue, *s.Value)
+		}
+	}
+	return minValue, maxValue
 }
 
 func NewBandIndicatorSeries(name string, samples []BandSample, options *PanelOptions) *BandIndicatorSeries {
@@ -135,9 +153,8 @@ type PointSample struct {
 type LineIndicatorSeries struct {
 	Name string
 
-	points     []PointSample
-	options    *PanelOptions
-	legendKind *LegendKind
+	points  []PointSample
+	options *PanelOptions
 }
 
 func NewLineIndicatorSeries(name string, points []PointSample, options *PanelOptions) *LineIndicatorSeries {
@@ -153,12 +170,31 @@ func NewLineIndicatorSeries(name string, points []PointSample, options *PanelOpt
 	}
 }
 
-func (ls *LineIndicatorSeries) SetLegend(kind LegendKind) {
-	ls.legendKind = &kind
+func (ls *LineIndicatorSeries) GetTimeRange() (time.Time, time.Time) {
+	if len(ls.points) == 0 {
+		return time.Time{}, time.Time{}
+	}
+	return ls.points[0].Time, ls.points[len(ls.points)-1].Time
 }
 
-func (ls *LineIndicatorSeries) GetLegend() *LegendKind {
-	return ls.legendKind
+func (ls *LineIndicatorSeries) GetValueRange() (float64, float64) {
+	if len(ls.points) == 0 {
+		return 0., 0.
+	}
+	minValue, maxValue := 0.0, 0.0
+	for _, p := range ls.points {
+		if p.Value == nil {
+			continue
+		}
+		if minValue == 0.0 && maxValue == 0.0 {
+			minValue = *p.Value
+			maxValue = *p.Value
+		} else if p.Value != nil {
+			minValue = min(minValue, *p.Value)
+			maxValue = max(maxValue, *p.Value)
+		}
+	}
+	return minValue, maxValue
 }
 
 func (ls *LineIndicatorSeries) AddPoints(points ...PointSample) {

@@ -94,6 +94,10 @@ func (st *SuperTrendStream) update(kline types.KLine) {
 	st.PushAndEmit(e.Value())
 }
 
+func (st *SuperTrendStream) Entities() []*SuperTrendBand {
+	return st.entities
+}
+
 func SuperTrend(source KLineSubscription, window int, multiplier float64) *SuperTrendStream {
 	atr := ATR2(source, window)
 	st := &SuperTrendStream{
