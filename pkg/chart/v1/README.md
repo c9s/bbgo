@@ -233,11 +233,11 @@ func FindVolumeRange(candles []Candle) (min, max float64)
 
 ## Design Philosophy
 
-1. **`chart.Series` as the integration point**: Indicators implement go-chart's `chart.Series` interface directly. There is no intermediate annotation or adapter layer — any type that satisfies `chart.Series` can be passed to `AddIndicator` and rendered by the existing go-chart pipeline without modification.
-2. **Data accumulation before layout**: `AddKLines`, `AddPoints`, and `AddSamples` collect raw data upfront. `DrawCandles` then assembles and configures the full series list, axes, and ranges in a single pass. This keeps chart layout logic centralized and predictable.
+1. **`IndicatorSeries` as the integration point**: `AddIndicator` accepts the `IndicatorSeries` interface, which extends go-chart's `chart.Series` with `GetTimeRange() (time.Time, time.Time)` and `GetValueRange() (float64, float64)`. These extra methods let the panel compute axes when rendering indicator-only charts (no klines). The two built-in types — `LineIndicatorSeries` and `BandIndicatorSeries` — satisfy this interface, and any external type can too.
+2. **Data accumulation before layout**: `AddKLines`, `AddPoints`, and `AddSamples` collect raw data upfront. `Write` triggers an internal `draw()` pass that assembles the full series list, axes, and ranges in a single shot. When klines are present, axes derive from their price/time range; when the panel contains only indicators, axes derive from `GetTimeRange`/`GetValueRange` across all registered indicator series.
 3. **Nullable values for natural gaps**: `PointSample.Value` and the three fields of `BandSample` are `*float64`. A nil value breaks the line at that point rather than zero-filling or interpolating, which correctly handles indicator warm-up periods and missing data.
-4. **Shared options struct**: `PanelOptions` carries both panel-level settings (dimensions, padding, volume toggle) and indicator color configuration. Passing the same struct to both `NewPanel` and the indicator series constructors avoids a proliferation of separate config types.
-5. **Composability over inheritance**: Multiple indicators of any `chart.Series`-compatible type can be overlaid on a single panel. The panel is type-agnostic — it stores `[]chart.Series` and delegates rendering entirely to each series' own `Render` method.
+4. **Shared options struct**: `PanelOptions` carries panel-level settings (dimensions, padding, volume toggle, title, x-axis padding, legend kind) and indicator color configuration. Passing the same struct to both `NewPanel` and the indicator series constructors avoids a proliferation of separate config types.
+5. **Composability over inheritance**: Multiple indicators of any `IndicatorSeries`-compatible type can be overlaid on a single panel. The panel stores `[]IndicatorSeries` and delegates rendering entirely to each series' own `Render` method.
 
 ## References
 
