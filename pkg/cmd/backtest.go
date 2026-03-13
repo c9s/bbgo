@@ -344,7 +344,7 @@ var BacktestCmd = &cobra.Command{
 					if profit == nil {
 						return
 					}
-					tradeStats.Add(profit)
+					tradeStats.AddProfit(profit)
 				})
 				tradeStatsMap[usedSymbol] = tradeStats
 
