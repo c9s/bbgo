@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
+	bbgochart "github.com/c9s/bbgo/pkg/chart/v1"
 	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -358,6 +359,10 @@ type EnvironmentConfig struct {
 	SyncBufferPeriod *types.Duration `json:"syncBufferPeriod"`
 }
 
+type ChartConfig struct {
+	Kind    string                 `json:"kind" yaml:"kind"` // kline, supertrend, etc
+	Options bbgochart.PanelOptions `json:"options" yaml:"options"`
+}
 type Config struct {
 	Build *BuildConfig `json:"build,omitempty" yaml:"build,omitempty"`
 
@@ -389,6 +394,8 @@ type Config struct {
 	PnLReporters []PnLReporterConfig `json:"reportPnL,omitempty" yaml:"reportPnL,omitempty"`
 
 	ProfilingConfig *ProfilingConfig `json:"profiling,omitempty" yaml:"profiling,omitempty"`
+
+	ChartConfig []ChartConfig `json:"chart,omitempty" yaml:"chart,omitempty"`
 }
 
 func (c *Config) Map() (map[string]interface{}, error) {
