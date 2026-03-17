@@ -7,8 +7,6 @@ import (
 type KeltnerStream struct {
 	types.SeriesBase
 
-	window, atrLength int
-
 	EWMA   *EWMAStream
 	StdDev *StdDevStream
 	ATR    *ATRStream
@@ -21,7 +19,7 @@ type KeltnerStream struct {
 	ThirdUpperBand, ThirdLowerBand   *types.Float64Series
 }
 
-func Keltner(source KLineSubscription, window, atrLength int) *KeltnerStream {
+func Keltner(source KLineSubscription, window, atrLength int, atrMultipliers ...float64) *KeltnerStream {
 	atr := ATR2(source, atrLength)
 
 	highPrices := HighPrices(source)
@@ -30,8 +28,6 @@ func Keltner(source KLineSubscription, window, atrLength int) *KeltnerStream {
 	ewma := EWMA2(closePrices, window)
 
 	s := &KeltnerStream{
-		window:          window,
-		atrLength:       atrLength,
 		highPrices:      highPrices,
 		lowPrices:       lowPrices,
 		closePrices:     closePrices,
@@ -46,16 +42,27 @@ func Keltner(source KLineSubscription, window, atrLength int) *KeltnerStream {
 		ThirdLowerBand:  types.NewFloat64Series(),
 	}
 
+	var firstMultiplier, secondMultiplier, thirdMultiplier float64 = 1, 2, 3
+	if len(atrMultipliers) > 0 {
+		firstMultiplier = atrMultipliers[0]
+	}
+	if len(atrMultipliers) > 1 {
+		secondMultiplier = atrMultipliers[1]
+	}
+	if len(atrMultipliers) > 2 {
+		thirdMultiplier = atrMultipliers[2]
+	}
+
 	source.AddSubscriber(func(kLine types.KLine) {
 		mid := s.EWMA.Last(0)
 		atr := s.ATR.Last(0)
 		s.Mid.PushAndEmit(mid)
-		s.FirstUpperBand.PushAndEmit(mid + atr)
-		s.FirstLowerBand.PushAndEmit(mid - atr)
-		s.SecondUpperBand.PushAndEmit(mid + 2*atr)
-		s.SecondLowerBand.PushAndEmit(mid - 2*atr)
-		s.ThirdUpperBand.PushAndEmit(mid + 3*atr)
-		s.ThirdLowerBand.PushAndEmit(mid - 3*atr)
+		s.FirstUpperBand.PushAndEmit(mid + firstMultiplier*atr)
+		s.FirstLowerBand.PushAndEmit(mid - firstMultiplier*atr)
+		s.SecondUpperBand.PushAndEmit(mid + secondMultiplier*atr)
+		s.SecondLowerBand.PushAndEmit(mid - secondMultiplier*atr)
+		s.ThirdUpperBand.PushAndEmit(mid + thirdMultiplier*atr)
+		s.ThirdLowerBand.PushAndEmit(mid - thirdMultiplier*atr)
 	})
 	return s
 }
