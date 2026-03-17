@@ -3,6 +3,7 @@ package bbgo
 import (
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -151,4 +152,8 @@ func (i *IndicatorSet) SuperTrend(
 		atrPeriod,
 		multiplier,
 	)
+}
+
+func (i *IndicatorSet) FixedWindowVP(interval types.Interval, window int, delta fixedpoint.Value) *indicatorv2.FixedWindowVolumeProfile {
+	return indicatorv2.NewFixedWindowVolumeProfile(i.KLines(interval), window, delta)
 }
