@@ -11,14 +11,15 @@ import (
 type FixedWindowVolumeProfile struct {
 	*types.Float64Series
 
-	delta   float64 // price increment for each price level
-	window  int     // number of KLines to aggregate before emitting a profile
-	wCount  int
-	profile map[float64]float64 // price level -> volume
+	delta    float64 // price increment for each price level
+	window   int     // number of KLines to aggregate before emitting a profile
+	wCount   int
+	accKLine types.KLine         // accumulated KLine for the current window
+	profile  map[float64]float64 // price level -> volume
 
 	useAvgOHLC                   bool
 	minPriceLevel, maxPriceLevel float64
-	resetCallbacks               []func(profile map[float64]float64)
+	resetCallbacks               []func(profile map[float64]float64, accKLine types.KLine)
 }
 
 func NewFixedWindowVolumeProfile(source KLineSubscription, window int, delta float64) *FixedWindowVolumeProfile {
@@ -43,6 +44,7 @@ func (vp *FixedWindowVolumeProfile) UseAvgOHLC() {
 
 func (vp *FixedWindowVolumeProfile) reset() {
 	vp.wCount = 0
+	vp.accKLine = types.KLine{}
 	vp.profile = make(map[float64]float64)
 	vp.minPriceLevel = math.Inf(1)
 	vp.maxPriceLevel = math.Inf(-1)
@@ -64,6 +66,11 @@ func (vp *FixedWindowVolumeProfile) calculateKline(kline types.KLine) {
 	} else {
 		price = kline.Close.Float64()
 	}
+	if vp.wCount == 0 {
+		vp.accKLine.Set(&kline)
+	} else {
+		vp.accKLine.Merge(&kline)
+	}
 
 	priceLevel := math.Round(price / vp.delta)
 	if vp.minPriceLevel > priceLevel {
@@ -78,7 +85,7 @@ func (vp *FixedWindowVolumeProfile) calculateKline(kline types.KLine) {
 	if vp.wCount == vp.window {
 		poc, _ := vp.PointOfControl()
 		vp.PushAndEmit(poc)
-		vp.EmitReset(vp.profile)
+		vp.EmitReset(vp.profile, vp.accKLine)
 		vp.reset()
 	}
 }

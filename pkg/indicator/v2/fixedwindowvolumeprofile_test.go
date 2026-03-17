@@ -49,7 +49,8 @@ func TestFixedWindowVolumeProfile_WindowCompletion(t *testing.T) {
 	vp := NewFixedWindowVolumeProfile(stream, 3, 1.0)
 
 	var emittedProfile map[float64]float64
-	vp.OnReset(func(p map[float64]float64) { emittedProfile = p })
+	var emittedKLine types.KLine
+	vp.OnReset(func(p map[float64]float64, k types.KLine) { emittedProfile = p; emittedKLine = k })
 
 	stream.EmitUpdate(vpKLine(1.0, 10.0))
 	stream.EmitUpdate(vpKLine(2.0, 30.0))
@@ -60,6 +61,9 @@ func TestFixedWindowVolumeProfile_WindowCompletion(t *testing.T) {
 	assert.Equal(t, 10.0, emittedProfile[1.0])
 	assert.Equal(t, 30.0, emittedProfile[2.0])
 	assert.Equal(t, 5.0, emittedProfile[3.0])
+	assert.Equal(t, 1.0, emittedKLine.Open.Float64())
+	assert.Equal(t, 3.0, emittedKLine.Close.Float64())
+	assert.Equal(t, 45.0, emittedKLine.Volume.Float64())
 }
 
 func Test_PointOfControl(t *testing.T) {
@@ -182,7 +186,7 @@ func TestFixedWindowVolumeProfile_ZeroVolumeSkipped(t *testing.T) {
 	vp := NewFixedWindowVolumeProfile(stream, 2, 1.0)
 
 	var resetFired bool
-	vp.OnReset(func(_ map[float64]float64) { resetFired = true })
+	vp.OnReset(func(_ map[float64]float64, _ types.KLine) { resetFired = true })
 
 	stream.EmitUpdate(vpKLine(1.0, 0.0)) // skipped
 	stream.EmitUpdate(vpKLine(2.0, 0.0)) // skipped
@@ -199,11 +203,17 @@ func TestFixedWindowVolumeProfile_UseAvgOHLC(t *testing.T) {
 	vp.UseAvgOHLC()
 
 	var emittedProfile map[float64]float64
-	vp.OnReset(func(p map[float64]float64) { emittedProfile = p })
+	var emittedKLine types.KLine
+	vp.OnReset(func(p map[float64]float64, k types.KLine) { emittedProfile = p; emittedKLine = k })
 
 	// O=0, H=4, L=0, C=4 → avgOHLC = (0+4+0+4)/4 = 2.0 → bucket 2
 	stream.EmitUpdate(vpOHLCKLine(0.0, 4.0, 0.0, 4.0, 10.0))
 
 	assert.Equal(t, 10.0, emittedProfile[2.0], "volume should be in the avg-OHLC bucket")
 	assert.Equal(t, 0.0, emittedProfile[4.0], "close-only bucket should be empty")
+	assert.Equal(t, 0.0, emittedKLine.Open.Float64())
+	assert.Equal(t, 4.0, emittedKLine.High.Float64())
+	assert.Equal(t, 0.0, emittedKLine.Low.Float64())
+	assert.Equal(t, 4.0, emittedKLine.Close.Float64())
+	assert.Equal(t, 10.0, emittedKLine.Volume.Float64())
 }
