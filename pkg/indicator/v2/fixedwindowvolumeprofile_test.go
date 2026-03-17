@@ -33,24 +33,24 @@ func TestInvalidDelta(t *testing.T) {
 	t.Run("ZeroDelta", func(t *testing.T) {
 		stream := &KLineStream{}
 		assert.Panics(t, func() {
-			NewFixedWindowVolumeProfile(stream, 3, 0)
+			NewFixedWindowVolumeProfile(stream, 3, fixedpoint.Zero)
 		})
 	})
 	t.Run("NegativeDelta", func(t *testing.T) {
 		stream := &KLineStream{}
 		assert.Panics(t, func() {
-			NewFixedWindowVolumeProfile(stream, 3, -1.0)
+			NewFixedWindowVolumeProfile(stream, 3, fixedpoint.NegOne)
 		})
 	})
 }
 
 func TestFixedWindowVolumeProfile_WindowCompletion(t *testing.T) {
 	stream := &KLineStream{}
-	vp := NewFixedWindowVolumeProfile(stream, 3, 1.0)
+	vp := NewFixedWindowVolumeProfile(stream, 3, fixedpoint.One)
 
-	var emittedProfile map[float64]float64
+	var emittedProfile map[fixedpoint.Value]fixedpoint.Value
 	var emittedKLine types.KLine
-	vp.OnReset(func(p map[float64]float64, k types.KLine) { emittedProfile = p; emittedKLine = k })
+	vp.OnReset(func(p map[fixedpoint.Value]fixedpoint.Value, k types.KLine) { emittedProfile = p; emittedKLine = k })
 
 	stream.EmitUpdate(vpKLine(1.0, 10.0))
 	stream.EmitUpdate(vpKLine(2.0, 30.0))
@@ -58,9 +58,9 @@ func TestFixedWindowVolumeProfile_WindowCompletion(t *testing.T) {
 
 	stream.EmitUpdate(vpKLine(3.0, 5.0))
 	assert.NotNil(t, emittedProfile, "window should have completed")
-	assert.Equal(t, 10.0, emittedProfile[1.0])
-	assert.Equal(t, 30.0, emittedProfile[2.0])
-	assert.Equal(t, 5.0, emittedProfile[3.0])
+	assert.Equal(t, fixedpoint.NewFromFloat(10.0), emittedProfile[fixedpoint.One])
+	assert.Equal(t, fixedpoint.NewFromFloat(30.0), emittedProfile[fixedpoint.NewFromFloat(2.0)])
+	assert.Equal(t, fixedpoint.NewFromFloat(5.0), emittedProfile[fixedpoint.NewFromFloat(3.0)])
 	assert.Equal(t, 1.0, emittedKLine.Open.Float64())
 	assert.Equal(t, 3.0, emittedKLine.Close.Float64())
 	assert.Equal(t, 45.0, emittedKLine.Volume.Float64())
@@ -70,20 +70,20 @@ func Test_PointOfControl(t *testing.T) {
 	t.Run("BasicPoC", func(t *testing.T) {
 		stream := &KLineStream{}
 		// large window so it never completes during the test
-		vp := NewFixedWindowVolumeProfile(stream, 100, 1.0)
+		vp := NewFixedWindowVolumeProfile(stream, 100, fixedpoint.One)
 
 		stream.EmitUpdate(vpKLine(1.0, 5.0))
 		stream.EmitUpdate(vpKLine(2.0, 10.0))
 		stream.EmitUpdate(vpKLine(3.0, 30.0))
 
 		poc, vol := vp.PointOfControl()
-		assert.Equal(t, 3.0, poc)
-		assert.Equal(t, 30.0, vol)
+		assert.Equal(t, fixedpoint.NewFromFloat(3.0), poc)
+		assert.Equal(t, fixedpoint.NewFromFloat(30.0), vol)
 	})
 
 	t.Run("AccumulatesVolume", func(t *testing.T) {
 		stream := &KLineStream{}
-		vp := NewFixedWindowVolumeProfile(stream, 100, 1.0)
+		vp := NewFixedWindowVolumeProfile(stream, 100, fixedpoint.One)
 
 		// two klines at the same price level should accumulate
 		stream.EmitUpdate(vpKLine(2.0, 10.0))
@@ -91,13 +91,13 @@ func Test_PointOfControl(t *testing.T) {
 		stream.EmitUpdate(vpKLine(3.0, 25.0))
 
 		poc, vol := vp.PointOfControl()
-		assert.Equal(t, 2.0, poc)
-		assert.Equal(t, 30.0, vol)
+		assert.Equal(t, fixedpoint.NewFromFloat(2.0), poc)
+		assert.Equal(t, fixedpoint.NewFromFloat(30.0), vol)
 	})
 
 	t.Run("PushedToSeries", func(t *testing.T) {
 		stream := &KLineStream{}
-		vp := NewFixedWindowVolumeProfile(stream, 3, 1.0)
+		vp := NewFixedWindowVolumeProfile(stream, 3, fixedpoint.One)
 
 		stream.EmitUpdate(vpKLine(1.0, 5.0))
 		stream.EmitUpdate(vpKLine(2.0, 10.0))
@@ -109,7 +109,7 @@ func Test_PointOfControl(t *testing.T) {
 
 	t.Run("MultipleWindows", func(t *testing.T) {
 		stream := &KLineStream{}
-		vp := NewFixedWindowVolumeProfile(stream, 2, 1.0)
+		vp := NewFixedWindowVolumeProfile(stream, 2, fixedpoint.One)
 
 		// first window: price 2 has higher volume → PoC = 2.0
 		stream.EmitUpdate(vpKLine(1.0, 10.0))
@@ -127,7 +127,7 @@ func Test_PointOfControl(t *testing.T) {
 	t.Run("AboveEqual", func(t *testing.T) {
 		stream := &KLineStream{}
 		// large window so profile never resets
-		vp := NewFixedWindowVolumeProfile(stream, 100, 1.0)
+		vp := NewFixedWindowVolumeProfile(stream, 100, fixedpoint.One)
 
 		// profile: price 1→vol 5, price 2→vol 10, price 3→vol 30
 		stream.EmitUpdate(vpKLine(1.0, 5.0))
@@ -135,19 +135,19 @@ func Test_PointOfControl(t *testing.T) {
 		stream.EmitUpdate(vpKLine(3.0, 30.0))
 
 		// at or above 2.0: buckets 2 and 3 → PoC at price 3 (vol 30)
-		poc, vol := vp.PointOfControlAboveEqual(2.0)
-		assert.Equal(t, 3.0, poc)
-		assert.Equal(t, 30.0, vol)
+		poc, vol := vp.PointOfControlAboveEqual(fixedpoint.NewFromFloat(2.0))
+		assert.Equal(t, fixedpoint.NewFromFloat(3.0), poc)
+		assert.Equal(t, fixedpoint.NewFromFloat(30.0), vol)
 
 		// at or above 4.0: nothing above max → returns (0, 0)
-		poc, vol = vp.PointOfControlAboveEqual(4.0)
-		assert.Equal(t, 0.0, poc)
-		assert.Equal(t, 0.0, vol)
+		poc, vol = vp.PointOfControlAboveEqual(fixedpoint.NewFromFloat(4.0))
+		assert.Equal(t, fixedpoint.Zero, poc)
+		assert.Equal(t, fixedpoint.Zero, vol)
 	})
 
 	t.Run("BelowEqual", func(t *testing.T) {
 		stream := &KLineStream{}
-		vp := NewFixedWindowVolumeProfile(stream, 100, 1.0)
+		vp := NewFixedWindowVolumeProfile(stream, 100, fixedpoint.One)
 
 		// profile: price 1→vol 5, price 2→vol 30, price 3→vol 40
 		stream.EmitUpdate(vpKLine(1.0, 5.0))
@@ -155,20 +155,20 @@ func Test_PointOfControl(t *testing.T) {
 		stream.EmitUpdate(vpKLine(3.0, 40.0))
 
 		// at or below 2.0: buckets 1 and 2 → PoC at price 2 (vol 30)
-		poc, vol := vp.PointOfControlBelowEqual(2.0)
-		assert.Equal(t, 2.0, poc)
-		assert.Equal(t, 30.0, vol)
+		poc, vol := vp.PointOfControlBelowEqual(fixedpoint.NewFromFloat(2.0))
+		assert.Equal(t, fixedpoint.NewFromFloat(2.0), poc)
+		assert.Equal(t, fixedpoint.NewFromFloat(30.0), vol)
 
 		// at or below 0.0: below min → returns (0, 0)
-		poc, vol = vp.PointOfControlBelowEqual(0.0)
-		assert.Equal(t, 0.0, poc)
-		assert.Equal(t, 0.0, vol)
+		poc, vol = vp.PointOfControlBelowEqual(fixedpoint.Zero)
+		assert.Equal(t, fixedpoint.Zero, poc)
+		assert.Equal(t, fixedpoint.Zero, vol)
 	})
 }
 
 func TestFixedWindowVolumeProfile_ResetClearsProfile(t *testing.T) {
 	stream := &KLineStream{}
-	vp := NewFixedWindowVolumeProfile(stream, 2, 1.0)
+	vp := NewFixedWindowVolumeProfile(stream, 2, fixedpoint.One)
 
 	stream.EmitUpdate(vpKLine(1.0, 10.0))
 	stream.EmitUpdate(vpKLine(2.0, 20.0))
@@ -177,16 +177,16 @@ func TestFixedWindowVolumeProfile_ResetClearsProfile(t *testing.T) {
 	// new kline starts a fresh profile
 	stream.EmitUpdate(vpKLine(5.0, 50.0))
 	poc, vol := vp.PointOfControl()
-	assert.Equal(t, 5.0, poc)
-	assert.Equal(t, 50.0, vol)
+	assert.Equal(t, fixedpoint.NewFromFloat(5.0), poc)
+	assert.Equal(t, fixedpoint.NewFromFloat(50.0), vol)
 }
 
 func TestFixedWindowVolumeProfile_ZeroVolumeSkipped(t *testing.T) {
 	stream := &KLineStream{}
-	vp := NewFixedWindowVolumeProfile(stream, 2, 1.0)
+	vp := NewFixedWindowVolumeProfile(stream, 2, fixedpoint.One)
 
 	var resetFired bool
-	vp.OnReset(func(_ map[float64]float64, _ types.KLine) { resetFired = true })
+	vp.OnReset(func(_ map[fixedpoint.Value]fixedpoint.Value, _ types.KLine) { resetFired = true })
 
 	stream.EmitUpdate(vpKLine(1.0, 0.0)) // skipped
 	stream.EmitUpdate(vpKLine(2.0, 0.0)) // skipped
@@ -199,18 +199,18 @@ func TestFixedWindowVolumeProfile_ZeroVolumeSkipped(t *testing.T) {
 
 func TestFixedWindowVolumeProfile_UseAvgOHLC(t *testing.T) {
 	stream := &KLineStream{}
-	vp := NewFixedWindowVolumeProfile(stream, 1, 1.0)
+	vp := NewFixedWindowVolumeProfile(stream, 1, fixedpoint.One)
 	vp.UseAvgOHLC()
 
-	var emittedProfile map[float64]float64
+	var emittedProfile map[fixedpoint.Value]fixedpoint.Value
 	var emittedKLine types.KLine
-	vp.OnReset(func(p map[float64]float64, k types.KLine) { emittedProfile = p; emittedKLine = k })
+	vp.OnReset(func(p map[fixedpoint.Value]fixedpoint.Value, k types.KLine) { emittedProfile = p; emittedKLine = k })
 
 	// O=0, H=4, L=0, C=4 → avgOHLC = (0+4+0+4)/4 = 2.0 → bucket 2
 	stream.EmitUpdate(vpOHLCKLine(0.0, 4.0, 0.0, 4.0, 10.0))
 
-	assert.Equal(t, 10.0, emittedProfile[2.0], "volume should be in the avg-OHLC bucket")
-	assert.Equal(t, 0.0, emittedProfile[4.0], "close-only bucket should be empty")
+	assert.Equal(t, fixedpoint.NewFromFloat(10.0), emittedProfile[fixedpoint.NewFromFloat(2.0)], "volume should be in the avg-OHLC bucket")
+	assert.Equal(t, fixedpoint.Zero, emittedProfile[fixedpoint.NewFromFloat(4.0)], "close-only bucket should be empty")
 	assert.Equal(t, 0.0, emittedKLine.Open.Float64())
 	assert.Equal(t, 4.0, emittedKLine.High.Float64())
 	assert.Equal(t, 0.0, emittedKLine.Low.Float64())

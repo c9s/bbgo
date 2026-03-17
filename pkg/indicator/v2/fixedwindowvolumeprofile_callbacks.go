@@ -3,14 +3,15 @@
 package indicatorv2
 
 import (
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (vp *FixedWindowVolumeProfile) OnReset(cb func(profile map[float64]float64, accKLine types.KLine)) {
+func (vp *FixedWindowVolumeProfile) OnReset(cb func(profile map[fixedpoint.Value]fixedpoint.Value, accKLine types.KLine)) {
 	vp.resetCallbacks = append(vp.resetCallbacks, cb)
 }
 
-func (vp *FixedWindowVolumeProfile) EmitReset(profile map[float64]float64, accKLine types.KLine) {
+func (vp *FixedWindowVolumeProfile) EmitReset(profile map[fixedpoint.Value]fixedpoint.Value, accKLine types.KLine) {
 	for _, cb := range vp.resetCallbacks {
 		cb(profile, accKLine)
 	}
