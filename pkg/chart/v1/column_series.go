@@ -93,15 +93,38 @@ func (cs *ColumnIndicatorSeries) Render(r chart.Renderer, b chart.Box, xRange, y
 	} else {
 		barWidth = cs.Options.ColumnWidth
 	}
+
+	// Apply gap between columns (default 15% gap)
+	gapRatio := cs.Options.ColumnGap
+	if gapRatio <= 0 {
+		gapRatio = 0.15
+	}
+	drawWidth := barWidth * (1 - gapRatio)
+
 	zeroY := YValueToCanvas(yRange, b, 0)
 
-	for _, sample := range cs.samples {
+	lastIdx := len(cs.samples) - 1
+	for i, sample := range cs.samples {
 		x := chart.TimeToFloat64(sample.Time)
 		xp := XValueToCanvas(xRange, b, x)
 		yp := YValueToCanvas(yRange, b, sample.Value)
 
-		left := int(float64(xp) - barWidth/2)
-		right := int(float64(xp) + barWidth/2)
+		// First and last columns get half width to avoid extending beyond chart boundaries
+		var left, right int
+		switch i {
+		case 0:
+			// First column: only extend to the right
+			left = xp
+			right = int(float64(xp) + drawWidth/2)
+		case lastIdx:
+			// Last column: only extend to the left
+			left = int(float64(xp) - drawWidth/2)
+			right = xp
+		default:
+			// Middle columns: full width centered on time
+			left = int(float64(xp) - drawWidth/2)
+			right = int(float64(xp) + drawWidth/2)
+		}
 		if right == left {
 			right = left + 1
 		}

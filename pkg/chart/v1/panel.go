@@ -117,10 +117,12 @@ func (p *Panel) draw() {
 				Max: chart.TimeToFloat64(maxTime) + p.Options.XAxisPadding,
 			},
 		}
+		// Calculate range padding correctly for negative values
+		rangeDelta := maxY - minY
 		yAxis = chart.YAxis{
 			Range: &chart.ContinuousRange{
-				Min: minY * (1 - p.Options.RangePadding),
-				Max: maxY * (1 + p.Options.RangePadding),
+				Min: minY - rangeDelta*p.Options.RangePadding,
+				Max: maxY + rangeDelta*p.Options.RangePadding,
 			},
 		}
 	}
@@ -198,6 +200,7 @@ type PanelOptions struct {
 
 	// column indicators options
 	ColumnWidth float64 `json:"column_width" yaml:"column_width"`
+	ColumnGap   float64 `json:"column_gap" yaml:"column_gap"` // gap ratio between columns, ex: 0.15 -> gap width = 0.15 * column width
 
 	// dot indicators options
 	DotRadius float64 `json:"dot_radius" yaml:"dot_radius"`
