@@ -196,6 +196,12 @@ type PanelOptions struct {
 	LowerBoundColor string `json:"lower_bound_color" yaml:"lower_bound_color"`
 	ValueColor      string `json:"value_color" yaml:"value_color"`
 
+	// column indicators options
+	ColumnWidth float64 `json:"column_width" yaml:"column_width"`
+
+	// dot indicators options
+	DotRadius float64 `json:"dot_radius" yaml:"dot_radius"`
+
 	// supertrend
 	Multiplier float64 `json:"multiplier" yaml:"multiplier"`
 }
