@@ -116,7 +116,7 @@ func chart(cmd *cobra.Command, args []string) error {
 		case "supertrend":
 			errDraw = drawSuperTrendChart(klines, &chartConfig)
 		case "atr":
-			errDraw = drawAtrChar(klines, &chartConfig)
+			errDraw = drawAtrChart(klines, &chartConfig)
 		}
 		if errDraw != nil {
 			return errDraw
@@ -210,7 +210,7 @@ func drawSuperTrendChart(klines []types.KLine, config *bbgo.ChartConfig) error {
 	return panel.Write(f)
 }
 
-func drawAtrChar(klines []types.KLine, config *bbgo.ChartConfig) error {
+func drawAtrChart(klines []types.KLine, config *bbgo.ChartConfig) error {
 	klineStream := indicatorv2.KLineStream{}
 	atrStream := indicatorv2.ATR2(
 		&klineStream, config.Options.Window,
