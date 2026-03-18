@@ -200,7 +200,8 @@ type PanelOptions struct {
 
 	// column indicators options
 	ColumnWidth float64 `json:"column_width" yaml:"column_width"`
-	ColumnGap   float64 `json:"column_gap" yaml:"column_gap"` // gap ratio between columns, ex: 0.15 -> gap width = 0.15 * column width
+	ColumnGap   float64 `json:"column_gap" yaml:"column_gap"`   // gap ratio between columns, ex: 0.15 -> gap width = 0.15 * column width
+	ColumnAlpha uint8   `json:"column_alpha" yaml:"column_alpha"` // alpha value for column colors (0-255), default 200
 
 	// dot indicators options
 	DotRadius float64 `json:"dot_radius" yaml:"dot_radius"`
