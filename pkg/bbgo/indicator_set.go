@@ -157,3 +157,7 @@ func (i *IndicatorSet) SuperTrend(
 func (i *IndicatorSet) FixedWindowVP(interval types.Interval, window int, delta fixedpoint.Value) *indicatorv2.FixedWindowVolumeProfile {
 	return indicatorv2.NewFixedWindowVolumeProfile(i.KLines(interval), window, delta)
 }
+
+func (i *IndicatorSet) TTMSqueeze(iw types.IntervalWindow) *indicatorv2.TTMSqueezeStream {
+	return indicatorv2.NewTTMSqueezeStream(i.KLines(iw.Interval), iw.Window)
+}
