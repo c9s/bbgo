@@ -47,6 +47,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/techsignal"
 	_ "github.com/c9s/bbgo/pkg/strategy/tradingdesk"
 	_ "github.com/c9s/bbgo/pkg/strategy/trendtrader"
+	_ "github.com/c9s/bbgo/pkg/strategy/ttmsqueeze"
 	_ "github.com/c9s/bbgo/pkg/strategy/wall"
 	_ "github.com/c9s/bbgo/pkg/strategy/xalign"
 	_ "github.com/c9s/bbgo/pkg/strategy/xbalance"

@@ -152,3 +152,7 @@ func (i *IndicatorSet) SuperTrend(
 		multiplier,
 	)
 }
+
+func (i *IndicatorSet) TTMSqueeze(iw types.IntervalWindow) *indicatorv2.TTMSqueezeStream {
+	return indicatorv2.NewTTMSqueezeStream(i.KLines(iw.Interval), iw.Window)
+}
