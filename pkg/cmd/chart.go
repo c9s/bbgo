@@ -117,7 +117,7 @@ func chart(cmd *cobra.Command, args []string) error {
 		case "supertrend":
 			errDraw = drawSuperTrendChart(klines, &chartConfig)
 		case "atr":
-			errDraw = drawAtrChar(klines, &chartConfig)
+			errDraw = drawAtrChart(klines, &chartConfig)
 		case "ttmsqueeze":
 			errDraw = drawTTMSqueezeChart(klines, &chartConfig)
 		}
