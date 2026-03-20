@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -543,12 +544,14 @@ var BacktestCmd = &cobra.Command{
 			summaryReport.Intervals = append(summaryReport.Intervals, interval)
 		}
 
+		var allTrades []types.Trade
 		for _, session := range environ.Sessions() {
 			for symbol, trades := range session.Trades {
 				if len(trades.Trades) == 0 {
 					log.Warnf("session has no %s trades", symbol)
 					continue
 				}
+				allTrades = append(allTrades, trades.Trades...)
 
 				tradeState := sessionTradeStats[session.Name][symbol]
 				profitFactor := tradeState.ProfitFactor
@@ -592,6 +595,25 @@ var BacktestCmd = &cobra.Command{
 			configJsonFile := filepath.Join(reportDir, "config.json")
 			if err := util.WriteJsonFile(configJsonFile, userConfig); err != nil {
 				return errors.Wrapf(err, "can not write config json file: %s", configJsonFile)
+			}
+
+			// sort all trades by time
+			slices.SortFunc(allTrades, func(a, b types.Trade) int {
+				return a.Time.Time().Compare(b.Time.Time())
+			})
+
+			// write trades to trades.tsv
+			tradesTsvFile := filepath.Join(reportDir, "trades.tsv")
+			tradesTsv, err := tsv.NewWriterFile(tradesTsvFile)
+			defer func() { _ = tradesTsv.Close() }()
+			if err != nil {
+				return errors.Wrapf(err, "can not create trades tsv file: %s", tradesTsvFile)
+			}
+			_ = tradesTsv.Write(types.Trade{}.CsvHeader())
+			for _, trade := range allTrades {
+				for _, record := range trade.CsvRecords() {
+					_ = tradesTsv.Write(record)
+				}
 			}
 
 			// append report index
