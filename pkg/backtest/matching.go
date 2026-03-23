@@ -11,6 +11,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -72,6 +73,25 @@ type SimplePriceMatching struct {
 	tradeUpdateCallbacks   []func(trade types.Trade)
 	orderUpdateCallbacks   []func(order types.Order)
 	balanceUpdateCallbacks []func(balances types.BalanceMap)
+}
+
+func (m *SimplePriceMatching) Prepare(srv *service.BacktestService, exchange *Exchange, startTime time.Time) error {
+	if !m.lastPrice.IsZero() {
+		// no prepare work needed
+		return nil
+	}
+	// set the last price
+	lastMinute := startTime.Add(-time.Minute).Truncate(time.Minute)
+	klines, err := srv.QueryKLinesBackward(exchange, m.Symbol, types.Interval1m, lastMinute, 1)
+	if err != nil {
+		return fmt.Errorf("failed to query last minute kline for symbol %s: %w", m.Symbol, err)
+	}
+	if len(klines) == 0 {
+		return fmt.Errorf("no kline data found for symbol %s 1m before start time: %s", m.Symbol, lastMinute)
+	}
+	m.lastPrice = klines[0].Close
+	m.currentTime = klines[0].EndTime.Time()
+	return nil
 }
 
 func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {

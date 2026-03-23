@@ -292,6 +292,9 @@ var BacktestCmd = &cobra.Command{
 			backtestEx := session.Exchange.(*backtest.Exchange)
 			backtestEx.MarketDataStream = session.MarketDataStream.(types.StandardStreamEmitter)
 			backtestEx.BindUserData(userDataStream)
+			if err := backtestEx.Prepare(userConfig); err != nil {
+				return errors.Wrap(err, "failed to prepare backtest exchange")
+			}
 		}
 
 		trader := bbgo.NewTrader(environ)
@@ -487,8 +490,8 @@ var BacktestCmd = &cobra.Command{
 				return
 			}
 
-		RunMultiExchangeData:
-			for {
+			keepRunMultiExchangeData := true
+			for keepRunMultiExchangeData {
 				for _, exK := range exchangeSources {
 					k, more := <-exK.C
 					if !more {
@@ -496,7 +499,8 @@ var BacktestCmd = &cobra.Command{
 							log.WithError(err).Errorf("close market data error")
 							return
 						}
-						break RunMultiExchangeData
+						keepRunMultiExchangeData = false
+						break
 					}
 
 					exK.Exchange.ConsumeKLine(k, requiredInterval)
