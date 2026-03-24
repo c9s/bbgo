@@ -1414,21 +1414,17 @@ func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.Exchange
 		return price, nil
 	}
 
-	tickers, err := session.Exchange.QueryTickers(ctx, s.Symbol)
+	ticker, err := session.Exchange.QueryTicker(ctx, s.Symbol)
 	if err != nil {
-		return fixedpoint.Zero, err
+		return fixedpoint.Zero, fmt.Errorf("ticker price not found: %w", err)
 	}
 
-	if ticker, ok := tickers[s.Symbol]; ok {
-		if !ticker.Last.IsZero() {
-			return ticker.Last, nil
-		}
-
-		// fallback to buy price
-		return ticker.Buy, nil
+	if !ticker.Last.IsZero() {
+		return ticker.Last, nil
 	}
 
-	return fixedpoint.Zero, fmt.Errorf("%s ticker price not found", s.Symbol)
+	// fallback to buy price
+	return ticker.Buy, nil
 }
 
 func calculateMinimalQuoteInvestment(market types.Market, grid *Grid) fixedpoint.Value {
