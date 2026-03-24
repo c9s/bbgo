@@ -186,7 +186,8 @@ func init() {
 type StreamOrderBook struct {
 	*MutexOrderBook
 
-	C chan *BookSignal
+	C      chan *BookSignal
+	Stream Stream // set when bind stream and can be used for the components
 
 	updateCallbacks   []func(update SliceOrderBook)
 	snapshotCallbacks []func(snapshot SliceOrderBook)
@@ -230,6 +231,7 @@ func (sb *StreamOrderBook) UpdateMetrics(t time.Time) {
 }
 
 func (sb *StreamOrderBook) BindStream(stream Stream) {
+	sb.Stream = stream
 	stream.OnDisconnect(func() {
 		sb.Reset()
 	})
