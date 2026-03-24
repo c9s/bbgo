@@ -124,7 +124,7 @@ func (e *Exchange) querySpotAccountBalance(ctx context.Context) (*hyperapi.Accou
 		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
 	}
 
-	return e.client.NewGetAccountBalanceRequest().User(e.client.UserAddress()).Do(ctx)
+	return e.client.NewGetAccountBalanceRequest().User(e.client.Account()).Do(ctx)
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
@@ -254,7 +254,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		return nil, fmt.Errorf("query open orders rate limiter wait error: %w", err)
 	}
 
-	resp, err := e.client.NewGetOpenOrdersRequest().User(e.client.UserAddress()).Do(ctx)
+	resp, err := e.client.NewGetOpenOrdersRequest().User(e.client.Account()).Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query open orders: %w", err)
 	}

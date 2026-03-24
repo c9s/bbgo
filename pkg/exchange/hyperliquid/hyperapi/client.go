@@ -28,6 +28,8 @@ const (
 	defaultHTTPTimeout = 15 * time.Second
 	ProductionURL      = "https://api.hyperliquid.xyz"
 	TestNetURL         = "https://api.hyperliquid-testnet.xyz"
+	ProductionWsURL    = "wss://api.hyperliquid.xyz/ws"
+	TestNetWsURL       = "wss://api.hyperliquid-testnet.xyz/ws"
 )
 
 var (
@@ -80,6 +82,11 @@ func (c *Client) Auth(secret, account string) {
 
 func (c *Client) SetVaultAddress(address string) {
 	c.vaultAddress = address
+}
+
+// Account returns the account address for private WebSocket subscriptions (e.g. userFills, orderUpdates).
+func (c *Client) Account() string {
+	return c.account
 }
 
 // NewRequest create new API request. Relative url can be provided in refURL.
@@ -166,10 +173,6 @@ func (c *Client) PhantomAgent(hash []byte) map[string]any {
 		"source":       source,
 		"connectionId": hash,
 	}
-}
-
-func (c *Client) UserAddress() string {
-	return c.account
 }
 
 func (c *Client) sign(typedData apitypes.TypedData, privateKey *ecdsa.PrivateKey) (SignatureResult, error) {

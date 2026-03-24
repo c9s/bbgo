@@ -49,7 +49,7 @@ func (e *Exchange) queryFuturesAccount(ctx context.Context) (*types.Account, err
 		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
 	}
 
-	futuresAccount, err := e.client.NewFuturesGetAccountBalanceRequest().User(e.client.UserAddress()).Do(ctx)
+	futuresAccount, err := e.client.NewFuturesGetAccountBalanceRequest().User(e.client.Account()).Do(ctx)
 	if err != nil {
 		return nil, err
 	}

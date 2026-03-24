@@ -438,9 +438,9 @@ func TestSignatureAddressRecovery(t *testing.T) {
 	client.Auth(privateKeyHex, account)
 
 	// Get the original address from the private key
-	originalAddress := client.UserAddress()
+	originalAddress := client.Account()
 	if originalAddress == "" {
-		t.Fatal("UserAddress should return a valid address")
+		t.Fatal("Account should return a valid address")
 	}
 
 	// Create a test action
