@@ -205,6 +205,10 @@ func NewStreamBook(symbol string, exchangeName ExchangeName) *StreamOrderBook {
 	}
 }
 
+func (sb *StreamOrderBook) Use(component func(book *StreamOrderBook)) {
+	component(sb)
+}
+
 func (sb *StreamOrderBook) UpdateMetrics(t time.Time) {
 	bestBid, bestAsk, ok := sb.BestBidAndAsk()
 	if sb.bestAskPriceGauge == nil {
