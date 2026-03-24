@@ -5,17 +5,23 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/sirupsen/logrus"
 )
 
-func StreamBookHealthCheck(ctx context.Context, checkDuration, reconnectThreshold time.Duration) func(*types.StreamOrderBook) {
+func StreamBookHealthCheck(ctx context.Context, checkInterval, reconnectThreshold time.Duration) func(*types.StreamOrderBook) {
 	return func(book *types.StreamOrderBook) {
+		logger := logrus.WithFields(logrus.Fields{
+			"component": "healthcheck",
+			"symbol":    book.Symbol,
+		})
 		go func() {
-			ticker := time.NewTicker(checkDuration)
+			ticker := time.NewTicker(checkInterval)
 			defer ticker.Stop()
 
 			for {
 				select {
 				case <-ctx.Done():
+					logger.Info("stream book health check context done")
 					return
 				case _, ok := <-ticker.C:
 					if !ok {
@@ -28,7 +34,13 @@ func StreamBookHealthCheck(ctx context.Context, checkDuration, reconnectThreshol
 					if book.Stream == nil {
 						continue
 					}
-					if time.Since(lastUpdate) >= reconnectThreshold {
+					duration := time.Since(lastUpdate)
+					if duration >= reconnectThreshold {
+						logger.Warnf(
+							"last update time exceeds threshold, reconnecting stream: %s >= %s",
+							duration.String(),
+							reconnectThreshold.String(),
+						)
 						book.Stream.Reconnect()
 					}
 				}
