@@ -7,10 +7,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func StreamBookHealthCheck(ctx context.Context, checkDuration, reconnectThreshold time.Duration) func(*types.StreamOrderBook) {
+func StreamBookHealthCheck(ctx context.Context, checkInterval, reconnectThreshold time.Duration) func(*types.StreamOrderBook) {
 	return func(book *types.StreamOrderBook) {
 		go func() {
-			ticker := time.NewTicker(checkDuration)
+			ticker := time.NewTicker(checkInterval)
 			defer ticker.Stop()
 
 			for {
