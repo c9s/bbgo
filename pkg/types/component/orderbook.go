@@ -18,6 +18,11 @@ func StreamBookHealthCheck(ctx context.Context, checkInterval, reconnectThreshol
 			ticker := time.NewTicker(checkInterval)
 			defer ticker.Stop()
 
+			logger.Infof(
+				"starting stream book health check %s: %s (%s)",
+				book.Symbol, checkInterval.String(), reconnectThreshold.String(),
+			)
+
 			for {
 				select {
 				case <-ctx.Done():
