@@ -49,7 +49,7 @@ func Test_StreamBookHealthCheck(t *testing.T) {
 		checkDuration := 10 * time.Millisecond
 		reconnectThreshold := 50 * time.Millisecond
 
-		book.Use(StreamBookHealthCheck(ctx, checkDuration, reconnectThreshold))
+		book.Use(StreamBookHealthCheck(ctx, "", checkDuration, reconnectThreshold))
 
 		// Wait for health check to trigger reconnect
 		select {
@@ -82,7 +82,7 @@ func Test_StreamBookHealthCheck(t *testing.T) {
 		checkDuration := 10 * time.Millisecond
 		reconnectThreshold := 200 * time.Millisecond
 
-		book.Use(StreamBookHealthCheck(ctx, checkDuration, reconnectThreshold))
+		book.Use(StreamBookHealthCheck(ctx, "", checkDuration, reconnectThreshold))
 
 		// Keep updating the book to keep it fresh
 		go func() {
@@ -140,7 +140,7 @@ func Test_StreamBookHealthCheck(t *testing.T) {
 		reconnectThreshold := 50 * time.Millisecond
 
 		// This should not panic even though stream is nil
-		book.Use(StreamBookHealthCheck(ctx, checkDuration, reconnectThreshold))
+		book.Use(StreamBookHealthCheck(ctx, "", checkDuration, reconnectThreshold))
 
 		// Wait for health check to run (it should not panic)
 		time.Sleep(100 * time.Millisecond)
