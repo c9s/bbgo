@@ -8,19 +8,20 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func StreamBookHealthCheck(ctx context.Context, checkInterval, reconnectThreshold time.Duration) func(*types.StreamOrderBook) {
+func StreamBookHealthCheck(ctx context.Context, sessionName string, checkInterval, reconnectThreshold time.Duration) func(*types.StreamOrderBook) {
 	return func(book *types.StreamOrderBook) {
 		logger := logrus.WithFields(logrus.Fields{
 			"component": "healthcheck",
 			"symbol":    book.Symbol,
+			"session":   sessionName,
 		})
 		go func() {
 			ticker := time.NewTicker(checkInterval)
 			defer ticker.Stop()
 
 			logger.Infof(
-				"starting stream book health check %s: %s (%s)",
-				book.Symbol, checkInterval.String(), reconnectThreshold.String(),
+				"starting stream book health check: %s (%s)",
+				checkInterval.String(), reconnectThreshold.String(),
 			)
 
 			for {
