@@ -287,6 +287,7 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
+		var allFilledOrders []types.Order
 		for _, session := range environ.Sessions() {
 			userDataStream := session.UserDataStream.(types.StandardStreamEmitter)
 			backtestEx := session.Exchange.(*backtest.Exchange)
@@ -295,6 +296,13 @@ var BacktestCmd = &cobra.Command{
 			if err := backtestEx.Prepare(userConfig); err != nil {
 				return errors.Wrap(err, "failed to prepare backtest exchange")
 			}
+			// Since we have prepared the exchanges with historical data, there might be some orders got filled when the strategies are run.
+			// We need to register the order update callback before the `trader.Run`, or else there might be missed filled orders.
+			session.UserDataStream.OnOrderUpdate(func(order types.Order) {
+				if order.Status == types.OrderStatusFilled {
+					allFilledOrders = append(allFilledOrders, order)
+				}
+			})
 		}
 
 		trader := bbgo.NewTrader(environ)
@@ -450,23 +458,6 @@ var BacktestCmd = &cobra.Command{
 					})
 				}
 			})
-
-			ordersTsv, err := tsv.NewWriterFile(filepath.Join(reportDir, "orders.tsv"))
-			if err != nil {
-				return err
-			}
-			defer func() { _ = ordersTsv.Close() }()
-			_ = ordersTsv.Write(types.Order{}.CsvHeader())
-
-			for _, exSource := range exchangeSources {
-				exSource.Session.UserDataStream.OnOrderUpdate(func(order types.Order) {
-					if order.Status == types.OrderStatusFilled {
-						for _, record := range order.CsvRecords() {
-							_ = ordersTsv.Write(record)
-						}
-					}
-				})
-			}
 		}
 
 		runCtx, cancelRun := context.WithCancel(ctx)
@@ -601,22 +592,46 @@ var BacktestCmd = &cobra.Command{
 				return errors.Wrapf(err, "can not write config json file: %s", configJsonFile)
 			}
 
-			// sort all trades by time
-			slices.SortFunc(allTrades, func(a, b types.Trade) int {
-				return a.Time.Time().Compare(b.Time.Time())
-			})
+			// write filled orders
+			if len(allFilledOrders) > 0 {
+				slices.SortFunc(allFilledOrders, func(a, b types.Order) int {
+					return a.UpdateTime.Time().Compare(b.UpdateTime.Time())
+				})
 
-			// write trades to trades.tsv
-			tradesTsvFile := filepath.Join(reportDir, "trades.tsv")
-			tradesTsv, err := tsv.NewWriterFile(tradesTsvFile)
-			defer func() { _ = tradesTsv.Close() }()
-			if err != nil {
-				return errors.Wrapf(err, "can not create trades tsv file: %s", tradesTsvFile)
+				orderTsvFile := filepath.Join(reportDir, "orders.tsv")
+				ordersTsv, err := tsv.NewWriterFile(orderTsvFile)
+				if err != nil {
+					return errors.Wrapf(err, "can not create orders tsv file: %s", orderTsvFile)
+				}
+				defer func() { _ = ordersTsv.Close() }()
+
+				_ = ordersTsv.Write(types.Order{}.CsvHeader())
+				for _, order := range allFilledOrders {
+					for _, record := range order.CsvRecords() {
+						_ = ordersTsv.Write(record)
+					}
+				}
 			}
-			_ = tradesTsv.Write(types.Trade{}.CsvHeader())
-			for _, trade := range allTrades {
-				for _, record := range trade.CsvRecords() {
-					_ = tradesTsv.Write(record)
+
+			if len(allTrades) > 0 {
+				// sort all trades by time
+				slices.SortFunc(allTrades, func(a, b types.Trade) int {
+					return a.Time.Time().Compare(b.Time.Time())
+				})
+
+				// write trades to trades.tsv
+				tradesTsvFile := filepath.Join(reportDir, "trades.tsv")
+				tradesTsv, err := tsv.NewWriterFile(tradesTsvFile)
+				defer func() { _ = tradesTsv.Close() }()
+				if err != nil {
+					return errors.Wrapf(err, "can not create trades tsv file: %s", tradesTsvFile)
+				}
+
+				_ = tradesTsv.Write(types.Trade{}.CsvHeader())
+				for _, trade := range allTrades {
+					for _, record := range trade.CsvRecords() {
+						_ = tradesTsv.Write(record)
+					}
 				}
 			}
 
