@@ -719,13 +719,13 @@ func setDualSidePosition[T OrderServiceConstraint](req T, order types.SubmitOrde
 
 	switch order.Side {
 	case types.SideTypeBuy:
-		if order.ReduceOnly {
+		if order.ReduceOnly || order.ClosePosition {
 			positionSide = futures.PositionSideTypeShort
 		} else {
 			positionSide = futures.PositionSideTypeLong
 		}
 	case types.SideTypeSell:
-		if order.ReduceOnly {
+		if order.ReduceOnly || order.ClosePosition {
 			positionSide = futures.PositionSideTypeLong
 		} else {
 			positionSide = futures.PositionSideTypeShort
