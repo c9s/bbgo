@@ -6,7 +6,6 @@ import (
 	"math"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -1204,54 +1203,6 @@ func (s *Strategy) updateGridNumOfOrdersMetrics(grid *Grid) {
 		metricsGridNumOfOrdersWithCorrectPrice.With(baseLabels).Set(float64(numOfOrdersWithCorrectPrice))
 		metricsGridNumOfMissingOrdersWithCorrectPrice.With(baseLabels).Set(float64(numOfMissingOrdersWithCorrectPrice))
 	}
-}
-
-func (s *Strategy) debugGridOrders(submitOrders []types.SubmitOrder, lastPrice fixedpoint.Value) {
-	if !s.Debug {
-		return
-	}
-
-	var sb strings.Builder
-
-	sb.WriteString("GRID ORDERS [\n")
-	for i, order := range submitOrders {
-		if i > 0 && lastPrice.Compare(order.Price) >= 0 && lastPrice.Compare(submitOrders[i-1].Price) <= 0 {
-			sb.WriteString(fmt.Sprintf("  - LAST PRICE: %f\n", lastPrice.Float64()))
-		}
-
-		sb.WriteString("  - " + order.String() + "\n")
-	}
-	sb.WriteString("] END OF GRID ORDERS")
-
-	s.logger.Info(sb.String())
-}
-
-func (s *Strategy) debugOrders(desc string, orders []types.Order) {
-	if !s.Debug {
-		return
-	}
-
-	var sb strings.Builder
-
-	if desc == "" {
-		desc = "ORDERS"
-	}
-
-	sb.WriteString(desc + " [\n")
-	for i, order := range orders {
-		sb.WriteString(fmt.Sprintf("  - %d) %s\n", i, order.String()))
-	}
-	sb.WriteString("]")
-
-	s.logger.Info(sb.String())
-}
-
-func (s *Strategy) debugLog(format string, args ...interface{}) {
-	if !s.Debug {
-		return
-	}
-
-	s.logger.Infof(format, args...)
 }
 
 func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoint.Value) ([]types.SubmitOrder, error) {
