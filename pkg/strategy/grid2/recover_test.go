@@ -14,16 +14,6 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func newStrategy(t *TestData) *Strategy {
-	s := t.Strategy
-	s.Debug = true
-	s.Initialize()
-	s.Market = t.Market
-	s.Position = types.NewPositionFromMarket(t.Market)
-	s.orderExecutor = bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, t.Market.Symbol, ID, s.InstanceID(), s.Position)
-	return &s
-}
-
 func TestBuildTwinOrderBook(t *testing.T) {
 	assert := assert.New(t)
 
