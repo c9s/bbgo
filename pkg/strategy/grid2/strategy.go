@@ -196,7 +196,9 @@ type Strategy struct {
 	// mu is used for locking the grid object field, avoid double grid opening
 	mu sync.Mutex
 
-	writeMutex           sync.Mutex
+	// writeMutex is used for locking the grid orders writing and cancelation
+	writeMutex sync.Mutex
+
 	tradingCtx, writeCtx context.Context
 	cancelWrite          context.CancelFunc
 
@@ -549,8 +551,8 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	s.logger.Infof("SUBMIT GRID REVERSE ORDER: %s", orderForm.String())
 
 	writeCtx := s.getWriteContext()
-	s.writeMutex.Lock()
-	defer s.writeMutex.Unlock()
+	s.lockWriteOrders()
+	defer s.unlockWriteOrders()
 	createdOrders, err := s.orderExecutor.SubmitOrders(writeCtx, orderForm)
 	if err != nil {
 		s.logger.WithError(err).Errorf("GRID REVERSE ORDER SUBMISSION ERROR: order: %s", orderForm.String())
@@ -993,7 +995,7 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 
 // CloseGrid closes the grid orders
 func (s *Strategy) CloseGrid(ctx context.Context) error {
-	s.writeMutex.Lock()
+	s.lockWriteOrders()
 	s.logger.Infof("closing %s grid", s.Symbol)
 	if s.cancelWrite != nil {
 		s.cancelWrite()
@@ -1005,7 +1007,7 @@ func (s *Strategy) CloseGrid(ctx context.Context) error {
 	s.logger.Infof("canceling grid orders...")
 
 	err := s.cancelAll(ctx)
-	s.writeMutex.Unlock()
+	s.unlockWriteOrders()
 
 	// free the grid object
 	s.setGrid(nil)
@@ -1134,9 +1136,9 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	writeCtx := s.getWriteContext(ctx)
 
-	s.writeMutex.Lock()
+	s.lockWriteOrders()
 	createdOrders, err2 := s.orderExecutor.SubmitOrders(writeCtx, submitOrders...)
-	s.writeMutex.Unlock()
+	s.unlockWriteOrders()
 	if err2 != nil {
 		s.EmitGridError(err2)
 		return err2
@@ -1414,21 +1416,17 @@ func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.Exchange
 		return price, nil
 	}
 
-	tickers, err := session.Exchange.QueryTickers(ctx, s.Symbol)
+	ticker, err := session.Exchange.QueryTicker(ctx, s.Symbol)
 	if err != nil {
-		return fixedpoint.Zero, err
+		return fixedpoint.Zero, fmt.Errorf("ticker price not found: %w", err)
 	}
 
-	if ticker, ok := tickers[s.Symbol]; ok {
-		if !ticker.Last.IsZero() {
-			return ticker.Last, nil
-		}
-
-		// fallback to buy price
-		return ticker.Buy, nil
+	if !ticker.Last.IsZero() {
+		return ticker.Last, nil
 	}
 
-	return fixedpoint.Zero, fmt.Errorf("%s ticker price not found", s.Symbol)
+	// fallback to buy price
+	return ticker.Buy, nil
 }
 
 func calculateMinimalQuoteInvestment(market types.Market, grid *Grid) fixedpoint.Value {
@@ -1768,8 +1766,8 @@ func (s *Strategy) newPrometheusLabels() prometheus.Labels {
 }
 
 func (s *Strategy) CleanUp(ctx context.Context) error {
-	s.writeMutex.Lock()
-	defer s.writeMutex.Unlock()
+	s.lockWriteOrders()
+	defer s.unlockWriteOrders()
 
 	_ = s.Initialize()
 
@@ -2076,8 +2074,8 @@ func (s *Strategy) openOrdersMismatches(ctx context.Context, session *bbgo.Excha
 }
 
 func (s *Strategy) cancelDuplicatedPriceOpenOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
-	s.writeMutex.Lock()
-	defer s.writeMutex.Unlock()
+	s.lockWriteOrders()
+	defer s.unlockWriteOrders()
 
 	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
 	if err != nil {
@@ -2136,4 +2134,18 @@ func (s *Strategy) newClientOrderID() string {
 		return uuid.New().String()
 	}
 	return ""
+}
+
+func (s *Strategy) lockWriteOrders() {
+	if bbgo.IsBackTesting {
+		return
+	}
+	s.writeMutex.Lock()
+}
+
+func (s *Strategy) unlockWriteOrders() {
+	if bbgo.IsBackTesting {
+		return
+	}
+	s.writeMutex.Unlock()
 }

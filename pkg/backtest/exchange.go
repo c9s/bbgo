@@ -138,13 +138,13 @@ func (e *Exchange) resetMatchingBooks() {
 
 func (e *Exchange) _addMatchingBook(symbol string, market types.Market) {
 	matching := &SimplePriceMatching{
+		Symbol:          symbol,
 		currentTime:     e.currentTime,
 		account:         e.account,
 		Market:          market,
 		closedOrders:    make(map[uint64]types.Order),
 		feeModeFunction: getFeeModeFunction(e.config.FeeMode),
 	}
-
 	e.matchingBooks[symbol] = matching
 }
 
@@ -152,6 +152,24 @@ func (e *Exchange) NewStream() types.Stream {
 	return &types.BacktestStream{
 		StandardStreamEmitter: &types.StandardStream{},
 	}
+}
+
+func (e *Exchange) Prepare(userConfig *bbgo.Config) error {
+	startTime := userConfig.Backtest.StartTime.Time()
+	symbols := make(map[string]struct{})
+	for _, symbol := range userConfig.Backtest.Symbols {
+		symbols[symbol] = struct{}{}
+	}
+	for _, m := range e.matchingBooks {
+		// only prepare the matching book if it's configured for the backtest
+		if _, found := symbols[m.Symbol]; !found {
+			continue
+		}
+		if err := m.Prepare(e.srv, e, startTime); err != nil {
+			return fmt.Errorf("failed to prepare backtest exchange for %s: %w", e.sourceName, err)
+		}
+	}
+	return nil
 }
 
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
