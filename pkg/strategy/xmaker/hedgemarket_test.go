@@ -267,9 +267,13 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	mockExchange := session.Exchange.(*mocks.MockExchangeExtended)
 
 	depth := Number(100.0)
+	// Use a large hedge interval so the ticker never fires during the test.
+	// All hedging is driven by the positionDeltaC channel, which eliminates
+	// the race between the ticker and the channel-driven hedge path.
+	largeInterval := types.Duration(time.Hour)
 	hm := NewHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: "BTCUSDT",
-		HedgeInterval:  hedgeInterval,
+		HedgeInterval:  largeInterval,
 		QuotingDepth:   depth,
 	}, session, market)
 
