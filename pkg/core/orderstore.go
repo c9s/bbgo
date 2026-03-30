@@ -111,7 +111,9 @@ func (s *OrderStore) Add(orders ...types.Order) {
 	for _, o := range orders {
 		if o.OrderID == 0 {
 			logrus.WithFields(o.LogFields()).Errorf("[orderstore] adding order %+v with OrderID 0", o)
+			continue
 		}
+
 		old, ok := s.orders[o.OrderID]
 		if ok && o.Tag == "" && old.Tag != "" {
 			o.Tag = old.Tag
@@ -126,6 +128,7 @@ func (s *OrderStore) Remove(o types.Order) {
 
 	if o.OrderID == 0 {
 		logrus.WithFields(o.LogFields()).Errorf("[orderstore-Remove] given order %+v with OrderID 0", o)
+		return
 	}
 
 	delete(s.orders, o.OrderID)
