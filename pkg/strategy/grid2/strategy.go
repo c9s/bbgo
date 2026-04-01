@@ -18,6 +18,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/tradingutil"
@@ -58,6 +59,8 @@ type OrderExecutor interface {
 	GracefulCancel(ctx context.Context, orders ...types.Order) error
 	ActiveMakerOrders() *bbgo.ActiveOrderBook
 }
+
+var _ common.StrategyTabularSummarizer = (*Strategy)(nil)
 
 //go:generate callbackgen -type Strategy
 type Strategy struct {
@@ -1787,4 +1790,10 @@ func (s *Strategy) unlockWriteOrders() {
 		return
 	}
 	s.writeMutex.Unlock()
+}
+
+func (s *Strategy) TabularStats() map[string]common.TabularStats {
+	return map[string]common.TabularStats{
+		"grid_profit_stats": s.GridProfitStats,
+	}
 }

@@ -38,6 +38,8 @@ func (f *ProfitFixer) Fix(parent context.Context, since, until time.Time, initia
 	// reset profit
 	profitStats.TotalQuoteProfit = fixedpoint.Zero
 	profitStats.ArbitrageCount = 0
+	profitStats.DailyArbitrageCount = make(map[time.Time]int)
+	profitStats.DailyProfit = make(map[time.Time]fixedpoint.Value)
 
 	defer f.logger.Infof("profitFixer: done")
 
@@ -98,6 +100,12 @@ func (f *ProfitFixer) Fix(parent context.Context, since, until time.Time, initia
 			quoteProfit := order.Quantity.Mul(f.grid.Spread)
 			profitStats.TotalQuoteProfit = profitStats.TotalQuoteProfit.Add(quoteProfit)
 			profitStats.ArbitrageCount++
+
+			// Normalize to midnight UTC for daily aggregation
+			orderTime := order.CreationTime.Time()
+			dateKey := time.Date(orderTime.Year(), orderTime.Month(), orderTime.Day(), 0, 0, 0, 0, orderTime.Location())
+			profitStats.DailyArbitrageCount[dateKey]++
+			profitStats.DailyProfit[dateKey] = profitStats.DailyProfit[dateKey].Add(quoteProfit)
 
 			f.logger.Debugf("profitFixer: filledSellOrder=%#v", order)
 		}
