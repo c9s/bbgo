@@ -72,7 +72,7 @@ func (s *IntervalProfitCollector) GetTimeInMarket() (avgHoldSec, totalTimeInMark
 	l := len(s.TimeInMarket)
 	for i := 0; i < l; i++ {
 		d := s.TimeInMarket[i]
-		totalTimeInMarketSec += int64(d / time.Millisecond)
+		totalTimeInMarketSec += int64(d.Seconds())
 	}
 	avgHoldSec = totalTimeInMarketSec / int64(l)
 	return
