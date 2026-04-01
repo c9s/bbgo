@@ -315,7 +315,7 @@ var BacktestCmd = &cobra.Command{
 			backtestEx.MarketDataStream = session.MarketDataStream.(types.StandardStreamEmitter)
 			backtestEx.BindUserData(userDataStream)
 			if err := backtestEx.Prepare(userConfig); err != nil {
-				return errors.Wrap(err, "failed to prepare backtest exchange")
+				log.WithError(err).Warn("failed to prepare backtest exchange")
 			}
 			// Since we have prepared the exchanges with historical data, there might be some orders got filled when the strategies are run.
 			// We need to register the order update callback before the `trader.Run`, or else there might be missed filled orders.
