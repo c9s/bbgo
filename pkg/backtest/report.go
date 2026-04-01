@@ -78,8 +78,8 @@ type SessionSymbolReport struct {
 	InitialBalances          types.BalanceMap          `json:"initialBalances,omitempty"`
 	FinalBalances            types.BalanceMap          `json:"finalBalances,omitempty"`
 	Manifests                Manifests                 `json:"manifests,omitempty"`
-	TradeCount               fixedpoint.Value          `json:"tradeCount,omitempty"`
-	RoundTurnCount           fixedpoint.Value          `json:"roundTurnCount,omitempty"`
+	TradeCount               int                       `json:"tradeCount,omitempty"`
+	RoundTurnCount           int                       `json:"roundTurnCount,omitempty"`
 	TotalNetProfit           fixedpoint.Value          `json:"totalNetProfit,omitempty"`
 	AvgNetProfit             fixedpoint.Value          `json:"avgNetProfit,omitempty"`
 	GrossProfit              fixedpoint.Value          `json:"grossProfit,omitempty"`
