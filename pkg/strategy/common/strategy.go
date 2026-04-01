@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -108,4 +109,28 @@ func (s *Strategy) IsHalted(t time.Time) bool {
 
 	_, isHalted := s.circuitBreakRiskControl.IsHalted(t)
 	return isHalted
+}
+
+type TabularStats interface {
+	SummaryHeader() []string
+	SummaryRecords() [][]string
+}
+
+// StrategySummarizer provides a convenient way for strategies to export detailed performance metrics
+// in tabular (CSV) and JSON formats. This interface is designed to produce structured, human-readable
+// summaries of strategy performance, useful for inspection and post-analysis. It differs from the
+// backtest module's StateRecorder interface, which is primarily a logger that records state transitions
+// over time. TabularStats formats comprehensive performance data (e.g., trade statistics, profit
+// analysis, position summaries) as structured tables, while json.Marshaler entries provide the same
+// or additional data in JSON form. It can also export time series metrics with varying time
+// granularities (e.g., daily, hourly, 1m metrics), with each time series represented as a separate
+// entry in the returned maps.
+type StrategySummarizer interface {
+	// SummaryStats returns two maps keyed by logical grouping names
+	// (e.g., "trades", "positions", "profits", "daily_metrics", "hourly_metrics").
+	// The first map contains TabularStats for CSV/tabular output, and the second contains
+	// json.Marshaler instances for JSON output. Keys are typically used as output file names
+	// or section identifiers. Time series metrics with different granularities should each
+	// have their own entry in the maps.
+	SummaryStats() (map[string]TabularStats, map[string]json.Marshaler)
 }
