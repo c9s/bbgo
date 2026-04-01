@@ -391,6 +391,7 @@ func toGlobalKLines(
 		}
 
 		kLines = append(kLines, types.KLine{
+			Exchange:  types.ExchangeMax,
 			Symbol:    symbol,
 			Interval:  interval,
 			StartTime: types.Time(startTime),
