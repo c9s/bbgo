@@ -551,9 +551,6 @@ var BacktestCmd = &cobra.Command{
 				}
 				allTrades = append(allTrades, trades.Trades...)
 
-				// profitFactor := tradeState.ProfitFactor
-				// winningRatio := tradeState.WinningRatio
-				// intervalProfits := tradeState.IntervalProfits[types.Interval1d]
 				tradeStats := sessionTradeStats[session.Name][symbol]
 				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Copy(), tradeStats)
 				if err != nil {
@@ -716,12 +713,12 @@ func createSymbolReport(
 		StartPrice:               startPrice,
 		InitialBalances:          initBalances,
 		FinalBalances:            finalBalances,
-		TradeCount:               fixedpoint.NewFromInt(int64(len(trades))),
+		TradeCount:               len(trades),
 		GrossLoss:                tradeStats.GrossLoss,
 		GrossProfit:              tradeStats.GrossProfit,
 		WinningCount:             tradeStats.NumOfProfitTrade,
 		LosingCount:              tradeStats.NumOfLossTrade,
-		RoundTurnCount:           roundTurnCount,
+		RoundTurnCount:           roundTurnCount.Int(),
 		WinningRatio:             tradeStats.WinningRatio,
 		PercentProfitable:        winningPct,
 		ProfitFactor:             tradeStats.ProfitFactor,
