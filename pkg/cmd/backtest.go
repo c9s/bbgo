@@ -162,15 +162,16 @@ var BacktestCmd = &cobra.Command{
 
 		environ := bbgo.NewEnvironment()
 
-		if userConfig.Backtest.CsvSource == nil {
-			return fmt.Errorf("user config backtest section needs csvsource config")
-		}
-		backtestService := service.NewBacktestServiceCSV(
-			outputDirectory,
-			userConfig.Backtest.CsvSource.Market,
-			userConfig.Backtest.CsvSource.Granularity,
-		)
+		var backtestService service.BackTestable
 		if modeCsv {
+			if userConfig.Backtest.CsvSource == nil {
+				return fmt.Errorf("user config backtest section needs csvsource config")
+			}
+			backtestService = service.NewBacktestServiceCSV(
+				outputDirectory,
+				userConfig.Backtest.CsvSource.Market,
+				userConfig.Backtest.CsvSource.Granularity,
+			)
 			if err := bbgo.BootstrapEnvironmentLightweight(ctx, environ, userConfig); err != nil {
 				return err
 			}
