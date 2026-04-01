@@ -62,6 +62,15 @@ func TestProfitFixer(t *testing.T) {
 	ctx := context.Background()
 	mockHistoryService := mocks.NewMockExchangeTradeHistoryService(mockCtrl)
 
+	// mock QueryTrades: return trades with fee data for the filled orders
+	mockHistoryService.EXPECT().QueryTrades(gomock.Any(), "ETHUSDT", gomock.Any()).
+		Return([]types.Trade{
+			{ID: 1, OrderID: 3, Symbol: "ETHUSDT", Side: types.SideTypeSell, Fee: number(0.018), FeeCurrency: "USDT", Price: number(1800), Quantity: number(0.1), Time: types.Time(mustNewTime("2022-01-01T00:01:00Z"))},
+			{ID: 2, OrderID: 4, Symbol: "ETHUSDT", Side: types.SideTypeSell, Fee: number(0.019), FeeCurrency: "USDT", Price: number(1900), Quantity: number(0.1), Time: types.Time(mustNewTime("2022-01-01T00:03:00Z"))},
+			{ID: 3, OrderID: 9, Symbol: "ETHUSDT", Side: types.SideTypeSell, Fee: number(0.018), FeeCurrency: "USDT", Price: number(1800), Quantity: number(0.1), Time: types.Time(mustNewTime("2022-01-01T00:04:00Z"))},
+			{ID: 4, OrderID: 10, Symbol: "ETHUSDT", Side: types.SideTypeSell, Fee: number(0.019), FeeCurrency: "USDT", Price: number(1900), Quantity: number(0.1), Time: types.Time(mustNewTime("2022-01-01T00:08:00Z"))},
+		}, nil).AnyTimes()
+
 	mockHistoryService.EXPECT().QueryClosedOrders(gomock.Any(), "ETHUSDT", mustNewTime("2022-01-01T00:00:00Z"), mustNewTime("2022-01-07T00:00:00Z"), uint64(0)).
 		Return([]types.Order{
 			newClosedLimitOrder("ETHUSDT", types.SideTypeBuy, number(1800.0), number(0.1), mustNewTime("2022-01-01T00:01:00Z")),
@@ -99,4 +108,11 @@ func TestProfitFixer(t *testing.T) {
 
 	assert.Equal(t, "40", stats.TotalQuoteProfit.String())
 	assert.Equal(t, 4, stats.ArbitrageCount)
+
+	// verify daily fee was aggregated
+	dateKey := getDateKey(mustNewTime("2022-01-01T00:00:00Z"))
+	assert.NotNil(t, stats.DailyFee[dateKey])
+	// trades for orders 3,4,9,10 all have USDT fees: 0.018 + 0.019 + 0.018 + 0.019
+	expectedFee := number(0.018).Add(number(0.019)).Add(number(0.018)).Add(number(0.019))
+	assert.Equal(t, expectedFee, stats.DailyFee[dateKey]["USDT"])
 }

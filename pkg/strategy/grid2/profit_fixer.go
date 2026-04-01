@@ -38,6 +38,9 @@ func (f *ProfitFixer) Fix(parent context.Context, since, until time.Time, initia
 	// reset profit
 	profitStats.TotalQuoteProfit = fixedpoint.Zero
 	profitStats.ArbitrageCount = 0
+	profitStats.DailyNumOfArbitrage = make(map[time.Time]int)
+	profitStats.DailyProfit = make(map[time.Time]fixedpoint.Value)
+	profitStats.DailyFee = make(map[time.Time]map[string]fixedpoint.Value)
 
 	defer f.logger.Infof("profitFixer: done")
 
@@ -56,7 +59,10 @@ func (f *ProfitFixer) Fix(parent context.Context, since, until time.Time, initia
 		f.logger.Infof("profitFixer: fixed profitStats=%#v", profitStats)
 	}()
 
-	for {
+	var err error
+	keepRunning := true
+	gridOrders := make(map[uint64]struct{})
+	for keepRunning {
 		select {
 		case <-ctx.Done():
 			if errors.Is(ctx.Err(), context.Canceled) {
@@ -67,12 +73,15 @@ func (f *ProfitFixer) Fix(parent context.Context, since, until time.Time, initia
 
 		case order, ok := <-orderC:
 			if !ok {
-				return <-errC
+				keepRunning = false
+				err = <-errC
+				continue
 			}
 
 			if !f.grid.HasPrice(order.Price) {
 				continue
 			}
+			gridOrders[order.OrderID] = struct{}{}
 
 			if profitStats.InitialOrderID == 0 || order.OrderID < profitStats.InitialOrderID {
 				profitStats.InitialOrderID = order.OrderID
@@ -99,7 +108,71 @@ func (f *ProfitFixer) Fix(parent context.Context, since, until time.Time, initia
 			profitStats.TotalQuoteProfit = profitStats.TotalQuoteProfit.Add(quoteProfit)
 			profitStats.ArbitrageCount++
 
+			// Normalize to midnight UTC for daily aggregation
+			orderTime := order.CreationTime.Time()
+			dateKey := getDateKey(orderTime)
+			profitStats.DailyNumOfArbitrage[dateKey]++
+			profitStats.DailyProfit[dateKey] = profitStats.DailyProfit[dateKey].Add(quoteProfit)
+
 			f.logger.Debugf("profitFixer: filledSellOrder=%#v", order)
 		}
 	}
+	if err != nil {
+		// query order error, skip fee aggregation and return error
+		return err
+	}
+	// query trades to aggregate daily fee
+	trades, err := f.queryTradesWithinTimeRange(ctx, since, until)
+	if err != nil {
+		f.logger.WithError(err).Warnf("profitFixer: failed to query trades for fee aggregation")
+		return err
+	}
+	f.logger.Infof("profitFixer: collected %d trades", len(trades))
+	for _, trade := range trades {
+		if _, ok := gridOrders[trade.OrderID]; !ok {
+			continue
+		}
+		dateKey := getDateKey(trade.Time.Time())
+		if trade.Fee.Sign() <= 0 {
+			continue
+		}
+		if profitStats.DailyFee[dateKey] == nil {
+			profitStats.DailyFee[dateKey] = make(map[string]fixedpoint.Value)
+		}
+		profitStats.DailyFee[dateKey][trade.FeeCurrency] = profitStats.DailyFee[dateKey][trade.FeeCurrency].Add(trade.Fee)
+	}
+	return nil
+}
+
+// queryTradesWithinTimeRange queries all trades in the given time range.
+func (f *ProfitFixer) queryTradesWithinTimeRange(ctx context.Context, since, until time.Time) ([]types.Trade, error) {
+	tradeQuery := &batch.TradeBatchQuery{ExchangeTradeHistoryService: f.historyService}
+	tradeC, errC := tradeQuery.Query(ctx, f.symbol, &types.TradeQueryOptions{
+		StartTime: &since,
+		EndTime:   &until,
+	})
+
+	var trades []types.Trade
+	var err error
+	keepRunning := true
+	for keepRunning {
+		select {
+		case <-ctx.Done():
+			if errors.Is(ctx.Err(), context.Canceled) {
+				return nil, nil
+			}
+
+			return nil, ctx.Err()
+
+		case trade, ok := <-tradeC:
+			if !ok {
+				keepRunning = false
+				err = <-errC
+				continue
+			}
+			trades = append(trades, trade)
+		}
+	}
+
+	return trades, err
 }
