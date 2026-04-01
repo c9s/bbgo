@@ -24,9 +24,11 @@ import (
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/data/tsv"
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -629,6 +631,9 @@ var BacktestCmd = &cobra.Command{
 				}
 			}
 
+			// write strategy stats if strategies implement StrategyTabularStats or StrategyJsonStats
+			writeStrategyStats(trader, reportDir)
+
 			// append report index
 			if reportFileInSubDir {
 				if err := backtest.AddReportIndexRun(outputDirectory, backtest.Run{
@@ -877,4 +882,70 @@ func rewriteManifestPaths(manifests backtest.Manifests, basePath string) (backte
 		filterManifests[k] = p
 	}
 	return filterManifests, nil
+}
+
+func writeStrategyStats(trader *bbgo.Trader, reportDir string) {
+	err := trader.IterateStrategies(func(strategy types.StrategyID) error {
+		strategyID := dynamic.CallID(strategy)
+		if len(strategyID) == 0 {
+			return nil
+		}
+
+		strategyDir := filepath.Join(reportDir, strategyID)
+
+		// Handle StrategyTabularStats
+		if tabularStatsStrategy, ok := strategy.(common.StrategyTabularSummarizer); ok {
+			statsMap := tabularStatsStrategy.TabularStats()
+			for statsName, stats := range statsMap {
+				fileName := strings.ReplaceAll(statsName, " ", "_") + ".tsv"
+				filePath := filepath.Join(strategyDir, fileName)
+
+				if err := os.MkdirAll(strategyDir, 0755); err != nil {
+					log.WithError(err).Warnf("failed to create strategy directory: %s", strategyDir)
+					continue
+				}
+
+				tsvWriter, err := tsv.NewWriterFile(filePath)
+				if err != nil {
+					log.WithError(err).Warnf("failed to create tabular stats file: %s", filePath)
+					continue
+				}
+
+				_ = tsvWriter.Write(stats.TabularHeader())
+				for _, record := range stats.TabularRecords() {
+					_ = tsvWriter.Write(record)
+				}
+				_ = tsvWriter.Close()
+
+				log.Infof("wrote strategy tabular stats to %s", filePath)
+			}
+		}
+
+		// Handle StrategyJsonStats
+		if jsonStatsStrategy, ok := strategy.(common.StrategyJsonSummarizer); ok {
+			statsMap := jsonStatsStrategy.JsonStats()
+			for statsName, stats := range statsMap {
+				fileName := strings.ReplaceAll(statsName, " ", "_") + ".json"
+				filePath := filepath.Join(strategyDir, fileName)
+
+				if err := os.MkdirAll(strategyDir, 0755); err != nil {
+					log.WithError(err).Warnf("failed to create strategy directory: %s", strategyDir)
+					continue
+				}
+
+				if err := util.WriteJsonFile(filePath, stats); err != nil {
+					log.WithError(err).Warnf("failed to write strategy json stats file: %s", filePath)
+					continue
+				}
+
+				log.Infof("wrote strategy json stats to %s", filePath)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.WithError(err).Warnf("error writing strategy stats")
+	}
 }
