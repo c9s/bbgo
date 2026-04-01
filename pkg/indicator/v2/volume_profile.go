@@ -164,8 +164,14 @@ func buildVolumeLevel(p, v bbgofloats.Slice) (sortedp, sortedv bbgofloats.Slice)
 		})
 	}
 
-	slices.SortStableFunc(levels, func(i, j VolumeLevel) bool {
-		return i.Price < j.Price
+	slices.SortStableFunc(levels, func(i, j VolumeLevel) int {
+		if i.Price == j.Price {
+			return 0
+		}
+		if i.Price < j.Price {
+			return -1
+		}
+		return 1
 	})
 
 	for _, v := range levels {
