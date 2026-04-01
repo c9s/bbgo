@@ -90,8 +90,8 @@ func (s *BacktestServiceCSV) Sync(ctx context.Context, exchange types.Exchange, 
 }
 
 // QueryKLine queries the klines from the database
-func (s *BacktestServiceCSV) QueryKLine(ex types.ExchangeName, symbol string, interval types.Interval, orderBy string, limit int) (*types.KLine, error) {
-	log.Infof("querying last kline exchange = %s AND symbol = %s AND interval = %s", ex, symbol, interval)
+func (s *BacktestServiceCSV) QueryKLine(ex types.Exchange, symbol string, interval types.Interval, orderBy string, limit int) (*types.KLine, error) {
+	log.Infof("querying last kline exchange = %s AND symbol = %s AND interval = %s", ex.Name(), symbol, interval)
 	if _, ok := s.kLines[interval]; !ok || len(s.kLines[interval]) == 0 {
 		return nil, errors.New("interval not initialized")
 	}
@@ -99,7 +99,7 @@ func (s *BacktestServiceCSV) QueryKLine(ex types.ExchangeName, symbol string, in
 }
 
 // QueryKLinesForward is used for querying klines to back-testing
-func (s *BacktestServiceCSV) QueryKLinesForward(exchange types.ExchangeName, symbol string, interval types.Interval, startTime time.Time, limit int) ([]types.KLine, error) {
+func (s *BacktestServiceCSV) QueryKLinesForward(exchange types.Exchange, symbol string, interval types.Interval, startTime time.Time, limit int) ([]types.KLine, error) {
 	// Sample implementation (modify as needed):
 	var result []types.KLine
 
@@ -122,7 +122,7 @@ func (s *BacktestServiceCSV) QueryKLinesForward(exchange types.ExchangeName, sym
 	return result, nil
 }
 
-func (s *BacktestServiceCSV) QueryKLinesBackward(exchange types.ExchangeName, symbol string, interval types.Interval, endTime time.Time, limit int) ([]types.KLine, error) {
+func (s *BacktestServiceCSV) QueryKLinesBackward(exchange types.Exchange, symbol string, interval types.Interval, endTime time.Time, limit int) ([]types.KLine, error) {
 	var result []types.KLine
 
 	// Access klines data based on interval

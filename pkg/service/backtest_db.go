@@ -24,13 +24,13 @@ type BackTestable interface {
 		ctx context.Context, ex types.Exchange, symbol string, intervals []types.Interval, since, until time.Time,
 	) error
 	QueryKLine(
-		ex types.ExchangeName, symbol string, interval types.Interval, orderBy string, limit int,
+		ex types.Exchange, symbol string, interval types.Interval, orderBy string, limit int,
 	) (*types.KLine, error)
 	QueryKLinesForward(
-		exchange types.ExchangeName, symbol string, interval types.Interval, startTime time.Time, limit int,
+		exchange types.Exchange, symbol string, interval types.Interval, startTime time.Time, limit int,
 	) ([]types.KLine, error)
 	QueryKLinesBackward(
-		exchange types.ExchangeName, symbol string, interval types.Interval, endTime time.Time, limit int,
+		exchange types.Exchange, symbol string, interval types.Interval, endTime time.Time, limit int,
 	) ([]types.KLine, error)
 	QueryKLinesCh(
 		since, until time.Time, exchange types.Exchange, symbols []string, intervals []types.Interval,
