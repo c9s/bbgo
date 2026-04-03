@@ -123,3 +123,48 @@ func TestTradeRingBuffer_Filter_WrapAround(t *testing.T) {
 		assert.Equal(t, 2, b.Count)
 	})
 }
+
+func TestTradeRingBuffer_TradeFrequency(t *testing.T) {
+	now := time.Now()
+	capacity := 10
+	b := NewTradeRingBuffer(capacity)
+
+	t.Run("zero frequency for empty buffer", func(t *testing.T) {
+		assert.Equal(t, 0.0, b.TradeFrequency())
+	})
+
+	t.Run("zero frequency for one trade", func(t *testing.T) {
+		b.Add(Trade{ID: 1, Time: Time(now)})
+		assert.Equal(t, 0.0, b.TradeFrequency())
+	})
+
+	t.Run("calculate frequency for two trades", func(t *testing.T) {
+		b := NewTradeRingBuffer(capacity)
+		b.Add(Trade{ID: 1, Time: Time(now)})
+		b.Add(Trade{ID: 2, Time: Time(now.Add(2 * time.Second))})
+		// 2 trades in 2 seconds = 1.0 trade per second
+		assert.Equal(t, 1.0, b.TradeFrequency())
+	})
+
+	t.Run("calculate frequency with more trades", func(t *testing.T) {
+		b := NewTradeRingBuffer(capacity)
+		for i := range 10 {
+			b.Add(Trade{ID: uint64(i + 1), Time: Time(now.Add(time.Duration(i) * time.Second))})
+		}
+		// 10 trades in 9 seconds = 1.111 trades per second
+		assert.InDelta(t, 1.111, b.TradeFrequency(), 0.001)
+	})
+
+	t.Run("frequency after filter", func(t *testing.T) {
+		b := NewTradeRingBuffer(capacity)
+		for i := range 10 {
+			b.Add(Trade{ID: uint64(i + 1), Time: Time(now.Add(time.Duration(i) * time.Second))})
+		}
+		// trades are at 0s, 1s, 2s, 3s, 4s, 5s, 6s, 7s, 8s, 9s
+		// filter after 5s -> trades at 5s, 6s, 7s, 8s, 9s (5 trades)
+		b.Filter(now.Add(5 * time.Second))
+		assert.Equal(t, 5, b.Count)
+		// 5 trades in 4 seconds = 1.25 trades per second
+		assert.Equal(t, 1.25, b.TradeFrequency())
+	})
+}

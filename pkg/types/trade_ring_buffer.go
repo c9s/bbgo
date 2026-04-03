@@ -10,6 +10,8 @@ type TradeRingBuffer struct {
 	Trades   []Trade
 	Start    int // ring buffer start index
 	Count    int // current number of stored trades
+
+	TradeCount int // total number of trades added
 }
 
 func NewTradeRingBuffer(capacity int) *TradeRingBuffer {
@@ -21,6 +23,7 @@ func NewTradeRingBuffer(capacity int) *TradeRingBuffer {
 
 // Add adds a trade into the ring buffer.
 func (b *TradeRingBuffer) Add(trade Trade) {
+	b.TradeCount++
 	if b.Count < b.Capacity {
 		// If not full, add trade directly.
 		idx := (b.Start + b.Count) % b.Capacity
@@ -65,4 +68,20 @@ func (b *TradeRingBuffer) Filter(startTime time.Time) []Trade {
 		res[i] = b.Trades[idx]
 	}
 	return res
+}
+
+// TradeFrequency returns the number of trades per second in the buffer.
+func (b *TradeRingBuffer) TradeFrequency() float64 {
+	if b.Count < 2 {
+		return 0
+	}
+
+	firstTrade := b.Trades[b.Start]
+	lastTrade := b.Trades[(b.Start+b.Count-1)%b.Capacity]
+	duration := lastTrade.Time.Time().Sub(firstTrade.Time.Time())
+	if duration <= 0 {
+		return 0
+	}
+
+	return float64(b.Count) / duration.Seconds()
 }
