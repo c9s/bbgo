@@ -2,15 +2,19 @@ package grid2
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/style"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var _ common.TabularStats = (*GridProfitStats)(nil)
 
 type GridProfitStats struct {
 	Symbol           string                      `json:"symbol"`
@@ -24,6 +28,9 @@ type GridProfitStats struct {
 	Market           types.Market                `json:"market,omitempty"`
 	Since            *time.Time                  `json:"since,omitempty"`
 	InitialOrderID   uint64                      `json:"initialOrderID"`
+
+	DailyArbitrageCount map[time.Time]int              `json:"dailyArbitrageCount,omitempty"`
+	DailyProfit         map[time.Time]fixedpoint.Value `json:"dailyProfit,omitempty"`
 
 	// ttl is the ttl to keep in persistence
 	ttl time.Duration
@@ -40,6 +47,9 @@ func newGridProfitStats(market types.Market) *GridProfitStats {
 		TotalFee:         make(map[string]fixedpoint.Value),
 		Volume:           fixedpoint.Zero,
 		Market:           market,
+
+		DailyArbitrageCount: make(map[time.Time]int),
+		DailyProfit:         make(map[time.Time]fixedpoint.Value),
 	}
 }
 
@@ -81,6 +91,18 @@ func (s *GridProfitStats) AddProfit(profit *GridProfit) {
 	case s.Market.BaseCurrency:
 		s.TotalBaseProfit = s.TotalBaseProfit.Add(profit.Profit)
 	}
+
+	// Normalize to midnight UTC for daily aggregation
+	dateKey := time.Date(profit.Time.Year(), profit.Time.Month(), profit.Time.Day(), 0, 0, 0, 0, time.UTC)
+	if s.DailyArbitrageCount == nil {
+		s.DailyArbitrageCount = make(map[time.Time]int)
+	}
+	s.DailyArbitrageCount[dateKey]++
+
+	if s.DailyProfit == nil {
+		s.DailyProfit = make(map[time.Time]fixedpoint.Value)
+	}
+	s.DailyProfit[dateKey] = s.DailyProfit[dateKey].Add(profit.Profit)
 }
 
 func (s *GridProfitStats) SlackAttachment() slack.Attachment {
@@ -186,4 +208,35 @@ func (s *GridProfitStats) PlainText() string {
 	}
 
 	return o
+}
+
+func (s *GridProfitStats) TabularHeader() []string {
+	return []string{"date", "arbitrage_count", "profit"}
+}
+
+func (s *GridProfitStats) TabularRecords() [][]string {
+	// collect and sort date keys
+	dateKeys := make(map[time.Time]struct{})
+	for k := range s.DailyArbitrageCount {
+		dateKeys[k] = struct{}{}
+	}
+	for k := range s.DailyProfit {
+		dateKeys[k] = struct{}{}
+	}
+
+	dates := make([]time.Time, 0, len(dateKeys))
+	for k := range dateKeys {
+		dates = append(dates, k)
+	}
+	sort.Slice(dates, func(i, j int) bool {
+		return dates[i].Before(dates[j])
+	})
+	var records [][]string
+	for _, date := range dates {
+		count := s.DailyArbitrageCount[date]
+		profit := s.DailyProfit[date]
+		dateStr := date.Format(time.DateOnly)
+		records = append(records, []string{dateStr, strconv.Itoa(count), profit.String()})
+	}
+	return records
 }

@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -108,4 +109,36 @@ func (s *Strategy) IsHalted(t time.Time) bool {
 
 	_, isHalted := s.circuitBreakRiskControl.IsHalted(t)
 	return isHalted
+}
+
+type TabularStats interface {
+	TabularHeader() []string
+	TabularRecords() [][]string
+}
+
+// StrategyTabularSummarizer provides a convenient way for strategies to export detailed performance metrics in tabular format.
+// This interface is designed to produce structured, human-readable summaries of strategy performance,
+// useful for inspection and post-analysis. It differs from the backtest module's StateRecorder interface,
+// which is primarily a logger that records state transitions over time. TabularStats formats comprehensive
+// performance data (e.g., trade statistics, profit analysis, position summaries) as structured tables.
+// It can also export time series metrics with varying time granularities (e.g., daily, hourly, 1m metrics),
+// with each time series represented as a separate TabularStats entry in the returned map.
+type StrategyTabularSummarizer interface {
+	// TabularStats returns a map of named TabularStats objects. Each key represents a logical grouping
+	// (e.g., "trades", "positions", "profits", "daily_metrics", "hourly_metrics") and is typically used
+	// as an output file name or section identifier. Time series metrics with different granularities
+	// should each have their own entry in the map.
+	TabularStats() map[string]TabularStats
+}
+
+// StrategyJsonSummarizer provides a convenient way for strategies to export detailed performance metrics in JSON format.
+// This interface is designed to produce structured, machine-readable summaries of strategy performance,
+// useful for inspection, post-analysis, and integration with external tools. It differs from the backtest module's
+// StateRecorder interface, which is primarily a logger that records state transitions over time. JsonStats formats
+// comprehensive performance data (e.g., trade statistics, profit analysis, position summaries) as JSON objects.
+type StrategyJsonSummarizer interface {
+	// JsonStats returns a map of named json.Marshaler objects. Each key represents a logical grouping
+	// (e.g., "trades", "positions", "profits") and is typically used as an output file name or section identifier.
+	// The Marshaler objects are serialized to JSON for detailed performance analysis.
+	JsonStats() map[string]json.Marshaler
 }
