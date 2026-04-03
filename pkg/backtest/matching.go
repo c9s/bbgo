@@ -75,7 +75,7 @@ type SimplePriceMatching struct {
 	balanceUpdateCallbacks []func(balances types.BalanceMap)
 }
 
-func (m *SimplePriceMatching) Prepare(srv *service.BacktestService, exchange *Exchange, startTime time.Time) error {
+func (m *SimplePriceMatching) Prepare(srv service.BackTestable, exchange *Exchange, startTime time.Time) error {
 	if !m.lastPrice.IsZero() {
 		// no prepare work needed
 		return nil
