@@ -50,9 +50,7 @@ type TradeVolumeWindowSignal struct {
 	Beta         float64 `json:"beta"`  // coefficient for trade frequency (default 1.0)
 
 	// Use fixed capacity ring buffer
-	trades []types.Trade
-	start  int // ring buffer start index
-	count  int // current number of stored trades
+	tradeRingBuffer *types.TradeRingBuffer
 
 	symbol string
 
@@ -76,16 +74,7 @@ func (s *TradeVolumeWindowSignal) handleTrade(trade types.Trade) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.count < tradeSliceCapacityLimit {
-		// If not full, add trade directly.
-		idx := (s.start + s.count) % tradeSliceCapacityLimit
-		s.trades[idx] = trade
-		s.count++
-	} else {
-		// If ring buffer is full, overwrite the oldest trade and update start index.
-		s.trades[s.start] = trade
-		s.start = (s.start + 1) % tradeSliceCapacityLimit
-	}
+	s.tradeRingBuffer.Add(trade)
 }
 
 // Bind preallocates the fixed capacity ring buffer and binds the market trade callback.
@@ -109,9 +98,7 @@ func (s *TradeVolumeWindowSignal) Bind(ctx context.Context, session *bbgo.Exchan
 	}
 
 	// Preallocate fixed capacity ring buffer.
-	s.trades = make([]types.Trade, tradeSliceCapacityLimit)
-	s.start = 0
-	s.count = 0
+	s.tradeRingBuffer = types.NewTradeRingBuffer(tradeSliceCapacityLimit)
 
 	if s.marketTradeStream == nil {
 		s.marketTradeStream = bbgo.NewMarketTradeStream(session, symbol)
@@ -132,28 +119,7 @@ func (s *TradeVolumeWindowSignal) filterTrades(startTime time.Time) []types.Trad
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	newStart := s.start
-	n := s.count
-	// Find first trade with time after startTime.
-	for i := 0; i < s.count; i++ {
-		idx := (s.start + i) % tradeSliceCapacityLimit
-		if !s.trades[idx].Time.Before(startTime) {
-			newStart = idx
-			n = s.count - i
-			break
-		}
-	}
-	// Update ring buffer: set start and count.
-	s.start = newStart
-	s.count = n
-
-	// Copy valid data to a new slice for return.
-	res := make([]types.Trade, n, n)
-	for i := 0; i < n; i++ {
-		idx := (s.start + i) % tradeSliceCapacityLimit
-		res[i] = s.trades[idx]
-	}
-	return res
+	return s.tradeRingBuffer.Filter(startTime)
 }
 
 // aggTradeVolume aggregates the buy and sell trade volumes.
