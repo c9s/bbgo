@@ -33,7 +33,7 @@ You can use BBGO's trading unit and back-test unit to implement your own strateg
 
 ### Trading Unit Developers 🧑‍💻
 
-You can use BBGO's underlying common exchange API; currently, it supports 4+ major exchanges, so you don't have to repeat
+You can use BBGO's underlying common exchange API; currently, it supports 8 major exchanges, so you don't have to repeat
 the implementation.
 
 ## Features
@@ -79,6 +79,21 @@ the implementation.
     - [Volatility Indicator](./pkg/indicator/volatility.go)
     - [Volume Weighted Average Price](./pkg/indicator/vwap.go)
     - [Zero Lag Exponential Moving Average](./pkg/indicator/zlema.go)
+    - [Fisher Transform](./pkg/indicator/fisher.go)
+    - [G-H Filter (Alpha-Beta Filter)](./pkg/indicator/ghfilter.go)
+    - [Geometric Moving Average](./pkg/indicator/gma.go)
+    - [Kalman Filter](./pkg/indicator/kalmanfilter.go)
+    - [Klinger Oscillator](./pkg/indicator/klingeroscillator.go)
+    - [Linear Regression](./pkg/indicator/linreg.go)
+    - [Parabolic SAR](./pkg/indicator/psar.go)
+    - [True Strength Index](./pkg/indicator/tsi.go)
+    - [UT Bot Alert](./pkg/indicator/utBotAlert.go)
+    - [Volume Weighted Moving Average](./pkg/indicator/vwma.go)
+    - [Weighted Drift](./pkg/indicator/wdrift.go)
+    - [Welles Wilder's Moving Average](./pkg/indicator/wwma.go)
+    - [Standard Deviation](./pkg/indicator/stddev.go)
+    - [ATR Percentage](./pkg/indicator/atrp.go)
+    - [Volume Profile](./pkg/indicator/volumeprofile.go)
     - And more...
 - HeikinAshi OHLC / Normal OHLC (check [this config](https://github.com/c9s/bbgo/blob/main/config/skeleton.yaml#L5))
 - React-powered Web Dashboard.
@@ -95,34 +110,47 @@ the implementation.
 
 ## Built-in Strategies
 
-| strategy    | description                                                                                                                             | type       | backtest support |
-|-------------|-----------------------------------------------------------------------------------------------------------------------------------------|------------|------------------|
-| grid        | the first generation grid strategy, it provides more flexibility, but you need to prepare inventories                                   | maker      |                  |
-| grid2       | the second generation grid strategy, it can convert your quote asset into a grid, supports base+quote mode                              | maker      |                  |
-| bollgrid    | strategy implements a basic grid strategy with the built-in bollinger indicator                                                         | maker      |                  | 
-| xmaker      | cross exchange market making strategy, it hedges your inventory risk on the other side                                                  | maker      | no               |
-| xnav        | this strategy helps you record the current net asset value                                                                              | tool       | no               |
-| xalign      | this strategy aligns your balance position automatically                                                                                | tool       | no               |
-| xfunding    | a funding rate fee strategy                                                                                                             | funding    | no               |
-| autoborrow  | this strategy uses margin to borrow assets, to help you keep a minimal balance                                                        | tool       | no               |
-| pivotshort  | this strategy finds the pivot low and enters the trade when the price breaks the previous low                                            | long/short |                  |
-| schedule    | this strategy buy/sell with a fixed quantity periodically, you can use this as a single DCA, or to refill the fee asset like BNB.       | tool       |
-| irr         | this strategy opens the position based on the predicated return rate                                                                    | long/short |                  |
-| bollmaker   | this strategy holds a long-term long/short position, places maker orders on both sides, and uses a bollinger band to control the position size | maker      |                  |
-| wall        | this strategy creates a wall (large amount of order) on the order book                                                                       | maker      | no               |
-| scmaker     | this market making strategy is designed for stable coin markets, like USDC/USDT                                                         | maker      |                  |
-| drift       |                                                                                                                                         | long/short |                  |
-| rsicross    | this strategy opens a long position when the fast rsi crosses over the slow rsi, this is a demo strategy for using the v2 indicator       | long/short |                  |
-| marketcap   | this strategy implements a strategy that rebalances the portfolio based on the market capitalization                                    | rebalance  | no               |
-| supertrend  | this strategy uses DEMA and Supertrend indicator to open the long/short position                                                        | long/short |                  |
-| trendtrader | this strategy opens a long/short position based on the trendline breakout                                                                 | long/short |                  |
-| elliottwave |                                                                                                                                         | long/short |                  |
-| ewoDgtrd    |                                                                                                                                         | long/short |                  |
-| fixedmaker  |                                                                                                                                         | maker      |                  |
-| factoryzoo  |                                                                                                                                         | long/short |                  |
-| fmaker      |                                                                                                                                         | maker      |                  |
-| linregmaker | a linear regression based market maker                                                                                                  | maker      |                  |
-| convert     | convert strategy is a tool that helps you convert a specific asset to a target asset                                                      | tool       | no               |
+| strategy        | description                                                                                                                             | type       | backtest support |
+|-----------------|-----------------------------------------------------------------------------------------------------------------------------------------|------------|------------------|
+| grid            | the first generation grid strategy, it provides more flexibility, but you need to prepare inventories                                   | maker      |                  |
+| grid2           | the second generation grid strategy, it can convert your quote asset into a grid, supports base+quote mode                              | maker      |                  |
+| bollgrid        | strategy implements a basic grid strategy with the built-in bollinger indicator                                                         | maker      |                  |
+| xmaker          | cross exchange market making strategy, it hedges your inventory risk on the other side                                                  | maker      | no               |
+| xdepthmaker     | cross exchange depth-based market making strategy                                                                                       | maker      | no               |
+| xfixedmaker     | cross exchange fixed-spread market making strategy                                                                                      | maker      | no               |
+| xnav            | this strategy helps you record the current net asset value                                                                              | tool       | no               |
+| xalign          | this strategy aligns your balance position automatically                                                                                | tool       | no               |
+| xfunding        | a funding rate fee strategy                                                                                                             | funding    | no               |
+| autoborrow      | this strategy uses margin to borrow assets, to help you keep a minimal balance                                                          | tool       | no               |
+| autobuy         | automatically buys a specific asset periodically                                                                                        | tool       | no               |
+| pivotshort      | this strategy finds the pivot low and enters the trade when the price breaks the previous low                                           | long/short |                  |
+| schedule        | this strategy buy/sell with a fixed quantity periodically, you can use this as a single DCA, or to refill the fee asset like BNB         | tool       |                  |
+| irr             | this strategy opens the position based on the predicated return rate                                                                    | long/short |                  |
+| bollmaker       | this strategy holds a long-term long/short position, places maker orders on both sides, and uses a bollinger band to control the position size | maker      |                  |
+| wall            | this strategy creates a wall (large amount of order) on the order book                                                                  | maker      | no               |
+| scmaker         | this market making strategy is designed for stable coin markets, like USDC/USDT                                                         | maker      |                  |
+| drift           |                                                                                                                                         | long/short |                  |
+| rsicross        | this strategy opens a long position when the fast rsi crosses over the slow rsi, this is a demo strategy for using the v2 indicator     | long/short |                  |
+| emacross        | EMA crossover strategy                                                                                                                  | long/short |                  |
+| marketcap       | this strategy implements a strategy that rebalances the portfolio based on the market capitalization                                     | rebalance  | no               |
+| supertrend      | this strategy uses DEMA and Supertrend indicator to open the long/short position                                                        | long/short |                  |
+| trendtrader     | this strategy opens a long/short position based on the trendline breakout                                                               | long/short |                  |
+| elliottwave     |                                                                                                                                         | long/short |                  |
+| ewoDgtrd        |                                                                                                                                         | long/short |                  |
+| fixedmaker      |                                                                                                                                         | maker      |                  |
+| factorzoo       |                                                                                                                                         | long/short |                  |
+| fmaker          |                                                                                                                                         | maker      |                  |
+| linregmaker     | a linear regression based market maker                                                                                                  | maker      |                  |
+| liquiditymaker  | provides liquidity on the order book                                                                                                    | maker      |                  |
+| audacitymaker   | an audacious market making strategy                                                                                                     | maker      |                  |
+| convert         | convert strategy is a tool that helps you convert a specific asset to a target asset                                                    | tool       | no               |
+| dca             | dollar-cost averaging strategy                                                                                                          | tool       |                  |
+| dca2            | second generation dollar-cost averaging strategy                                                                                        | tool       |                  |
+| rebalance       | rebalances your portfolio based on target weights                                                                                       | rebalance  | no               |
+| deposit2transfer | automatically transfers deposits to another account                                                                                    | tool       | no               |
+| sentinel        | monitors exchange connectivity and health                                                                                               | tool       | no               |
+| tri             | triangular arbitrage strategy                                                                                                           | arbitrage  | no               |
+| random          | places random orders for testing purposes                                                                                               | tool       | no               |
 
 
 
@@ -135,6 +163,8 @@ the implementation.
 - MAX Spot Exchange (located in Taiwan)
 - Bitget Exchange
 - Bybit Exchange
+- Coinbase Exchange
+- Bitfinex Exchange
 
 ## Documentation and General Topics
 
@@ -142,7 +172,7 @@ the implementation.
 
 ## Requirements
 
-* Go SDK 1.22
+* Go SDK 1.25
 
 * Linux / MacOS / Windows (WSL)
 
@@ -152,6 +182,10 @@ the implementation.
   - Binance: <https://accounts.binance.com/en/register?ref=38192708>
   - OKEx: <https://www.okex.com/join/2412712?src=from:ios-share>
   - Kucoin: <https://www.kucoin.com/ucenter/signup?rcode=r3KX2D4>
+  - Bybit: <https://www.bybit.com/>
+  - Bitget: <https://www.bitget.com/>
+  - Coinbase: <https://www.coinbase.com/>
+  - Bitfinex: <https://www.bitfinex.com/>
 
   This project is maintained and supported by a small group of people. If you would like to support this project, please
   Register on the exchanges using the provided links with the referral codes above.
@@ -233,6 +267,19 @@ KUCOIN_API_KEY_VERSION=2
 # for Bybit exchange, if you have one
 BYBIT_API_KEY=
 BYBIT_API_SECRET=
+
+# for Bitget exchange, if you have one
+BITGET_API_KEY=
+BITGET_API_SECRET=
+BITGET_API_PASSPHRASE=
+
+# for Coinbase exchange, if you have one
+COINBASE_API_KEY=
+COINBASE_API_SECRET=
+
+# for Bitfinex exchange, if you have one
+BITFINEX_API_KEY=
+BITFINEX_API_SECRET=
 ```
 
 Prepare your dotenv file `.env.local` and BBGO yaml config file `bbgo.yaml`.
