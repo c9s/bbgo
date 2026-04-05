@@ -13,7 +13,6 @@ import (
 
 type DownloadTester struct {
 	Exchange    types.ExchangeName
-	Reader      MakeCSVTickReader
 	Market      MarketType
 	Granularity DataType
 	Symbols     []string
@@ -29,13 +28,9 @@ var (
 )
 
 func Test_CSV_Download(t *testing.T) {
-	// if _, ok := os.LookupEnv("TEST_CSV_DOWNLOADER"); !ok {
-	// 	t.Skip()
-	// }
 	var tests = []DownloadTester{
 		{
 			Exchange:    types.ExchangeBinance,
-			Reader:      NewBinanceCSVTickReader,
 			Market:      SPOT,
 			Granularity: AGGTRADES,
 			Symbols:     symbols,
@@ -43,7 +38,6 @@ func Test_CSV_Download(t *testing.T) {
 		},
 		{
 			Exchange:    types.ExchangeBybit,
-			Reader:      NewBybitCSVTickReader,
 			Market:      FUTURES,
 			Granularity: AGGTRADES,
 			Symbols:     symbols,
@@ -51,7 +45,6 @@ func Test_CSV_Download(t *testing.T) {
 		},
 		{
 			Exchange:    types.ExchangeOKEx,
-			Reader:      NewOKExCSVTickReader,
 			Market:      SPOT,
 			Granularity: AGGTRADES,
 			Symbols:     symbols,
@@ -73,11 +66,10 @@ func Test_CSV_Download(t *testing.T) {
 			)
 			assert.NoError(t, err)
 
-			klineMap, err := ReadTicksFromCSVWithDecoder(
+			klineMap, err := ReadTicksFromCSV(
 				filepath.Join(path, string(tt.Granularity)),
 				symbol,
 				intervals,
-				MakeCSVTickReader(tt.Reader),
 			)
 			assert.NoError(t, err)
 
@@ -100,8 +92,5 @@ func Test_CSV_Download(t *testing.T) {
 				assert.NoError(t, err)
 			}
 		}
-
-		// err = os.RemoveAll(tt.Path)
-		// assert.NoError(t, err)
 	}
 }
