@@ -12,26 +12,13 @@ var _ KLineReader = (*CSVKLineReader)(nil)
 
 // CSVKLineReader is a KLineReader that reads from a CSV file.
 type CSVKLineReader struct {
-	csv     *csv.Reader
-	decoder CSVKLineDecoder
+	csv *csv.Reader
 }
-
-// MakeCSVKLineReader is a factory method type that creates a new CSVKLineReader.
-type MakeCSVKLineReader func(csv *csv.Reader) *CSVKLineReader
 
 // NewCSVKLineReader creates a new CSVKLineReader with the default Binance decoder.
 func NewCSVKLineReader(csv *csv.Reader) *CSVKLineReader {
 	return &CSVKLineReader{
-		csv:     csv,
-		decoder: BinanceCSVKLineDecoder,
-	}
-}
-
-// NewCSVKLineReaderWithDecoder creates a new CSVKLineReader with the given decoder.
-func NewCSVKLineReaderWithDecoder(csv *csv.Reader, decoder CSVKLineDecoder) *CSVKLineReader {
-	return &CSVKLineReader{
-		csv:     csv,
-		decoder: decoder,
+		csv: csv,
 	}
 }
 
@@ -44,7 +31,7 @@ func (r *CSVKLineReader) Read(interval time.Duration) (types.KLine, error) {
 		return k, err
 	}
 
-	return r.decoder(rec, interval)
+	return parseCsvKLineRecord(rec, interval)
 }
 
 // ReadAll reads all the KLines from the underlying CSV data.
