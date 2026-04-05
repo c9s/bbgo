@@ -32,11 +32,11 @@ func (c *CsvTick) ToGlobalTrade() (*types.Trade, error) {
 	}
 	return &types.Trade{
 		ID: c.TradeID,
-		// OrderID:    // not implemented
+		// OrderID:    // not applicable
 		Exchange:      c.Exchange,
 		Price:         c.Price,
 		Quantity:      c.Size,
-		QuoteQuantity: c.Price.Mul(c.Size), // todo this does not seem right use of propert.. looses info on foreign notional
+		QuoteQuantity: c.Price.Mul(c.Size),
 		Symbol:        c.Symbol,
 		Side:          c.Side,
 		IsBuyer:       c.Side == types.SideTypeBuy,

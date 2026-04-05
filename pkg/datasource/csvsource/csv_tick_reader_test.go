@@ -11,7 +11,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func TestCSVTickReader_ReadWithBinanceDecoder(t *testing.T) {
+func TestCSVTickReader_Read(t *testing.T) {
 	tests := []struct {
 		name string
 		give string
@@ -19,37 +19,52 @@ func TestCSVTickReader_ReadWithBinanceDecoder(t *testing.T) {
 		err  error
 	}{
 		{
-			name: "Read Tick",
-			give: "11782578,6.00000000,1.00000000,14974844,14974844,1698623884463,True,True",
+			name: "Read buy tick",
+			give: "11782578,buy,1.00000000,6.00000000,1698623884463",
 			want: &CsvTick{
+				TradeID:      11782578,
+				Side:         types.SideTypeBuy,
 				Timestamp:    types.NewMillisecondTimestampFromInt(1698623884463),
 				Size:         Number(1),
 				Price:        Number(6),
-				HomeNotional: Number(6),
+				HomeNotional: Number(1),
+			},
+			err: nil,
+		},
+		{
+			name: "Read sell tick",
+			give: "100,sell,2.50000000,10.00000000,1698623884463",
+			want: &CsvTick{
+				TradeID:      100,
+				Side:         types.SideTypeSell,
+				Timestamp:    types.NewMillisecondTimestampFromInt(1698623884463),
+				Size:         Number(2.5),
+				Price:        Number(10),
+				HomeNotional: Number(2.5),
 			},
 			err: nil,
 		},
 		{
 			name: "Not enough columns",
-			give: "1609459200000,28923.63000000,29031.34000000",
+			give: "11782578,buy,1.00000000",
 			want: nil,
 			err:  ErrNotEnoughColumns,
 		},
 		{
 			name: "Invalid time format",
-			give: "11782578,6.00000000,1.00000000,14974844,14974844,23/12/2021,True,True",
+			give: "11782578,buy,1.00000000,6.00000000,23/12/2021",
 			want: nil,
 			err:  ErrInvalidTimeFormat,
 		},
 		{
 			name: "Invalid price format",
-			give: "11782578,sixty,1.00000000,14974844,14974844,1698623884463,True,True",
+			give: "11782578,buy,1.00000000,sixty,1698623884463",
 			want: nil,
 			err:  ErrInvalidPriceFormat,
 		},
 		{
 			name: "Invalid size format",
-			give: "11782578,1.00000000,one,14974844,14974844,1698623884463,True,True",
+			give: "11782578,buy,one,6.00000000,1698623884463",
 			want: nil,
 			err:  ErrInvalidVolumeFormat,
 		},
@@ -57,8 +72,8 @@ func TestCSVTickReader_ReadWithBinanceDecoder(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reader := NewBinanceCSVTickReader(csv.NewReader(strings.NewReader(tt.give)))
-			tick, err := reader.Read(0)
+			reader := NewCSVTickReader(csv.NewReader(strings.NewReader(tt.give)))
+			tick, err := reader.Read()
 			if err == nil {
 				assertTickEqual(t, tt.want, tick)
 			}
@@ -68,6 +83,8 @@ func TestCSVTickReader_ReadWithBinanceDecoder(t *testing.T) {
 }
 
 func assertTickEqual(t *testing.T, exp, act *CsvTick) {
+	assert.Equal(t, exp.TradeID, act.TradeID)
+	assert.Equal(t, exp.Side, act.Side)
 	assert.Equal(t, exp.Timestamp.Time(), act.Timestamp.Time())
 	assert.Equal(t, 0, exp.Price.Compare(act.Price))
 	assert.Equal(t, 0, exp.Size.Compare(act.Size))
