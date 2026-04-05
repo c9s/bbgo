@@ -3,13 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/datasource/csvsource"
-	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -34,22 +34,10 @@ func NewBacktestServiceCSV(
 }
 
 func (s *BacktestServiceCSV) Verify(sourceExchange types.Exchange, symbols []string, startTime time.Time, endTime time.Time) error {
-	// TODO: use isFutures here
-	_, _, isIsolated, isolatedSymbol := exchange2.GetSessionAttributes(sourceExchange)
-	// override symbol if isolatedSymbol is not empty
-	if isIsolated && len(isolatedSymbol) > 0 {
-		err := csvsource.Download(
-			s.path,
-			isolatedSymbol,
-			sourceExchange.Name(),
-			s.market,
-			s.granularity,
-			startTime,
-			endTime,
-		)
-		if err != nil {
-			return errors.Errorf("downloading csv data: %v", err)
-		}
+	// TODO: verify the content of the csv file
+	// check if the csv file exists
+	if _, err := os.Open(s.path); err != nil {
+		return fmt.Errorf("cannot open file: %w", err)
 	}
 
 	return nil
@@ -61,24 +49,10 @@ func (s *BacktestServiceCSV) Sync(ctx context.Context, exchange types.Exchange, 
 
 	path := fmt.Sprintf("%s/%s/%s", s.path, exchange.Name().String(), symbol)
 
-	var reader csvsource.MakeCSVTickReader
-
-	switch exchange.Name() {
-	case types.ExchangeBinance:
-		reader = csvsource.NewBinanceCSVTickReader
-	case types.ExchangeBybit:
-		reader = csvsource.NewBybitCSVTickReader
-	case types.ExchangeOKEx:
-		reader = csvsource.NewOKExCSVTickReader
-	default:
-		return fmt.Errorf("%s not supported yet.. care to fix it? PR's welcome ;)", exchange.Name().String())
-	}
-
-	kLineMap, err := csvsource.ReadTicksFromCSVWithDecoder(
+	kLineMap, err := csvsource.ReadTicksFromCSV(
 		path,
 		symbol,
 		intervals,
-		csvsource.MakeCSVTickReader(reader),
 	)
 	if err != nil {
 		return errors.Errorf("reading csv data: %v", err)
