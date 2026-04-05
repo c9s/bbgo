@@ -3,6 +3,7 @@ package csvsource
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -138,8 +139,8 @@ func (c *CSVTickConverter) addMissingKLines(
 				High:        last.Close,
 				Low:         last.Close,
 				Close:       last.Close,
-				Volume:      0,
-				QuoteVolume: 0,
+				Volume:      fixedpoint.Zero,
+				QuoteVolume: fixedpoint.Zero,
 				Closed:      true,
 			})
 		} else {
