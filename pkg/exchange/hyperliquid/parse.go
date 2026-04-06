@@ -3,9 +3,20 @@ package hyperliquid
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+	"sync"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+)
+
+type MarketType string
+
+const (
+	MarketTypeUnknown MarketType = "unknown"
+	MarketTypeSpot    MarketType = "spot"
+	MarketTypePerp    MarketType = "perp"
 )
 
 // wsFrame is the generic WebSocket message frame from Hyperliquid.
@@ -215,7 +226,91 @@ func parseWebSocketEvent(message []byte) (any, error) {
 
 // coinToSymbol converts Hyperliquid coin (e.g. "BTC") to bbgo symbol (e.g. "BTCUSDC").
 func coinToSymbol(coin string) string {
-	return coin + QuoteCurrency
+	symbol, _, ok := resolveCoin(coin)
+	if !ok {
+		return ""
+	}
+	return symbol
+}
+
+// resolveCoin resolves Hyperliquid coin id into a global symbol and market type.
+// Resolution order:
+// 1) runtime metadata maps
+// 2) format-based fallback
+func resolveCoin(coin string) (string, MarketType, bool) {
+	if coin == "" {
+		return "", MarketTypeUnknown, false
+	}
+
+	if symbol, ok := lookupGlobalSymbolFromSyncMap(&spotSymbolSyncMap, coin, false); ok {
+		return symbol, MarketTypeSpot, true
+	}
+
+	if symbol, ok := lookupGlobalSymbolFromSyncMap(&futuresSymbolSyncMap, coin, true); ok {
+		return symbol, MarketTypePerp, true
+	}
+
+	if strings.HasPrefix(coin, "@") {
+		return "", MarketTypeSpot, false
+	}
+
+	if strings.Contains(coin, "/") {
+		parts := strings.SplitN(coin, "/", 2)
+		if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+			return parts[0] + parts[1], MarketTypeSpot, true
+		}
+
+		return "", MarketTypeSpot, false
+	}
+
+	return coin + QuoteCurrency, MarketTypePerp, true
+}
+
+func lookupGlobalSymbolFromSyncMap(symbolMap *sync.Map, coin string, isFutures bool) (string, bool) {
+	var found string
+	symbolMap.Range(func(key, val any) bool {
+		globalSymbol, ok := key.(string)
+		if !ok || globalSymbol == "" {
+			return true
+		}
+
+		localSymbol, ok := val.(string)
+		if !ok || localSymbol == "" {
+			return true
+		}
+
+		if localSymbolMatchesCoin(localSymbol, globalSymbol, coin, isFutures) {
+			found = globalSymbol
+			return false
+		}
+		return true
+	})
+
+	return found, found != ""
+}
+
+func localSymbolMatchesCoin(localSymbol, globalSymbol, coin string, isFutures bool) bool {
+	at := strings.LastIndexByte(localSymbol, '@')
+	if at <= 0 || at+1 >= len(localSymbol) {
+		return false
+	}
+
+	base := localSymbol[:at]
+	index := localSymbol[at+1:]
+	if _, err := strconv.Atoi(index); err != nil {
+		return false
+	}
+
+	if isFutures {
+		return coin == base
+	}
+
+	if coin == "@"+index {
+		return true
+	}
+
+	quote := strings.TrimPrefix(globalSymbol, base)
+	return quote != "" && coin == base+"/"+quote
 }
 
 // intervalFromCandleInterval maps Hyperliquid interval string to types.Interval.

@@ -423,7 +423,7 @@ func (e *Exchange) syncSymbolsToMap(ctx context.Context) error {
 	}
 
 	// Remove outdated symbols
-	symbolMap.Range(func(key, _ interface{}) bool {
+	symbolMap.Range(func(key, _ any) bool {
 		if symbol, ok := key.(string); !ok || existing[symbol] == struct{}{} {
 			return true
 		} else if _, found := existing[symbol]; !found {

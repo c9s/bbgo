@@ -241,6 +241,34 @@ func TestParseWebSocketEvent_UnknownChannel(t *testing.T) {
 
 // Unit tests for conversion functions
 
+func TestResolveCoin_MetadataAndFallback(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		coin      string
+		want      string
+		wantType  MarketType
+		wantFound bool
+	}{
+		{name: "perp from metadata", coin: "BTC", want: "BTCUSDC", wantType: MarketTypePerp, wantFound: true},
+		{name: "spot @index from metadata", coin: "@107", want: "HYPEUSDC", wantType: MarketTypeSpot, wantFound: true},
+		{name: "spot pair from metadata", coin: "PURR/USDC", want: "PURRUSDC", wantType: MarketTypeSpot, wantFound: true},
+		{name: "spot pair fallback", coin: "ABC/USDC", want: "ABCUSDC", wantType: MarketTypeSpot, wantFound: true},
+		{name: "spot @ fallback", coin: "@9999", want: "", wantType: MarketTypeSpot, wantFound: false},
+		{name: "perp fallback", coin: "ETH", want: "ETHUSDC", wantType: MarketTypePerp, wantFound: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotType, ok := resolveCoin(tt.coin)
+			assert.Equal(t, tt.wantFound, ok)
+			assert.Equal(t, tt.wantType, gotType)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestWsBookToSliceOrderBook(t *testing.T) {
 	t.Parallel()
 
@@ -286,6 +314,23 @@ func TestWsTradeToTrade(t *testing.T) {
 	assert.Equal(t, fixedpoint.NewFromFloat(50000.0), result.Price)
 	assert.Equal(t, fixedpoint.NewFromFloat(0.5), result.Quantity)
 	assert.True(t, result.IsFutures)
+}
+
+func TestWsTradeToTrade_UsesSpotCoinResolver(t *testing.T) {
+	t.Parallel()
+
+	wsTrade := WsTrade{
+		Coin: "@107",
+		Side: "B",
+		Px:   fixedpoint.NewFromFloat(10.0),
+		Sz:   fixedpoint.NewFromFloat(1.0),
+		Time: types.NewMillisecondTimestampFromInt(1234567890),
+		Tid:  1,
+	}
+
+	result := wsTradeToTrade(wsTrade, false)
+	assert.Equal(t, "HYPEUSDC", result.Symbol)
+	assert.False(t, result.IsFutures)
 }
 
 func TestWsCandleToKLine(t *testing.T) {
@@ -488,6 +533,25 @@ func TestWsClearinghouseStateToFuturesPositions_ZeroPosition(t *testing.T) {
 
 	result := wsClearinghouseStateToFuturesPositions(state)
 	assert.Len(t, result, 0) // Zero positions should be skipped
+}
+
+func TestWsClearinghouseStateToFuturesPositions_SkipsSpotLikeCoin(t *testing.T) {
+	t.Parallel()
+
+	state := WsClearinghouseState{
+		AssetPositions: []WsAssetPosition{
+			{
+				Type: "oneWay",
+				Position: WsPosition{
+					Coin: "PURR/USDC",
+					Szi:  fixedpoint.NewFromFloat(1.0),
+				},
+			},
+		},
+	}
+
+	result := wsClearinghouseStateToFuturesPositions(state)
+	assert.Len(t, result, 0)
 }
 
 // Integration tests (require real credentials)

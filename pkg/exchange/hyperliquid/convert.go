@@ -268,10 +268,7 @@ func wsTradeToTrade(w WsTrade, isFutures bool) types.Trade {
 
 // wsCandleToKLine converts WS candle to bbgo KLine.
 func wsCandleToKLine(c WsCandle) types.KLine {
-	symbol := c.Symbol
-	if symbol == "" || !strings.HasSuffix(symbol, QuoteCurrency) {
-		symbol = coinToSymbol(symbol)
-	}
+	symbol := coinToSymbol(c.Symbol)
 	interval := intervalFromCandleInterval(c.Interval)
 	return types.KLine{
 		Exchange:                 types.ExchangeHyperliquid,
@@ -365,10 +362,15 @@ func wsClearinghouseStateToFuturesPositions(state WsClearinghouseState) types.Fu
 	positions := make(types.FuturesPositionMap)
 	for _, asset := range state.AssetPositions {
 		p := asset.Position
-		symbol := coinToSymbol(p.Coin)
-		szi := p.Szi
+
+		symbol, marketType, ok := resolveCoin(p.Coin)
+		if !ok || marketType != MarketTypePerp {
+			log.WithField("coin", p.Coin).Warn("hyperliquid: skip non-perp position coin")
+			continue
+		}
 
 		// Skip zero positions
+		szi := p.Szi
 		if szi.IsZero() {
 			continue
 		}
