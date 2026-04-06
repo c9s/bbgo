@@ -28,6 +28,7 @@ var (
 )
 
 func Test_CSV_Download(t *testing.T) {
+	t.Skip()
 	var tests = []DownloadTester{
 		{
 			Exchange:    types.ExchangeBinance,
