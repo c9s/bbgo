@@ -1,3 +1,5 @@
+//go:build !dnum
+
 package csvsource
 
 import (
@@ -58,7 +60,7 @@ func TestCSVTickReader_Read(t *testing.T) {
 		},
 		{
 			name: "Invalid price format",
-			give: "11782578,buy,1.00000000,sixty,1698623884463",
+			give: "11782578,buy,1.00000000,6o,1698623884463",
 			want: nil,
 			err:  ErrInvalidPriceFormat,
 		},
