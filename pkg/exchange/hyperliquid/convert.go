@@ -5,6 +5,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/hyperliquid/hyperapi"
@@ -76,6 +77,62 @@ func toLocalFuturesSymbol(symbol string) (string, int) {
 
 	log.Errorf("failed to look up local symbol and asset from %s", symbol)
 	return symbol, -1
+}
+
+func toGlobalSymbol(localSymbol string, isFutures bool) string {
+	symbolMap := &spotSymbolSyncMap
+	if isFutures {
+		symbolMap = &futuresSymbolSyncMap
+	}
+
+	if symbol, ok := lookupGlobalSymbol(symbolMap, localSymbol); ok {
+		return symbol
+	}
+
+	log.Errorf("failed to look up global symbol symbol %s", localSymbol)
+	return localSymbol
+}
+
+func lookupGlobalSymbol(symbolMap *sync.Map, localSymbol string) (string, bool) {
+	var symbol string
+	var found bool
+
+	inputCoin := localSymbol
+	inputHasAt := strings.LastIndexByte(inputCoin, '@') > 0
+	if at := strings.LastIndexByte(localSymbol, '@'); at > 0 {
+		inputCoin = localSymbol[:at]
+	}
+
+	symbolMap.Range(func(key, value any) bool {
+		mapLocalSymbol, ok := value.(string)
+		if !ok {
+			return true
+		}
+
+		if inputHasAt {
+			if mapLocalSymbol != localSymbol {
+				return true
+			}
+		} else {
+			if at := strings.LastIndexByte(mapLocalSymbol, '@'); at > 0 {
+				mapLocalSymbol = mapLocalSymbol[:at]
+			}
+			if mapLocalSymbol != inputCoin {
+				return true
+			}
+		}
+
+		globalSymbol, ok := key.(string)
+		if !ok {
+			return true
+		}
+
+		symbol = globalSymbol
+		found = true
+		return false
+	})
+
+	return symbol, found
 }
 
 func toGlobalBalance(account *hyperapi.Account) types.BalanceMap {
@@ -163,7 +220,8 @@ func toLocalInterval(interval types.Interval) (string, error) {
 	return in, nil
 }
 
-func kLineToGlobal(k hyperapi.KLine, interval types.Interval, symbol string) types.KLine {
+func kLineToGlobal(k hyperapi.KLine, interval types.Interval, isFutures bool) types.KLine {
+	symbol := toGlobalSymbol(k.Symbol, isFutures)
 	return types.KLine{
 		Exchange:                 types.ExchangeHyperliquid,
 		Symbol:                   symbol,
@@ -185,15 +243,18 @@ func kLineToGlobal(k hyperapi.KLine, interval types.Interval, symbol string) typ
 }
 
 func toGlobalOrder(order hyperapi.OpenOrder, isFutures bool) types.Order {
-	// TODO: implement time in force and order type
+	timeInForce := toGlobalTimeInForce(order.Tif)
+	orderType := toGlobalOrderType(order, timeInForce)
+	symbol := toGlobalSymbol(order.Coin, isFutures)
+
 	return types.Order{
 		SubmitOrder: types.SubmitOrder{
-			Symbol:      order.Coin + QuoteCurrency,
+			Symbol:      symbol,
 			Price:       order.LimitPx,
 			Quantity:    order.Sz,
 			Side:        toGlobalSide(order.Side),
-			Type:        types.OrderType(order.OrderType),
-			TimeInForce: types.TimeInForceGTC,
+			Type:        orderType,
+			TimeInForce: timeInForce,
 		},
 		Exchange:     types.ExchangeHyperliquid,
 		OrderID:      uint64(order.Oid),
@@ -201,6 +262,53 @@ func toGlobalOrder(order hyperapi.OpenOrder, isFutures bool) types.Order {
 		UpdateTime:   types.Time(order.Timestamp),
 		IsFutures:    isFutures,
 	}
+}
+
+func toGlobalTimeInForce(tif string) types.TimeInForce {
+	switch strings.ToLower(strings.TrimSpace(tif)) {
+	case "gtc":
+		return types.TimeInForceGTC
+	case "ioc":
+		return types.TimeInForceIOC
+	case "alo":
+		return types.TimeInForceALO
+	default:
+		return types.TimeInForceGTC
+	}
+}
+
+func toGlobalOrderType(order hyperapi.OpenOrder, tif types.TimeInForce) types.OrderType {
+	orderType := strings.ToLower(strings.TrimSpace(order.OrderType))
+	triggerCondition := strings.ToLower(strings.TrimSpace(order.TriggerCondition))
+
+	if !order.IsTrigger {
+		switch orderType {
+		case "market":
+			return types.OrderTypeMarket
+		case "limit":
+			if tif == types.TimeInForceALO {
+				return types.OrderTypeLimitMaker
+			}
+			return types.OrderTypeLimit
+		default:
+			return types.OrderTypeLimit
+		}
+	}
+
+	isTakeProfit := strings.Contains(triggerCondition, "tp") ||
+		strings.Contains(triggerCondition, "profit")
+	isMarket := strings.Contains(orderType, "market")
+	if isTakeProfit {
+		if isMarket {
+			return types.OrderTypeTakeProfitMarket
+		}
+		return types.OrderTypeTakeProfit
+	}
+
+	if isMarket {
+		return types.OrderTypeStopMarket
+	}
+	return types.OrderTypeStopLimit
 }
 
 func toGlobalSide(side string) types.SideType {
@@ -225,16 +333,17 @@ func wsLevelsToPriceVolumeSlice(levels []WsLevel) types.PriceVolumeSlice {
 	return out
 }
 
-// wsBookToSliceOrderBook converts WS l2Book to bbgo SliceOrderBook.
+// toGlobalOrderBook converts WS l2Book to bbgo SliceOrderBook.
 // levels[0] = bids, levels[1] = asks per Hyperliquid doc.
-func wsBookToSliceOrderBook(book WsBook) *types.SliceOrderBook {
-	symbol := coinToSymbol(book.Coin)
+func toGlobalOrderBook(book WsBook, isFutures bool) *types.SliceOrderBook {
 	bids := wsLevelsToPriceVolumeSlice(book.Levels[0])
 	asks := wsLevelsToPriceVolumeSlice(book.Levels[1])
 	var t time.Time
 	if !book.Time.Time().IsZero() {
 		t = book.Time.Time()
 	}
+
+	symbol := toGlobalSymbol(book.Coin, isFutures)
 	return &types.SliceOrderBook{
 		Symbol: symbol,
 		Bids:   bids,
@@ -243,8 +352,10 @@ func wsBookToSliceOrderBook(book WsBook) *types.SliceOrderBook {
 	}
 }
 
-// wsTradeToTrade converts WS trade to bbgo Trade (market trade).
-func wsTradeToTrade(w WsTrade, isFutures bool) types.Trade {
+// toGlobalMarketTrade converts WS trade to bbgo Trade (market trade).
+func toGlobalMarketTrade(w WsTrade, isFutures bool) types.Trade {
+	symbol := toGlobalSymbol(w.Coin, isFutures)
+
 	price := w.Px
 	sz := w.Sz
 	side := toGlobalSide(w.Side)
@@ -255,7 +366,7 @@ func wsTradeToTrade(w WsTrade, isFutures bool) types.Trade {
 		Price:         price,
 		Quantity:      sz,
 		QuoteQuantity: price.Mul(sz),
-		Symbol:        coinToSymbol(w.Coin),
+		Symbol:        symbol,
 		Side:          side,
 		IsBuyer:       side == types.SideTypeBuy,
 		IsMaker:       false, // not provided by WS
@@ -266,10 +377,11 @@ func wsTradeToTrade(w WsTrade, isFutures bool) types.Trade {
 	}
 }
 
-// wsCandleToKLine converts WS candle to bbgo KLine.
-func wsCandleToKLine(c WsCandle) types.KLine {
-	symbol := coinToSymbol(c.Symbol)
+// toGlobalKLine converts WS candle to bbgo KLine.
+func toGlobalKLine(c WsCandle, isFutures bool) types.KLine {
+	symbol := toGlobalSymbol(c.Symbol, isFutures)
 	interval := intervalFromCandleInterval(c.Interval)
+
 	return types.KLine{
 		Exchange:                 types.ExchangeHyperliquid,
 		Symbol:                   symbol,
@@ -289,8 +401,9 @@ func wsCandleToKLine(c WsCandle) types.KLine {
 	}
 }
 
-// wsFillToTrade converts WS user fill to bbgo Trade (private trade update).
-func wsFillToTrade(f WsFill, isFutures bool) types.Trade {
+// toGlobalPrivateTrade converts WS user fill to bbgo Trade (private trade update).
+func toGlobalPrivateTrade(f WsFill, isFutures bool) types.Trade {
+	symbol := toGlobalSymbol(f.Coin, isFutures)
 	side := toGlobalSide(f.Side)
 	return types.Trade{
 		ID:            uint64(f.Tid),
@@ -299,7 +412,7 @@ func wsFillToTrade(f WsFill, isFutures bool) types.Trade {
 		Price:         f.Px,
 		Quantity:      f.Sz,
 		QuoteQuantity: f.Px.Mul(f.Sz),
-		Symbol:        coinToSymbol(f.Coin),
+		Symbol:        symbol,
 		Side:          side,
 		IsBuyer:       side == types.SideTypeBuy,
 		IsMaker:       !f.Crossed,
@@ -310,7 +423,7 @@ func wsFillToTrade(f WsFill, isFutures bool) types.Trade {
 	}
 }
 
-func wsOrderStatusToGlobal(status string) types.OrderStatus {
+func toGlobalOrderStatus(status string) types.OrderStatus {
 	switch status {
 	case "open", "openOrder":
 		return types.OrderStatusNew
@@ -329,16 +442,18 @@ func wsOrderStatusToGlobal(status string) types.OrderStatus {
 	}
 }
 
-// wsOrderUpdateToOrder converts WS order update to bbgo Order.
-func wsOrderUpdateToOrder(o WsOrderUpdate, isFutures bool) types.Order {
+// toGlobalOrderUpdate converts WS order update to bbgo Order.
+func toGlobalOrderUpdate(o WsOrderUpdate, isFutures bool) types.Order {
+	symbol := toGlobalSymbol(o.Order.Coin, isFutures)
+
 	ob := o.Order
-	status := wsOrderStatusToGlobal(o.Status)
+	status := toGlobalOrderStatus(o.Status)
 	qty := ob.Sz
 	price := ob.LimitPx
 	origSz := ob.OrigSz
 	return types.Order{
 		SubmitOrder: types.SubmitOrder{
-			Symbol:      coinToSymbol(ob.Coin),
+			Symbol:      symbol,
 			Price:       price,
 			Quantity:    origSz,
 			Side:        toGlobalSide(ob.Side),
@@ -357,17 +472,11 @@ func wsOrderUpdateToOrder(o WsOrderUpdate, isFutures bool) types.Order {
 	}
 }
 
-// wsClearinghouseStateToFuturesPositions converts WS clearinghouse state to bbgo FuturesPositionMap.
-func wsClearinghouseStateToFuturesPositions(state WsClearinghouseState) types.FuturesPositionMap {
+// toGlobalFuturesPositions converts WS clearinghouse state to bbgo FuturesPositionMap.
+func toGlobalFuturesPositions(state WsClearinghouseState) types.FuturesPositionMap {
 	positions := make(types.FuturesPositionMap)
 	for _, asset := range state.AssetPositions {
 		p := asset.Position
-
-		symbol, marketType, ok := resolveCoin(p.Coin)
-		if !ok || marketType != MarketTypePerp {
-			log.WithField("coin", p.Coin).Warn("hyperliquid: skip non-perp position coin")
-			continue
-		}
 
 		// Skip zero positions
 		szi := p.Szi
@@ -397,6 +506,7 @@ func wsClearinghouseStateToFuturesPositions(state WsClearinghouseState) types.Fu
 			liquidationPrice = *p.LiquidationPx
 		}
 
+		symbol := toGlobalSymbol(p.Coin, true)
 		posKey := types.NewPositionKey(symbol, positionSide)
 		positions[posKey] = types.FuturesPosition{
 			Symbol:        symbol,
@@ -422,4 +532,34 @@ func wsClearinghouseStateToFuturesPositions(state WsClearinghouseState) types.Fu
 		}
 	}
 	return positions
+}
+
+func toGlobalTicker(markPx, midPx, prevDayPx, dayNtlVlm string) types.Ticker {
+	mark := fixedpoint.MustNewFromString(markPx)
+	mid := fixedpoint.MustNewFromString(midPx)
+	prev := fixedpoint.MustNewFromString(prevDayPx)
+	dayNotional := fixedpoint.MustNewFromString(dayNtlVlm)
+
+	last := mark
+	if last.IsZero() {
+		last = mid
+	}
+
+	bid := mid
+	ask := mid
+	if mid.IsZero() {
+		bid = mark
+		ask = mark
+	}
+
+	return types.Ticker{
+		Time:   time.Now(),
+		Volume: dayNotional, // Hyperliquid provides day notional volume, not base volume.
+		Last:   last,
+		Open:   prev,
+		High:   fixedpoint.Zero, // Not provided by Hyperliquid asset context.
+		Low:    fixedpoint.Zero, // Not provided by Hyperliquid asset context.
+		Buy:    bid,             // Best bid is not provided; use mid/mark as approximation.
+		Sell:   ask,             // Best ask is not provided; use mid/mark as approximation.
+	}
 }

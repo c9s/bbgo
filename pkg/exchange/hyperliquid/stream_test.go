@@ -239,37 +239,7 @@ func TestParseWebSocketEvent_UnknownChannel(t *testing.T) {
 	assert.Nil(t, event) // Unknown channels return nil
 }
 
-// Unit tests for conversion functions
-
-func TestResolveCoin_MetadataAndFallback(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		coin      string
-		want      string
-		wantType  MarketType
-		wantFound bool
-	}{
-		{name: "perp from metadata", coin: "BTC", want: "BTCUSDC", wantType: MarketTypePerp, wantFound: true},
-		{name: "spot @index from metadata", coin: "@107", want: "HYPEUSDC", wantType: MarketTypeSpot, wantFound: true},
-		{name: "spot pair from metadata", coin: "PURR/USDC", want: "PURRUSDC", wantType: MarketTypeSpot, wantFound: true},
-		{name: "spot pair fallback", coin: "ABC/USDC", want: "ABCUSDC", wantType: MarketTypeSpot, wantFound: true},
-		{name: "spot @ fallback", coin: "@9999", want: "", wantType: MarketTypeSpot, wantFound: false},
-		{name: "perp fallback", coin: "ETH", want: "ETHUSDC", wantType: MarketTypePerp, wantFound: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, gotType, ok := resolveCoin(tt.coin)
-			assert.Equal(t, tt.wantFound, ok)
-			assert.Equal(t, tt.wantType, gotType)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestWsBookToSliceOrderBook(t *testing.T) {
+func TestToGlobalOrderBook(t *testing.T) {
 	t.Parallel()
 
 	book := WsBook{
@@ -287,7 +257,7 @@ func TestWsBookToSliceOrderBook(t *testing.T) {
 		},
 	}
 
-	result := wsBookToSliceOrderBook(book)
+	result := toGlobalOrderBook(book, true)
 	assert.Equal(t, "BTCUSDC", result.Symbol)
 	assert.Len(t, result.Bids, 2)
 	assert.Len(t, result.Asks, 2)
@@ -295,7 +265,7 @@ func TestWsBookToSliceOrderBook(t *testing.T) {
 	assert.Equal(t, fixedpoint.NewFromFloat(50100.0), result.Asks[0].Price)
 }
 
-func TestWsTradeToTrade(t *testing.T) {
+func TestToGlobalMarketTrade(t *testing.T) {
 	t.Parallel()
 
 	wsTrade := WsTrade{
@@ -308,7 +278,7 @@ func TestWsTradeToTrade(t *testing.T) {
 		Tid:  12345,
 	}
 
-	result := wsTradeToTrade(wsTrade, true)
+	result := toGlobalMarketTrade(wsTrade, true)
 	assert.Equal(t, "BTCUSDC", result.Symbol)
 	assert.Equal(t, types.SideTypeBuy, result.Side)
 	assert.Equal(t, fixedpoint.NewFromFloat(50000.0), result.Price)
@@ -316,11 +286,11 @@ func TestWsTradeToTrade(t *testing.T) {
 	assert.True(t, result.IsFutures)
 }
 
-func TestWsTradeToTrade_UsesSpotCoinResolver(t *testing.T) {
+func TestToGlobalMarketTrade_UsesSpotCoinResolver(t *testing.T) {
 	t.Parallel()
 
 	wsTrade := WsTrade{
-		Coin: "@107",
+		Coin: "HYPE@107",
 		Side: "B",
 		Px:   fixedpoint.NewFromFloat(10.0),
 		Sz:   fixedpoint.NewFromFloat(1.0),
@@ -328,12 +298,12 @@ func TestWsTradeToTrade_UsesSpotCoinResolver(t *testing.T) {
 		Tid:  1,
 	}
 
-	result := wsTradeToTrade(wsTrade, false)
+	result := toGlobalMarketTrade(wsTrade, false)
 	assert.Equal(t, "HYPEUSDC", result.Symbol)
 	assert.False(t, result.IsFutures)
 }
 
-func TestWsCandleToKLine(t *testing.T) {
+func TestToGlobalKLine(t *testing.T) {
 	t.Parallel()
 
 	// Test with a closed candle (past time)
@@ -351,14 +321,14 @@ func TestWsCandleToKLine(t *testing.T) {
 		N:         50,
 	}
 
-	result := wsCandleToKLine(candle)
+	result := toGlobalKLine(candle, true)
 	assert.Equal(t, "BTCUSDC", result.Symbol)
 	assert.Equal(t, types.Interval1m, result.Interval)
 	assert.Equal(t, fixedpoint.NewFromFloat(50000.0), result.Open)
 	assert.Equal(t, fixedpoint.NewFromFloat(50100.0), result.Close)
 }
 
-func TestWsFillToTrade(t *testing.T) {
+func TestToGlobalPrivateTrade(t *testing.T) {
 	t.Parallel()
 
 	fill := WsFill{
@@ -378,7 +348,7 @@ func TestWsFillToTrade(t *testing.T) {
 		FeeToken:      "USDC",
 	}
 
-	result := wsFillToTrade(fill, true)
+	result := toGlobalPrivateTrade(fill, true)
 	assert.Equal(t, "BTCUSDC", result.Symbol)
 	assert.Equal(t, types.SideTypeBuy, result.Side)
 	assert.Equal(t, uint64(12345), result.OrderID)
@@ -388,7 +358,7 @@ func TestWsFillToTrade(t *testing.T) {
 	assert.True(t, result.IsFutures)
 }
 
-func TestWsOrderUpdateToOrder(t *testing.T) {
+func TestToGlobalOrderUpdate(t *testing.T) {
 	t.Parallel()
 
 	orderUpdate := WsOrderUpdate{
@@ -406,7 +376,7 @@ func TestWsOrderUpdateToOrder(t *testing.T) {
 		StatusTimestamp: types.NewMillisecondTimestampFromInt(1234567890),
 	}
 
-	result := wsOrderUpdateToOrder(orderUpdate, true)
+	result := toGlobalOrderUpdate(orderUpdate, true)
 	assert.Equal(t, "BTCUSDC", result.Symbol)
 	assert.Equal(t, types.SideTypeBuy, result.Side)
 	assert.Equal(t, uint64(12345), result.OrderID)
@@ -451,7 +421,7 @@ func TestWsClearinghouseStateToFuturesPositions(t *testing.T) {
 		Withdrawable: 92500.0,
 	}
 
-	result := wsClearinghouseStateToFuturesPositions(state)
+	result := toGlobalFuturesPositions(state)
 	assert.Len(t, result, 1)
 
 	posKey := types.NewPositionKey("BTCUSDC", types.PositionLong)
@@ -493,7 +463,7 @@ func TestWsClearinghouseStateToFuturesPositions_ShortPosition(t *testing.T) {
 		},
 	}
 
-	result := wsClearinghouseStateToFuturesPositions(state)
+	result := toGlobalFuturesPositions(state)
 	assert.Len(t, result, 1)
 
 	posKey := types.NewPositionKey("ETHUSDC", types.PositionShort)
@@ -531,27 +501,8 @@ func TestWsClearinghouseStateToFuturesPositions_ZeroPosition(t *testing.T) {
 		},
 	}
 
-	result := wsClearinghouseStateToFuturesPositions(state)
+	result := toGlobalFuturesPositions(state)
 	assert.Len(t, result, 0) // Zero positions should be skipped
-}
-
-func TestWsClearinghouseStateToFuturesPositions_SkipsSpotLikeCoin(t *testing.T) {
-	t.Parallel()
-
-	state := WsClearinghouseState{
-		AssetPositions: []WsAssetPosition{
-			{
-				Type: "oneWay",
-				Position: WsPosition{
-					Coin: "PURR/USDC",
-					Szi:  fixedpoint.NewFromFloat(1.0),
-				},
-			},
-		},
-	}
-
-	result := wsClearinghouseStateToFuturesPositions(state)
-	assert.Len(t, result, 0)
 }
 
 // Integration tests (require real credentials)

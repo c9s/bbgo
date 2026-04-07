@@ -16,6 +16,7 @@ type OpenOrder struct {
 	LimitPx          fixedpoint.Value           `json:"limitPx"`
 	Oid              int64                      `json:"oid"`
 	OrderType        string                     `json:"orderType"`
+	Tif              string                     `json:"tif"`
 	OrigSz           fixedpoint.Value           `json:"origSz"`
 	ReduceOnly       bool                       `json:"reduceOnly"`
 	Side             string                     `json:"side"`

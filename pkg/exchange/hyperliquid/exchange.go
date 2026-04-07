@@ -259,11 +259,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		return nil, fmt.Errorf("failed to query open orders: %w", err)
 	}
 
-	localSymbol, _ := e.getLocalSymbol(symbol)
 	for _, order := range resp {
-		if order.Coin != localSymbol {
-			continue
-		}
 		orders = append(orders, toGlobalOrder(order, e.IsFutures))
 	}
 
@@ -331,13 +327,48 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 		return nil, fmt.Errorf("query ticker rate limiter wait error: %w", err)
 	}
 
-	_, err := e.client.NewSpotGetMetaAndAssetCtxsRequest().Do(ctx)
+	filter := make(map[string]struct{}, len(symbol))
+	for _, s := range symbol {
+		if s != "" {
+			filter[s] = struct{}{}
+		}
+	}
+
+	if e.IsFutures {
+		return e.queryFuturesTickers(ctx, filter)
+	}
+
+	return e.querySpotTickers(ctx, filter)
+}
+
+func (e *Exchange) querySpotTickers(ctx context.Context, filter map[string]struct{}) (map[string]types.Ticker, error) {
+	result := make(map[string]types.Ticker, len(filter))
+
+	resp, err := e.client.NewSpotGetMetaAndAssetCtxsRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make(map[string]types.Ticker, len(symbol))
-	// TODO
+	for i, s := range resp.Meta.Universe {
+		if i >= len(resp.AssetCtxs) {
+			break
+		}
+
+		globalSymbol := toGlobalSpotMarket(s, resp.Meta.Tokens).Symbol
+		if len(filter) > 0 {
+			if _, ok := filter[globalSymbol]; !ok {
+				continue
+			}
+		}
+
+		assetCtx := resp.AssetCtxs[i]
+		result[globalSymbol] = toGlobalTicker(
+			assetCtx.MarkPrice,
+			assetCtx.MidPrice,
+			assetCtx.PrevDayPrice,
+			assetCtx.DayNotionalVolume,
+		)
+	}
 
 	return result, nil
 }
@@ -372,7 +403,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	}
 	var kLines []types.KLine
 	for _, candle := range candles {
-		kLines = append(kLines, kLineToGlobal(candle, interval, symbol))
+		kLines = append(kLines, kLineToGlobal(candle, interval, e.IsFutures))
 	}
 
 	return kLines, nil

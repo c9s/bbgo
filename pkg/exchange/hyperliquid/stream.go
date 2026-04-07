@@ -137,7 +137,7 @@ func (s *Stream) dispatchEvent(e any) {
 		// Subscription confirmed; no action needed.
 		return
 	case *WsBookEvent:
-		book := wsBookToSliceOrderBook(ev.Book)
+		book := toGlobalOrderBook(ev.Book, s.exchange.IsFutures)
 		s.EmitBookSnapshot(*book)
 		if bid, okBid := book.BestBid(); okBid {
 			if ask, okAsk := book.BestAsk(); okAsk {
@@ -152,11 +152,11 @@ func (s *Stream) dispatchEvent(e any) {
 		}
 	case *WsTradesEvent:
 		for _, w := range ev.Trades {
-			trade := wsTradeToTrade(w, s.exchange.IsFutures)
+			trade := toGlobalMarketTrade(w, s.exchange.IsFutures)
 			s.EmitMarketTrade(trade)
 		}
 	case *WsCandleEvent:
-		kline := wsCandleToKLine(ev.Candle)
+		kline := toGlobalKLine(ev.Candle, s.exchange.IsFutures)
 		s.emitCandle(kline)
 	case *WsUserFillsEvent:
 		if ev.UserFills.IsSnapshot != nil && *ev.UserFills.IsSnapshot {
@@ -164,15 +164,15 @@ func (s *Stream) dispatchEvent(e any) {
 			return
 		}
 		for _, f := range ev.UserFills.Fills {
-			trade := wsFillToTrade(f, s.exchange.IsFutures)
+			trade := toGlobalPrivateTrade(f, s.exchange.IsFutures)
 			s.EmitTradeUpdate(trade)
 		}
 	case *WsOrderUpdateEvent:
-		order := wsOrderUpdateToOrder(ev.OrderUpdate, s.exchange.IsFutures)
+		order := toGlobalOrderUpdate(ev.OrderUpdate, s.exchange.IsFutures)
 		s.EmitOrderUpdate(order)
 	case *WsClearinghouseStateEvent:
 		// Convert clearinghouse state to positions and emit
-		positions := wsClearinghouseStateToFuturesPositions(ev.State)
+		positions := toGlobalFuturesPositions(ev.State)
 		if len(positions) > 0 {
 			s.EmitFuturesPositionUpdate(positions)
 		}

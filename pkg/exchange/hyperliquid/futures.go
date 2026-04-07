@@ -60,3 +60,34 @@ func (e *Exchange) queryFuturesAccount(ctx context.Context) (*types.Account, err
 
 	return account, nil
 }
+
+func (e *Exchange) queryFuturesTickers(ctx context.Context, filter map[string]struct{}) (map[string]types.Ticker, error) {
+	result := make(map[string]types.Ticker, len(filter))
+	resp, err := e.client.NewFuturesGetMetaAndAssetCtxsRequest().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, perp := range resp.Meta.Universe {
+		if i >= len(resp.AssetCtxs) {
+			break
+		}
+
+		globalSymbol := perp.Name + QuoteCurrency
+		if len(filter) > 0 {
+			if _, ok := filter[globalSymbol]; !ok {
+				continue
+			}
+		}
+
+		ctx := resp.AssetCtxs[i]
+		result[globalSymbol] = toGlobalTicker(
+			ctx.MarkPrice,
+			ctx.MidPrice,
+			ctx.PrevDayPrice,
+			ctx.DayNotionalVolume,
+		)
+	}
+
+	return result, nil
+}
