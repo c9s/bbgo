@@ -257,7 +257,7 @@ func (s *TradeStats) CsvRecords() [][]string {
 	}
 }
 
-func (s *TradeStats) Add(profit *Profit) {
+func (s *TradeStats) AddProfit(profit *Profit) {
 	if s.Symbol != "" && profit.Symbol != s.Symbol {
 		return
 	}
