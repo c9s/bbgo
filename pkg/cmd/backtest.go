@@ -176,7 +176,6 @@ var BacktestCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			backtestService = service.NewBacktestService(environ.DatabaseService.DB)
 			if err := bbgo.BootstrapBacktestEnvironment(ctx, environ); err != nil {
 				return err
 			}
@@ -184,6 +183,7 @@ var BacktestCmd = &cobra.Command{
 			if environ.DatabaseService == nil {
 				return errors.New("database service is not enabled, please check your environment variables DB_DRIVER and DB_DSN")
 			}
+			backtestService = service.NewBacktestService(environ.DatabaseService.DB)
 		}
 		environ.BacktestService = backtestService
 		bbgo.SetBackTesting(backtestService)
