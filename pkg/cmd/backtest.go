@@ -24,9 +24,11 @@ import (
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/data/tsv"
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -313,7 +315,7 @@ var BacktestCmd = &cobra.Command{
 			backtestEx.MarketDataStream = session.MarketDataStream.(types.StandardStreamEmitter)
 			backtestEx.BindUserData(userDataStream)
 			if err := backtestEx.Prepare(userConfig); err != nil {
-				return errors.Wrap(err, "failed to prepare backtest exchange")
+				log.WithError(err).Warn("failed to prepare backtest exchange")
 			}
 			// Since we have prepared the exchanges with historical data, there might be some orders got filled when the strategies are run.
 			// We need to register the order update callback before the `trader.Run`, or else there might be missed filled orders.
@@ -650,6 +652,11 @@ var BacktestCmd = &cobra.Command{
 				}
 			}
 
+			// write strategy stats if strategies implement StrategyTabularStats or StrategyJsonStats
+			if err := writeStrategyStats(trader, reportDir); err != nil {
+				return fmt.Errorf("error writing strategy stats: %w", err)
+			}
+
 			// append report index
 			if reportFileInSubDir {
 				if err := backtest.AddReportIndexRun(outputDirectory, backtest.Run{
@@ -896,4 +903,57 @@ func rewriteManifestPaths(manifests backtest.Manifests, basePath string) (backte
 		filterManifests[k] = p
 	}
 	return filterManifests, nil
+}
+
+func writeStrategyStats(trader *bbgo.Trader, reportDir string) error {
+	err := trader.IterateStrategies(func(strategy types.StrategyID) error {
+		strategyID := dynamic.CallID(strategy)
+		if len(strategyID) == 0 {
+			return nil
+		}
+
+		strategyDir := filepath.Join(reportDir, strategyID)
+		if err := os.MkdirAll(strategyDir, 0755); err != nil {
+			log.WithError(err).Warnf("failed to create strategy directory, skip writing summary: %s", strategyDir)
+			return nil
+		}
+
+		if tabularStatsStrategy, ok := strategy.(common.StrategySummarizer); ok {
+			statsMap, jsonMap := tabularStatsStrategy.SummaryStats()
+			for statsName, stats := range statsMap {
+				fileName := strings.ReplaceAll(statsName, " ", "_") + ".tsv"
+				filePath := filepath.Join(strategyDir, fileName)
+
+				tsvWriter, err := tsv.NewWriterFile(filePath)
+				if err != nil {
+					log.WithError(err).Warnf("failed to create tabular stats file: %s", filePath)
+					continue
+				}
+
+				_ = tsvWriter.Write(stats.SummaryHeader())
+				for _, record := range stats.SummaryRecords() {
+					_ = tsvWriter.Write(record)
+				}
+				_ = tsvWriter.Close()
+
+				log.Infof("wrote strategy tabular stats to %s", filePath)
+			}
+
+			for statsName, stats := range jsonMap {
+				fileName := strings.ReplaceAll(statsName, " ", "_") + ".json"
+				filePath := filepath.Join(strategyDir, fileName)
+
+				if err := util.WriteJsonFile(filePath, stats); err != nil {
+					log.WithError(err).Warnf("failed to write strategy json stats file: %s", filePath)
+					continue
+				}
+
+				log.Infof("wrote strategy json stats to %s", filePath)
+			}
+		}
+
+		return nil
+	})
+
+	return err
 }

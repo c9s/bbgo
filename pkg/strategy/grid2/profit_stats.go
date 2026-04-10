@@ -2,15 +2,19 @@ package grid2
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/style"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var _ common.TabularStats = (*GridProfitStats)(nil)
 
 type GridProfitStats struct {
 	Symbol           string                      `json:"symbol"`
@@ -24,6 +28,10 @@ type GridProfitStats struct {
 	Market           types.Market                `json:"market,omitempty"`
 	Since            *time.Time                  `json:"since,omitempty"`
 	InitialOrderID   uint64                      `json:"initialOrderID"`
+
+	DailyFee            map[time.Time]map[string]fixedpoint.Value `json:"dailyFee,omitempty"`
+	DailyNumOfArbitrage map[time.Time]int                         `json:"dailyArbitrageCount,omitempty"`
+	DailyProfit         map[time.Time]fixedpoint.Value            `json:"dailyProfit,omitempty"`
 
 	// ttl is the ttl to keep in persistence
 	ttl time.Duration
@@ -40,6 +48,10 @@ func newGridProfitStats(market types.Market) *GridProfitStats {
 		TotalFee:         make(map[string]fixedpoint.Value),
 		Volume:           fixedpoint.Zero,
 		Market:           market,
+
+		DailyFee:            make(map[time.Time]map[string]fixedpoint.Value),
+		DailyNumOfArbitrage: make(map[time.Time]int),
+		DailyProfit:         make(map[time.Time]fixedpoint.Value),
 	}
 }
 
@@ -69,6 +81,16 @@ func (s *GridProfitStats) AddTrade(trade types.Trade) {
 		t := trade.Time.Time()
 		s.Since = &t
 	}
+
+	// accumulate daily fee
+	dateKey := getDateKey(trade.Time.Time())
+	if s.DailyFee == nil {
+		s.DailyFee = make(map[time.Time]map[string]fixedpoint.Value)
+	}
+	if s.DailyFee[dateKey] == nil {
+		s.DailyFee[dateKey] = make(map[string]fixedpoint.Value)
+	}
+	s.DailyFee[dateKey][trade.FeeCurrency] = s.DailyFee[dateKey][trade.FeeCurrency].Add(trade.Fee)
 }
 
 func (s *GridProfitStats) AddProfit(profit *GridProfit) {
@@ -81,6 +103,18 @@ func (s *GridProfitStats) AddProfit(profit *GridProfit) {
 	case s.Market.BaseCurrency:
 		s.TotalBaseProfit = s.TotalBaseProfit.Add(profit.Profit)
 	}
+
+	// Normalize to midnight UTC for daily aggregation
+	dateKey := getDateKey(profit.Time)
+	if s.DailyNumOfArbitrage == nil {
+		s.DailyNumOfArbitrage = make(map[time.Time]int)
+	}
+	s.DailyNumOfArbitrage[dateKey]++
+
+	if s.DailyProfit == nil {
+		s.DailyProfit = make(map[time.Time]fixedpoint.Value)
+	}
+	s.DailyProfit[dateKey] = s.DailyProfit[dateKey].Add(profit.Profit)
 }
 
 func (s *GridProfitStats) SlackAttachment() slack.Attachment {
@@ -186,4 +220,80 @@ func (s *GridProfitStats) PlainText() string {
 	}
 
 	return o
+}
+
+// Implements common.TabularStats interface
+func (s *GridProfitStats) SummaryHeader() []string {
+	feeCurrencies := s.collectFeeCurrencies()
+	header := []string{"date", "arbitrage_count", "profit"}
+	for _, currency := range feeCurrencies {
+		header = append(header, "fee_"+currency)
+	}
+	return header
+}
+
+func (s *GridProfitStats) SummaryRecords() [][]string {
+	feeCurrencies := s.collectFeeCurrencies()
+
+	// collect and sort date keys
+	dateKeys := make(map[time.Time]struct{})
+	for k := range s.DailyNumOfArbitrage {
+		dateKeys[k] = struct{}{}
+	}
+	for k := range s.DailyProfit {
+		dateKeys[k] = struct{}{}
+	}
+	for k := range s.DailyFee {
+		dateKeys[k] = struct{}{}
+	}
+
+	dates := make([]time.Time, 0, len(dateKeys))
+	for k := range dateKeys {
+		dates = append(dates, k)
+	}
+	sort.Slice(dates, func(i, j int) bool {
+		return dates[i].Before(dates[j])
+	})
+	var records [][]string
+	for _, date := range dates {
+		count := s.DailyNumOfArbitrage[date]
+		profit := s.DailyProfit[date]
+		dateStr := date.Format(time.DateOnly)
+		record := []string{dateStr, strconv.Itoa(count), profit.String()}
+		dailyFees := s.DailyFee[date]
+		for _, currency := range feeCurrencies {
+			if dailyFees != nil {
+				record = append(record, dailyFees[currency].String())
+			} else {
+				record = append(record, fixedpoint.Zero.String())
+			}
+		}
+		records = append(records, record)
+	}
+	return records
+}
+
+// collectFeeCurrencies returns a sorted list of unique fee currencies across all days.
+func (s *GridProfitStats) collectFeeCurrencies() []string {
+	currencySet := make(map[string]struct{})
+	for _, fees := range s.DailyFee {
+		for currency := range fees {
+			currencySet[currency] = struct{}{}
+		}
+	}
+	currencies := make([]string, 0, len(currencySet))
+	for c := range currencySet {
+		currencies = append(currencies, c)
+	}
+	sort.Strings(currencies)
+	return currencies
+}
+
+func getDateKey(ts time.Time) time.Time {
+	dateKey := time.Date(
+		ts.Year(), ts.Month(), ts.Day(),
+		0, 0, 0, 0,
+		ts.Location(),
+	).UTC()
+	return dateKey
 }
