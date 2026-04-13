@@ -741,19 +741,20 @@ func setDualSidePosition[T OrderServiceConstraint](req T, order types.SubmitOrde
 	}
 }
 
-func (e *Exchange) QueryFuturesFundingRates(ctx context.Context, symbol string) ([]binanceapi.FutureFundingRate, error) {
-	req := e.futuresClient2.NewFuturesFundingRateRequest()
-	if symbol != "" {
-		req.Symbol(symbol)
-	}
-	fundingRates, err := req.Do(ctx)
+func (e *Exchange) QueryPremiumIndices(ctx context.Context) ([]types.PremiumIndex, error) {
+	req := e.futuresClient2.NewFuturesPremiumIndicesRequest()
+	rawIndices, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return fundingRates, nil
+	var indices []types.PremiumIndex
+	for _, r := range rawIndices {
+		indices = append(indices, r.PremiumIndex())
+	}
+	return indices, nil
 }
 
-func (e *Exchange) QueryFuturesFundingInfo(ctx context.Context) ([]binanceapi.FutureFundingInfo, error) {
+func (e *Exchange) QueryFuturesFundingInfo(ctx context.Context) ([]binanceapi.FuturesFundingInfo, error) {
 	req := e.futuresClient2.NewFuturesFundingInfoRequest()
 	fundingInfo, err := req.Do(ctx)
 	if err != nil {

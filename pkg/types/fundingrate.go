@@ -7,6 +7,7 @@ import (
 )
 
 type FundingRate struct {
+	Symbol      string
 	FundingRate fixedpoint.Value
 	FundingTime time.Time
 	Time        time.Time
