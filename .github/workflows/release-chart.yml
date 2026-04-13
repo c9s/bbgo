@@ -10,6 +10,7 @@ on:
     branches:
       - "main"
       - "v*"
+      - "c9s/helm-chart-release"
 
 jobs:
   releaseChart:
