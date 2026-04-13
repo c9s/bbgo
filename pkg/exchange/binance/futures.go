@@ -740,3 +740,24 @@ func setDualSidePosition[T OrderServiceConstraint](req T, order types.SubmitOrde
 		v.PositionSide(positionSide)
 	}
 }
+
+func (e *Exchange) QueryFuturesFundingRates(ctx context.Context, symbol string) ([]binanceapi.FutureFundingRate, error) {
+	req := e.futuresClient2.NewFuturesFundingRateRequest()
+	if symbol != "" {
+		req.Symbol(symbol)
+	}
+	fundingRates, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return fundingRates, nil
+}
+
+func (e *Exchange) QueryFuturesFundingInfo(ctx context.Context) ([]binanceapi.FutureFundingInfo, error) {
+	req := e.futuresClient2.NewFuturesFundingInfoRequest()
+	fundingInfo, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return fundingInfo, nil
+}
