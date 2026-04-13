@@ -1,5 +1,4 @@
 //go:build !dnum
-// +build !dnum
 
 package xmaker
 

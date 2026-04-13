@@ -1,5 +1,4 @@
 //go:build dnum
-// +build dnum
 
 // Copyright Suneido Software Corp. All rights reserved.
 // Governed by the MIT license found in the LICENSE file.
