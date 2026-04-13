@@ -27,3 +27,21 @@ type FuturesFundingRateRequest struct {
 func (c *FuturesRestClient) NewFuturesFundingRateRequest() *FuturesFundingRateRequest {
 	return &FuturesFundingRateRequest{client: c}
 }
+
+type FutureFundingInfo struct {
+	Symbol                   string           `json:"symbol"`
+	AdjustedFundingRateCap   fixedpoint.Value `json:"adjustedFundingRateCap"`
+	AdjustedFundingRateFloor fixedpoint.Value `json:"adjustedFundingRateFloor"`
+	FundingIntervalHours     int              `json:"fundingIntervalHours"`
+	Disclaimer               bool             `json:"disclaimer"`
+	UpdateTime               int64            `json:"updateTime"`
+}
+
+//go:generate requestgen -method GET -url /fapi/v1/fundingInfo -type FuturesFundingInfoRequest -responseType []FutureFundingInfo
+type FuturesFundingInfoRequest struct {
+	client requestgen.APIClient
+}
+
+func (c *FuturesRestClient) NewFuturesFundingInfoRequest() *FuturesFundingInfoRequest {
+	return &FuturesFundingInfoRequest{client: c}
+}

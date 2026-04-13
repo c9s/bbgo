@@ -752,3 +752,12 @@ func (e *Exchange) QueryFuturesFundingRates(ctx context.Context, symbol string) 
 	}
 	return fundingRates, nil
 }
+
+func (e *Exchange) QueryFuturesFundingInfo(ctx context.Context) ([]binanceapi.FutureFundingInfo, error) {
+	req := e.futuresClient2.NewFuturesFundingInfoRequest()
+	fundingInfo, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return fundingInfo, nil
+}
