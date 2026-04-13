@@ -1,16 +1,20 @@
-## bbgo market
+## bbgo chart
 
-List the symbols that the are available to be traded in the exchange
+create charts from config file
 
 ```
-bbgo market [flags]
+bbgo chart [--session=[exchange_name]] [--symbol=[symbol]] [[--since=yyyy/mm/dd]] [[--until=yyyy/mm/dd]]  [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help             help for market
-      --session string   the exchange session name for querying information
+  -h, --help              help for chart
+      --interval string   the interval for the chart, e.g. 1h, 15m
+      --session string    the exchange session name for charting
+      --since string      chart from time
+      --symbol string     the symbol to chart, e.g. BTCUSDT
+      --until string      chart until time
 ```
 
 ### Options inherited from parent commands

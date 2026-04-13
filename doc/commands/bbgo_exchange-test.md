@@ -1,16 +1,16 @@
-## bbgo market
+## bbgo exchange-test
 
-List the symbols that the are available to be traded in the exchange
+test the exchange
 
 ```
-bbgo market [flags]
+bbgo exchange-test [--session SESSION] [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help             help for market
-      --session string   the exchange session name for querying information
+      --exchange string   the exchange name to test
+  -h, --help              help for exchange-test
 ```
 
 ### Options inherited from parent commands
