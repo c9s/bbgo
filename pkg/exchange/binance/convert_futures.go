@@ -2,7 +2,6 @@ package binance
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
@@ -394,29 +393,6 @@ func toGlobalFuturesOrderStatus(orderStatus futures.OrderStatusType) types.Order
 	}
 
 	return types.OrderStatus(orderStatus)
-}
-
-func convertPremiumIndex(index *futures.PremiumIndex) (*types.PremiumIndex, error) {
-	markPrice, err := fixedpoint.NewFromString(index.MarkPrice)
-	if err != nil {
-		return nil, err
-	}
-
-	lastFundingRate, err := fixedpoint.NewFromString(index.LastFundingRate)
-	if err != nil {
-		return nil, err
-	}
-
-	nextFundingTime := time.Unix(0, index.NextFundingTime*int64(time.Millisecond))
-	t := time.Unix(0, index.Time*int64(time.Millisecond))
-
-	return &types.PremiumIndex{
-		Symbol:          index.Symbol,
-		MarkPrice:       markPrice,
-		NextFundingTime: nextFundingTime,
-		LastFundingRate: lastFundingRate,
-		Time:            t,
-	}, nil
 }
 
 func toGlobalPositionRisk(positions []binanceapi.FuturesPositionRisk) []types.PositionRisk {
