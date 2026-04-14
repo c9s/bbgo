@@ -1611,38 +1611,31 @@ func convertDepthLegacy(
 // QueryPremiumIndex is only for futures
 func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) (*types.PremiumIndex, error) {
 	// when symbol is set, only one index will be returned.
-	indexes, err := e.futuresClient.NewPremiumIndexService().Symbol(symbol).Do(ctx)
+	req := e.futuresClient2.NewFuturesPremiumIndexRequest(symbol)
+	r, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return convertPremiumIndex(indexes[0])
+	index := r.PremiumIndex()
+	return &index, nil
 }
 
 func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (*types.FundingRate, error) {
-	rates, err := e.futuresClient.NewFundingRateService().
+	req := e.futuresClient2.NewFuturesFundingRateHistoryRequest().
 		Symbol(symbol).
-		Limit(1).
-		Do(ctx)
+		Limit(1)
+	rawRates, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(rates) == 0 {
+	if len(rawRates) == 0 {
 		return nil, errors.New("empty funding rate data")
 	}
 
-	rate := rates[0]
-	fundingRate, err := fixedpoint.NewFromString(rate.FundingRate)
-	if err != nil {
-		return nil, err
-	}
-
-	return &types.FundingRate{
-		FundingRate: fundingRate,
-		FundingTime: time.Unix(0, rate.FundingTime*int64(time.Millisecond)),
-		Time:        time.Unix(0, rate.FundingTime*int64(time.Millisecond)),
-	}, nil
+	rate := rawRates[0].FundingRate()
+	return &rate, nil
 }
 
 // in seconds
