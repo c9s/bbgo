@@ -9,11 +9,11 @@ import (
 )
 
 type rawPremiumIndex struct {
-	Symbol          string           `json:"symbol"`
-	MarkPrice       fixedpoint.Value `json:"markPrice"`
-	LastFundingRate fixedpoint.Value `json:"lastFundingRate"`
-	NextFundingTime int64            `json:"nextFundingTime"`
-	Time            int64            `json:"time"`
+	Symbol          string                     `json:"symbol"`
+	MarkPrice       fixedpoint.Value           `json:"markPrice"`
+	LastFundingRate fixedpoint.Value           `json:"lastFundingRate"`
+	NextFundingTime types.MillisecondTimestamp `json:"nextFundingTime"`
+	Time            types.MillisecondTimestamp `json:"time"`
 }
 
 func (p *rawPremiumIndex) PremiumIndex() types.PremiumIndex {
@@ -21,8 +21,8 @@ func (p *rawPremiumIndex) PremiumIndex() types.PremiumIndex {
 		Symbol:          p.Symbol,
 		MarkPrice:       p.MarkPrice,
 		LastFundingRate: p.LastFundingRate,
-		NextFundingTime: time.Unix(0, p.NextFundingTime*int64(time.Millisecond)),
-		Time:            time.Unix(0, p.Time*int64(time.Millisecond)),
+		NextFundingTime: p.NextFundingTime.Time(),
+		Time:            p.Time.Time(),
 	}
 }
 
@@ -47,12 +47,12 @@ func (c *FuturesRestClient) NewFuturesPremiumIndicesRequest() *FuturesPremiumInd
 }
 
 type FuturesFundingInfo struct {
-	Symbol                   string           `json:"symbol"`
-	AdjustedFundingRateCap   fixedpoint.Value `json:"adjustedFundingRateCap"`
-	AdjustedFundingRateFloor fixedpoint.Value `json:"adjustedFundingRateFloor"`
-	FundingIntervalHours     int              `json:"fundingIntervalHours"`
-	Disclaimer               bool             `json:"disclaimer"`
-	UpdateTime               int64            `json:"updateTime"`
+	Symbol                   string                      `json:"symbol"`
+	AdjustedFundingRateCap   fixedpoint.Value            `json:"adjustedFundingRateCap"`
+	AdjustedFundingRateFloor fixedpoint.Value            `json:"adjustedFundingRateFloor"`
+	FundingIntervalHours     int                         `json:"fundingIntervalHours"`
+	Disclaimer               bool                        `json:"disclaimer"`
+	UpdateTime               *types.MillisecondTimestamp `json:"updateTime,omitempty"`
 }
 
 //go:generate requestgen -method GET -url /fapi/v1/fundingInfo -type FuturesFundingInfoRequest -responseType []FuturesFundingInfo
@@ -65,18 +65,18 @@ func (c *FuturesRestClient) NewFuturesFundingInfoRequest() *FuturesFundingInfoRe
 }
 
 type rawFundingRate struct {
-	Symbol       string           `json:"symbol"`
-	FundingRate_ fixedpoint.Value `json:"fundingRate"`
-	FundingTime  int64            `json:"fundingTime"`
-	Time         int64            `json:"time"`
+	Symbol       string                     `json:"symbol"`
+	FundingRate_ fixedpoint.Value           `json:"fundingRate"`
+	FundingTime  types.MillisecondTimestamp `json:"fundingTime"`
+	Time         types.MillisecondTimestamp `json:"time"`
 }
 
 func (f *rawFundingRate) FundingRate() types.FundingRate {
 	return types.FundingRate{
 		Symbol:      f.Symbol,
 		FundingRate: f.FundingRate_,
-		FundingTime: time.Unix(0, f.FundingTime*int64(time.Millisecond)),
-		Time:        time.Unix(0, f.Time*int64(time.Millisecond)),
+		FundingTime: f.FundingTime.Time(),
+		Time:        f.Time.Time(),
 	}
 }
 
