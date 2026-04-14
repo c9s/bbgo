@@ -1,0 +1,30 @@
+---
+name: Release Helm Charts
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    types: [synchronize, opened, reopened]
+    branches:
+      - "main"
+      - "v*"
+      - "c9s/helm-chart-release"
+
+jobs:
+  releaseChart:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Configure Git user
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+      - name: Run chart-releaser job
+        uses: "helm/chart-releaser-action@v1.7.0"
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
