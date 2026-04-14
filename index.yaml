@@ -3,6 +3,16 @@ entries:
   bbgo:
   - apiVersion: v2
     appVersion: 1.63.0
+    created: "2026-04-14T04:34:55.614038206Z"
+    description: Helm chart for bbgo trading bot
+    digest: 5dcbd837e41762abe0eb5690a780119c43fc557e69f6df5294e3d7f4a0eaf11a
+    name: bbgo
+    type: application
+    urls:
+    - https://github.com/c9s/bbgo/releases/download/bbgo-0.4.6/bbgo-0.4.6.tgz
+    version: 0.4.6
+  - apiVersion: v2
+    appVersion: 1.63.0
     created: "2026-04-14T02:28:47.332735824Z"
     description: Helm chart for bbgo trading bot
     digest: f140852c21b421272814f79a9428a06e1cd27772b08442d8373f71678f7081a9
@@ -21,4 +31,4 @@ entries:
     urls:
     - https://github.com/c9s/bbgo/releases/download/bbgo-0.4.3/bbgo-0.4.3.tgz
     version: 0.4.3
-generated: "2026-04-14T02:28:47.332743739Z"
+generated: "2026-04-14T04:34:55.614052722Z"
