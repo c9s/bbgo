@@ -5,12 +5,14 @@ on:
   push:
     branches:
     - main
-  pull_request:
-    types: [synchronize, opened, reopened]
-    branches:
-      - "main"
-      - "v*"
-      - "c9s/helm-chart-release"
+  ## FOR debugging
+  #
+  # pull_request:
+  #   types: [synchronize, opened, reopened]
+  #   branches:
+  #     - "main"
+  #     - "v*"
+  #     - "c9s/helm-chart-release"
 
 jobs:
   releaseChart:
