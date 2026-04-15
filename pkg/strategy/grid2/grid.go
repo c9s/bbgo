@@ -28,7 +28,7 @@ type Grid struct {
 	// Pins are the pinned grid prices, from low to high
 	Pins []Pin `json:"pins"`
 
-	pinsCache map[Pin]struct{} `json:"-"`
+	pinsCache map[Pin]struct{}
 
 	calculator PinCalculator
 }
