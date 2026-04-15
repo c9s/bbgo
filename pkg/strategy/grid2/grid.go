@@ -28,6 +28,8 @@ type Grid struct {
 	// Pins are the pinned grid prices, from low to high
 	Pins []Pin `json:"pins"`
 
+	// pinsCache is a map of pinned prices, for fast lookup of price.
+	// This is used for checking if a price is pinned.
 	pinsCache map[Pin]struct{}
 
 	calculator PinCalculator
