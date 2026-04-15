@@ -1638,6 +1638,28 @@ func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (
 	return &rate, nil
 }
 
+// QueryTakerBuySellVolumes queries the taker buy/sell volumes for a symbol and interval. It is only supported for futures.
+func (e *Exchange) QueryTakerBuySellVolumes(ctx context.Context, symbol string, period types.Interval, options types.TradeQueryOptions) ([]binanceapi.FuturesTakerBuySellVolume, error) {
+	req := e.futuresClient2.NewFuturesTakerBuySellVolumeRequest().
+		Symbol(symbol).
+		Period(period)
+	if options.StartTime != nil {
+		req.StartTime(*options.StartTime)
+	}
+	if options.EndTime != nil {
+		req.EndTime(*options.EndTime)
+	}
+	if options.Limit > 0 {
+		req.Limit(uint64(options.Limit))
+	}
+
+	takerVol, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return takerVol, nil
+}
+
 // in seconds
 var SupportedIntervals = map[types.Interval]int{
 	types.Interval1s:  1,
