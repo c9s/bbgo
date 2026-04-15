@@ -477,10 +477,15 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 
 			origQuantity := newQuantity
 			newQuantity = newQuantity.Round(s.Market.VolumePrecision, fixedpoint.Down)
+
+			// the newQuantity should not be less than the original order quantity
+			newQuantity = fixedpoint.Max(newQuantity, o.Quantity)
 			s.logger.Infof("round down %s %s order base quantity %s to %s by base precision %d", s.Symbol, newSide, origQuantity.String(), newQuantity.String(), s.Market.VolumePrecision)
 
 		} else if s.QuantityOrAmount.Quantity.Sign() > 0 {
 			newQuantity = s.QuantityOrAmount.Quantity
+
+			newQuantity = fixedpoint.Max(newQuantity, o.Quantity)
 		}
 
 		// TODO: need to consider sell order fee for the profit calculation
