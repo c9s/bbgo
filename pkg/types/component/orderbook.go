@@ -29,7 +29,7 @@ func StreamBookHealthCheck(ctx context.Context, sessionName string, checkInterva
 				case <-ctx.Done():
 					logger.Info("stream book health check context done")
 					return
-				case _, ok := <-ticker.C:
+				case tickTime, ok := <-ticker.C:
 					if !ok {
 						return
 					}
@@ -48,6 +48,12 @@ func StreamBookHealthCheck(ctx context.Context, sessionName string, checkInterva
 							reconnectThreshold.String(),
 						)
 						book.Stream.Reconnect()
+					} else {
+						logger.Infof(
+							"last update time is %s at %s",
+							lastUpdate.Format(time.RFC3339),
+							tickTime.Format(time.RFC3339),
+						)
 					}
 				}
 			}
