@@ -142,6 +142,8 @@ type Strategy struct {
 	// PrometheusLabels will be used as the base prometheus labels
 	PrometheusLabels prometheus.Labels `json:"prometheusLabels"`
 
+	mergedPrometheusLabels prometheus.Labels
+
 	// OrderGroupID is the group ID used for the strategy instance for canceling orders
 	OrderGroupID uint32 `json:"orderGroupID"`
 
@@ -249,7 +251,16 @@ func (s *Strategy) Defaults() error {
 func (s *Strategy) Initialize() error {
 	s.filledOrderIDMap = types.NewSyncOrderMap()
 	s.logger = log.WithFields(s.LogFields)
+	s.mergedPrometheusLabels = s.newPrometheusLabels()
 	return nil
+}
+
+func (s *Strategy) getPrometheusLabels() prometheus.Labels {
+	if s.mergedPrometheusLabels == nil {
+		s.mergedPrometheusLabels = s.newPrometheusLabels()
+	}
+
+	return s.mergedPrometheusLabels
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -1133,7 +1144,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	defer s.EmitGridReady()
 
 	// update the number of orders to metrics
-	baseLabels := s.newPrometheusLabels()
+	baseLabels := s.getPrometheusLabels()
 	metricsGridNumOfOrders.With(baseLabels).Set(float64(len(createdOrders)))
 
 	var orderIds []uint64
@@ -1176,7 +1187,7 @@ func (s *Strategy) updateGridNumOfOrdersMetricsWithLock() {
 }
 
 func (s *Strategy) updateGridNumOfOrdersMetrics(grid *Grid) {
-	baseLabels := s.newPrometheusLabels()
+	baseLabels := s.getPrometheusLabels()
 	makerOrders := s.orderExecutor.ActiveMakerOrders()
 	numOfOrders := makerOrders.NumOfOrders()
 	metricsGridNumOfOrders.With(baseLabels).Set(float64(numOfOrders))
@@ -1494,6 +1505,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	s.session = session
 
+	// newPrometheusLabels requires session.Name to setup the exchange label
+	s.mergedPrometheusLabels = s.newPrometheusLabels()
+
 	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
 		s.orderQueryService = service
 	}
@@ -1587,7 +1601,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 
 	s.OnGridProfit(func(stats *GridProfitStats, profit *GridProfit) {
-		labels := s.newPrometheusLabels()
+		labels := s.getPrometheusLabels()
 		metricsGridProfit.With(labels).Set(stats.TotalQuoteProfit.Float64())
 	})
 
