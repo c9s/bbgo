@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -626,6 +627,43 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 
 	a.UpdateBalances(balances)
 	return a, nil
+}
+
+type CollateralTier struct {
+	Range fixedpoint.Range
+	Rate  fixedpoint.Value
+}
+
+func (e *Exchange) QueryCrossMarginCollateralRatio(ctx context.Context) (map[string][]CollateralTier, error) {
+	req := e.client2.NewGetCrossMarginCollateralRatioRequest()
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tiers := make(map[string][]CollateralTier)
+	for _, info := range resp {
+		var collateralTiers []CollateralTier
+		for _, tier := range info.Collaterals {
+			maxValue := fixedpoint.PosInf
+			if tier.MaxUsdValue != nil {
+				maxValue = *tier.MaxUsdValue
+			}
+			collateralTiers = append(collateralTiers, CollateralTier{
+				Range: fixedpoint.Range{
+					Min: tier.MinUsdValue,
+					Max: maxValue,
+				},
+				Rate: tier.DiscountRate,
+			})
+		}
+		sort.Slice(collateralTiers, func(i, j int) bool {
+			return collateralTiers[i].Range.Min.Compare(collateralTiers[j].Range.Min) < 0
+		})
+		for _, asset := range info.AssetNames {
+			tiers[asset] = collateralTiers
+		}
+	}
+	return tiers, nil
 }
 
 func (e *Exchange) Withdraw(
