@@ -47,6 +47,14 @@ type InteractiveSubmitOrder struct {
 	ConfirmOnce func()
 }
 
+type ErrorOrderCancelled struct {
+	Order types.SubmitOrder
+}
+
+func (e *ErrorOrderCancelled) Error() string {
+	return fmt.Sprintf("order is manually canceled: %v", e.Order)
+}
+
 func NewInteractiveSubmitOrder(order types.SubmitOrder, delay time.Duration, mentions []string, slackEvtID string) *InteractiveSubmitOrder {
 	itOrder := &InteractiveSubmitOrder{
 		id:          uuid.NewString(),
@@ -181,7 +189,7 @@ func (itOrder *InteractiveSubmitOrder) asyncSubmit(ctx context.Context, session 
 	case <-ctx.Done():
 		err = ctx.Err()
 	case <-itOrder.cancelC:
-		err = fmt.Errorf("order is manually canceled: %v", itOrder.submitOrder)
+		err = &ErrorOrderCancelled{Order: itOrder.submitOrder}
 	case <-itOrder.confirmC:
 		order, err = session.Exchange.SubmitOrder(ctx, itOrder.submitOrder)
 	case <-timer.C:
