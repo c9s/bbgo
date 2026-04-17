@@ -837,7 +837,9 @@ func (s *Strategy) onSubmittedOrderCallback(session *bbgo.ExchangeSession, submi
 
 func (s *Strategy) asyncOrderCallbackWithRetry(ctx context.Context, sessions bbgo.ExchangeSessionMap, currency string, changeQuantity fixedpoint.Value) OnSubmittedOrderCallback {
 	return func(session *bbgo.ExchangeSession, submitOrder *types.SubmitOrder, createdOrder *types.Order, err error) {
-		if err != nil {
+		var cancelledErr *ErrorOrderCancelled
+		if err != nil && !errors.As(err, &cancelledErr) {
+			// there is an error and the order is not cancelled
 			// select another session and retry once
 			log.WithError(err).Infof("select new session to retry for %s: %s %s", session.Name, changeQuantity, currency)
 			// keep the original session and order for later
