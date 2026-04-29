@@ -1675,8 +1675,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		fmt.Println(s.GridProfitStats.PlainText())
 
-		fmt.Println("HedgeSimulator ProfitStats:\n", s.hedgeSimulator.ProfitStats.PlainText())
-		fmt.Println("HedgeSimulator Position:\n", s.hedgeSimulator.Position.PlainText())
+		fmt.Println("## HedgeSimulator ProfitStats\n", s.hedgeSimulator.ProfitStats.PlainText())
+		fmt.Println("## HedgeSimulator Position\n", s.hedgeSimulator.Position.PlainText())
 
 		if s.KeepOrdersWhenShutdown {
 			s.logger.Infof("keepOrdersWhenShutdown is set, will keep the orders on the exchange")
