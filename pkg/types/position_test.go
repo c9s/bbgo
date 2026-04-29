@@ -3,6 +3,9 @@ package types
 import (
 	"testing"
 
+	"time"
+
+	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -378,4 +381,51 @@ func TestPosition_GetBaseAndAverageCost(t *testing.T) {
 	base, avgCost := pos.GetBaseAndAverageCost()
 	assert.Equal(t, pos.Base, base)
 	assert.Equal(t, pos.AverageCost, avgCost)
+}
+
+func TestPosition_SlackAttachment(t *testing.T) {
+	pos := &Position{
+		Symbol:        "BTCUSDT",
+		BaseCurrency:  "BTC",
+		QuoteCurrency: "USDT",
+		Base:          fixedpoint.NewFromFloat(1.0),
+		AverageCost:   fixedpoint.NewFromFloat(50000.0),
+		Market: Market{
+			Symbol:          "BTCUSDT",
+			PricePrecision:  2,
+			VolumePrecision: 4,
+			QuoteCurrency:   "USDT",
+			BaseCurrency:    "BTC",
+		},
+	}
+
+	t.Run("without last price", func(t *testing.T) {
+		var attachment slack.Attachment = pos.SlackAttachment()
+		assert.NotEmpty(t, attachment.Title)
+		for _, field := range attachment.Fields {
+			assert.NotEqual(t, "Last Price", field.Title)
+			assert.NotEqual(t, "Unrealized PnL", field.Title)
+		}
+	})
+
+	t.Run("with last price", func(t *testing.T) {
+		lastPrice := fixedpoint.NewFromFloat(55000.0)
+		pos.SetLastPrice(lastPrice, time.Now())
+		attachment := pos.SlackAttachment()
+
+		var hasLastPrice, hasUnrealizedPnL bool
+		for _, field := range attachment.Fields {
+			if field.Title == "Last Price" {
+				hasLastPrice = true
+				assert.Contains(t, field.Value, "55000.00")
+			}
+			if field.Title == "Unrealized PnL" {
+				hasUnrealizedPnL = true
+				// Unrealized PnL = (55000 - 50000) * 1 = 5000
+				assert.Contains(t, field.Value, "5000")
+			}
+		}
+		assert.True(t, hasLastPrice, "should have Last Price field")
+		assert.True(t, hasUnrealizedPnL, "should have Unrealized PnL field")
+	})
 }

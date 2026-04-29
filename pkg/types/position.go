@@ -497,6 +497,21 @@ func (p *Position) SlackAttachment() slack.Attachment {
 		}
 	}
 
+	if lastPrice, ok := p.getLastPrice(time.Now()); ok {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Last Price",
+			Value: p.Market.FormatPrice(lastPrice) + " " + p.QuoteCurrency,
+			Short: true,
+		})
+
+		unrealizedPnL := p.unrealizedProfit(lastPrice)
+		fields = append(fields, slack.AttachmentField{
+			Title: "Unrealized PnL",
+			Value: unrealizedPnL.String() + " " + p.QuoteCurrency,
+			Short: true,
+		})
+	}
+
 	footer := templateutil.Render("Last updated time: {{ . }}",
 		time.Now().Format(time.RFC822))
 
