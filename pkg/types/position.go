@@ -48,6 +48,8 @@ type PositionRisk struct {
 	UpdateTime             MillisecondTimestamp `json:"updateTime,omitempty"`
 }
 
+const EffectiveLastPriceDuration = 10 * time.Minute
+
 // Position stores the position data
 type Position struct {
 	Symbol        string `json:"symbol" db:"symbol"`
@@ -80,6 +82,9 @@ type Position struct {
 
 	// closing is a flag for marking this position is closing
 	closing bool
+
+	lastPrice     fixedpoint.Value
+	lastPriceTime time.Time
 
 	sync.Mutex
 
@@ -261,6 +266,11 @@ func (p *Position) GetBaseAndAverageCost() (base fixedpoint.Value, averageCost f
 func (p *Position) GetQuantity() fixedpoint.Value {
 	base := p.GetBase()
 	return base.Abs()
+}
+
+func (p *Position) SetLastPrice(price fixedpoint.Value, time time.Time) {
+	p.lastPrice = price
+	p.lastPriceTime = time
 }
 
 func (p *Position) UnrealizedProfit(price fixedpoint.Value) fixedpoint.Value {
@@ -513,9 +523,34 @@ func (p *Position) SlackAttachment() slack.Attachment {
 	}
 }
 
+// getLastPrice returns the last price of the position, if the position is not opened yet, it returns zero.
+// The last price is valid for 10 seconds.
+// If the last price is not valid, it returns zero.
+//
+// The last price is used to calculate the unrealized profit.
+//
+// The last price is also used to calculate the position size.
+//
+// The last price is also used to calculate the position size.
+func (p *Position) getLastPrice(now time.Time) (fixedpoint.Value, bool) {
+	if p.lastPrice.IsZero() {
+		return fixedpoint.Zero, false
+	}
+
+	if p.lastPriceTime.IsZero() {
+		return fixedpoint.Zero, false
+	}
+
+	if now.Sub(p.lastPriceTime) > EffectiveLastPriceDuration {
+		return fixedpoint.Zero, false
+	}
+
+	return p.lastPrice, true
+}
+
 func (p *Position) PlainText() (msg string) {
 	posType := p.Type()
-	msg = fmt.Sprintf("%s Position %s: average cost = %v, base = %v, quote = %v, opened at %s",
+	msg = fmt.Sprintf("%s Position %s: Average cost = %v, Base = %v, Quote = %v, Opened at %s",
 		posType,
 		p.Symbol,
 		p.AverageCost,
@@ -526,8 +561,13 @@ func (p *Position) PlainText() (msg string) {
 
 	if p.TotalFee != nil {
 		for feeCurrency, fee := range p.TotalFee {
-			msg += fmt.Sprintf("\nfee (%s) = %v", feeCurrency, fee)
+			msg += fmt.Sprintf("\nFee (%s) = %f", feeCurrency, fee.Float64())
 		}
+	}
+
+	if lastPrice, ok := p.getLastPrice(time.Now()); ok {
+		msg += fmt.Sprintf("\nLast price = %f", lastPrice.Float64())
+		msg += fmt.Sprintf("\nUnrealized PnL = %f", p.unrealizedProfit(lastPrice).Float64())
 	}
 
 	return msg
