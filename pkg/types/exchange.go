@@ -17,26 +17,28 @@ const DateFormat = "2006-01-02"
 type ExchangeName string
 
 const (
-	ExchangeMax      ExchangeName = "max"
-	ExchangeBinance  ExchangeName = "binance"
-	ExchangeOKEx     ExchangeName = "okex"
-	ExchangeKucoin   ExchangeName = "kucoin"
-	ExchangeBitget   ExchangeName = "bitget"
-	ExchangeBacktest ExchangeName = "backtest"
-	ExchangeBybit    ExchangeName = "bybit"
-	ExchangeCoinBase ExchangeName = "coinbase"
-	ExchangeBitfinex ExchangeName = "bitfinex"
+	ExchangeMax         ExchangeName = "max"
+	ExchangeBinance     ExchangeName = "binance"
+	ExchangeOKEx        ExchangeName = "okex"
+	ExchangeKucoin      ExchangeName = "kucoin"
+	ExchangeBitget      ExchangeName = "bitget"
+	ExchangeBacktest    ExchangeName = "backtest"
+	ExchangeBybit       ExchangeName = "bybit"
+	ExchangeCoinBase    ExchangeName = "coinbase"
+	ExchangeBitfinex    ExchangeName = "bitfinex"
+	ExchangeHyperliquid ExchangeName = "hyperliquid"
 )
 
 var SupportedExchanges = map[ExchangeName]struct{}{
-	ExchangeMax:      struct{}{},
-	ExchangeBinance:  struct{}{},
-	ExchangeOKEx:     struct{}{},
-	ExchangeKucoin:   struct{}{},
-	ExchangeBitget:   struct{}{},
-	ExchangeBybit:    struct{}{},
-	ExchangeCoinBase: struct{}{},
-	ExchangeBitfinex: struct{}{},
+	ExchangeMax:         struct{}{},
+	ExchangeBinance:     struct{}{},
+	ExchangeOKEx:        struct{}{},
+	ExchangeKucoin:      struct{}{},
+	ExchangeBitget:      struct{}{},
+	ExchangeBybit:       struct{}{},
+	ExchangeCoinBase:    struct{}{},
+	ExchangeBitfinex:    struct{}{},
+	ExchangeHyperliquid: struct{}{},
 	// note: we are not using "backtest"
 }
 
