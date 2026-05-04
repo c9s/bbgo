@@ -62,7 +62,7 @@ type OrderExecutor interface {
 }
 
 type HedgingConfig struct {
-	HedgeInterval types.Interval  `json:"hedgeInterval"`
+	HedgeInterval types.Interval  `json:"interval"`
 	RatioScale    *bbgo.SlideRule `json:"ratioScale"`
 }
 
@@ -172,8 +172,6 @@ type Strategy struct {
 
 	Hedging *HedgingConfig `json:"hedging"`
 
-	HedgeInterval types.Interval `json:"hedgeInterval"`
-
 	GridProfitStats *grid2.GridProfitStats `persistence:"grid_profit_stats"`
 
 	Position       *types.Position `persistence:"position"`
@@ -226,8 +224,8 @@ func (s *Strategy) ID() string {
 
 func (s *Strategy) Validate() error {
 	if s.Hedging != nil {
-		if s.Hedging.HedgeInterval == "" && s.HedgeInterval != "" {
-			s.Hedging.HedgeInterval = s.HedgeInterval
+		if s.Hedging.HedgeInterval == "" {
+			s.Hedging.HedgeInterval = types.Interval1h
 		}
 
 		if s.Hedging.RatioScale != nil {
@@ -308,13 +306,11 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: interval})
 	}
 
-	hedgeInterval := s.HedgeInterval
-	if s.Hedging != nil && s.Hedging.HedgeInterval != "" {
-		hedgeInterval = s.Hedging.HedgeInterval
-	}
-
-	if hedgeInterval.Duration() > 0 {
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: hedgeInterval})
+	if s.Hedging != nil {
+		hedgeInterval := s.Hedging.HedgeInterval
+		if hedgeInterval.Duration() > 0 {
+			session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: hedgeInterval})
+		}
 	}
 }
 
@@ -1557,39 +1553,31 @@ func (s *Strategy) calculateHedgeRatio(price fixedpoint.Value) (fixedpoint.Value
 }
 
 func (s *Strategy) hedge(price fixedpoint.Value) {
+	gridPosition := s.Position.GetBase()
+	ratio := fixedpoint.One
+	var err error
+
 	if s.Hedging != nil && s.Hedging.RatioScale != nil {
-		ratio, err := s.calculateHedgeRatio(price)
+		ratio, err = s.calculateHedgeRatio(price)
 		if err != nil {
 			s.logger.WithError(err).Error("failed to calculate hedge ratio")
 			return
 		}
 
-		net := s.positionExposure.GetNet()
-		desiredPending := net.Mul(ratio)
-		currentPending := s.positionExposure.GetPending()
-		diff := desiredPending.Sub(currentPending)
+		s.logger.Infof("current hedge ratio: %s (price %s)", ratio.Percentage(), price.String())
+	}
 
-		if diff.IsZero() {
-			return
-		}
+	desiredUncovered := gridPosition.Mul(fixedpoint.One.Sub(ratio))
+	currentUncovered := s.positionExposure.GetUncovered()
+	diff := currentUncovered.Sub(desiredUncovered)
 
-		delta := diff.Neg()
-		s.positionExposure.Cover(diff)
-		uncovered := s.positionExposure.GetUncovered()
-
-		if err := s.hedgeService.Hedge(uncovered, delta); err != nil {
-			s.logger.WithError(err).Error("failed to hedge")
-		}
+	if diff.IsZero() {
 		return
 	}
 
+	delta := diff.Neg()
+	s.positionExposure.Cover(diff)
 	uncovered := s.positionExposure.GetUncovered()
-	if uncovered.IsZero() {
-		return
-	}
-
-	delta := uncovered.Neg()
-	s.positionExposure.Cover(uncovered)
 
 	if err := s.hedgeService.Hedge(uncovered, delta); err != nil {
 		s.logger.WithError(err).Error("failed to hedge")
@@ -1617,37 +1605,32 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.hedgeSimulator.SetSpread(fixedpoint.NewFromFloat(0.01 * 0.01))  // 0.01% spread
 	s.hedgeService = s.hedgeSimulator
 
-	hedgeInterval := s.HedgeInterval
 	if s.Hedging != nil && s.Hedging.HedgeInterval != "" {
-		hedgeInterval = s.Hedging.HedgeInterval
-	}
+		hedgeInterval := s.Hedging.HedgeInterval
+		if hedgeInterval.Duration() > 0 {
+			if err := s.hedgeSimulator.LoadKLines("data/binance/futures"); err != nil {
+				s.logger.WithError(err).Error("failed to load klines for hedge simulator")
+				return err
+			}
 
-	if hedgeInterval.Duration() > 0 {
-		if err := s.hedgeSimulator.LoadKLines("data/binance/futures"); err != nil {
-			s.logger.WithError(err).Error("failed to load klines for hedge simulator")
-			return err
+			session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+				s.positionExposure.Open(trade.PositionDelta())
+			})
+
+			s.hedgeSimulator.OnTrade(func(trade types.Trade) {
+				s.positionExposure.Close(trade.PositionDelta())
+			})
+
+			session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
+				if err := s.hedgeSimulator.Move(kline.GetEndTime().Time()); err != nil {
+					s.logger.WithError(err).Error("failed to move hedge simulator")
+				}
+			}))
+
+			session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, hedgeInterval, func(k types.KLine) {
+				s.hedge(k.Close)
+			}))
 		}
-
-		session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-			s.positionExposure.Open(trade.PositionDelta())
-		})
-
-		s.hedgeSimulator.OnTrade(func(trade types.Trade) {
-			s.positionExposure.Close(trade.PositionDelta())
-		})
-
-		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
-			if kline.Symbol != s.Symbol {
-				return
-			}
-			if err := s.hedgeSimulator.Move(kline.GetEndTime().Time()); err != nil {
-				s.logger.WithError(err).Error("failed to move hedge simulator")
-			}
-		}))
-
-		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, hedgeInterval, func(k types.KLine) {
-			s.hedge(k.Close)
-		}))
 	}
 
 	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
@@ -1766,11 +1749,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			s.cancelWrite()
 		}
 
-		fmt.Println("## GridProfitStats\n\n", s.GridProfitStats.PlainText())
-		fmt.Println("## Position\n\n", s.Position.PlainText())
-
-		fmt.Println("## HedgeSimulator ProfitStats\n\n", s.hedgeSimulator.ProfitStats.PlainText())
-		fmt.Println("## HedgeSimulator Position\n\n", s.hedgeSimulator.Position.PlainText())
+		fmt.Println("## GridProfitStats\n\n", s.GridProfitStats.PlainText(), "\n\n")
+		fmt.Println("## Position\n\n", s.Position.PlainText(), "\n\n")
+		fmt.Println("## HedgeSimulator ProfitStats\n\n", s.hedgeSimulator.ProfitStats.PlainText(), "\n\n")
+		fmt.Println("## HedgeSimulator Position\n\n", s.hedgeSimulator.Position.PlainText(), "\n\n")
 
 		if s.KeepOrdersWhenShutdown {
 			s.logger.Infof("keepOrdersWhenShutdown is set, will keep the orders on the exchange")
@@ -1793,6 +1775,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	if !s.TakeProfitPrice.IsZero() {
 		session.MarketDataStream.OnKLineClosed(s.newTakeProfitHandler(ctx, session))
 	}
+
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
+		s.Position.SetLastPrice(k.Close, k.EndTime.Time())
+	}))
 
 	// detect if there are previous grid orders on the order book
 	session.UserDataStream.OnStart(func() {
