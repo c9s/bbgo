@@ -547,6 +547,8 @@ func (p *Position) SlackAttachment() slack.Attachment {
 // The last price is also used to calculate the position size.
 //
 // The last price is also used to calculate the position size.
+//
+// now = time.Time{} means the last price will be returned
 func (p *Position) getLastPrice(now time.Time) (fixedpoint.Value, bool) {
 	if p.lastPrice.IsZero() {
 		return fixedpoint.Zero, false
@@ -556,7 +558,7 @@ func (p *Position) getLastPrice(now time.Time) (fixedpoint.Value, bool) {
 		return fixedpoint.Zero, false
 	}
 
-	if now.Sub(p.lastPriceTime) > EffectiveLastPriceDuration {
+	if !now.IsZero() && now.Sub(p.lastPriceTime) > EffectiveLastPriceDuration {
 		return fixedpoint.Zero, false
 	}
 
@@ -580,7 +582,7 @@ func (p *Position) PlainText() (msg string) {
 		}
 	}
 
-	if lastPrice, ok := p.getLastPrice(time.Now()); ok {
+	if lastPrice, ok := p.getLastPrice(time.Time{}); ok {
 		msg += fmt.Sprintf("\nLast price = %f", lastPrice.Float64())
 		msg += fmt.Sprintf("\nUnrealized PnL = %f", p.unrealizedProfit(lastPrice).Float64())
 	}

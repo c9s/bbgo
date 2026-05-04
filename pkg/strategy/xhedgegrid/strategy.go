@@ -1622,6 +1622,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			})
 
 			session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
+				s.hedgeSimulator.Position.SetLastPrice(kline.Close, kline.GetEndTime().Time())
+
 				if err := s.hedgeSimulator.Move(kline.GetEndTime().Time()); err != nil {
 					s.logger.WithError(err).Error("failed to move hedge simulator")
 				}
@@ -1749,8 +1751,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			s.cancelWrite()
 		}
 
-		fmt.Println("## GridProfitStats\n\n", s.GridProfitStats.PlainText(), "\n\n")
-		fmt.Println("## Position\n\n", s.Position.PlainText(), "\n\n")
+		fmt.Println("## GridProfitStats\n\n", s.GridProfitStats.PlainText())
+		fmt.Println("## Position\n\n", s.Position.PlainText())
 		fmt.Println("## HedgeSimulator ProfitStats\n\n", s.hedgeSimulator.ProfitStats.PlainText(), "\n\n")
 		fmt.Println("## HedgeSimulator Position\n\n", s.hedgeSimulator.Position.PlainText(), "\n\n")
 
