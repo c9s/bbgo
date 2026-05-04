@@ -61,6 +61,11 @@ type OrderExecutor interface {
 	ActiveMakerOrders() *bbgo.ActiveOrderBook
 }
 
+type HedgingConfig struct {
+	HedgeInterval types.Interval  `json:"hedgeInterval"`
+	RatioScale    *bbgo.SlideRule `json:"ratioScale"`
+}
+
 //go:generate callbackgen -type Strategy
 type Strategy struct {
 	Environment *bbgo.Environment
@@ -165,6 +170,8 @@ type Strategy struct {
 	// Debug enables the debug mode
 	Debug bool `json:"debug"`
 
+	Hedging *HedgingConfig `json:"hedging"`
+
 	HedgeInterval types.Interval `json:"hedgeInterval"`
 
 	GridProfitStats *grid2.GridProfitStats `persistence:"grid_profit_stats"`
@@ -218,6 +225,23 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Validate() error {
+	if s.Hedging != nil {
+		if s.Hedging.HedgeInterval == "" && s.HedgeInterval != "" {
+			s.Hedging.HedgeInterval = s.HedgeInterval
+		}
+
+		if s.Hedging.RatioScale != nil {
+			scale, err := s.Hedging.RatioScale.Scale()
+			if err != nil {
+				return err
+			}
+
+			if err := scale.Solve(); err != nil {
+				return err
+			}
+		}
+	}
+
 	if s.AutoRange == nil {
 		if s.UpperPrice.IsZero() {
 			return errors.New("upperPrice can not be zero, you forgot to set?")
@@ -282,6 +306,15 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	if s.AutoRange != nil {
 		interval := s.AutoRange.Interval()
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: interval})
+	}
+
+	hedgeInterval := s.HedgeInterval
+	if s.Hedging != nil && s.Hedging.HedgeInterval != "" {
+		hedgeInterval = s.Hedging.HedgeInterval
+	}
+
+	if hedgeInterval.Duration() > 0 {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: hedgeInterval})
 	}
 }
 
@@ -1510,6 +1543,59 @@ func (s *Strategy) getWriteContext(fallbackCtxList ...context.Context) context.C
 	return context.Background()
 }
 
+func (s *Strategy) calculateHedgeRatio(price fixedpoint.Value) (fixedpoint.Value, error) {
+	if s.Hedging == nil || s.Hedging.RatioScale == nil {
+		return fixedpoint.One, nil
+	}
+
+	scale, err := s.Hedging.RatioScale.Scale()
+	if err != nil {
+		return fixedpoint.One, err
+	}
+
+	return fixedpoint.NewFromFloat(scale.Call(price.Float64())), nil
+}
+
+func (s *Strategy) hedge(price fixedpoint.Value) {
+	if s.Hedging != nil && s.Hedging.RatioScale != nil {
+		ratio, err := s.calculateHedgeRatio(price)
+		if err != nil {
+			s.logger.WithError(err).Error("failed to calculate hedge ratio")
+			return
+		}
+
+		net := s.positionExposure.GetNet()
+		desiredPending := net.Mul(ratio)
+		currentPending := s.positionExposure.GetPending()
+		diff := desiredPending.Sub(currentPending)
+
+		if diff.IsZero() {
+			return
+		}
+
+		delta := diff.Neg()
+		s.positionExposure.Cover(diff)
+		uncovered := s.positionExposure.GetUncovered()
+
+		if err := s.hedgeService.Hedge(uncovered, delta); err != nil {
+			s.logger.WithError(err).Error("failed to hedge")
+		}
+		return
+	}
+
+	uncovered := s.positionExposure.GetUncovered()
+	if uncovered.IsZero() {
+		return
+	}
+
+	delta := uncovered.Neg()
+	s.positionExposure.Cover(uncovered)
+
+	if err := s.hedgeService.Hedge(uncovered, delta); err != nil {
+		s.logger.WithError(err).Error("failed to hedge")
+	}
+}
+
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 
@@ -1531,7 +1617,12 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.hedgeSimulator.SetSpread(fixedpoint.NewFromFloat(0.01 * 0.01))  // 0.01% spread
 	s.hedgeService = s.hedgeSimulator
 
-	if s.HedgeInterval.Duration() > 0 {
+	hedgeInterval := s.HedgeInterval
+	if s.Hedging != nil && s.Hedging.HedgeInterval != "" {
+		hedgeInterval = s.Hedging.HedgeInterval
+	}
+
+	if hedgeInterval.Duration() > 0 {
 		if err := s.hedgeSimulator.LoadKLines("data/binance/futures"); err != nil {
 			s.logger.WithError(err).Error("failed to load klines for hedge simulator")
 			return err
@@ -1554,18 +1645,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			}
 		}))
 
-		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.HedgeInterval, func(kline types.KLine) {
-			uncovered := s.positionExposure.GetUncovered()
-			if uncovered.IsZero() {
-				return
-			}
-
-			delta := uncovered.Neg()
-			s.positionExposure.Cover(uncovered)
-
-			if err := s.hedgeService.Hedge(uncovered, delta); err != nil {
-				s.logger.WithError(err).Error("failed to hedge")
-			}
+		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, hedgeInterval, func(k types.KLine) {
+			s.hedge(k.Close)
 		}))
 	}
 
@@ -1585,6 +1666,18 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.UpperPrice = fixedpoint.NewFromFloat(pivotHigh.Last(0))
 		s.LowerPrice = fixedpoint.NewFromFloat(pivotLow.Last(0))
 		s.logger.Infof("autoRange is enabled, using pivot high %f and pivot low %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+	}
+
+	if s.Hedging != nil && s.Hedging.RatioScale == nil && !s.UpperPrice.IsZero() && !s.LowerPrice.IsZero() {
+		s.Hedging.RatioScale = &bbgo.SlideRule{
+			LinearScale: &bbgo.LinearScale{
+				Domain: [2]float64{s.LowerPrice.Float64(), s.UpperPrice.Float64()},
+				Range:  [2]float64{1.0, 0.0},
+			},
+		}
+		if scale, err := s.Hedging.RatioScale.Scale(); err == nil {
+			_ = scale.Solve()
+		}
 	}
 
 	s.logger.Infof("market info: %+v", s.Market)
@@ -1673,10 +1766,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			s.cancelWrite()
 		}
 
-		fmt.Println(s.GridProfitStats.PlainText())
+		fmt.Println("## GridProfitStats\n\n", s.GridProfitStats.PlainText())
+		fmt.Println("## Position\n\n", s.Position.PlainText())
 
-		fmt.Println("## HedgeSimulator ProfitStats\n", s.hedgeSimulator.ProfitStats.PlainText())
-		fmt.Println("## HedgeSimulator Position\n", s.hedgeSimulator.Position.PlainText())
+		fmt.Println("## HedgeSimulator ProfitStats\n\n", s.hedgeSimulator.ProfitStats.PlainText())
+		fmt.Println("## HedgeSimulator Position\n\n", s.hedgeSimulator.Position.PlainText())
 
 		if s.KeepOrdersWhenShutdown {
 			s.logger.Infof("keepOrdersWhenShutdown is set, will keep the orders on the exchange")
