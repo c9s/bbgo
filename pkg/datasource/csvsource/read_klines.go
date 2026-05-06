@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -28,6 +30,7 @@ func ReadAllKLineCsv(dir string, symbol string, interval types.Interval) ([]type
 		if d.IsDir() {
 			return nil
 		}
+
 		if filepath.Ext(path) != ".csv" {
 			return nil
 		}
@@ -40,12 +43,14 @@ func ReadAllKLineCsv(dir string, symbol string, interval types.Interval) ([]type
 		//nolint:errcheck // Read ops only so safe to ignore err return
 		defer file.Close()
 
+		log.Infof("reading %s", file.Name())
 		reader := NewCSVKLineReader(csv.NewReader(file), symbol, interval)
-		newKlines, err := reader.ReadAll()
+		fileKLines, err := reader.ReadAll()
 		if err != nil {
 			return err
 		}
-		klines = append(klines, newKlines...)
+
+		klines = append(klines, fileKLines...)
 		return nil
 	})
 	if err != nil {
