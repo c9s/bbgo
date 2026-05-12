@@ -84,7 +84,7 @@ func (p *ProfitStatsTracker) Rotate() {
 }
 
 func (p *ProfitStatsTracker) AddProfit(profit types.Profit) {
-	(*p.CurrentProfitStats).AddProfit(profit)
+	(*p.CurrentProfitStats).AddProfit(&profit)
 }
 
 func (p *ProfitStatsTracker) AddTrade(trade types.Trade) {
