@@ -77,6 +77,9 @@ type Strategy struct {
 	MarketSelectionConfig *MarketSelectionConfig      `json:"marketSelection,omitempty"`
 	MaxPositionExposure   map[string]fixedpoint.Value `json:"maxPositionExposure"`
 
+	HaltRoundNotificationInterval types.Duration       `json:"haltRoundNotificationInterval"`
+	lastHaltNotificationTime      map[string]time.Time `json:"lastHaltNotificationTime"`
+
 	CriticalErrorConfig CriticalErrorConfig                            `json:"criticalErrorConfig"`
 	CircuitBreakers     map[string]*circuitbreaker.BasicCircuitBreaker `json:"circuitBreakers"`
 
@@ -173,6 +176,9 @@ func (s *Strategy) Defaults() error {
 		s.MaxClosedRetryCnt = 3
 	}
 
+	if s.HaltRoundNotificationInterval.Duration() == 0 {
+		s.HaltRoundNotificationInterval = types.Duration(time.Minute * 30)
+	}
 	s.CriticalErrorConfig.Defaults()
 
 	return nil
@@ -204,6 +210,7 @@ func (s *Strategy) Initialize() error {
 	if s.CircuitBreakers == nil {
 		s.CircuitBreakers = make(map[string]*circuitbreaker.BasicCircuitBreaker)
 	}
+	s.lastHaltNotificationTime = make(map[string]time.Time)
 	return nil
 }
 
@@ -540,6 +547,10 @@ func (s *Strategy) CrossRun(
 			if round.HasOrder(trade.OrderID) {
 				round.HandleSpotTrade(trade, trade.Time.Time())
 
+				spotOrderBook := s.spotOrderBooks[round.SpotSymbol()].Copy()
+				futuresOrderBook := s.futuresOrderBooks[round.FuturesSymbol()].Copy()
+				round.Tick(trade.Time.Time(), spotOrderBook, futuresOrderBook)
+
 				spotFilledPosition := round.SpotWorker().FilledPosition()
 				filledRatio := spotFilledPosition.Div(round.TriggeredFundingRate()).Abs()
 				if round.State() == RoundClosing {
@@ -635,31 +646,35 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		// calculate the deviation of the unhedged position
 		deviation := fixedpoint.One.Sub(futuresFilled.Div(spotFilled)).Abs()
 		deviationTooLarge := deviation.Compare(s.CriticalErrorConfig.MaxHedgeDeviation) > 0
+		roundSymbol := round.SpotSymbol()
 		if !halted && deviationTooLarge {
 			// the round is originally not halted but the deviation is too large -> we need to halt the round
 			round.Halt(tickTime)
 			s.logger.Warnf("round %s halted due to large hedge deviation: %s, spot filled: %s, futures filled: %s",
-				round.SpotSymbol(),
+				roundSymbol,
 				deviation,
 				spotFilled,
 				futuresFilled,
 			)
+			s.lastHaltNotificationTime[round.SpotSymbol()] = tickTime
 			bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required.",
-				round.SpotSymbol(),
+				roundSymbol,
 				round.NewNotification(true),
 			)
 		} else if halted && !deviationTooLarge {
 			// the deviation is back to normal, resume the round
 			haltedAt := round.HaltedAt()
 			round.Resume()
+			// remove the last notification time
+			delete(s.lastHaltNotificationTime, roundSymbol)
 			s.logger.Infof("round %s resumed as hedge deviation back to normal: %s, spot filled: %s, futures filled: %s",
-				round.SpotSymbol(),
+				roundSymbol,
 				deviation,
 				spotFilled,
 				futuresFilled,
 			)
 			bbgo.Notify("✅ Round %s resumed as hedge deviation back to normal. It was halted at %s.",
-				round.SpotSymbol(),
+				roundSymbol,
 				haltedAt.Format(time.RFC3339),
 				round.NewNotification(false),
 			)
@@ -667,6 +682,19 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 
 		// round is still halted, skip the rest of the processing
 		if round.IsHalted() {
+			haltedAt := round.HaltedAt()
+			elapsed := tickTime.Sub(haltedAt)
+			lastNotifyTime, found := s.lastHaltNotificationTime[round.SpotSymbol()]
+			if !found || tickTime.Sub(lastNotifyTime) > s.HaltRoundNotificationInterval.Duration() {
+				s.lastHaltNotificationTime[roundSymbol] = tickTime
+				// send notification for rounds that have been halted for a while.
+				bbgo.Notify("💥 Round %s halted for %s (since %s). Manual intervention is required",
+					roundSymbol,
+					elapsed.String(),
+					haltedAt.Format(time.RFC3339),
+					round.NewNotification(true),
+				)
+			}
 			continue
 		}
 
