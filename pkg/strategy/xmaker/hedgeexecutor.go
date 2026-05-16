@@ -122,6 +122,44 @@ func (m *MarketOrderHedgeExecutor) Hedge(
 	}
 
 	m.logger.Infof("hedge order created: %+v", hedgeOrder)
+
+	if hedgeOrder != nil {
+		updatedOrder, err := m.syncOrder(ctx, *hedgeOrder)
+		if err != nil {
+			m.logger.WithError(err).WithFields(hedgeOrder.LogFields()).Errorf("failed to sync order: %+v", hedgeOrder)
+		} else if updatedOrder != nil {
+			orderLogger := m.logger.WithFields(updatedOrder.LogFields())
+			// Compare the order quantity, if the order quantity is changed from the server side
+			// we should uncover the difference
+			if !updatedOrder.Quantity.Eq(hedgeOrder.Quantity) {
+				// if we sent sell 1 BTC (-1 BTC), but the order was adjusted to sell 0.1 BTC (-0.1 BTC)
+				// we should uncover +0.9 BTC to the position exposure (meaning -0.9 BTC the the covered position)
+
+				// Net Position: 1.0, Pending: 0.0
+				// Submit Order { Quantity: 1, Side: Sell }
+				// Net Position: 1.0, Pending: 1.0
+				// Order Updated { Quantity: 0.1, Side: Sell }
+				// to quantityToDelta = -(-0.9) (Sell) = +0.9
+				// to coverDeltaDiff = +0.9
+				// to uncover = 0.9 = cover -0.9
+				// Net Position: 1.0, Pending: 0.1
+				// Covered Position: 0.1
+				// Uncover: 0.9
+				quantityDiff := updatedOrder.Quantity.Sub(hedgeOrder.Quantity)
+
+				orderLogger.Infof("hedge order quantity changed from %s to %s, adjusting covered position by %s",
+					hedgeOrder.Quantity.String(), updatedOrder.Quantity.String(), quantityDiff.String())
+
+				if !quantityDiff.IsZero() {
+					coverDeltaDiff := quantityToDelta(quantityDiff, side)
+					m.positionExposure.Uncover(coverDeltaDiff)
+					orderLogger.Infof("hedge order quantity changed from %s to %s, adjusting covered position by %s",
+						hedgeOrder.Quantity.String(), updatedOrder.Quantity.String(), coverDeltaDiff.String())
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
