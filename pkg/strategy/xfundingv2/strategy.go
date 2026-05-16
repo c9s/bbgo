@@ -30,6 +30,19 @@ func init() {
 type CriticalErrorConfig struct {
 	MaxRemainingNotional fixedpoint.Value `json:"maxRemainingNotional"`
 	MaxFundingRateFlip   fixedpoint.Value `json:"maxFundingRateFlip"`
+	MaxHedgeDeviation    fixedpoint.Value `json:"maxHedgeDeviation"`
+}
+
+func (c *CriticalErrorConfig) Defaults() {
+	if c.MaxRemainingNotional.IsZero() {
+		c.MaxRemainingNotional = fixedpoint.NewFromInt(500)
+	}
+	if c.MaxFundingRateFlip.IsZero() {
+		c.MaxFundingRateFlip = fixedpoint.NewFromFloat(0.0003) // 0.03%
+	}
+	if c.MaxHedgeDeviation.IsZero() {
+		c.MaxHedgeDeviation = fixedpoint.NewFromFloat(0.3) // 30%
+	}
 }
 
 type Strategy struct {
@@ -160,12 +173,7 @@ func (s *Strategy) Defaults() error {
 		s.MaxClosedRetryCnt = 3
 	}
 
-	if s.CriticalErrorConfig.MaxRemainingNotional.IsZero() {
-		s.CriticalErrorConfig.MaxRemainingNotional = fixedpoint.NewFromInt(500)
-	}
-	if s.CriticalErrorConfig.MaxFundingRateFlip.IsZero() {
-		s.CriticalErrorConfig.MaxFundingRateFlip = fixedpoint.NewFromFloat(0.0003) // 0.03%
-	}
+	s.CriticalErrorConfig.Defaults()
 
 	return nil
 }
@@ -619,7 +627,51 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	// start processing
 	// 1. transit active rounds
 	for _, round := range s.activeRounds {
+		// check if the round is halted or should be halted
+		halted := round.IsHalted()
+		// spot and futures position should be close to each other at all time.
+		spotFilled := round.SpotWorker().FilledPosition()
+		futuresFilled := round.FuturesWorker().FilledPosition()
+		// calculate the deviation of the unhedged position
+		deviation := fixedpoint.One.Sub(futuresFilled.Div(spotFilled)).Abs()
+		deviationTooLarge := deviation.Compare(s.CriticalErrorConfig.MaxHedgeDeviation) > 0
+		if !halted && deviationTooLarge {
+			// the round is originally not halted but the deviation is too large -> we need to halt the round
+			round.Halt(tickTime)
+			s.logger.Warnf("round %s halted due to large hedge deviation: %s, spot filled: %s, futures filled: %s",
+				round.SpotSymbol(),
+				deviation,
+				spotFilled,
+				futuresFilled,
+			)
+			bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required.",
+				round.SpotSymbol(),
+				round.NewNotification(true),
+			)
+		} else if halted && !deviationTooLarge {
+			// the deviation is back to normal, resume the round
+			haltedAt := round.HaltedAt()
+			round.Resume()
+			s.logger.Infof("round %s resumed as hedge deviation back to normal: %s, spot filled: %s, futures filled: %s",
+				round.SpotSymbol(),
+				deviation,
+				spotFilled,
+				futuresFilled,
+			)
+			bbgo.Notify("✅ Round %s resumed as hedge deviation back to normal. It was halted at %s.",
+				round.SpotSymbol(),
+				haltedAt.Format(time.RFC3339),
+				round.NewNotification(false),
+			)
+		}
+
+		// round is still halted, skip the rest of the processing
+		if round.IsHalted() {
+			continue
+		}
+
 		s.transitRoundState(ctx, round, tickTime)
+
 		// enque closed active rounds
 		if round.State() == RoundClosed {
 			s.logger.Infof("move round to closed queue: %s", round)
@@ -644,9 +696,9 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				// send notification for rounds that failed to pass the cleanup process for 3 times.
 				// the symbol of the round will be blocked for opening new round until the issue is resolved.
 				task.Notified = true
-				bbgo.Notify("💥 Failed to handle closed round after %d retries. Manual intervention is required!",
+				bbgo.Notify("💥 Failed to handle closed round after %d retries. Manual intervention is required.",
 					s.MaxClosedRetryCnt,
-					round,
+					round.NewNotification(true),
 				)
 			}
 			continue
@@ -657,7 +709,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		if err := s.handleClosedRound(closeRoundCtx, task, tickTime); err != nil {
 			s.logger.WithError(err).Errorf("failed to handle closed round: %s", task.Round)
 		} else {
-			bbgo.Notify("✅ Successfully handled closed round: %s", round.String(), round)
+			bbgo.Notify("✅ Successfully handled closed round: %s", round.String(), round.NewNotification(false))
 			s.logger.Infof("successfully handled closed round: %s", task.Round)
 			delete(s.closedRoundTasks, task.Round.SpotSymbol())
 		}
@@ -703,7 +755,7 @@ func (s *Strategy) transitRoundState(ctx context.Context, round *ArbitrageRound,
 		if round.State() == RoundReady {
 			bbgo.Notify("🟢 Round entered ready state: %s",
 				round.SpotSymbol(),
-				round,
+				round.NewNotification(false),
 			)
 		}
 	case RoundReady:
@@ -711,7 +763,7 @@ func (s *Strategy) transitRoundState(ctx context.Context, round *ArbitrageRound,
 		if round.State() == RoundClosing {
 			bbgo.Notify("🔴 Round is closing: %s",
 				round.SpotSymbol(),
-				round,
+				round.NewNotification(false),
 			)
 		}
 	case RoundClosing:
@@ -738,7 +790,7 @@ func (s *Strategy) transitOpeningOrReadyRound(ctx context.Context, round *Arbitr
 				round.TriggeredFundingRate(),
 				fundingRate.LastFundingRate,
 				s.CriticalErrorConfig.MaxFundingRateFlip,
-				round,
+				round.NewNotification(true),
 			)
 		}
 		if round.NumHoldingIntervals(currentTime) >= round.MinHoldingIntervals() {
@@ -884,7 +936,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			s.pendingRounds[selectedCandidate.Symbol] = &PendingRound{
 				Round: round,
 			}
-			bbgo.Notify("🆕 Created new pending round: %s", round.SpotSymbol(), round)
+			bbgo.Notify("🆕 Created new pending round: %s", round.SpotSymbol(), round.NewNotification(false))
 		}
 	}
 }
@@ -1161,7 +1213,7 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 			bbgo.Notify("⬅️ Transferred %s %s back to spot account",
 				balance.Available,
 				asset,
-				round,
+				round.NewNotification(false),
 			)
 		}
 	}
