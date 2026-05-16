@@ -129,11 +129,6 @@ func (w *TWAPWorker) AveragePrice() fixedpoint.Value {
 	return tradingutil.AveragePriceFromTrades(trades)
 }
 
-// AddTrade adds a trade to the worker if it belongs to an order managed by this worker.
-func (w *TWAPWorker) AddTrade(trade types.Trade) bool {
-	return w.syncState.TWAPExecutor.AddTrade(trade)
-}
-
 func (w *TWAPWorker) FilledPosition() fixedpoint.Value {
 	trades := w.syncState.TWAPExecutor.AllTrades()
 	position := fixedpoint.Zero

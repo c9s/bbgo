@@ -574,7 +574,7 @@ func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, currentTime time.Tim
 }
 
 func (r *ArbitrageRound) handleSpotTrade(trade types.Trade, currentTime time.Time) {
-	if ok := r.spotWorker.AddTrade(trade); !ok {
+	if ok := r.spotWorker.Executor().AddTrade(trade); !ok {
 		return
 	}
 	r.logger.Infof("handling spot trade: %s", trade)
@@ -625,7 +625,7 @@ func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, currentTime time.
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if ok := r.futuresWorker.AddTrade(trade); ok {
+	if ok := r.futuresWorker.Executor().AddTrade(trade); ok {
 		r.logger.Infof("handling future trade: %s", trade)
 	}
 }

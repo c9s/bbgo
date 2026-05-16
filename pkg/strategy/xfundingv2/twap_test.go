@@ -72,7 +72,7 @@ func processTrade(worker *TWAPWorker, executor *bbgo.GeneralOrderExecutor, trade
 	// Process trade to update position
 	executor.TradeCollector().ProcessTrade(trade)
 	// Add trade to the worker (simulates the strategy-level OnTrade callback)
-	worker.AddTrade(trade)
+	worker.Executor().AddTrade(trade)
 }
 
 // makeTrade creates a trade with fee in BNB to avoid affecting base/quote quantity
