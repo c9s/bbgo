@@ -49,6 +49,7 @@ type ArbitrageRound struct {
 	syncState     ArbitrageRoundSyncState
 	spotWorker    *TWAPWorker
 	futuresWorker *TWAPWorker
+	haltedAt      time.Time
 
 	futuresService                                FuturesService
 	spotExchangeFeeRates, futuresExchangeFeeRates map[types.ExchangeName]types.ExchangeFee
@@ -99,6 +100,38 @@ func NewArbitrageRound(
 		futuresService:     futuresService,
 		retryTransferTickC: make(chan time.Time, 100),
 	}
+}
+
+func (r *ArbitrageRound) Halt(currentTime time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.haltedAt = currentTime
+}
+
+func (r *ArbitrageRound) HaltedAt() time.Time {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.haltedAt
+}
+
+func (r *ArbitrageRound) IsHalted() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.isHalted()
+}
+
+func (r *ArbitrageRound) isHalted() bool {
+	return !r.haltedAt.IsZero()
+}
+
+func (r *ArbitrageRound) Resume() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.haltedAt = time.Time{}
 }
 
 func (r *ArbitrageRound) SetSpotExchangeFeeRates(fee types.ExchangeFee) {
@@ -699,8 +732,8 @@ func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBo
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.syncState.State == RoundPending {
-		// not started yet, do nothing
+	if r.syncState.State == RoundPending || r.isHalted() {
+		// not started yet or halted, do nothing
 		return
 	}
 
