@@ -1273,7 +1273,6 @@ func (s *Strategy) isBullishEngulfing(p, c types.KLine, cfg *EngulfingTakeProfit
 	return true
 }
 
-// maybeEngulfingTakeProfit evaluates the last two klines and closes position if profitable
 // maybeUpdateTrailingStop adjusts existing stop-loss to trail when ROI exceeds threshold
 // If ROI > 1%, move stop to 0.2% away from current price in the profitable direction:
 // - Long: set stop at price * (1 - 0.002)
