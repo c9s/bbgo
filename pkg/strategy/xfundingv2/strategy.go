@@ -1229,7 +1229,10 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 		// long futures -> transfer quote currency
 		asset = round.FuturesMarket().QuoteCurrency
 	}
-	account := s.futuresSession.GetAccount()
+	account, err := s.futuresSession.UpdateAccount(ctx)
+	if err != nil {
+		return fmt.Errorf("[handleClosedRound] failed to update futures account when handling round exit: %w", err)
+	}
 	balance, ok := account.Balance(asset)
 	if !ok {
 		return fmt.Errorf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round)
