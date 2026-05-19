@@ -77,8 +77,8 @@ type Strategy struct {
 	MarketSelectionConfig *MarketSelectionConfig      `json:"marketSelection,omitempty"`
 	MaxPositionExposure   map[string]fixedpoint.Value `json:"maxPositionExposure"`
 
-	HaltRoundNotificationInterval types.Duration       `json:"haltRoundNotificationInterval"`
-	lastHaltNotificationTime      map[string]time.Time `json:"lastHaltNotificationTime"`
+	HaltRoundNotificationInterval types.Duration `json:"haltRoundNotificationInterval"`
+	haltNotificationLimiters      map[string]*rate.Limiter
 
 	CriticalErrorConfig CriticalErrorConfig                            `json:"criticalErrorConfig"`
 	CircuitBreakers     map[string]*circuitbreaker.BasicCircuitBreaker `json:"circuitBreakers"`
@@ -210,7 +210,7 @@ func (s *Strategy) Initialize() error {
 	if s.CircuitBreakers == nil {
 		s.CircuitBreakers = make(map[string]*circuitbreaker.BasicCircuitBreaker)
 	}
-	s.lastHaltNotificationTime = make(map[string]time.Time)
+	s.haltNotificationLimiters = make(map[string]*rate.Limiter)
 	return nil
 }
 
@@ -401,7 +401,7 @@ func (s *Strategy) CrossRun(
 		s.futuresGeneralOrderExecutors[symbol] = futuresExecutor
 		return nil
 	}
-	for _, symbol := range candidateSymbols {
+	for _, symbol := range s.candidateSymbols {
 		if err := setupGeneralExecutorsForSymbol(symbol); err != nil {
 			return err
 		}
@@ -496,6 +496,7 @@ func (s *Strategy) CrossRun(
 		}
 		round.SetSlackAlert(s.SlackAlert)
 	}
+
 	for _, symbol := range s.candidateSymbols {
 		if breaker, found := s.CircuitBreakers[symbol]; !found {
 			s.CircuitBreakers[symbol] = s.defaultBreaker(symbol)
@@ -513,6 +514,22 @@ func (s *Strategy) CrossRun(
 		if closedRound.RetryCnt >= s.MaxClosedRetryCnt {
 			closedRound.RetryCnt--
 			closedRound.Notified = false
+		}
+	}
+
+	// setup halt notification limiters
+	for _, symbol := range s.candidateSymbols {
+		s.haltNotificationLimiters[symbol] = rate.NewLimiter(
+			rate.Every(s.HaltRoundNotificationInterval.Duration()),
+			1,
+		)
+	}
+	for _, round := range s.allRounds() {
+		if _, found := s.haltNotificationLimiters[round.SpotSymbol()]; !found {
+			s.haltNotificationLimiters[round.SpotSymbol()] = rate.NewLimiter(
+				rate.Every(s.HaltRoundNotificationInterval.Duration()),
+				1,
+			)
 		}
 	}
 
@@ -656,7 +673,6 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				spotFilled,
 				futuresFilled,
 			)
-			s.lastHaltNotificationTime[round.SpotSymbol()] = tickTime
 			bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required.",
 				roundSymbol,
 				round.NewCriticalNotification(),
@@ -665,8 +681,6 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			// the deviation is back to normal, resume the round
 			haltedAt := round.HaltedAt()
 			round.Resume()
-			// remove the last notification time
-			delete(s.lastHaltNotificationTime, roundSymbol)
 			s.logger.Infof("round %s resumed as hedge deviation back to normal: %s, spot filled: %s, futures filled: %s",
 				roundSymbol,
 				deviation,
@@ -684,9 +698,8 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		if round.IsHalted() {
 			haltedAt := round.HaltedAt()
 			elapsed := tickTime.Sub(haltedAt)
-			lastNotifyTime, found := s.lastHaltNotificationTime[round.SpotSymbol()]
-			if !found || tickTime.Sub(lastNotifyTime) > s.HaltRoundNotificationInterval.Duration() {
-				s.lastHaltNotificationTime[roundSymbol] = tickTime
+			limiter, found := s.haltNotificationLimiters[round.SpotSymbol()]
+			if found && limiter.AllowN(tickTime, 1) {
 				// send notification for rounds that have been halted for a while.
 				bbgo.Notify("💥 Round %s halted for %s (since %s). Manual intervention is required",
 					roundSymbol,
