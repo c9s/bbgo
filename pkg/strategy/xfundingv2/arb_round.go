@@ -49,6 +49,7 @@ type ArbitrageRound struct {
 	syncState     ArbitrageRoundSyncState
 	spotWorker    *TWAPWorker
 	futuresWorker *TWAPWorker
+	haltedAt      time.Time
 
 	futuresService                                FuturesService
 	spotExchangeFeeRates, futuresExchangeFeeRates map[types.ExchangeName]types.ExchangeFee
@@ -99,6 +100,38 @@ func NewArbitrageRound(
 		futuresService:     futuresService,
 		retryTransferTickC: make(chan time.Time, 100),
 	}
+}
+
+func (r *ArbitrageRound) Halt(currentTime time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.haltedAt = currentTime
+}
+
+func (r *ArbitrageRound) HaltedAt() time.Time {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.haltedAt
+}
+
+func (r *ArbitrageRound) IsHalted() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.isHalted()
+}
+
+func (r *ArbitrageRound) isHalted() bool {
+	return !r.haltedAt.IsZero()
+}
+
+func (r *ArbitrageRound) Resume() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.haltedAt = time.Time{}
 }
 
 func (r *ArbitrageRound) SetSpotExchangeFeeRates(fee types.ExchangeFee) {
@@ -253,10 +286,17 @@ func (r *ArbitrageRound) SetSlackAlert(alert slackalert.SlackAlert) {
 	r.slackAlert = alert
 }
 
-func (r *ArbitrageRound) NewNotification(isCritical bool) *roundNotification {
+func (r *ArbitrageRound) NewCriticalNotification() *roundNotification {
 	return &roundNotification{
 		ArbitrageRound: r,
-		IsCritical:     isCritical,
+		IsCritical:     true,
+	}
+}
+
+func (r *ArbitrageRound) NewNotification() *roundNotification {
+	return &roundNotification{
+		ArbitrageRound: r,
+		IsCritical:     false,
 	}
 }
 
@@ -541,7 +581,8 @@ func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, currentTime time.Tim
 }
 
 func (r *ArbitrageRound) handleSpotTrade(trade types.Trade, currentTime time.Time) {
-	if ok := r.spotWorker.AddTrade(trade); !ok {
+	if ok := r.spotWorker.Executor().AddTrade(trade); !ok {
+		// the trade does not belong to the spot worker, skip
 		return
 	}
 	r.logger.Infof("handling spot trade: %s", trade)
@@ -592,7 +633,7 @@ func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, currentTime time.
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if ok := r.futuresWorker.AddTrade(trade); ok {
+	if ok := r.futuresWorker.Executor().AddTrade(trade); ok {
 		r.logger.Infof("handling future trade: %s", trade)
 	}
 }
@@ -632,9 +673,10 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration time.Duratio
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// set spot target position to zero
+	// the futures target position will be synced as the spot position is closing
 	r.spotWorker.SetTargetPosition(fixedpoint.Zero)
 	r.spotWorker.ResetTime(currentTime, duration)
-	r.futuresWorker.SetTargetPosition(fixedpoint.Zero)
 	r.futuresWorker.ResetTime(currentTime, duration)
 
 	r.syncState.State = RoundClosing
@@ -699,8 +741,8 @@ func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBo
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.syncState.State == RoundPending {
-		// not started yet, do nothing
+	if r.syncState.State == RoundPending || r.isHalted() {
+		// not started yet or halted, do nothing
 		return
 	}
 
@@ -759,18 +801,20 @@ func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBo
 	}
 }
 
-func (r *ArbitrageRound) syncFuturesPosition(trade types.Trade) {
-	if r.syncState.State != RoundOpening {
-		// only sync futures position when the round is opening
+func (r *ArbitrageRound) syncFuturesPosition(spotTrade types.Trade) {
+	// sanity check
+	if r.spotWorker.Symbol() != spotTrade.Symbol {
 		return
 	}
-	// the target spot position can be either positive or negative
-	futureTargetPosition := r.futuresWorker.TargetPosition()
-	if r.spotWorker.TargetPosition().Sign() > 0 {
-		futureTargetPosition = futureTargetPosition.Sub(trade.Quantity)
-	} else {
-		futureTargetPosition = futureTargetPosition.Add(trade.Quantity)
-	}
-	r.logger.Infof("syncing futures position to %s: %s", futureTargetPosition, trade)
+	// the filled spot position can be positive or negative
+	filledSpotPosition := r.spotWorker.FilledPosition()
+	// the futures target position should be always the negation of the spot filled position to maintain delta-neutral
+	oriFuturesTargetPosition := r.futuresWorker.TargetPosition()
+	futureTargetPosition := filledSpotPosition.Neg()
+	r.logger.Infof("syncing futures position %s -> %s: %s",
+		oriFuturesTargetPosition,
+		futureTargetPosition,
+		spotTrade,
+	)
 	r.futuresWorker.SetTargetPosition(futureTargetPosition)
 }
