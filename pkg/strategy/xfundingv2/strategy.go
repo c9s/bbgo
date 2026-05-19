@@ -659,7 +659,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			s.lastHaltNotificationTime[round.SpotSymbol()] = tickTime
 			bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required.",
 				roundSymbol,
-				round.NewNotification(true),
+				round.NewCriticalNotification(),
 			)
 		} else if halted && !deviationTooLarge {
 			// the deviation is back to normal, resume the round
@@ -676,7 +676,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			bbgo.Notify("✅ Round %s resumed as hedge deviation back to normal. It was halted at %s.",
 				roundSymbol,
 				haltedAt.Format(time.RFC3339),
-				round.NewNotification(false),
+				round.NewNotification(),
 			)
 		}
 
@@ -692,7 +692,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 					roundSymbol,
 					elapsed.String(),
 					haltedAt.Format(time.RFC3339),
-					round.NewNotification(true),
+					round.NewCriticalNotification(),
 				)
 			}
 			continue
@@ -726,7 +726,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				task.Notified = true
 				bbgo.Notify("💥 Failed to handle closed round after %d retries. Manual intervention is required.",
 					s.MaxClosedRetryCnt,
-					round.NewNotification(true),
+					round.NewCriticalNotification(),
 				)
 			}
 			continue
@@ -737,7 +737,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		if err := s.handleClosedRound(closeRoundCtx, task, tickTime); err != nil {
 			s.logger.WithError(err).Errorf("failed to handle closed round: %s", task.Round)
 		} else {
-			bbgo.Notify("✅ Successfully handled closed round: %s", round.String(), round.NewNotification(false))
+			bbgo.Notify("✅ Successfully handled closed round: %s", round.String(), round.NewNotification())
 			s.logger.Infof("successfully handled closed round: %s", task.Round)
 			delete(s.closedRoundTasks, task.Round.SpotSymbol())
 		}
@@ -783,7 +783,7 @@ func (s *Strategy) transitRoundState(ctx context.Context, round *ArbitrageRound,
 		if round.State() == RoundReady {
 			bbgo.Notify("🟢 Round entered ready state: %s",
 				round.SpotSymbol(),
-				round.NewNotification(false),
+				round.NewNotification(),
 			)
 		}
 	case RoundReady:
@@ -791,7 +791,7 @@ func (s *Strategy) transitRoundState(ctx context.Context, round *ArbitrageRound,
 		if round.State() == RoundClosing {
 			bbgo.Notify("🔴 Round is closing: %s",
 				round.SpotSymbol(),
-				round.NewNotification(false),
+				round.NewNotification(),
 			)
 		}
 	case RoundClosing:
@@ -818,7 +818,7 @@ func (s *Strategy) transitOpeningOrReadyRound(ctx context.Context, round *Arbitr
 				round.TriggeredFundingRate(),
 				fundingRate.LastFundingRate,
 				s.CriticalErrorConfig.MaxFundingRateFlip,
-				round.NewNotification(true),
+				round.NewCriticalNotification(),
 			)
 		}
 		if round.NumHoldingIntervals(currentTime) >= round.MinHoldingIntervals() {
@@ -964,7 +964,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			s.pendingRounds[selectedCandidate.Symbol] = &PendingRound{
 				Round: round,
 			}
-			bbgo.Notify("🆕 Created new pending round: %s", round.SpotSymbol(), round.NewNotification(false))
+			bbgo.Notify("🆕 Created new pending round: %s", round.SpotSymbol(), round.NewNotification())
 		}
 	}
 }
@@ -1244,7 +1244,7 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 			bbgo.Notify("⬅️ Transferred %s %s back to spot account",
 				balance.Available,
 				asset,
-				round.NewNotification(false),
+				round.NewNotification(),
 			)
 		}
 	}

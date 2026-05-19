@@ -286,10 +286,17 @@ func (r *ArbitrageRound) SetSlackAlert(alert slackalert.SlackAlert) {
 	r.slackAlert = alert
 }
 
-func (r *ArbitrageRound) NewNotification(isCritical bool) *roundNotification {
+func (r *ArbitrageRound) NewCriticalNotification() *roundNotification {
 	return &roundNotification{
 		ArbitrageRound: r,
-		IsCritical:     isCritical,
+		IsCritical:     true,
+	}
+}
+
+func (r *ArbitrageRound) NewNotification() *roundNotification {
+	return &roundNotification{
+		ArbitrageRound: r,
+		IsCritical:     false,
 	}
 }
 
