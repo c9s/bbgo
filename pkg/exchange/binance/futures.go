@@ -762,3 +762,27 @@ func (e *Exchange) QueryFuturesFundingInfo(ctx context.Context) ([]binanceapi.Fu
 	}
 	return fundingInfo, nil
 }
+
+func (e *Exchange) QueryFuturesAdlRisk(ctx context.Context, symbol string) (map[string]*binanceapi.AdlRisk, error) {
+	adlRisks := make(map[string]*binanceapi.AdlRisk)
+	var rawRisks []*binanceapi.RawAdlRisk
+	if symbol == "" {
+		req := e.futuresClient2.NewFuturesAdlRiskQuery()
+		resp, err := req.Do(ctx)
+		if err != nil {
+			return adlRisks, err
+		}
+		rawRisks = resp
+	} else {
+		req := e.futuresClient2.NewFuturesSymbolAdlRiskQuery(symbol)
+		resp, err := req.Do(ctx)
+		if err != nil {
+			return adlRisks, err
+		}
+		rawRisks = append(rawRisks, resp)
+	}
+	for _, raw := range rawRisks {
+		adlRisks[raw.Symbol] = raw.ToAdlRisk()
+	}
+	return adlRisks, nil
+}
