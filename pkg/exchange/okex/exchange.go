@@ -1062,3 +1062,38 @@ func setDualSidePosition(req *okexapi.PlaceOrderRequest, order types.SubmitOrder
 		}
 	}
 }
+
+func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	req := e.client.NewMarketBooksRequest()
+	instId := e.getInstrumentId(symbol)
+	req.InstId(instId).Size(200)
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return snapshot, 0, err
+	}
+	if len(resp.Data) == 0 {
+		return snapshot, 0, fmt.Errorf("empty order book data for symbol: %s", symbol)
+	}
+
+	snapshot.Symbol = symbol
+	snapshot.Time = resp.Data[0].Ts.Time()
+	snapshot.Bids = make([]types.PriceVolume, 0, len(resp.Data[0].Bids))
+	snapshot.Asks = make([]types.PriceVolume, 0, len(resp.Data[0].Asks))
+	for _, bid := range resp.Data[0].Bids {
+		snapshot.Bids = append(snapshot.Bids, types.PriceVolume{
+			Price:  bid[0],
+			Volume: bid[1],
+		})
+	}
+
+	for _, ask := range resp.Data[0].Asks {
+		snapshot.Asks = append(snapshot.Asks, types.PriceVolume{
+			Price:  ask[0],
+			Volume: ask[1],
+		})
+	}
+
+	finalUpdateID = resp.Data[0].Ts.Time().UnixMilli()
+
+	return snapshot, finalUpdateID, nil
+}
