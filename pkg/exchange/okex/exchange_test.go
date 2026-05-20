@@ -864,3 +864,18 @@ func TestExchange_getInstrumentId(t *testing.T) {
 		})
 	}
 }
+
+func TestExchange_QueryDepth(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ex := New(key, secret, passphrase)
+
+	depth, finalUpdateID, err := ex.QueryDepth(context.Background(), "BTCUSDT")
+	assert.NoError(t, err)
+	assert.NotZero(t, finalUpdateID)
+	assert.NotNil(t, depth)
+}
