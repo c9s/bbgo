@@ -93,6 +93,7 @@ func TestHedgeMarket_Hedge(t *testing.T) {
 		SymbolSelector: "BTCUSDT",
 		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   depth,
+		SyncOrder:      types.BoolPtr(false),
 	}, session, market)
 
 	err := hm.stream.Connect(ctx)
@@ -207,6 +208,7 @@ func TestHedgeMarket_RedispatchPositionAfterFailure(t *testing.T) {
 		SymbolSelector: "BTCUSDT",
 		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   depth,
+		SyncOrder:      types.BoolPtr(false),
 	}, session, market)
 
 	mainPosition := bbgo.NewPositionExposure("BTCUSDT")
@@ -276,6 +278,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 		SymbolSelector: "BTCUSDT",
 		HedgeInterval:  largeInterval,
 		QuotingDepth:   depth,
+		SyncOrder:      types.BoolPtr(false),
 	}, session, market)
 
 	// the connectivity waiting is blocking, so we need to run it in a goroutine

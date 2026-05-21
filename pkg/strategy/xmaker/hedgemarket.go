@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/bbgo/sessionworker"
 	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/strategy/xmaker/pricer"
@@ -70,6 +71,8 @@ type HedgeMarketConfig struct {
 
 	QuotingDepth        fixedpoint.Value `json:"quotingDepth"`
 	QuotingDepthInQuote fixedpoint.Value `json:"quotingDepthInQuote"`
+
+	SyncOrder *bool `json:"syncOrder,omitempty"`
 }
 
 func (c *HedgeMarketConfig) Defaults() error {
@@ -98,6 +101,11 @@ func (c *HedgeMarketConfig) Defaults() error {
 
 	if c.QuotingDepthInQuote.IsZero() {
 		c.QuotingDepthInQuote = fixedpoint.NewFromFloat(1000) // default to $1000
+	}
+
+	if c.SyncOrder == nil {
+		defaultSyncOrder := true
+		c.SyncOrder = &defaultSyncOrder
 	}
 
 	return nil
@@ -178,6 +186,8 @@ type HedgeMarket struct {
 	market  types.Market
 	stream  types.Stream
 
+	orderQueryService types.ExchangeOrderQueryService
+
 	connectivity *types.Connectivity
 
 	book      *types.StreamOrderBook
@@ -255,6 +265,8 @@ func NewHedgeMarket(
 	}
 	logger := log.WithFields(logFields)
 
+	orderQueryService, _ := session.Exchange.(types.ExchangeOrderQueryService)
+
 	m := &HedgeMarket{
 		HedgeMarketConfig: config,
 		session:           session,
@@ -262,6 +274,8 @@ func NewHedgeMarket(
 		stream:            stream,
 		book:              book,
 		depthBook:         depthBook,
+
+		orderQueryService: orderQueryService,
 
 		connectivity: connectivity,
 
@@ -313,6 +327,50 @@ func (m *HedgeMarket) SetLogger(logger logrus.FieldLogger) {
 		"exchange":     m.session.ExchangeName,
 		"hedge_market": m.market.Symbol,
 	})
+}
+
+func (m *HedgeMarket) syncOrder(ctx context.Context, order types.Order) (*types.Order, error) {
+	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, m.orderQueryService, order.AsQuery())
+	if err != nil {
+		return nil, fmt.Errorf("unable to query order #%d: %w", order.OrderID, err)
+	} else if updatedOrder != nil {
+		if updatedOrder.Quantity.Compare(order.Quantity) != 0 {
+			m.logger.WithFields(order.LogFields()).
+				Warnf("order quantity changed from %s to %s for order #%d",
+					order.Quantity.String(), updatedOrder.Quantity.String(), order.OrderID)
+		}
+	}
+
+	orderTrades, err := retry.QueryOrderTradesUntilSuccessful(ctx, m.orderQueryService, order.AsQuery())
+	if err != nil {
+		return updatedOrder, fmt.Errorf("unable to query order #%d trades: %w", order.OrderID, err)
+	}
+
+	for _, trade := range orderTrades {
+		m.tradeCollector.ProcessTrade(trade)
+	}
+
+	return updatedOrder, nil
+}
+
+func (m *HedgeMarket) syncHistoryOrder(ctx context.Context) {
+	if m.SyncOrder != nil && !*m.SyncOrder {
+		return
+	}
+
+	historyOrders := m.orderStore.Orders()
+	m.logger.Infof("loaded %d historical orders", len(historyOrders))
+
+	for _, order := range historyOrders {
+		updatedOrder, err := m.syncOrder(ctx, order)
+		if err != nil {
+			m.logger.WithError(err).WithFields(order.LogFields()).Warnf("failed to sync order")
+		} else if updatedOrder != nil {
+			m.orderStore.Update(*updatedOrder)
+		}
+	}
+
+	m.orderStore.Prune(8 * time.Hour)
 }
 
 // SetPriceFeeMode sets the fee mode used when computing hedge quote prices.
@@ -723,6 +781,17 @@ func (m *HedgeMarket) getDebtQuota() fixedpoint.Value {
 	return debtQuota
 }
 
+// Send sends the position delta to the hedge market.
+func (m *HedgeMarket) Send(delta fixedpoint.Value) {
+	select {
+	case m.positionDeltaC <- delta:
+	case <-time.After(30 * time.Second):
+		m.logger.Warnf("position delta channel is full, dropping delta: %f", delta.Float64())
+	}
+}
+
+// hedge executes the hedge logic to adjust the position exposure to zero.
+// you should pass the position delta to the positionDeltaC channel
 func (m *HedgeMarket) hedge(ctx context.Context) error {
 	if err := m.hedgeExecutor.Clear(ctx); err != nil {
 		return fmt.Errorf("failed to clear hedge executor: %w", err)
@@ -928,6 +997,9 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 		close(m.hedgedC)
 	}()
 
+	recoverTicker := time.NewTicker(3 * time.Minute)
+	defer recoverTicker.Stop()
+
 	ticker := time.NewTicker(hedgeInterval)
 	defer ticker.Stop()
 
@@ -935,6 +1007,15 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 		select {
 		case <-ctx.Done():
 			return
+
+		case tickerTime := <-recoverTicker.C:
+			tradeHistoryService, ok := m.session.Exchange.(types.ExchangeTradeHistoryService)
+			if ok {
+				// TODO: if we found trade missing, we should consider reconnect the websocket connection.
+				if err := m.tradeCollector.Recover(ctx, tradeHistoryService, m.market.Symbol, tickerTime.Add(3*time.Minute)); err != nil {
+					m.logger.WithError(err).Errorf("failed to recover trade history from trade collector")
+				}
+			}
 
 		case <-ticker.C:
 			if m.positionExposure.IsClosed() {
