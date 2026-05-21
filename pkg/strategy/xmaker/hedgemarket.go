@@ -997,6 +997,9 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 		close(m.hedgedC)
 	}()
 
+	recoverTicker := time.NewTicker(3 * time.Minute)
+	defer recoverTicker.Stop()
+
 	ticker := time.NewTicker(hedgeInterval)
 	defer ticker.Stop()
 
@@ -1004,6 +1007,15 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 		select {
 		case <-ctx.Done():
 			return
+
+		case tickerTime := <-recoverTicker.C:
+			tradeHistoryService, ok := m.session.Exchange.(types.ExchangeTradeHistoryService)
+			if ok {
+				// TODO: if we found trade missing, we should consider reconnect the websocket connection.
+				if err := m.tradeCollector.Recover(ctx, tradeHistoryService, m.market.Symbol, tickerTime.Add(3*time.Minute)); err != nil {
+					m.logger.WithError(err).Errorf("failed to recover trade history from trade collector")
+				}
+			}
 
 		case <-ticker.C:
 			if m.positionExposure.IsClosed() {
