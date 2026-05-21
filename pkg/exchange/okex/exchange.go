@@ -563,11 +563,11 @@ func (e *Exchange) QueryKLines(
 			log.Warnf("!!!OKX EXCHANGE API NOTICE!!! The maximum kline query time range is recent 1440 minutes, %s given", options.StartTime)
 		}
 
-		req.After(*options.StartTime)
+		req.Before(*options.StartTime)
 	}
 
 	if options.EndTime != nil {
-		req.Before(*options.EndTime)
+		req.After(*options.EndTime)
 	}
 
 	candles, err := req.Do(ctx)
@@ -579,6 +579,7 @@ func (e *Exchange) QueryKLines(
 	for _, candle := range candles {
 		klines = append(klines, kLineToGlobal(candle, interval, symbol))
 	}
+	klines = types.SortKLinesAscending(klines)
 
 	return klines, nil
 
