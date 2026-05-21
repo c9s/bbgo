@@ -71,6 +71,8 @@ type HedgeMarketConfig struct {
 
 	QuotingDepth        fixedpoint.Value `json:"quotingDepth"`
 	QuotingDepthInQuote fixedpoint.Value `json:"quotingDepthInQuote"`
+
+	SyncOrder *bool `json:"syncOrder,omitempty"`
 }
 
 func (c *HedgeMarketConfig) Defaults() error {
@@ -99,6 +101,11 @@ func (c *HedgeMarketConfig) Defaults() error {
 
 	if c.QuotingDepthInQuote.IsZero() {
 		c.QuotingDepthInQuote = fixedpoint.NewFromFloat(1000) // default to $1000
+	}
+
+	if c.SyncOrder == nil {
+		defaultSyncOrder := true
+		c.SyncOrder = &defaultSyncOrder
 	}
 
 	return nil
@@ -347,6 +354,10 @@ func (m *HedgeMarket) syncOrder(ctx context.Context, order types.Order) (*types.
 }
 
 func (m *HedgeMarket) syncHistoryOrder(ctx context.Context) {
+	if m.SyncOrder != nil && !*m.SyncOrder {
+		return
+	}
+
 	historyOrders := m.orderStore.Orders()
 	m.logger.Infof("loaded %d historical orders", len(historyOrders))
 

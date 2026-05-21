@@ -122,8 +122,7 @@ func (m *MarketOrderHedgeExecutor) Hedge(
 	}
 
 	m.logger.Infof("hedge order created: %+v", hedgeOrder)
-
-	if hedgeOrder != nil {
+	if hedgeOrder != nil && (m.SyncOrder == nil || *m.SyncOrder) {
 		updatedOrder, err := m.syncOrder(ctx, *hedgeOrder)
 		if err != nil {
 			m.logger.WithError(err).WithFields(hedgeOrder.LogFields()).Errorf("failed to sync order: %+v", hedgeOrder)

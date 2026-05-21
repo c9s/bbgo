@@ -114,6 +114,7 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		SymbolSelector: sourceMarket.Symbol,
 		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   Number(100.0),
+		SyncOrder:      types.BoolPtr(false),
 	}, sourceSession, sourceMarket)
 
 	sourceHedgeMarket.book.Load(types.SliceOrderBook{
@@ -132,6 +133,7 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		SymbolSelector: fiatMarket.Symbol,
 		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   Number(10.0),
+		SyncOrder:      types.BoolPtr(false),
 	}, fiatSession, fiatMarket)
 
 	fiatHedgeMarket.book.Load(types.SliceOrderBook{
