@@ -976,6 +976,10 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		s.logger.Warnf("source session is in maintenance, skipping update quote")
 		return nil
 	}
+	if s.makerSession.IsInMaintenance() {
+		s.logger.Warnf("maker session is in maintenance, skipping update quote")
+		return nil
+	}
 
 	if !s.makerSession.Connectivity.IsConnected() {
 		s.logger.Warnf("maker session is disconnected, skipping update quote")
