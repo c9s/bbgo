@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,7 +56,8 @@ type Strategy struct {
 
 	AutoRepay bool `json:"autoRepay"`
 
-	SlackAlert *slackalert.SlackAlert `json:"slackAlert"`
+	SlackAlert          *slackalert.SlackAlert `json:"slackAlert"`
+	EmergencySlackAlert *slackalert.SlackAlert `json:"emergencySlackAlert"`
 
 	ScanWindow types.Duration `json:"scanWindow"`
 
@@ -270,7 +272,10 @@ func (s *Strategy) checkDeposits(ctx context.Context, firstTime bool) {
 
 			if err2 != nil {
 				logger.WithError(err2).Errorf("unable to transfer deposit asset into the margin account")
-
+				if s.EmergencySlackAlert != nil && strings.Contains(err2.Error(), "reaches platform max pledged collateral amount") {
+					s.postEmergencyLiveNoteMessage(d, "🚨 Unable to transfer deposit due to restricted asset error: %s", d.Asset)
+					return
+				}
 				s.postLiveNoteError(d, "❌ Unable to transfer deposit asset into the margin account, error: %+v", err2)
 			} else {
 				s.logger.Infof("%s %s has been transferred successfully", amount.String(), d.Asset)
@@ -350,6 +355,16 @@ func (s *Strategy) postLiveNoteMessage(d types.Deposit, msgf string, args ...any
 		bbgo.PostLiveNote(&d,
 			livenote.Channel(s.SlackAlert.Channel),
 			livenote.Comment(fmt.Sprintf(msgf, args...)),
+		)
+	}
+}
+
+func (s *Strategy) postEmergencyLiveNoteMessage(d types.Deposit, msgf string, args ...any) {
+	if s.EmergencySlackAlert != nil {
+		bbgo.PostLiveNote(&d,
+			livenote.Channel(s.EmergencySlackAlert.Channel),
+			livenote.Comment(fmt.Sprintf(msgf, args...)),
+			livenote.OneTimeMention(s.EmergencySlackAlert.Mentions...),
 		)
 	}
 }
