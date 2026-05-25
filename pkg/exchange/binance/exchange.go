@@ -675,8 +675,8 @@ func (e *Exchange) QueryCrossMarginCollateralRatio(ctx context.Context) (map[str
 	return tiers, nil
 }
 
-func (e *Exchange) QueryRestrictedAssets(ctx context.Context) (*binanceapi.RestrictedAssetResponse, error) {
-	req := e.client2.NewRestrictedAssetRequest()
+func (e *Exchange) QueryRestrictedAssets(ctx context.Context) (*binanceapi.GetMarginRestrictedAssetsResponse, error) {
+	req := e.client2.NewGetMarginRestrictedAssetsRequest()
 	return req.Do(ctx)
 }
 
