@@ -349,6 +349,12 @@ type FuturesPosition struct {
 	PositionRisk *PositionRisk
 }
 
+func (f *FuturesPosition) SetMarket(market Market) {
+	f.Market = market
+	f.BaseCurrency = market.BaseCurrency
+	f.QuoteCurrency = market.QuoteCurrency
+}
+
 func NewPositionFromMarket(market Market) *Position {
 	if len(market.BaseCurrency) == 0 || len(market.QuoteCurrency) == 0 {
 		panic("logical exception: missing market information, base currency or quote currency is empty")

@@ -5,6 +5,7 @@ import (
 	"maps"
 	"sync"
 
+	"github.com/slack-go/slack"
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -348,4 +349,90 @@ func (a *Account) Print(log LogFunc) {
 	}
 
 	a.balances.Print(log)
+}
+
+func (m FuturesPositionMap) OpenPositions() FuturesPositionMap {
+	openPositions := make(FuturesPositionMap)
+	for k, v := range m {
+		if !v.Base.IsZero() {
+			openPositions[k] = v
+		}
+	}
+	return openPositions
+}
+
+func (p *FuturesPosition) SlackAttachment() slack.Attachment {
+	if p.PositionRisk == nil {
+		return slack.Attachment{}
+	}
+
+	var blocks []slack.Block
+
+	marginType := "Cross"
+	if p.Isolated {
+		marginType = "Isolated"
+	}
+
+	var color, side string
+	sign := p.Base.Sign()
+	if sign > 0 {
+		color = "#228B22"
+		side = string(PositionLong)
+	} else if sign < 0 {
+		color = "#DC143C"
+		side = string(PositionShort)
+	} else {
+		color = "#d7d7d7"
+		side = string(PositionClosed)
+	}
+
+	title := fmt.Sprintf("%s %s Perp %s %sX", p.Symbol, side, marginType, p.PositionRisk.Leverage)
+
+	roi := fixedpoint.Zero
+	if !p.PositionRisk.InitialMargin.IsZero() {
+		roi = p.PositionRisk.UnrealizedPnL.Div(p.PositionRisk.InitialMargin).Mul(fixedpoint.NewFromInt(100))
+	}
+
+	pnlSign := ""
+	if p.PositionRisk.UnrealizedPnL.Sign() > 0 {
+		pnlSign = "+"
+	}
+	roiSign := ""
+	if roi.Sign() > 0 {
+		roiSign = "+"
+	}
+
+	blocks = append(blocks, slack.NewSectionBlock(
+		nil,
+		[]*slack.TextBlockObject{
+			slack.NewTextBlockObject(slack.MarkdownType, "_Size / Amount_", false, false),
+			slack.NewTextBlockObject(slack.MarkdownType, "_PNL / ROI%_", false, false),
+			slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*%s %s*\n%s %s",
+				p.Base, p.BaseCurrency, p.PositionRisk.Notional.Abs(), p.QuoteCurrency), false, false),
+			slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*%s%s*\n%s%s%%",
+				pnlSign, p.PositionRisk.UnrealizedPnL, roiSign, roi.FormatString(2)), false, false),
+		},
+		nil,
+	))
+
+	liqPrice := p.PositionRisk.LiquidationPrice.String()
+	if p.PositionRisk.LiquidationPrice.IsZero() {
+		liqPrice = "--"
+	}
+
+	blocks = append(blocks, slack.NewSectionBlock(
+		nil,
+		[]*slack.TextBlockObject{
+			slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("_Entry Price (%s)_\n%s", p.QuoteCurrency, p.PositionRisk.EntryPrice), false, false),
+			slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("_Mark Price (%s)_\n%s", p.QuoteCurrency, p.PositionRisk.MarkPrice), false, false),
+			slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("_Liq. Price (%s)_\n%s", p.QuoteCurrency, liqPrice), false, false),
+		},
+		nil,
+	))
+
+	return slack.Attachment{
+		Color:  color,
+		Title:  title,
+		Blocks: slack.Blocks{BlockSet: blocks},
+	}
 }
