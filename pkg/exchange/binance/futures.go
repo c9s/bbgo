@@ -26,9 +26,9 @@ func (e *Exchange) queryFuturesClosedOrders(
 	if lastOrderID > 0 {
 		req.OrderID(int64(lastOrderID))
 	} else {
-		req.StartTime(since.UnixMilli() / int64(time.Millisecond))
+		req.StartTime(since.UnixMilli())
 		if until.Sub(since) < 24*time.Hour {
-			req.EndTime(until.UnixMilli() / int64(time.Millisecond))
+			req.EndTime(until.UnixMilli())
 		}
 	}
 
