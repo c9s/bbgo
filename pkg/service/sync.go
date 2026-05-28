@@ -23,6 +23,7 @@ type SyncService struct {
 	WithdrawService *WithdrawService
 	DepositService  *DepositService
 	MarginService   *MarginService
+	FuturesService  *FuturesService
 }
 
 // SyncSessionSymbols syncs the trades from the given exchange session
@@ -52,6 +53,13 @@ func (s *SyncService) SyncSessionSymbols(
 		logger.Infof("syncing %s %s orders from %s to %s...", exchange.Name(), symbol, startTime, endTime)
 		if err := s.OrderService.Sync(ctx, exchange, symbol, startTime, endTime); err != nil {
 			return err
+		}
+
+		if service, ok := exchange.(types.ExchangeRiskService); ok {
+			logger.Infof("syncing %s %s position risk...", exchange.Name(), symbol)
+			if err := s.FuturesService.Sync(ctx, service, symbol); err != nil {
+				return err
+			}
 		}
 	}
 
