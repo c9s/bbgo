@@ -28,24 +28,25 @@ type ExchangeFee struct {
 
 // PositionRisk stores the position risk data
 type PositionRisk struct {
-	Leverage         fixedpoint.Value `json:"leverage,omitempty"`
-	LiquidationPrice fixedpoint.Value `json:"liquidationPrice,omitempty"`
+	Leverage         fixedpoint.Value `json:"leverage,omitempty" db:"leverage"`
+	LiquidationPrice fixedpoint.Value `json:"liquidationPrice,omitempty" db:"liquidation_price"`
 
-	Symbol                 string               `json:"symbol,omitempty"`
-	PositionSide           PositionType         `json:"positionSide,omitempty"`
-	EntryPrice             fixedpoint.Value     `json:"entryPrice,omitempty"`
-	MarkPrice              fixedpoint.Value     `json:"markPrice,omitempty"`
-	BreakEvenPrice         fixedpoint.Value     `json:"breakEvenPrice,omitempty"`
-	PositionAmount         fixedpoint.Value     `json:"positionAmount,omitempty"`
-	UnrealizedPnL          fixedpoint.Value     `json:"unrealizedPnL,omitempty"`
-	Notional               fixedpoint.Value     `json:"notional,omitempty"`
-	InitialMargin          fixedpoint.Value     `json:"initialMargin,omitempty"`
-	MaintMargin            fixedpoint.Value     `json:"maintMargin,omitempty"`
-	PositionInitialMargin  fixedpoint.Value     `json:"positionInitialMargin,omitempty"`
-	OpenOrderInitialMargin fixedpoint.Value     `json:"openOrderInitialMargin,omitempty"`
-	Adl                    fixedpoint.Value     `json:"adl,omitempty"`
-	MarginAsset            string               `json:"marginAsset,omitempty"`
-	UpdateTime             MillisecondTimestamp `json:"updateTime,omitempty"`
+	Exchange               ExchangeName         `json:"exchange" db:"exchange"`
+	Symbol                 string               `json:"symbol,omitempty" db:"symbol"`
+	PositionSide           PositionType         `json:"positionSide,omitempty" db:"position_side"`
+	EntryPrice             fixedpoint.Value     `json:"entryPrice,omitempty" db:"entry_price"`
+	MarkPrice              fixedpoint.Value     `json:"markPrice,omitempty" db:"mark_price"`
+	BreakEvenPrice         fixedpoint.Value     `json:"breakEvenPrice,omitempty" db:"break_even_price"`
+	PositionAmount         fixedpoint.Value     `json:"positionAmount,omitempty" db:"position_amount"`
+	UnrealizedPnL          fixedpoint.Value     `json:"unrealizedPnL,omitempty" db:"unrealized_pnl"`
+	Notional               fixedpoint.Value     `json:"notional,omitempty" db:"notional"`
+	InitialMargin          fixedpoint.Value     `json:"initialMargin,omitempty" db:"initial_margin"`
+	MaintMargin            fixedpoint.Value     `json:"maintMargin,omitempty" db:"maint_margin"`
+	PositionInitialMargin  fixedpoint.Value     `json:"positionInitialMargin,omitempty" db:"position_initial_margin"`
+	OpenOrderInitialMargin fixedpoint.Value     `json:"openOrderInitialMargin,omitempty" db:"open_order_initial_margin"`
+	Adl                    fixedpoint.Value     `json:"adl,omitempty" db:"adl"`
+	MarginAsset            string               `json:"marginAsset,omitempty" db:"margin_asset"`
+	UpdateTime             MillisecondTimestamp `json:"updateTime,omitempty" db:"updated_at"`
 }
 
 // Position stores the position data

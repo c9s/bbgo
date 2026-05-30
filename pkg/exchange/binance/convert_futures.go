@@ -405,6 +405,7 @@ func toGlobalPositionRisk(positions []binanceapi.FuturesPositionRisk) []types.Po
 		retPositions[i] = types.PositionRisk{
 			LiquidationPrice:       position.LiquidationPrice,
 			PositionSide:           toGlobalPositionSide(position.PositionSide),
+			Exchange:               types.ExchangeBinance,
 			Symbol:                 position.Symbol,
 			MarkPrice:              position.MarkPrice,
 			EntryPrice:             position.EntryPrice,

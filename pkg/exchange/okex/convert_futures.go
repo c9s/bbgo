@@ -74,6 +74,7 @@ func toGlobalPositionRisk(positions []okexapi.Position) []types.PositionRisk {
 	for i, position := range positions {
 		retPositions[i] = types.PositionRisk{
 			Leverage:       position.Lever,
+			Exchange:       types.ExchangeOKEx,
 			Symbol:         toGlobalSymbol(position.InstId),
 			PositionAmount: position.Pos,
 			PositionSide:   toGlobalPositionSide(okexapi.PosSide(position.PosSide)),

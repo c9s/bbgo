@@ -125,6 +125,43 @@ func (t *MillisecondTimestamp) UnmarshalJSON(data []byte) error {
 	// Unreachable
 }
 
+func (t MillisecondTimestamp) Value() (driver.Value, error) {
+	tt := time.Time(t)
+	if tt.IsZero() {
+		return nil, nil
+	}
+	return tt, nil
+}
+
+func (t *MillisecondTimestamp) Scan(src interface{}) error {
+	if src == nil {
+		return nil
+	}
+
+	switch d := src.(type) {
+	case *time.Time:
+		*t = MillisecondTimestamp(*d)
+	case time.Time:
+		*t = MillisecondTimestamp(d)
+	case string:
+		tt, err := time.Parse("2006-01-02 15:04:05.999999999-07:00", d)
+		if err != nil {
+			return err
+		}
+		*t = MillisecondTimestamp(tt)
+	case []byte:
+		tt, err := time.Parse("2006-01-02 15:04:05.999999999-07:00", string(d))
+		if err != nil {
+			return err
+		}
+		*t = MillisecondTimestamp(tt)
+	default:
+		return fmt.Errorf("unsupported type for MillisecondTimestamp.Scan: %T", src)
+	}
+
+	return nil
+}
+
 func convertFloat64ToTime(vt string, f float64) (time.Time, error) {
 	idx := strings.Index(vt, ".")
 	if idx > 0 {

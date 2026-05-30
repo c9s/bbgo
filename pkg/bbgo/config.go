@@ -318,8 +318,10 @@ type SyncConfig struct {
 
 	// UserDataStream is for real-time sync with websocket user data stream
 	UserDataStream *struct {
-		Trades       bool `json:"trades,omitempty" yaml:"trades,omitempty"`
-		FilledOrders bool `json:"filledOrders,omitempty" yaml:"filledOrders,omitempty"`
+		Trades                      bool           `json:"trades,omitempty" yaml:"trades,omitempty"`
+		FilledOrders                bool           `json:"filledOrders,omitempty" yaml:"filledOrders,omitempty"`
+		FuturesPosition             bool           `json:"futuresPosition,omitempty" yaml:"futuresPosition,omitempty"`
+		FuturesPositionSyncInterval types.Duration `json:"futuresPositionSyncInterval,omitempty" yaml:"futuresPositionSyncInterval,omitempty"`
 	} `json:"userDataStream,omitempty" yaml:"userDataStream,omitempty"`
 }
 

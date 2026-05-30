@@ -246,6 +246,7 @@ func (environ *Environment) ConfigureDatabaseDriver(
 		MarginService:   environ.MarginService,
 		WithdrawService: &service.WithdrawService{DB: db},
 		DepositService:  &service.DepositService{DB: db},
+		FuturesService:  service.NewFuturesService(db),
 	}
 
 	return nil
@@ -427,6 +428,32 @@ func (environ *Environment) BindSync(config *SyncConfig) {
 		}
 	}
 
+	futuresPositionWriterCreator := func(ex types.ExchangeRiskService) func(types.Trade) {
+		return func(trade types.Trade) {
+			if !(trade.IsFutures || trade.IsIsolated) {
+				return
+			}
+
+			err := environ.SyncService.FuturesService.QueryPositionsAndInsert(
+				context.Background(),
+				ex,
+				trade.Time.Time(),
+				trade.Symbol,
+			)
+			if err != nil {
+				log.WithError(err).Errorf(
+					"failed to query and insert position risk: %s",
+					trade.String(),
+				)
+			}
+		}
+	}
+
+	// setup the futures position sync interval
+	if environ.SyncService != nil && environ.SyncService.FuturesService != nil {
+		environ.SyncService.FuturesService.PositionRiskUpdateInterval = config.UserDataStream.FuturesPositionSyncInterval.Duration()
+	}
+
 	for _, session := range environ.sessions {
 		// avoid using the iterator variable.
 		s2 := session
@@ -439,6 +466,21 @@ func (environ *Environment) BindSync(config *SyncConfig) {
 		if config.UserDataStream.FilledOrders {
 			orderWriter := orderWriterCreator(s2)
 			session.UserDataStream.OnOrderUpdate(orderWriter)
+		}
+
+		// setup sync for futures position risk
+		if config.UserDataStream.FuturesPosition {
+			if environ.SyncService == nil || environ.SyncService.FuturesService == nil {
+				log.Warnf(
+					"futures position sync is enabled but SyncService is not properly configured, futures position sync disabled: %s",
+					session.Name,
+				)
+				continue
+			}
+			if ex, ok := session.Exchange.(types.ExchangeRiskService); ok {
+				futuresPositionWriter := futuresPositionWriterCreator(ex)
+				session.UserDataStream.OnTradeUpdate(futuresPositionWriter)
+			}
 		}
 	}
 }
