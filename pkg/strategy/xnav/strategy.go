@@ -211,6 +211,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 	priceTime := time.Now()
 	sessionAssets := map[string]asset.Map{}
+	sessionFuturesPositions := map[string]types.FuturesPositionMap{}
 
 	// iterate the sessions and record them
 	quoteCurrency := "USDT"
@@ -250,7 +251,17 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 		}
 
 		sessionAssets[sessionName] = assets
-
+		if account.AccountType == types.AccountTypeFutures {
+			openPositions := account.FuturesInfo.Positions.OpenPositions()
+			if len(openPositions) > 0 {
+				for _, position := range openPositions {
+					if market, found := session.Market(position.Symbol); found {
+						position.SetMarket(market)
+					}
+				}
+				sessionFuturesPositions[sessionName] = openPositions
+			}
+		}
 	}
 
 	totalAssets := asset.Map{}
@@ -274,11 +285,21 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 	bbgo.Notify(displayAssets)
 
-	if s.ShowBreakdown && len(sessionAssets) > 1 {
+	if len(sessionAssets) > 1 {
 		for sessionName, assets := range sessionAssets {
 			slackAttachment := assets.SlackAttachment()
 			slackAttachment.Title = "Session " + sessionName + " " + slackAttachment.Title
 			bbgo.Notify(slackAttachment)
+		}
+	}
+
+	if s.ShowBreakdown && len(sessionFuturesPositions) > 0 {
+		for sessionName, positions := range sessionFuturesPositions {
+			for _, position := range positions {
+				slackAttachment := position.SlackAttachment()
+				slackAttachment.Title = "Session " + sessionName + " " + slackAttachment.Title
+				bbgo.Notify(slackAttachment)
+			}
 		}
 	}
 
