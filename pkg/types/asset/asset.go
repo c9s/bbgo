@@ -157,40 +157,36 @@ func (m Map) SlackAttachment() slack.Attachment {
 	}
 
 	for _, a := range assets {
+		var text string
 		if !a.NetAssetInUSD.IsZero() {
-			text := fmt.Sprintf("%s (≈ %s) (≈ %s) (%s)",
+			text = fmt.Sprintf("%s (≈ %s) (≈ %s) (%s)",
 				a.NetAsset.String(),
 				currency.USD.FormatMoney(a.NetAssetInUSD),
 				currency.BTC.FormatMoney(a.NetAssetInBTC),
 				a.NetAssetInUSD.Div(netAssetInUSD).FormatPercentage(2),
 			)
-
-			if !a.Borrowed.IsZero() {
-				text += fmt.Sprintf(" Borrowed: %s", a.Borrowed.String())
-			}
-
-			if !a.Interest.IsZero() {
-				text += fmt.Sprintf(" Interest: %s", a.Interest.String())
-			}
-
-			fields = append(fields, slack.AttachmentField{
-				Title: a.Currency,
-				Value: text,
-				Short: false,
-			})
 		} else {
-			text := a.NetAsset.String()
-
-			if !a.Borrowed.IsZero() {
-				text += fmt.Sprintf(" Borrowed: %s", a.Borrowed.String())
-			}
-
-			fields = append(fields, slack.AttachmentField{
-				Title: a.Currency,
-				Value: text,
-				Short: false,
-			})
+			text = a.NetAsset.String()
 		}
+		if !a.Borrowed.IsZero() {
+			text += fmt.Sprintf(
+				" Borrowed: %s (≈ %s)",
+				a.Borrowed.String(),
+				currency.USD.FormatMoney(a.Borrowed.Mul(a.PriceInUSD)),
+			)
+		}
+
+		if !a.Interest.IsZero() {
+			text += fmt.Sprintf(" Interest: %s (≈ %s)",
+				a.Interest.String(),
+				currency.USD.FormatMoney(a.InterestInUSD),
+			)
+		}
+		fields = append(fields, slack.AttachmentField{
+			Title: a.Currency,
+			Value: text,
+			Short: false,
+		})
 	}
 
 	return slack.Attachment{
