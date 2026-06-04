@@ -288,27 +288,48 @@ func isWorkingOrder(status api.OrderStatus) bool {
 // fee currency on Coinbase is USD:
 // https://help.coinbase.com/en/exchange/trading-and-funding/exchange-fees
 func (msg *MatchMessage) Trade(s *Stream) types.Trade {
+	// For public market trade:
+	// - the side is the taker side
+	// - isMaker: the buyer is the market maker or not.
+	// - orderUUID is the taker order id
+	// For the user trade:
+	// - the side is the user side
+	// - isMaker: whether the user is the maker or not.
+	// - orderUUID is the user order id
+
+	// Step 1: convert the match message to a market trade
 	var side types.SideType
+	var isMaker bool
+	orderUUID := msg.TakerOrderID
 	// NOTE: the message side is the maker side
+	// https://docs.cdp.coinbase.com/exchange/websocket-feed/channels#match
+	// the market trade side in bbgo should be the taker side.
 	switch msg.Side {
 	case "buy":
-		side = types.SideTypeBuy
-	case "sell":
+		// the taker is on the sell side
 		side = types.SideTypeSell
+		// the buyer is maker
+		isMaker = true
+	case "sell":
+		// the taker is on the buy side
+		side = types.SideTypeBuy
+		// the buyer is taker
+		isMaker = false
 	default:
 		side = types.SideType(msg.Side)
 	}
 	quoteQuantity := msg.Size.Mul(msg.Price)
-	orderUUID := ""
+	// Step 2: check if it's a match of authenticated user
 	if msg.UserID != "" {
+		isMaker = msg.IsAuthMaker()
 		// it's an match of authenticated user, which means it's from a user data stream
 		switch msg.UserID {
 		case msg.TakerUserID:
 			// the user is the taker
 			orderUUID = msg.TakerOrderID
-			side = side.Reverse() // the user is on the reverse side of the maker side
 		case msg.MakerUserID:
 			// the user is the maker
+			side = side.Reverse() // the user is on the reverse side of the taker side
 			orderUUID = msg.MakerOrderID
 		}
 	}
@@ -335,7 +356,7 @@ func (msg *MatchMessage) Trade(s *Stream) types.Trade {
 		Side:          side,
 		Symbol:        toGlobalSymbol(msg.ProductID),
 		IsBuyer:       side == types.SideTypeBuy,
-		IsMaker:       msg.IsAuthMaker(),
+		IsMaker:       isMaker,
 		Time:          types.Time(msg.Time),
 		FeeProcessing: true, // assume the fee is processing when a match happens
 		FeeCurrency:   quoteCurrency,
