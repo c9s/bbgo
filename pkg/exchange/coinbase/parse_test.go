@@ -4,6 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func Test_ParseInvalidMessage(t *testing.T) {
@@ -433,6 +437,190 @@ func Test_ParseOrderBookSnapshot(t *testing.T) {
 	msg, err := parseMessage(data)
 	assert.NoError(t, err)
 	assert.IsType(t, &OrderBookSnapshotMessage{}, msg)
+}
+
+func Test_MatchMessage_publicTrade(t *testing.T) {
+	stream := &Stream{
+		marketInfoMap: map[string]*api.MarketInfo{
+			"BTC-USD": {QuoteCurrency: "USD"},
+		},
+	}
+
+	t.Run("maker_side_buy_means_taker_sells", func(t *testing.T) {
+		msg := &MatchMessage{
+			seqenceMessageType: seqenceMessageType{
+				messageBaseType: messageBaseType{Type: "match"},
+				ProductID:       "BTC-USD",
+			},
+			TradeID: 100,
+			Size:    fixedpoint.NewFromFloat(1.5),
+			Price:   fixedpoint.NewFromFloat(30000),
+			Side:    "buy",
+		}
+
+		trade := msg.publicTrade(stream)
+		assert.Equal(t, types.SideTypeSell, trade.Side)
+		assert.True(t, trade.IsMaker)
+		assert.False(t, trade.IsBuyer)
+		assert.Equal(t, "BTCUSD", trade.Symbol)
+		assert.Equal(t, fixedpoint.NewFromFloat(1.5), trade.Quantity)
+		assert.Equal(t, fixedpoint.NewFromFloat(30000), trade.Price)
+		assert.Equal(t, fixedpoint.NewFromFloat(45000), trade.QuoteQuantity)
+		assert.Equal(t, "USD", trade.FeeCurrency)
+		assert.Equal(t, uint64(100), trade.ID)
+	})
+
+	t.Run("maker_side_sell_means_taker_buys", func(t *testing.T) {
+		msg := &MatchMessage{
+			seqenceMessageType: seqenceMessageType{
+				messageBaseType: messageBaseType{Type: "match"},
+				ProductID:       "BTC-USD",
+			},
+			TradeID: 101,
+			Size:    fixedpoint.NewFromFloat(0.5),
+			Price:   fixedpoint.NewFromFloat(29000),
+			Side:    "sell",
+		}
+
+		trade := msg.publicTrade(stream)
+		assert.Equal(t, types.SideTypeBuy, trade.Side)
+		assert.False(t, trade.IsMaker)
+		assert.True(t, trade.IsBuyer)
+		assert.Equal(t, "BTCUSD", trade.Symbol)
+		assert.Equal(t, fixedpoint.NewFromFloat(0.5), trade.Quantity)
+		assert.Equal(t, fixedpoint.NewFromFloat(29000), trade.Price)
+		assert.Equal(t, fixedpoint.NewFromFloat(14500), trade.QuoteQuantity)
+	})
+
+	t.Run("unknown_side_passthrough", func(t *testing.T) {
+		msg := &MatchMessage{
+			seqenceMessageType: seqenceMessageType{
+				messageBaseType: messageBaseType{Type: "match"},
+				ProductID:       "BTC-USD",
+			},
+			TradeID: 102,
+			Size:    fixedpoint.NewFromFloat(1.0),
+			Price:   fixedpoint.NewFromFloat(28000),
+			Side:    "unknown",
+		}
+
+		trade := msg.publicTrade(stream)
+		assert.Equal(t, types.SideType("unknown"), trade.Side)
+	})
+}
+
+func Test_MatchMessage_userTrade(t *testing.T) {
+	stream := &Stream{
+		marketInfoMap: map[string]*api.MarketInfo{
+			"ETH-USD": {QuoteCurrency: "USD"},
+		},
+	}
+
+	t.Run("user_is_taker_maker_side_buy", func(t *testing.T) {
+		msg := &MatchMessage{
+			seqenceMessageType: seqenceMessageType{
+				messageBaseType: messageBaseType{Type: "match"},
+				ProductID:       "ETH-USD",
+			},
+			TradeID:      200,
+			MakerOrderID: "maker-order-1",
+			TakerOrderID: "taker-order-1",
+			Size:         fixedpoint.NewFromFloat(10.0),
+			Price:        fixedpoint.NewFromFloat(2000),
+			Side:         "buy",
+			UserID:       "user-123",
+			TakerUserID:  "user-123",
+			TakerFeeRate: fixedpoint.NewFromFloat(0.005),
+		}
+
+		trade := msg.userTrade(stream)
+		// maker side is buy, so taker side is sell
+		assert.Equal(t, types.SideTypeSell, trade.Side)
+		assert.False(t, trade.IsMaker)
+		assert.False(t, trade.IsBuyer)
+		assert.Equal(t, "ETHUSD", trade.Symbol)
+		assert.Equal(t, fixedpoint.NewFromFloat(10.0), trade.Quantity)
+		assert.Equal(t, fixedpoint.NewFromFloat(2000), trade.Price)
+		assert.Equal(t, fixedpoint.NewFromFloat(20000), trade.QuoteQuantity)
+		assert.Equal(t, "USD", trade.FeeCurrency)
+		// fee = quoteQuantity * takerFeeRate = 20000 * 0.005 = 100
+		assert.Equal(t, fixedpoint.NewFromFloat(100), trade.Fee)
+	})
+
+	t.Run("user_is_taker_maker_side_sell", func(t *testing.T) {
+		msg := &MatchMessage{
+			seqenceMessageType: seqenceMessageType{
+				messageBaseType: messageBaseType{Type: "match"},
+				ProductID:       "ETH-USD",
+			},
+			TradeID:      201,
+			MakerOrderID: "maker-order-2",
+			TakerOrderID: "taker-order-2",
+			Size:         fixedpoint.NewFromFloat(5.0),
+			Price:        fixedpoint.NewFromFloat(1800),
+			Side:         "sell",
+			UserID:       "user-123",
+			TakerUserID:  "user-123",
+			TakerFeeRate: fixedpoint.NewFromFloat(0.005),
+		}
+
+		trade := msg.userTrade(stream)
+		// maker side is sell, so taker side is buy
+		assert.Equal(t, types.SideTypeBuy, trade.Side)
+		assert.False(t, trade.IsMaker)
+		assert.True(t, trade.IsBuyer)
+	})
+
+	t.Run("user_is_maker_maker_side_sell", func(t *testing.T) {
+		msg := &MatchMessage{
+			seqenceMessageType: seqenceMessageType{
+				messageBaseType: messageBaseType{Type: "match"},
+				ProductID:       "ETH-USD",
+			},
+			TradeID:      202,
+			MakerOrderID: "maker-order-3",
+			TakerOrderID: "taker-order-3",
+			Size:         fixedpoint.NewFromFloat(3.0),
+			Price:        fixedpoint.NewFromFloat(1900),
+			Side:         "sell",
+			UserID:       "user-abc",
+			MakerUserID:  "user-abc",
+			MakerFeeRate: fixedpoint.NewFromFloat(0.001),
+		}
+
+		trade := msg.userTrade(stream)
+		// user is maker, maker side is sell
+		assert.Equal(t, types.SideTypeSell, trade.Side)
+		assert.True(t, trade.IsMaker)
+		assert.False(t, trade.IsBuyer)
+		// fee = quoteQuantity * makerFeeRate = 5700 * 0.001 = 5.7
+		assert.Equal(t, fixedpoint.NewFromFloat(5700), trade.QuoteQuantity)
+		assert.Equal(t, fixedpoint.NewFromFloat(5.7), trade.Fee)
+	})
+
+	t.Run("user_is_maker_maker_side_buy", func(t *testing.T) {
+		msg := &MatchMessage{
+			seqenceMessageType: seqenceMessageType{
+				messageBaseType: messageBaseType{Type: "match"},
+				ProductID:       "ETH-USD",
+			},
+			TradeID:      203,
+			MakerOrderID: "maker-order-4",
+			TakerOrderID: "taker-order-4",
+			Size:         fixedpoint.NewFromFloat(2.0),
+			Price:        fixedpoint.NewFromFloat(2100),
+			Side:         "buy",
+			UserID:       "user-abc",
+			MakerUserID:  "user-abc",
+			MakerFeeRate: fixedpoint.NewFromFloat(0.001),
+		}
+
+		trade := msg.userTrade(stream)
+		// user is maker, maker side is buy
+		assert.Equal(t, types.SideTypeBuy, trade.Side)
+		assert.True(t, trade.IsMaker)
+		assert.True(t, trade.IsBuyer)
+	})
 }
 
 func Test_ParseOrderBookUpdate(t *testing.T) {
