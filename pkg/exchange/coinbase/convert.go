@@ -288,30 +288,85 @@ func isWorkingOrder(status api.OrderStatus) bool {
 // fee currency on Coinbase is USD:
 // https://help.coinbase.com/en/exchange/trading-and-funding/exchange-fees
 func (msg *MatchMessage) Trade(s *Stream) types.Trade {
+	if msg.UserID == "" {
+		return msg.publicTrade(s)
+	}
+	return msg.userTrade(s)
+}
+
+func (msg *MatchMessage) publicTrade(s *Stream) types.Trade {
+	// For public market trade:
+	// - the side is the taker side
+	// - isMaker: the buyer is the market maker or not.
+	// - orderUUID is the taker order id
 	var side types.SideType
+	var isMaker bool
+	orderUUID := msg.TakerOrderID
 	// NOTE: the message side is the maker side
+	// https://docs.cdp.coinbase.com/exchange/websocket-feed/channels#match
+	// the market trade side in bbgo should be the taker side.
 	switch msg.Side {
 	case "buy":
-		side = types.SideTypeBuy
-	case "sell":
+		// the taker is on the sell side
 		side = types.SideTypeSell
+		// the buyer is maker
+		isMaker = true
+	case "sell":
+		// the taker is on the buy side
+		side = types.SideTypeBuy
+		// the buyer is taker
+		isMaker = false
 	default:
 		side = types.SideType(msg.Side)
 	}
-	quoteQuantity := msg.Size.Mul(msg.Price)
-	orderUUID := ""
-	if msg.UserID != "" {
-		// it's an match of authenticated user, which means it's from a user data stream
-		switch msg.UserID {
-		case msg.TakerUserID:
-			// the user is the taker
-			orderUUID = msg.TakerOrderID
-			side = side.Reverse() // the user is on the reverse side of the maker side
-		case msg.MakerUserID:
-			// the user is the maker
-			orderUUID = msg.MakerOrderID
-		}
+
+	return msg.buildTrade(s, orderUUID, side, isMaker)
+}
+
+func (msg *MatchMessage) userTrade(s *Stream) types.Trade {
+	// For the user trade:
+	// - the side is the user side
+	// - isMaker: whether the user is the maker or not.
+	// - orderUUID is the user order id
+
+	var orderUUID string
+	var side types.SideType
+
+	// NOTE: the message side is the maker side
+	// https://docs.cdp.coinbase.com/exchange/websocket-feed/channels#match
+	var makerSide types.SideType
+	switch msg.Side {
+	case "buy":
+		makerSide = types.SideTypeBuy
+	case "sell":
+		makerSide = types.SideTypeSell
+	default:
+		makerSide = types.SideType(msg.Side)
 	}
+	// it's an match of authenticated user, which means it's from a user data stream
+	switch msg.UserID {
+	case msg.TakerUserID:
+		// the user is the taker
+		orderUUID = msg.TakerOrderID
+		// the user is on the reverse side of the maker side
+		side = makerSide.Reverse()
+	case msg.MakerUserID:
+		// the user is the maker
+		orderUUID = msg.MakerOrderID
+		side = makerSide
+	}
+
+	isMaker := msg.IsAuthMaker()
+	return msg.buildTrade(s, orderUUID, side, isMaker)
+}
+
+func (msg *MatchMessage) buildTrade(
+	s *Stream,
+	orderUUID string,
+	side types.SideType,
+	isMaker bool,
+) types.Trade {
+	quoteQuantity := msg.Size.Mul(msg.Price)
 	var orderID uint64 = 0
 	if orderUUID != "" {
 		orderID = util.FNV64(orderUUID)
@@ -335,7 +390,7 @@ func (msg *MatchMessage) Trade(s *Stream) types.Trade {
 		Side:          side,
 		Symbol:        toGlobalSymbol(msg.ProductID),
 		IsBuyer:       side == types.SideTypeBuy,
-		IsMaker:       msg.IsAuthMaker(),
+		IsMaker:       isMaker,
 		Time:          types.Time(msg.Time),
 		FeeProcessing: true, // assume the fee is processing when a match happens
 		FeeCurrency:   quoteCurrency,

@@ -227,7 +227,7 @@ func (m *MatchMessage) IsAuthMaker() bool {
 	if !m.isAuth() {
 		return false
 	}
-	return len(m.MakerUserID) > 0
+	return len(m.MakerUserID) > 0 && m.MakerUserID == m.UserID
 }
 
 // https://help.coinbase.com/en/exchange/trading-and-funding/exchange-fees
