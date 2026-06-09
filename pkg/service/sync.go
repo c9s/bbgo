@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	bbgoEx "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
@@ -55,10 +56,13 @@ func (s *SyncService) SyncSessionSymbols(
 			return err
 		}
 
-		if service, ok := exchange.(types.ExchangeRiskService); ok {
-			logger.Infof("syncing %s %s position risk...", exchange.Name(), symbol)
-			if err := s.FuturesService.Sync(ctx, service, symbol); err != nil {
-				return err
+		_, isFutures, _, _ := bbgoEx.GetSessionAttributes(exchange)
+		if isFutures {
+			if service, ok := exchange.(types.ExchangeRiskService); ok {
+				logger.Infof("syncing %s %s position risk...", exchange.Name(), symbol)
+				if err := s.FuturesService.Sync(ctx, service, symbol); err != nil {
+					return err
+				}
 			}
 		}
 	}
