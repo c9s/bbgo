@@ -914,7 +914,7 @@ func (session *ExchangeSession) MarketDataStore(symbol string) (s *types.MarketD
 	return s, true
 }
 
-// KLine updates will be received in the order listend in intervals array
+// SerialMarketDataStore returns a SerialMarketDataStore for the given symbol and intervals.
 func (session *ExchangeSession) SerialMarketDataStore(
 	ctx context.Context, symbol string, intervals []types.Interval, useAggTrade ...bool,
 ) (store *types.SerialMarketDataStore, ok bool) {
@@ -1406,11 +1406,7 @@ func (session *ExchangeSession) FormatOrders(orders []types.SubmitOrder) (format
 	return formattedOrders, err
 }
 
-// GetMarginInfoUpdater returns the margin info updater
-// it could be nil if the session is not a margin session
-// be sure to check nil before using it:
-//
-//	if session.Margin { ... := session.GetMarginInfoUpdater() }
+// IsInMaintenance checks if the session is currently in maintenance mode.
 func (session *ExchangeSession) IsInMaintenance() bool {
 	if session.Maintenance != nil {
 		return session.Maintenance.IsInMaintenance()
@@ -1419,6 +1415,11 @@ func (session *ExchangeSession) IsInMaintenance() bool {
 	return false
 }
 
+// GetMarginInfoUpdater returns the margin info updater
+// it could be nil if the session is not a margin session
+// be sure to check nil before using it:
+//
+//	if session.Margin { ... := session.GetMarginInfoUpdater() }
 func (session *ExchangeSession) GetMarginInfoUpdater() *MarginInfoUpdater {
 	return session.marginInfoUpdater
 }
