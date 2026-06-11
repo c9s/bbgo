@@ -185,6 +185,8 @@ type ExchangeSessionConfig struct {
 	UseHeikinAshi bool `json:"heikinAshi,omitempty" yaml:"heikinAshi,omitempty"`
 
 	Maintenance *MaintenanceConfig `json:"maintenance,omitempty" yaml:"maintenance,omitempty"`
+
+	SessionOptions map[string]any `json:"sessionOptions,omitempty" yaml:"sessionOptions,omitempty"`
 }
 
 // ExchangeSession presents the exchange connection Session

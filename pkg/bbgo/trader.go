@@ -115,6 +115,14 @@ func (trader *Trader) Configure(userConfig *Config) error {
 		}
 	}
 
+	for _, session := range trader.environment.Sessions() {
+		if ex, ok := session.Exchange.(types.SessionOptionConfigurer); ok {
+			if err := ex.ConfigureOptions(session.SessionOptions); err != nil {
+				return err
+			}
+		}
+	}
+
 	for _, strategy := range userConfig.CrossExchangeStrategies {
 		log.Infof("attaching cross exchange strategy %T", strategy)
 		trader.AttachCrossExchangeStrategy(strategy)

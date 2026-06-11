@@ -96,6 +96,10 @@ type Exchange interface {
 	ExchangeTradeService
 }
 
+type SessionOptionConfigurer interface {
+	ConfigureOptions(map[string]any) error
+}
+
 //go:generate mockgen -destination=mocks/mock_exchange_extended.go -package=mocks . ExchangeExtended
 type ExchangeExtended interface {
 	Exchange
