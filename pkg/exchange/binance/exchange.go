@@ -1712,6 +1712,33 @@ func (e *Exchange) QueryTakerBuySellVolumes(ctx context.Context, symbol string, 
 	return takerVol, nil
 }
 
+// SessionOptionConfigurer
+func (e *Exchange) ConfigureOptions(options map[string]any) error {
+	spotBnbBurn, spotOk := options["spotBnbBurn"].(bool)
+	interestBnbBurn, interestOk := options["interestBnbBurn"].(bool)
+	if !spotOk && !interestOk {
+		// nothing to configure for bnb burn
+		return nil
+	}
+	req := e.client2.NewToggleBurnBnbRequest()
+	if spotOk {
+		req.SpotBnbBurn(spotBnbBurn)
+	}
+	if interestOk {
+		req.InterestBnbBurn(interestBnbBurn)
+	}
+
+	timedCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := req.Do(timedCtx)
+	if err != nil {
+		return err
+	}
+	log.Infof("Toggle Burn BNB response: %+v", resp)
+	return nil
+}
+
 // in seconds
 var SupportedIntervals = map[types.Interval]int{
 	types.Interval1s:  1,
