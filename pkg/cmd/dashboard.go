@@ -9,6 +9,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/cmd/widget"
 	"github.com/c9s/bbgo/pkg/exchange"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	ui "github.com/gizak/termui/v3"
 	"github.com/spf13/cobra"
@@ -19,6 +20,7 @@ func init() {
 	orderFlowCmd.MarkFlagRequired("exchange")
 	orderFlowCmd.Flags().String("symbol", "", "trading pair symbol")
 	orderFlowCmd.MarkFlagRequired("symbol")
+	orderFlowCmd.Flags().String("aggregate", "0", "aggregate price unit; 0 disables aggregation")
 	dashboardCmd.AddCommand(orderFlowCmd)
 	RootCmd.AddCommand(dashboardCmd)
 }
@@ -52,6 +54,15 @@ var orderFlowCmd = &cobra.Command{
 		if len(exName) == 0 || len(symbol) == 0 {
 			return errors.New("--exchange and --symbol are required")
 		}
+		aggregate, err := cmd.Flags().GetString("aggregate")
+		if err != nil {
+			return err
+		}
+		aggregateUnit, err := fixedpoint.NewFromString(aggregate)
+		if err != nil {
+			return err
+		}
+
 		// create a new public trade stream
 		exMin, err := exchange.NewWithEnvVarPrefix(types.ExchangeName(exName), strings.ToUpper(exName))
 		ex, ok := exMin.(types.Exchange)
@@ -64,6 +75,7 @@ var orderFlowCmd = &cobra.Command{
 		w := widget.NewOrderFlowWidget()
 		w.Title = " Order Flow Circles (總量正規化) "
 		stream.OnMarketTrade(types.TradeWith(symbol, func(trade types.Trade) {
+			trade.Price = aggregatePrice(trade.Price, aggregateUnit)
 			w.UpdateTrade(trade)
 		}))
 		stream.SetPublicOnly()
@@ -103,4 +115,11 @@ var orderFlowCmd = &cobra.Command{
 			}
 		}
 	},
+}
+
+func aggregatePrice(price, aggregateUnit fixedpoint.Value) fixedpoint.Value {
+	if aggregateUnit.Sign() <= 0 {
+		return price
+	}
+	return price.Div(aggregateUnit).Floor().Mul(aggregateUnit)
 }
