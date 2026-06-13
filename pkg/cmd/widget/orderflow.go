@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"sort"
+	"sync"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -11,6 +13,16 @@ import (
 )
 
 const brailleOffset = '\u2800'
+
+// maxOrderFlowSideLevels caps how many price levels are shown above and below
+// the POC. All traded prices are retained; only the display is windowed.
+const maxOrderFlowSideLevels = 10
+
+const (
+	priceColWidth = 13
+	deltaColWidth = 10
+	volColWidth   = 16
+)
 
 var brailleDots = [4][2]rune{
 	{0x01, 0x08},
@@ -35,62 +47,73 @@ func (p *PriceLevel) TotalVol() fixedpoint.Value {
 
 type OrderFlowWidget struct {
 	ui.Block
-	levels     []PriceLevel
-	indicesMap map[fixedpoint.Value]int
-}
-
-func (w *OrderFlowWidget) SetLevels(levels []PriceLevel) {
-	w.levels = levels
-	for i, lvl := range levels {
-		w.indicesMap[lvl.Price] = i
-	}
+	mu     sync.Mutex
+	levels []PriceLevel
 }
 
 func (w *OrderFlowWidget) UpdateTrade(trade types.Trade) {
-	idx, ok := w.indicesMap[trade.Price]
-	if !ok {
-		newLevel := PriceLevel{
-			Price: trade.Price,
-		}
-		if trade.Side == types.SideTypeBuy {
-			newLevel.BidVol = trade.Quantity
-		} else {
-			newLevel.AskVol = trade.Quantity
-		}
-		w.levels = append(w.levels, newLevel)
-		w.indicesMap[trade.Price] = len(w.levels) - 1
-	} else {
-		if trade.Side == types.SideTypeBuy {
-			w.levels[idx].BidVol = w.levels[idx].BidVol.Add(trade.Quantity)
-		} else {
-			w.levels[idx].AskVol = w.levels[idx].AskVol.Add(trade.Quantity)
-		}
+	level := PriceLevel{
+		Price: trade.Price,
 	}
+	if trade.Side == types.SideTypeBuy {
+		level.BidVol = trade.Quantity
+	} else {
+		level.AskVol = trade.Quantity
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.upsertLevel(level)
+}
+
+func (w *OrderFlowWidget) upsertLevel(level PriceLevel) {
+	for idx := range w.levels {
+		if !w.levels[idx].Price.Eq(level.Price) {
+			continue
+		}
+		w.levels[idx].BidVol = w.levels[idx].BidVol.Add(level.BidVol)
+		w.levels[idx].AskVol = w.levels[idx].AskVol.Add(level.AskVol)
+		return
+	}
+
+	w.levels = append(w.levels, level)
+}
+
+func (w *OrderFlowWidget) sortedLevelsSnapshot() []PriceLevel {
+	w.mu.Lock()
+	levels := append([]PriceLevel(nil), w.levels...)
+	w.mu.Unlock()
+
+	sort.Slice(levels, func(i, j int) bool {
+		return levels[i].Price.Compare(levels[j].Price) > 0
+	})
+
+	return levels
 }
 
 func NewOrderFlowWidget() *OrderFlowWidget {
 	return &OrderFlowWidget{
-		Block:      *ui.NewBlock(),
-		indicesMap: make(map[fixedpoint.Value]int),
+		Block: *ui.NewBlock(),
 	}
 }
 
 func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 	w.Block.Draw(buf)
 
-	if len(w.levels) == 0 {
+	levels := w.sortedLevelsSnapshot()
+	if len(levels) == 0 {
 		return
 	}
 
 	maxVol := fixedpoint.Zero
 	totalDelta := fixedpoint.Zero
 	pocPrice := fixedpoint.Zero
-	pocVol := fixedpoint.Zero
-	for _, lvl := range w.levels {
+	pocIdx := 0
+	for idx, lvl := range levels {
 		if v := lvl.TotalVol(); v.Compare(maxVol) > 0 {
 			maxVol = v
 			pocPrice = lvl.Price
-			pocVol = v
+			pocIdx = idx
 		}
 		totalDelta = totalDelta.Add(lvl.Delta())
 	}
@@ -99,10 +122,8 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 	}
 
 	inner := w.Inner
-	numLevels := len(w.levels)
 
-	priceColWidth := 8
-	infoColWidth := 16
+	infoColWidth := deltaColWidth + volColWidth
 	circleStart := inner.Min.X + priceColWidth
 	circleEnd := inner.Max.X - infoColWidth
 	circleWidth := circleEnd - circleStart
@@ -111,87 +132,126 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 	}
 
 	availableHeight := inner.Max.Y - inner.Min.Y - 2
+
+	// Show at most maxOrderFlowSideLevels above and below the POC, shrinking
+	// further if the terminal cannot fit that many rows.
+	const minRowHeight = 2
+	maxVisible := availableHeight / minRowHeight
+	if maxVisible < 1 {
+		return
+	}
+
+	side := maxOrderFlowSideLevels
+	if half := (maxVisible - 1) / 2; half < side {
+		side = half
+	}
+
+	start := pocIdx - side
+	if start < 0 {
+		start = 0
+	}
+	end := pocIdx + side + 1
+	if end > len(levels) {
+		end = len(levels)
+	}
+	visibleLevels := levels[start:end]
+	hiddenBelow := len(levels) - end
+
+	numLevels := len(visibleLevels)
 	rowHeight := availableHeight / numLevels
-	if rowHeight < 2 {
-		rowHeight = 2
+	if rowHeight < minRowHeight {
+		rowHeight = minRowHeight
 	}
 
 	maxRadius := math.Min(float64(circleWidth), float64(rowHeight*2)) * 0.85
+	cyBraille := float64(rowHeight*4) / 2.0
 
-	for i, lvl := range w.levels {
-		rowTopY := inner.Min.Y + i*rowHeight
+	// Circles and the price/delta/volume columns occupy disjoint x-ranges, so a
+	// single pass in price order is enough; on overlap the lower price's circle
+	// paints over the higher one.
+	for idx, lvl := range visibleLevels {
+		rowTopY := inner.Min.Y + idx*rowHeight
 		rowCenterY := rowTopY + rowHeight/2
-		if rowCenterY >= inner.Max.Y-2 {
-			break
-		}
 
 		delta := lvl.Delta()
 		totalVol := lvl.TotalVol()
-		ratio := totalVol.Div(maxVol).Float64()
-		radius := ratio * maxRadius
+		radius := totalVol.Div(maxVol).Float64() * maxRadius
 		if radius < 1.5 {
 			radius = 1.5
 		}
 
 		color := ui.ColorGreen
-		if delta < 0 {
+		if delta.Sign() < 0 {
 			color = ui.ColorRed
-		} else if delta == 0 {
-			color = ui.ColorYellow
+		} else if delta.IsZero() {
+			color = ui.ColorWhite
 		}
-
-		priceStyle := ui.NewStyle(ui.ColorWhite)
-		if lvl.Price.Eq(pocPrice) {
-			priceStyle = ui.NewStyle(ui.ColorYellow, ui.ColorClear, ui.ModifierBold)
-		}
-		buf.SetString(fmt.Sprintf("%.5f", lvl.Price.Float64()), priceStyle, image.Pt(inner.Min.X, rowCenterY))
-
-		cxBraille := float64(circleWidth)
-		cyBraille := float64(rowHeight*4) / 2.0
 
 		for ty := 0; ty < rowHeight; ty++ {
 			termY := rowTopY + ty
+			if termY < inner.Min.Y {
+				continue
+			}
 			if termY >= inner.Max.Y-2 {
 				break
 			}
 			for tx := 0; tx < circleWidth; tx++ {
-				termX := circleStart + tx
 				var brailleRune rune
 				for sy := 0; sy < 4; sy++ {
 					for sx := 0; sx < 2; sx++ {
-						bx := float64(tx*2 + sx)
-						by := float64(ty*4 + sy)
-						dx := bx - cxBraille
-						dy := by - cyBraille
+						dx := float64(tx*2+sx) - float64(circleWidth)
+						dy := float64(ty*4+sy) - cyBraille
 						if dx*dx+dy*dy <= radius*radius {
 							brailleRune |= brailleDots[sy][sx]
 						}
 					}
 				}
 				if brailleRune != 0 {
+					pt := image.Pt(circleStart+tx, termY)
+					// Merge dots with any circle already drawn here so a smaller
+					// circle drawn later cannot erase a larger one's filled cell.
+					if existing := buf.GetCell(pt).Rune; existing >= brailleOffset && existing < brailleOffset+0x100 {
+						brailleRune |= existing - brailleOffset
+					}
 					buf.SetCell(ui.Cell{
 						Rune:  brailleOffset + brailleRune,
 						Style: ui.NewStyle(color),
-					}, image.Pt(termX, termY))
+					}, pt)
 				}
 			}
 		}
 
-		deltaStr := fmt.Sprintf(" %.4f", delta.Float64())
-		buf.SetString(deltaStr, ui.NewStyle(color), image.Pt(circleEnd-9, rowCenterY))
+		priceStyle := ui.NewStyle(ui.ColorWhite)
+		if lvl.Price.Eq(pocPrice) {
+			priceStyle = ui.NewStyle(ui.ColorYellow, ui.ColorClear, ui.ModifierBold)
+		}
+		setPaddedString(buf, fmt.Sprintf("%.5f", lvl.Price.Float64()), priceStyle, image.Pt(inner.Min.X, rowCenterY), priceColWidth)
+
+		deltaStr := fmt.Sprintf("% .4f", delta.Float64())
+		setPaddedString(buf, deltaStr, ui.NewStyle(color), image.Pt(circleEnd, rowCenterY), deltaColWidth)
 
 		volStr := fmt.Sprintf(" V:%.5f", totalVol.Float64())
-		buf.SetString(volStr, ui.NewStyle(ui.ColorCyan), image.Pt(circleEnd, rowCenterY))
+		setPaddedString(buf, volStr, ui.NewStyle(ui.ColorCyan), image.Pt(circleEnd+deltaColWidth, rowCenterY), volColWidth)
 	}
 
 	summaryY := inner.Max.Y - 1
 	deltaColor := ui.ColorGreen
-	if totalDelta < 0 {
+	if totalDelta.Sign() < 0 {
 		deltaColor = ui.ColorRed
 	}
 	summary := fmt.Sprintf(
 		" Total Δ: %.4f | POC: %.5f (Vol %.5f)",
-		totalDelta.Float64(), pocPrice.Float64(), pocVol.Float64())
+		totalDelta.Float64(), pocPrice.Float64(), maxVol.Float64())
+	if start > 0 || hiddenBelow > 0 {
+		summary += fmt.Sprintf(" | hidden ↑%d ↓%d", start, hiddenBelow)
+	}
 	buf.SetString(summary, ui.NewStyle(deltaColor), image.Pt(inner.Min.X, summaryY))
 	buf.SetString(" [q] quit", ui.NewStyle(ui.ColorWhite), image.Pt(inner.Max.X-10, summaryY))
+}
+
+func setPaddedString(buf *ui.Buffer, s string, style ui.Style, point image.Point, width int) {
+	if len(s) > width {
+		s = s[:width]
+	}
+	buf.SetString(fmt.Sprintf("%-*s", width, s), style, point)
 }
