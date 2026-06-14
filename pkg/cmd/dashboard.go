@@ -20,7 +20,7 @@ func init() {
 	orderFlowCmd.MarkFlagRequired("exchange")
 	orderFlowCmd.Flags().String("symbol", "", "trading pair symbol")
 	orderFlowCmd.MarkFlagRequired("symbol")
-	orderFlowCmd.Flags().String("aggregate", "0", "aggregate price unit; 0 disables aggregation")
+	orderFlowCmd.Flags().Float64("aggregate", 0, "aggregate price unit; 0 disables aggregation")
 	dashboardCmd.AddCommand(orderFlowCmd)
 	RootCmd.AddCommand(dashboardCmd)
 }
@@ -54,14 +54,11 @@ var orderFlowCmd = &cobra.Command{
 		if len(exName) == 0 || len(symbol) == 0 {
 			return errors.New("--exchange and --symbol are required")
 		}
-		aggregate, err := cmd.Flags().GetString("aggregate")
+		aggregate, err := cmd.Flags().GetFloat64("aggregate")
 		if err != nil {
 			return err
 		}
-		aggregateUnit, err := fixedpoint.NewFromString(aggregate)
-		if err != nil {
-			return err
-		}
+		aggregateUnit := fixedpoint.NewFromFloat(aggregate)
 
 		// create a new public trade stream
 		exMin, err := exchange.NewWithEnvVarPrefix(types.ExchangeName(exName), strings.ToUpper(exName))
