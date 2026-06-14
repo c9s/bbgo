@@ -163,8 +163,7 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 		rowHeight = minRowHeight
 	}
 
-	// Position rows proportionally to price so the vertical gap between levels
-	// reflects the actual price distance, not just their rank.
+	// Price range of the visible levels, used to position rows proportionally.
 	minPrice := visibleLevels[0].Price
 	maxPrice := visibleLevels[0].Price
 	for _, lvl := range visibleLevels {
@@ -177,6 +176,8 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 	}
 	priceRange := maxPrice.Sub(minPrice)
 
+	// Band the rows may occupy: half a row of margin top and bottom (so circles
+	// aren't clipped) and three rows reserved at the bottom for the summary.
 	drawMinY := inner.Min.Y + rowHeight/2
 	drawMaxY := inner.Max.Y - 3 - rowHeight/2
 	if drawMaxY < drawMinY {
@@ -187,29 +188,43 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 		return
 	}
 
+	// Place every row at its proportional ideal, then de-overlap so clustered
+	// prices that round to the same Y keep a one-row gap. maxVisible caps the
+	// count so the gaps always fit: no level (the POC included) is ever dropped.
+	const minGap = 1
+	rowCenterYs := make([]int, numLevels)
+	for i, lvl := range visibleLevels {
+		y := (drawMinY + drawMaxY) / 2
+		if !priceRange.IsZero() {
+			priceOffset := maxPrice.Sub(lvl.Price).Div(priceRange).Float64()
+			y = drawMinY + int(math.Round(priceOffset*float64(drawMaxY-drawMinY)))
+		}
+		rowCenterYs[i] = y
+	}
+	// Pass 1 (top→bottom): push colliding rows down.
+	for i := 1; i < numLevels; i++ {
+		if lo := rowCenterYs[i-1] + minGap; rowCenterYs[i] < lo {
+			rowCenterYs[i] = lo
+		}
+	}
+	// Pass 2 (bottom→top): if the tail overran the band, pin it and pull back up.
+	if rowCenterYs[numLevels-1] > drawMaxY {
+		rowCenterYs[numLevels-1] = drawMaxY
+	}
+	for i := numLevels - 2; i >= 0; i-- {
+		if hi := rowCenterYs[i+1] - minGap; rowCenterYs[i] > hi {
+			rowCenterYs[i] = hi
+		}
+	}
+
 	maxRadius := math.Min(float64(circleWidth), float64(rowHeight*2)) * 0.85
 	cyBraille := float64(rowHeight*4) / 2.0
 
 	// Circles and the price/delta/volume columns occupy disjoint x-ranges, so a
 	// single pass in price order is enough; on overlap the lower price's circle
 	// paints over the higher one.
-	lastRowCenterY := drawMinY - 1
-	for _, lvl := range visibleLevels {
-		// Map price → Y. Higher price sits nearer the top (smaller Y); equal
-		// prices share the mid-line. Nudge down by one row when two levels would
-		// collide so every visible level stays readable.
-		rowCenterY := (drawMinY + drawMaxY) / 2
-		if !priceRange.IsZero() {
-			priceOffset := maxPrice.Sub(lvl.Price).Div(priceRange).Float64()
-			rowCenterY = drawMinY + int(math.Round(priceOffset*float64(drawMaxY-drawMinY)))
-		}
-		if rowCenterY <= lastRowCenterY {
-			rowCenterY = lastRowCenterY + 1
-		}
-		if rowCenterY > drawMaxY || rowCenterY >= inner.Max.Y-2 {
-			break
-		}
-		lastRowCenterY = rowCenterY
+	for i, lvl := range visibleLevels {
+		rowCenterY := rowCenterYs[i]
 		rowTopY := rowCenterY - rowHeight/2
 
 		delta := lvl.Delta()
