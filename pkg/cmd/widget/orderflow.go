@@ -163,15 +163,54 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 		rowHeight = minRowHeight
 	}
 
+	// Position rows proportionally to price so the vertical gap between levels
+	// reflects the actual price distance, not just their rank.
+	minPrice := visibleLevels[0].Price
+	maxPrice := visibleLevels[0].Price
+	for _, lvl := range visibleLevels {
+		if lvl.Price.Compare(minPrice) < 0 {
+			minPrice = lvl.Price
+		}
+		if lvl.Price.Compare(maxPrice) > 0 {
+			maxPrice = lvl.Price
+		}
+	}
+	priceRange := maxPrice.Sub(minPrice)
+
+	drawMinY := inner.Min.Y + rowHeight/2
+	drawMaxY := inner.Max.Y - 3 - rowHeight/2
+	if drawMaxY < drawMinY {
+		drawMinY = inner.Min.Y
+		drawMaxY = inner.Max.Y - 3
+	}
+	if drawMaxY < drawMinY {
+		return
+	}
+
 	maxRadius := math.Min(float64(circleWidth), float64(rowHeight*2)) * 0.85
 	cyBraille := float64(rowHeight*4) / 2.0
 
 	// Circles and the price/delta/volume columns occupy disjoint x-ranges, so a
 	// single pass in price order is enough; on overlap the lower price's circle
 	// paints over the higher one.
-	for idx, lvl := range visibleLevels {
-		rowTopY := inner.Min.Y + idx*rowHeight
-		rowCenterY := rowTopY + rowHeight/2
+	lastRowCenterY := drawMinY - 1
+	for _, lvl := range visibleLevels {
+		// Map price → Y. Higher price sits nearer the top (smaller Y); equal
+		// prices share the mid-line. Nudge down by one row when two levels would
+		// collide so every visible level stays readable.
+		rowCenterY := (drawMinY + drawMaxY) / 2
+		if !priceRange.IsZero() {
+			priceOffset := maxPrice.Sub(lvl.Price).Div(priceRange).Float64()
+			rowCenterY = drawMinY + int(math.Round(priceOffset*float64(drawMaxY-drawMinY)))
+		}
+		if rowCenterY <= lastRowCenterY {
+			rowCenterY = lastRowCenterY + 1
+		}
+		if rowCenterY > drawMaxY || rowCenterY >= inner.Max.Y-2 {
+			break
+		}
+		lastRowCenterY = rowCenterY
+		rowTopY := rowCenterY - rowHeight/2
 
 		delta := lvl.Delta()
 		totalVol := lvl.TotalVol()
