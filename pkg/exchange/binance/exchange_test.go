@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/c9s/bbgo/pkg/testutil"
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,4 +70,58 @@ func Test_QueryPositionRisk(t *testing.T) {
 		assert.True(t, symbols["BTCUSDT"] || symbols["ETHUSDT"])
 	}
 
+}
+
+func Test_QueryFuturesMarkPriceKLines(t *testing.T) {
+	ex := New("", "")
+	ex.UseFutures()
+	assert.NotEmpty(t, ex)
+	ctx := context.Background()
+
+	klines, err := ex.futuresClient2.NewFuturesMarkPriceKlinesRequest().
+		Symbol("BTCUSDT").
+		Interval(types.Interval1h).
+		Limit(10).
+		Do(ctx)
+
+	if len(os.Getenv("GITHUB_CI")) > 0 {
+		// Github action runs in the US, and therefore binance api is not accessible
+		assert.Error(t, err)
+	} else {
+		assert.NoError(t, err)
+		assert.NotEmpty(t, klines)
+		if len(klines) > 0 {
+			k := klines[0]
+			assert.False(t, k.OpenTime.Time().IsZero())
+			assert.False(t, k.CloseTime.Time().IsZero())
+			assert.False(t, k.Close.IsZero())
+		}
+	}
+}
+
+func Test_QueryFuturesIndexPriceKLines(t *testing.T) {
+	ex := New("", "")
+	ex.UseFutures()
+	assert.NotEmpty(t, ex)
+	ctx := context.Background()
+
+	klines, err := ex.futuresClient2.NewFuturesIndexPriceKlinesRequest().
+		Pair("BTCUSDT").
+		Interval(types.Interval1h).
+		Limit(10).
+		Do(ctx)
+
+	if len(os.Getenv("GITHUB_CI")) > 0 {
+		// Github action runs in the US, and therefore binance api is not accessible
+		assert.Error(t, err)
+	} else {
+		assert.NoError(t, err)
+		assert.NotEmpty(t, klines)
+		if len(klines) > 0 {
+			k := klines[0]
+			assert.False(t, k.OpenTime.Time().IsZero())
+			assert.False(t, k.CloseTime.Time().IsZero())
+			assert.False(t, k.Close.IsZero())
+		}
+	}
 }
