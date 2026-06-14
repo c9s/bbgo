@@ -12,8 +12,6 @@ import (
 	ui "github.com/gizak/termui/v3"
 )
 
-const brailleOffset = '\u2800'
-
 // maxOrderFlowSideLevels caps how many price levels are shown above and below
 // the POC. All traded prices are retained; only the display is windowed.
 const maxOrderFlowSideLevels = 10
@@ -23,13 +21,6 @@ const (
 	deltaColWidth = 10
 	volColWidth   = 16
 )
-
-var brailleDots = [4][2]rune{
-	{0x01, 0x08},
-	{0x02, 0x10},
-	{0x04, 0x20},
-	{0x40, 0x80},
-}
 
 type PriceLevel struct {
 	Price  fixedpoint.Value
@@ -218,14 +209,12 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 	}
 
 	maxRadius := math.Min(float64(circleWidth), float64(rowHeight*2)) * 0.85
-	cyBraille := float64(rowHeight*4) / 2.0
 
 	// Circles and the price/delta/volume columns occupy disjoint x-ranges, so a
 	// single pass in price order is enough; on overlap the lower price's circle
 	// paints over the higher one.
 	for i, lvl := range visibleLevels {
 		rowCenterY := rowCenterYs[i]
-		rowTopY := rowCenterY - rowHeight/2
 
 		delta := lvl.Delta()
 		totalVol := lvl.TotalVol()
@@ -241,39 +230,7 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 			color = ui.ColorWhite
 		}
 
-		for ty := 0; ty < rowHeight; ty++ {
-			termY := rowTopY + ty
-			if termY < inner.Min.Y {
-				continue
-			}
-			if termY >= inner.Max.Y-2 {
-				break
-			}
-			for tx := 0; tx < circleWidth; tx++ {
-				var brailleRune rune
-				for sy := 0; sy < 4; sy++ {
-					for sx := 0; sx < 2; sx++ {
-						dx := float64(tx*2+sx) - float64(circleWidth)
-						dy := float64(ty*4+sy) - cyBraille
-						if dx*dx+dy*dy <= radius*radius {
-							brailleRune |= brailleDots[sy][sx]
-						}
-					}
-				}
-				if brailleRune != 0 {
-					pt := image.Pt(circleStart+tx, termY)
-					// Merge dots with any circle already drawn here so a smaller
-					// circle drawn later cannot erase a larger one's filled cell.
-					if existing := buf.GetCell(pt).Rune; existing >= brailleOffset && existing < brailleOffset+0x100 {
-						brailleRune |= existing - brailleOffset
-					}
-					buf.SetCell(ui.Cell{
-						Rune:  brailleOffset + brailleRune,
-						Style: ui.NewStyle(color),
-					}, pt)
-				}
-			}
-		}
+		drawCircle(buf, image.Pt(circleStart+circleWidth/2, rowCenterY), int(math.Round(radius)), ui.NewStyle(color))
 
 		priceStyle := ui.NewStyle(ui.ColorWhite)
 		if lvl.Price.Eq(pocPrice) {
