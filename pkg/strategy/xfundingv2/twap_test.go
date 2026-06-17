@@ -96,10 +96,10 @@ func TestTWAPWorker_FillingOrders(t *testing.T) {
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{
-			Duration:      10 * time.Minute,
+			Duration:      types.Duration(10 * time.Minute),
 			NumSlices:     5,
 			OrderType:     TWAPOrderTypeMaker,
-			CheckInterval: 1 * time.Second,
+			CheckInterval: types.Duration(1 * time.Second),
 			NumOfTicks:    1,
 		}
 
@@ -207,10 +207,10 @@ func TestTWAPWorker_FillingOrders(t *testing.T) {
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{
-			Duration:      6 * time.Minute,
+			Duration:      types.Duration(6 * time.Minute),
 			NumSlices:     3,
 			OrderType:     TWAPOrderTypeMaker,
-			CheckInterval: 1 * time.Second,
+			CheckInterval: types.Duration(1 * time.Second),
 			NumOfTicks:    1,
 		}
 
@@ -311,10 +311,10 @@ func TestTWAPWorker_OpenThenClose(t *testing.T) {
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{
-			Duration:      4 * time.Minute,
+			Duration:      types.Duration(4 * time.Minute),
 			NumSlices:     2,
 			OrderType:     TWAPOrderTypeMaker,
-			CheckInterval: 1 * time.Second,
+			CheckInterval: types.Duration(1 * time.Second),
 			NumOfTicks:    1,
 		}
 
@@ -434,10 +434,10 @@ func TestTWAPWorker_OpenThenClose(t *testing.T) {
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{
-			Duration:      4 * time.Minute,
+			Duration:      types.Duration(4 * time.Minute),
 			NumSlices:     2,
 			OrderType:     TWAPOrderTypeMaker,
-			CheckInterval: 1 * time.Second,
+			CheckInterval: types.Duration(1 * time.Second),
 			NumOfTicks:    1,
 		}
 
@@ -561,10 +561,10 @@ func TestTWAPWorker_Deadline(t *testing.T) {
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{
-			Duration:      2 * time.Minute,
+			Duration:      types.Duration(2 * time.Minute),
 			NumSlices:     2,
 			OrderType:     TWAPOrderTypeMaker,
-			CheckInterval: 1 * time.Second,
+			CheckInterval: types.Duration(1 * time.Second),
 			NumOfTicks:    1,
 		}
 
@@ -628,10 +628,10 @@ func TestTWAPWorker_Deadline(t *testing.T) {
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{
-			Duration:      2 * time.Minute,
+			Duration:      types.Duration(2 * time.Minute),
 			NumSlices:     2,
 			OrderType:     TWAPOrderTypeMaker,
-			CheckInterval: 1 * time.Second,
+			CheckInterval: types.Duration(1 * time.Second),
 			NumOfTicks:    1,
 		}
 
@@ -709,7 +709,7 @@ func TestTWAPWorker_Misc(t *testing.T) {
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{
-			Duration:     10 * time.Minute,
+			Duration:     types.Duration(10 * time.Minute),
 			NumSlices:    5,
 			OrderType:    TWAPOrderTypeMaker,
 			MaxSliceSize: Number(0.5),
@@ -760,7 +760,7 @@ func TestTWAPWorker_Misc(t *testing.T) {
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{
-			Duration:  2 * time.Minute,
+			Duration:  types.Duration(2 * time.Minute),
 			NumSlices: 2,
 			OrderType: TWAPOrderTypeMaker,
 		}
@@ -819,7 +819,7 @@ func TestTWAPWorker_Misc(t *testing.T) {
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{
-			Duration:   10 * time.Minute,
+			Duration:   types.Duration(10 * time.Minute),
 			NumSlices:  5,
 			OrderType:  TWAPOrderTypeMaker,
 			NumOfTicks: 1,
@@ -890,7 +890,7 @@ func TestTWAPWorker_Misc(t *testing.T) {
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{
-			Duration:   10 * time.Minute,
+			Duration:   types.Duration(10 * time.Minute),
 			NumSlices:  5,
 			OrderType:  TWAPOrderTypeTaker, // Taker orders
 			NumOfTicks: 1,

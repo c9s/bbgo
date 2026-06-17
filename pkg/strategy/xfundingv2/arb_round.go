@@ -278,7 +278,7 @@ func (r *ArbitrageRound) String() string {
 		r.spotWorker.FilledPosition(),
 		r.futuresWorker.FilledPosition(),
 		r.syncState.ClosingTime.Format(time.RFC3339),
-		r.syncState.ClosingTime.Add(r.syncState.ClosingDuration).Format(time.RFC3339),
+		r.syncState.ClosingTime.Add(r.syncState.ClosingDuration.Duration()).Format(time.RFC3339),
 	)
 }
 
@@ -338,7 +338,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			},
 			slack.AttachmentField{
 				Title: "Expected Close Time",
-				Value: n.syncState.ClosingTime.Add(n.syncState.ClosingDuration).Format(time.RFC3339),
+				Value: n.syncState.ClosingTime.Add(n.syncState.ClosingDuration.Duration()).Format(time.RFC3339),
 				Short: true,
 			})
 	} else if n.HasStarted() {
@@ -669,7 +669,7 @@ func (r *ArbitrageRound) State() RoundState {
 	return r.syncState.State
 }
 
-func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration time.Duration) {
+func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

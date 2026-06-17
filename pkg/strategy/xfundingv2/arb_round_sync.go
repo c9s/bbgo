@@ -95,8 +95,8 @@ type ArbitrageRoundSyncState struct {
 	// StartTime is the time when the round is started
 	StartTime time.Time `json:"startTime"`
 	// ClosingTime is the time when the round is entered closing state
-	ClosingTime     time.Time     `json:"closingTime"`
-	ClosingDuration time.Duration `json:"closingDuration"`
+	ClosingTime     time.Time      `json:"closingTime"`
+	ClosingDuration types.Duration `json:"closingDuration"`
 	// LastUpdateTime is the last time when the round is updated
 	LastUpdateTime time.Time `json:"lastUpdateTime"`
 }
@@ -111,7 +111,7 @@ func (r *ArbitrageRound) MarshalJSON() ([]byte, error) {
 		SpotWorker:    r.spotWorker,
 		FuturesWorker: r.futuresWorker,
 	}
-	return json.Marshal(v)
+	return json.Marshal(&v)
 }
 
 func (r *ArbitrageRound) UnmarshalJSON(b []byte) error {

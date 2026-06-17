@@ -53,6 +53,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/xdepthmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/xfixedmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/xfunding"
+	_ "github.com/c9s/bbgo/pkg/strategy/xfundingv2"
 	_ "github.com/c9s/bbgo/pkg/strategy/xgap"
 	_ "github.com/c9s/bbgo/pkg/strategy/xhedgegrid"
 	_ "github.com/c9s/bbgo/pkg/strategy/xmaker"

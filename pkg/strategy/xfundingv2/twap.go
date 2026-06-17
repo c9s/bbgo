@@ -31,16 +31,16 @@ const (
 
 type TWAPWorkerConfig struct {
 	// Duration is the total time duration for the TWAP execution
-	Duration time.Duration `json:"duration"`
+	Duration types.Duration `json:"duration"`
 	// ClosingDuration is the expected time duration for the closing phase of the TWAP execution.
-	ClosingDuration time.Duration `json:"closingDuration"`
+	ClosingDuration types.Duration `json:"closingDuration"`
 
 	// NumSlices is how many slices to divide the total time duration into.
 	NumSlices int `json:"numSlices"`
 	// OrderType specifies whether to use maker or taker orders for execution.
 	OrderType TWAPOrderType `json:"orderType"`
 	// CheckInterval is how often to check for price improvement for the active order.
-	CheckInterval time.Duration `json:"checkInterval,omitempty"`
+	CheckInterval types.Duration `json:"checkInterval,omitempty"`
 
 	// optional configs
 	// MaxSlippage is the maximum slippage ratio for taker orders (e.g. 0.001 = 0.1%)
@@ -51,6 +51,24 @@ type TWAPWorkerConfig struct {
 	MinSliceSize fixedpoint.Value `json:"minSliceSize,omitempty"`
 	// NumOfTicks is for orders: number of ticks to improve price, maker only
 	NumOfTicks int `json:"numOfTicks,omitempty"`
+}
+
+func (c *TWAPWorkerConfig) Defaults() {
+	if c.Duration == 0 {
+		c.Duration = types.Duration(2 * time.Hour)
+	}
+	if c.ClosingDuration == 0 {
+		c.ClosingDuration = types.Duration(time.Hour)
+	}
+	if c.NumSlices == 0 {
+		c.NumSlices = 4
+	}
+	if c.OrderType == "" {
+		c.OrderType = TWAPOrderTypeMaker
+	}
+	if c.CheckInterval == 0 {
+		c.CheckInterval = types.Duration(10 * time.Minute)
+	}
 }
 
 type TWAPWorker struct {
@@ -190,7 +208,7 @@ func (w *TWAPWorker) Start(ctx context.Context, currentTime time.Time) error {
 	w.logger.Infof(
 		"[TWAP Start] started: targetPosition=%s, duration=%s, interval=%s",
 		w.syncState.TargetPosition,
-		w.syncState.Config.Duration,
+		w.syncState.Config.Duration.Duration(),
 		w.syncState.PlaceOrderInterval,
 	)
 	return nil
@@ -206,18 +224,18 @@ func (w *TWAPWorker) RemainingDuration(currentTime time.Time) time.Duration {
 // ResetTime resets the start and end time of the TWAP execution.
 // It can be used to extend the execution time by resetting the end time to a later time.
 // ex: TWAP worker is opening a position and then switch to closing the position, we can reset the time for the closing.
-func (w *TWAPWorker) ResetTime(currentTime time.Time, duration time.Duration) {
+func (w *TWAPWorker) ResetTime(currentTime time.Time, duration types.Duration) {
 	w.syncState.State = TWAPWorkerStateRunning
 	w.syncState.StartTime = currentTime
 	w.syncState.Config.Duration = duration
-	w.syncState.EndTime = currentTime.Add(w.syncState.Config.Duration)
+	w.syncState.EndTime = currentTime.Add(w.syncState.Config.Duration.Duration())
 
 	numSlices := w.syncState.Config.NumSlices
 	if numSlices <= 0 {
 		numSlices = 1
 	}
 
-	w.syncState.PlaceOrderInterval = w.syncState.Config.Duration / time.Duration(numSlices)
+	w.syncState.PlaceOrderInterval = w.syncState.Config.Duration.Duration() / time.Duration(numSlices)
 	w.syncState.CurrentIntervalStart = currentTime
 	w.syncState.CurrentIntervalEnd = w.syncState.CurrentIntervalStart.Add(w.syncState.PlaceOrderInterval)
 	if w.syncState.CurrentIntervalEnd.After(w.syncState.EndTime) {
@@ -360,7 +378,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 	// we are within current interval and we have a better price
 	if w.shouldUpdateActiveOrder(orderBook) && currentTime.Before(w.syncState.CurrentIntervalEnd) {
 		// throttle order updates to avoid excessive cancel-and-replace
-		if !w.syncState.LastCheckTime.IsZero() && currentTime.Sub(w.syncState.LastCheckTime) < w.syncState.Config.CheckInterval {
+		if !w.syncState.LastCheckTime.IsZero() && currentTime.Sub(w.syncState.LastCheckTime) < w.syncState.Config.CheckInterval.Duration() {
 			return nil
 		}
 		w.syncState.LastCheckTime = currentTime

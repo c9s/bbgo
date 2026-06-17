@@ -66,7 +66,7 @@ func (o *TWAPExecutor) Initialize(s *Strategy) error {
 }
 
 func (o *TWAPExecutor) MarshalJSON() ([]byte, error) {
-	return json.Marshal(o.syncState)
+	return json.Marshal(&o.syncState)
 }
 
 func (o *TWAPExecutor) UnmarshalJSON(b []byte) error {
