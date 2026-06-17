@@ -10,6 +10,8 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+
+	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 )
 
 func TestArbitrageRound_MarshalUnmarshalJSON(t *testing.T) {
@@ -39,7 +41,10 @@ func TestArbitrageRound_MarshalUnmarshalJSON(t *testing.T) {
 				Symbol:              "BTCUSDT",
 				SpotExchangeName:    types.ExchangeBinance,
 				FuturesExchangeName: types.ExchangeBinance,
-				Asset:               "BTC",
+				DirectionPolicy: directionPolicy{
+					Direction: types.PositionShort,
+					Market:    Market("BTCUSDT"),
+				},
 
 				SpotFeeAssetAmount:    fixedpoint.NewFromFloat(0.01),
 				FuturesFeeAssetAmount: fixedpoint.NewFromFloat(0.02),
@@ -83,8 +88,11 @@ func TestArbitrageRound_MarshalUnmarshalJSON(t *testing.T) {
 				SpotExchangeName:     types.ExchangeBinance,
 				FuturesExchangeName:  types.ExchangeBinance,
 				State:                RoundPending,
-				Asset:                "ETH",
-				FundingFeeRecords:    make(map[int64]FundingFee),
+				DirectionPolicy: directionPolicy{
+					Direction: types.PositionShort,
+					Market:    Market("ETHUSDT"),
+				},
+				FundingFeeRecords: make(map[int64]FundingFee),
 			},
 		}
 
