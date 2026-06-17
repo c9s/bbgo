@@ -67,7 +67,7 @@ func (m *mockFuturesService) QueryPositionRisk(ctx context.Context, symbol ...st
 
 func newTestArbitrageRound(t *testing.T, ctrl *gomock.Controller, fundingIntervalHours, minHoldingIntervals int, nextFundingTime time.Time) (*ArbitrageRound, *mockFuturesService) {
 	config := TWAPWorkerConfig{
-		Duration:  10 * time.Minute,
+		Duration:  types.Duration(10 * time.Minute),
 		NumSlices: 5,
 	}
 
@@ -266,10 +266,10 @@ func TestArbitrageRound_DeltaNeutral(t *testing.T) {
 	defer ctrl.Finish()
 
 	config := TWAPWorkerConfig{
-		Duration:      10 * time.Minute,
+		Duration:      types.Duration(10 * time.Minute),
 		NumSlices:     2,
 		OrderType:     TWAPOrderTypeMaker,
-		CheckInterval: 1 * time.Second,
+		CheckInterval: types.Duration(1 * time.Second),
 		NumOfTicks:    1,
 	}
 
@@ -400,7 +400,7 @@ func TestArbitrageRound_DeltaNeutral(t *testing.T) {
 	// Phase 4: Set closing
 	// ==========================================
 	closeTime := startTime.Add(20 * time.Minute)
-	closeDuration := 10 * time.Minute
+	closeDuration := types.Duration(10 * time.Minute)
 	round.SetClosing(closeTime, closeDuration)
 	assert.Equal(t, RoundClosing, round.State())
 	assert.Equal(t, fixedpoint.Zero, spotWorker.TargetPosition())

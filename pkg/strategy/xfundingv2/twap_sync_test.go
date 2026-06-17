@@ -28,7 +28,7 @@ func TestTWAPWorker_MarshalJSON(t *testing.T) {
 		w := &TWAPWorker{
 			syncState: TWAPWorkerSyncState{
 				Config: TWAPWorkerConfig{
-					Duration:    10 * time.Minute,
+					Duration:    types.Duration(10 * time.Minute),
 					NumSlices:   5,
 					OrderType:   TWAPOrderTypeTaker,
 					MaxSlippage: fixedpoint.NewFromFloat(0.001),
@@ -62,7 +62,7 @@ func TestTWAPWorker_MarshalJSON(t *testing.T) {
 		w := &TWAPWorker{
 			syncState: TWAPWorkerSyncState{
 				Config: TWAPWorkerConfig{
-					Duration:  5 * time.Minute,
+					Duration:  types.Duration(5 * time.Minute),
 					NumSlices: 3,
 				},
 				TargetPosition: fixedpoint.NewFromFloat(2.0),
@@ -102,7 +102,7 @@ func TestTWAPWorker_UnmarshalJSON(t *testing.T) {
 		executor := &TWAPExecutor{
 			syncState: TWAPExecutorSyncState{
 				Config: TWAPWorkerConfig{
-					Duration:  10 * time.Minute,
+					Duration:  types.Duration(10 * time.Minute),
 					NumSlices: 5,
 					OrderType: TWAPOrderTypeTaker,
 				},
@@ -116,11 +116,11 @@ func TestTWAPWorker_UnmarshalJSON(t *testing.T) {
 		original := &TWAPWorker{
 			syncState: TWAPWorkerSyncState{
 				Config: TWAPWorkerConfig{
-					Duration:      10 * time.Minute,
+					Duration:      types.Duration(10 * time.Minute),
 					NumSlices:     5,
 					OrderType:     TWAPOrderTypeTaker,
 					MaxSlippage:   fixedpoint.NewFromFloat(0.001),
-					CheckInterval: 30 * time.Second,
+					CheckInterval: types.Duration(30 * time.Second),
 				},
 				TargetPosition:       fixedpoint.NewFromFloat(1.5),
 				State:                TWAPWorkerStateRunning,
@@ -157,7 +157,7 @@ func TestTWAPWorker_UnmarshalJSON(t *testing.T) {
 		original := &TWAPWorker{
 			syncState: TWAPWorkerSyncState{
 				Config: TWAPWorkerConfig{
-					Duration:  5 * time.Minute,
+					Duration:  types.Duration(5 * time.Minute),
 					NumSlices: 3,
 				},
 				TargetPosition: fixedpoint.NewFromFloat(2.0),

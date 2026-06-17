@@ -46,7 +46,7 @@ type TWAPWorkerSyncState struct {
 }
 
 func (w *TWAPWorker) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.syncState)
+	return json.Marshal(&w.syncState)
 }
 
 func (w *TWAPWorker) UnmarshalJSON(b []byte) error {

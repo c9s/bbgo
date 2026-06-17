@@ -17,7 +17,7 @@ func TestTWAPExecutor_MarshalJSON(t *testing.T) {
 	market.Exchange = types.ExchangeBinance
 
 	config := TWAPWorkerConfig{
-		Duration:    5 * time.Minute,
+		Duration:    types.Duration(5 * time.Minute),
 		NumSlices:   10,
 		OrderType:   TWAPOrderTypeMaker,
 		NumOfTicks:  3,
@@ -97,10 +97,10 @@ func TestTWAPExecutor_MarshalJSON_NotFutures(t *testing.T) {
 
 func TestTWAPExecutor_UnmarshalJSON(t *testing.T) {
 	t.Run("valid JSON", func(t *testing.T) {
-		// time.Duration marshals as nanoseconds (int64)
+		// types.Duration marshals as a string (e.g. "5m0s")
 		jsonData := `{
 			"config": {
-				"duration": 300000000000,
+				"duration": "5m",
 				"numSlices": 10,
 				"orderType": "maker",
 				"numOfTicks": 3
@@ -116,7 +116,7 @@ func TestTWAPExecutor_UnmarshalJSON(t *testing.T) {
 		var executor TWAPExecutor
 		err := json.Unmarshal([]byte(jsonData), &executor)
 		assert.NoError(t, err)
-		assert.Equal(t, 5*time.Minute, executor.syncState.Config.Duration)
+		assert.Equal(t, types.Duration(5*time.Minute), executor.syncState.Config.Duration)
 		assert.Equal(t, 10, executor.syncState.Config.NumSlices)
 		assert.Equal(t, TWAPOrderTypeMaker, executor.syncState.Config.OrderType)
 		assert.Equal(t, "BTCUSDT", executor.syncState.Market.Symbol)

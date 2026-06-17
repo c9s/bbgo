@@ -61,7 +61,7 @@ func TestArbitrageRound_MarshalUnmarshalJSON(t *testing.T) {
 				State:           RoundReady,
 				StartTime:       startTime,
 				ClosingTime:     closingTime,
-				ClosingDuration: 30 * time.Minute,
+				ClosingDuration: types.Duration(30 * time.Minute),
 				LastUpdateTime:  lastUpdateTime,
 			},
 		}

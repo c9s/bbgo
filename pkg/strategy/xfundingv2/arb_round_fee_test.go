@@ -327,7 +327,7 @@ func TestStrategy_CalculateRoundFeeAsset(t *testing.T) {
 
 		nextFundingTime := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
 		config := TWAPWorkerConfig{
-			Duration:  10 * time.Minute,
+			Duration:  types.Duration(10 * time.Minute),
 			NumSlices: 5,
 		}
 		spotWorker, _, _, _ := newTestTWAPWorker(t, ctrl, config)
@@ -444,7 +444,7 @@ func TestStrategy_CalculateRoundFeeAsset(t *testing.T) {
 
 		nextFundingTime := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
 		config := TWAPWorkerConfig{
-			Duration:  10 * time.Minute,
+			Duration:  types.Duration(10 * time.Minute),
 			NumSlices: 5,
 		}
 		spotWorker, _, _, _ := newTestTWAPWorker(t, ctrl, config)
