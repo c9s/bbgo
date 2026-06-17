@@ -144,6 +144,8 @@ func (s *Strategy) Defaults() error {
 		return errors.New("empty candidateSymbols")
 	}
 
+	s.TWAPWorkerConfig.Defaults()
+
 	if s.TickSymbol == "" {
 		s.TickSymbol = s.CandidateSymbols[0]
 	}

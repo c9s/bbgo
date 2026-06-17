@@ -53,6 +53,24 @@ type TWAPWorkerConfig struct {
 	NumOfTicks int `json:"numOfTicks,omitempty"`
 }
 
+func (c *TWAPWorkerConfig) Defaults() {
+	if c.Duration == 0 {
+		c.Duration = 2 * time.Hour
+	}
+	if c.ClosingDuration == 0 {
+		c.ClosingDuration = time.Hour
+	}
+	if c.NumSlices == 0 {
+		c.NumSlices = 4
+	}
+	if c.OrderType == "" {
+		c.OrderType = TWAPOrderTypeMaker
+	}
+	if c.CheckInterval == 0 {
+		c.CheckInterval = 10 * time.Minute
+	}
+}
+
 type TWAPWorker struct {
 	syncState TWAPWorkerSyncState
 
