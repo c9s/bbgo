@@ -79,16 +79,17 @@ type ArbitrageRoundSyncState struct {
 	Symbol              string             `json:"symbol"`
 	SpotExchangeName    types.ExchangeName `json:"spotExchangeName"`
 	FuturesExchangeName types.ExchangeName `json:"futuresExchangeName"`
-	Asset               string             `json:"asset"` // base asset, e.g. "BTC"
+	DirectionPolicy     directionPolicy    `json:"directionPolicy"`
 
 	SpotFeeAssetAmount    fixedpoint.Value `json:"spotFeeAssetAmount"`
 	FuturesFeeAssetAmount fixedpoint.Value `json:"futuresFeeAssetAmount"`
 	FeeSymbol             string           `json:"feeSymbol"`
 	AvgFeeCost            fixedpoint.Value `json:"avgFeeCost"`
 
-	RetryDuration    time.Duration             `json:"retryDuration"`
-	RetryTransfers   map[uint64]*transferRetry `json:"retryTransfers"`
-	SyncedSpotTrades map[uint64]struct{}       `json:"syncedSpotTrades"`
+	RetryDuration       time.Duration             `json:"retryDuration"`
+	RetryTransfers      map[uint64]*transferRetry `json:"retryTransfers"`
+	SyncedSpotTrades    map[uint64]struct{}       `json:"syncedSpotTrades"`
+	SyncedFuturesTrades map[uint64]struct{}       `json:"syncedFuturesTrades"`
 
 	State RoundState `json:"state"`
 
