@@ -15,13 +15,13 @@ var brailleDots = [4][2]rune{
 	{0x40, 0x80},
 }
 
-func drawCircle(buffer *ui.Buffer, center image.Point, radius int, style ui.Style) {
+func DrawCircle(buffer *ui.Buffer, center image.Point, radius int, style ui.Style) {
 	if radius <= 0 {
 		return
 	}
 
-	cx := float64(center.X*2) + 0.5
-	cy := float64(center.Y*4) + 1.5
+	cx := float64(center.X * 2)
+	cy := float64(center.Y * 4)
 	r2 := float64(radius * radius)
 
 	cellRadiusX := radius/2 + 1

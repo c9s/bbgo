@@ -38,8 +38,9 @@ func (p *PriceLevel) TotalVol() fixedpoint.Value {
 
 type OrderFlowWidget struct {
 	ui.Block
-	mu     sync.Mutex
-	levels []PriceLevel
+	mu        sync.Mutex
+	levels    []PriceLevel
+	lastTrade *types.Trade
 }
 
 func (w *OrderFlowWidget) UpdateTrade(trade types.Trade) {
@@ -55,6 +56,8 @@ func (w *OrderFlowWidget) UpdateTrade(trade types.Trade) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.upsertLevel(level)
+	t := trade
+	w.lastTrade = &t
 }
 
 func (w *OrderFlowWidget) upsertLevel(level PriceLevel) {
@@ -70,16 +73,17 @@ func (w *OrderFlowWidget) upsertLevel(level PriceLevel) {
 	w.levels = append(w.levels, level)
 }
 
-func (w *OrderFlowWidget) sortedLevelsSnapshot() []PriceLevel {
+func (w *OrderFlowWidget) sortedLevelsSnapshot() ([]PriceLevel, *types.Trade) {
 	w.mu.Lock()
 	levels := append([]PriceLevel(nil), w.levels...)
+	lastTrade := w.lastTrade
 	w.mu.Unlock()
 
 	sort.Slice(levels, func(i, j int) bool {
 		return levels[i].Price.Compare(levels[j].Price) > 0
 	})
 
-	return levels
+	return levels, lastTrade
 }
 
 func NewOrderFlowWidget() *OrderFlowWidget {
@@ -91,7 +95,7 @@ func NewOrderFlowWidget() *OrderFlowWidget {
 func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 	w.Block.Draw(buf)
 
-	levels := w.sortedLevelsSnapshot()
+	levels, lastTrade := w.sortedLevelsSnapshot()
 	if len(levels) == 0 {
 		return
 	}
@@ -230,7 +234,7 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 			color = ui.ColorWhite
 		}
 
-		drawCircle(buf, image.Pt(circleStart+circleWidth/2, rowCenterY), int(math.Round(radius)), ui.NewStyle(color))
+		DrawCircle(buf, image.Pt(circleStart+circleWidth/2, rowCenterY), int(math.Round(radius)), ui.NewStyle(color))
 
 		priceStyle := ui.NewStyle(ui.ColorWhite)
 		if lvl.Price.Eq(pocPrice) {
@@ -253,11 +257,33 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 	summary := fmt.Sprintf(
 		" Total Δ: %.4f | POC: %.5f (Vol %.5f)",
 		totalDelta.Float64(), pocPrice.Float64(), maxVol.Float64())
+	if lastTrade != nil {
+		pocRel := "= POC"
+		switch lastTrade.Price.Compare(pocPrice) {
+		case 1:
+			pocRel = "↑ POC"
+		case -1:
+			pocRel = "↓ POC"
+		}
+		summary += fmt.Sprintf(" | Last Trade: %s %.5f (%s)", lastTrade.Side, lastTrade.Price.Float64(), pocRel)
+	}
 	if start > 0 || hiddenBelow > 0 {
 		summary += fmt.Sprintf(" | hidden ↑%d ↓%d", start, hiddenBelow)
 	}
 	buf.SetString(summary, ui.NewStyle(deltaColor), image.Pt(inner.Min.X, summaryY))
 	buf.SetString(" [q] quit", ui.NewStyle(ui.ColorWhite), image.Pt(inner.Max.X-10, summaryY))
+
+	if lastTrade != nil && summaryY-1 >= inner.Min.Y {
+		tradeColor := ui.ColorGreen
+		if lastTrade.Side == types.SideTypeSell {
+			tradeColor = ui.ColorRed
+		}
+		tradeLine := fmt.Sprintf(
+			" Last Trade: %-4s %.5f x %.5f @ %s",
+			lastTrade.Side, lastTrade.Price.Float64(), lastTrade.Quantity.Float64(),
+			lastTrade.Time.Time().Format("15:04:05"))
+		buf.SetString(tradeLine, ui.NewStyle(tradeColor), image.Pt(inner.Min.X, summaryY-1))
+	}
 }
 
 func setPaddedString(buf *ui.Buffer, s string, style ui.Style, point image.Point, width int) {

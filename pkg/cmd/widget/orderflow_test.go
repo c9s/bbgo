@@ -37,7 +37,7 @@ func TestOrderFlowWidget_UpdateTradeAggregatesByPriceAndSide(t *testing.T) {
 		Side:     types.SideTypeSell,
 	})
 
-	levels := w.sortedLevelsSnapshot()
+	levels, _ := w.sortedLevelsSnapshot()
 	assert.Len(t, levels, n)
 	assert.True(t, hasPriceLevel(levels, fixedpoint.NewFromInt(1)))
 	assert.True(t, hasPriceLevel(levels, fixedpoint.NewFromInt(n)))
@@ -70,9 +70,11 @@ func TestOrderFlowWidget_DrawWindowsAroundPOC(t *testing.T) {
 		})
 	}
 
-	// Tall enough that height is not the limiter (21 rows × 2).
-	w.SetRect(0, 0, 80, 46)
-	buf := ui.NewBuffer(image.Rect(0, 0, 80, 46))
+	// Tall enough that height is not the limiter (21 rows × 2). Width must be
+	// wide enough for the summary line, which now also includes last-trade and
+	// elapsed info before the trailing "hidden" counters.
+	w.SetRect(0, 0, 200, 46)
+	buf := ui.NewBuffer(image.Rect(0, 0, 200, 46))
 	w.Draw(buf)
 
 	text := bufferText(buf)
