@@ -70,7 +70,7 @@ var orderFlowCmd = &cobra.Command{
 		stream.Subscribe(types.MarketTradeChannel, symbol, types.SubscribeOptions{})
 
 		w := widget.NewOrderFlowWidget()
-		w.Title = " Order Flow Circles (總量正規化) "
+		w.Title = " Order Flow Delta (Total Volume Normalization) "
 		stream.OnMarketTrade(types.TradeWith(symbol, func(trade types.Trade) {
 			trade.Price = aggregatePrice(trade.Price, aggregateUnit)
 			w.UpdateTrade(trade)

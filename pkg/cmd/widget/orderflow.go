@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -41,6 +42,7 @@ type OrderFlowWidget struct {
 	mu        sync.Mutex
 	levels    []PriceLevel
 	lastTrade *types.Trade
+	startTime time.Time
 }
 
 func (w *OrderFlowWidget) UpdateTrade(trade types.Trade) {
@@ -89,6 +91,8 @@ func (w *OrderFlowWidget) sortedLevelsSnapshot() ([]PriceLevel, *types.Trade) {
 func NewOrderFlowWidget() *OrderFlowWidget {
 	return &OrderFlowWidget{
 		Block: *ui.NewBlock(),
+
+		startTime: time.Now(),
 	}
 }
 
@@ -119,11 +123,17 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 	inner := w.Inner
 
 	infoColWidth := deltaColWidth + volColWidth
-	circleStart := inner.Min.X + priceColWidth
-	circleEnd := inner.Max.X - infoColWidth
-	circleWidth := circleEnd - circleStart
-	if circleWidth < 4 {
+	barStart := inner.Min.X + priceColWidth
+	barEnd := inner.Max.X - infoColWidth
+	barWidth := barEnd - barStart
+	if barWidth < 4 {
 		return
+	}
+	barSideGap := w.Inner.Dx() / 8
+	barCenterX := barStart + barWidth/2
+	maxBarHalfWidth := barWidth/2 - barSideGap
+	if maxBarHalfWidth < 1 {
+		maxBarHalfWidth = 1
 	}
 
 	availableHeight := inner.Max.Y - inner.Min.Y - 2
@@ -171,8 +181,8 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 	}
 	priceRange := maxPrice.Sub(minPrice)
 
-	// Band the rows may occupy: half a row of margin top and bottom (so circles
-	// aren't clipped) and three rows reserved at the bottom for the summary.
+	// Band the rows may occupy: half a row of margin top and bottom and three
+	// rows reserved at the bottom for the summary.
 	drawMinY := inner.Min.Y + rowHeight/2
 	drawMaxY := inner.Max.Y - 3 - rowHeight/2
 	if drawMaxY < drawMinY {
@@ -212,20 +222,18 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 		}
 	}
 
-	maxRadius := math.Min(float64(circleWidth), float64(rowHeight*2)) * 0.85
+	maxAbsDelta := fixedpoint.Zero
+	for _, lvl := range visibleLevels {
+		if d := lvl.Delta().Abs(); d.Compare(maxAbsDelta) > 0 {
+			maxAbsDelta = d
+		}
+	}
 
-	// Circles and the price/delta/volume columns occupy disjoint x-ranges, so a
-	// single pass in price order is enough; on overlap the lower price's circle
-	// paints over the higher one.
 	for i, lvl := range visibleLevels {
 		rowCenterY := rowCenterYs[i]
 
 		delta := lvl.Delta()
 		totalVol := lvl.TotalVol()
-		radius := totalVol.Div(maxVol).Float64() * maxRadius
-		if radius < 1.5 {
-			radius = 1.5
-		}
 
 		color := ui.ColorGreen
 		if delta.Sign() < 0 {
@@ -234,7 +242,16 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 			color = ui.ColorWhite
 		}
 
-		DrawCircle(buf, image.Pt(circleStart+circleWidth/2, rowCenterY), int(math.Round(radius)), ui.NewStyle(color))
+		halfWidth := 0
+		if !maxAbsDelta.IsZero() {
+			halfWidth = int(math.Round(delta.Abs().Div(maxAbsDelta).Float64() * float64(maxBarHalfWidth)))
+		}
+		if halfWidth < 1 && !delta.IsZero() {
+			halfWidth = 1
+		}
+		if halfWidth > 0 {
+			DrawHorizontalBar(buf, barCenterX-halfWidth, barCenterX+halfWidth, rowCenterY, ui.NewStyle(color))
+		}
 
 		priceStyle := ui.NewStyle(ui.ColorWhite)
 		if lvl.Price.Eq(pocPrice) {
@@ -243,10 +260,10 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 		setPaddedString(buf, fmt.Sprintf("%.5f", lvl.Price.Float64()), priceStyle, image.Pt(inner.Min.X, rowCenterY), priceColWidth)
 
 		deltaStr := fmt.Sprintf("% .4f", delta.Float64())
-		setPaddedString(buf, deltaStr, ui.NewStyle(color), image.Pt(circleEnd, rowCenterY), deltaColWidth)
+		setPaddedString(buf, deltaStr, ui.NewStyle(color), image.Pt(barEnd, rowCenterY), deltaColWidth)
 
 		volStr := fmt.Sprintf(" V:%.5f", totalVol.Float64())
-		setPaddedString(buf, volStr, ui.NewStyle(ui.ColorCyan), image.Pt(circleEnd+deltaColWidth, rowCenterY), volColWidth)
+		setPaddedString(buf, volStr, ui.NewStyle(ui.ColorCyan), image.Pt(barEnd+deltaColWidth, rowCenterY), volColWidth)
 	}
 
 	summaryY := inner.Max.Y - 1
@@ -265,25 +282,25 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 		case -1:
 			pocRel = "↓ POC"
 		}
-		summary += fmt.Sprintf(" | Last Trade: %s %.5f (%s)", lastTrade.Side, lastTrade.Price.Float64(), pocRel)
+		summary += fmt.Sprintf(" | Last Trade: %s %s@%.5f (%s)",
+			lastTrade.Side,
+			lastTrade.Quantity,
+			lastTrade.Price.Float64(),
+			pocRel,
+		)
 	}
 	if start > 0 || hiddenBelow > 0 {
 		summary += fmt.Sprintf(" | hidden ↑%d ↓%d", start, hiddenBelow)
 	}
+	elapsedTime := time.Since(w.startTime).Truncate(time.Second)
+	buf.SetString(fmt.Sprintf(
+		" Elapsed: %s (since %s)",
+		elapsedTime, w.startTime.Format(time.RFC3339)),
+		ui.NewStyle(deltaColor),
+		image.Pt(inner.Min.X, summaryY-1),
+	)
 	buf.SetString(summary, ui.NewStyle(deltaColor), image.Pt(inner.Min.X, summaryY))
 	buf.SetString(" [q] quit", ui.NewStyle(ui.ColorWhite), image.Pt(inner.Max.X-10, summaryY))
-
-	if lastTrade != nil && summaryY-1 >= inner.Min.Y {
-		tradeColor := ui.ColorGreen
-		if lastTrade.Side == types.SideTypeSell {
-			tradeColor = ui.ColorRed
-		}
-		tradeLine := fmt.Sprintf(
-			" Last Trade: %-4s %.5f x %.5f @ %s",
-			lastTrade.Side, lastTrade.Price.Float64(), lastTrade.Quantity.Float64(),
-			lastTrade.Time.Time().Format("15:04:05"))
-		buf.SetString(tradeLine, ui.NewStyle(tradeColor), image.Pt(inner.Min.X, summaryY-1))
-	}
 }
 
 func setPaddedString(buf *ui.Buffer, s string, style ui.Style, point image.Point, width int) {

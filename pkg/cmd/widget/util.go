@@ -54,3 +54,16 @@ func DrawCircle(buffer *ui.Buffer, center image.Point, radius int, style ui.Styl
 		}
 	}
 }
+
+// DrawHorizontalBar draws a horizontal bar from xstart to xend at the given y coordinate.
+func DrawHorizontalBar(buffer *ui.Buffer, xstart, xend int, y int, style ui.Style) {
+	if xend < xstart {
+		xstart, xend = xend, xstart
+	}
+	for x := xstart; x <= xend; x++ {
+		buffer.SetCell(
+			ui.NewCell(ui.SHADED_BLOCKS[1], style),
+			image.Pt(x, y),
+		)
+	}
+}
