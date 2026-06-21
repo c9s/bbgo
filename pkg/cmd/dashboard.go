@@ -104,6 +104,7 @@ var orderFlowCmd = &cobra.Command{
 					if e.ID == "q" || e.ID == "<C-c>" {
 						return nil
 					}
+					w.HandleKeyboardEvent(e)
 				case ui.ResizeEvent:
 					payload := e.Payload.(ui.Resize)
 					w.SetRect(0, 0, payload.Width, payload.Height)

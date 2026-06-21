@@ -39,10 +39,11 @@ func (p *PriceLevel) TotalVol() fixedpoint.Value {
 
 type OrderFlowWidget struct {
 	ui.Block
-	mu        sync.Mutex
-	levels    []PriceLevel
-	lastTrade *types.Trade
-	startTime time.Time
+	mu                  sync.Mutex
+	levels              []PriceLevel
+	lastTrade           *types.Trade
+	startTime           time.Time
+	visibleLevelsOffset int
 }
 
 func (w *OrderFlowWidget) UpdateTrade(trade types.Trade) {
@@ -99,27 +100,30 @@ func NewOrderFlowWidget() *OrderFlowWidget {
 func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 	w.Block.Draw(buf)
 
+	// levels: high price → low price
 	levels, lastTrade := w.sortedLevelsSnapshot()
 	if len(levels) == 0 {
 		return
 	}
 
-	maxVol := fixedpoint.Zero
+	// Identify the POC and total delta
 	totalDelta := fixedpoint.Zero
+	pocVol := fixedpoint.Zero
 	pocPrice := fixedpoint.Zero
 	pocIdx := 0
 	for idx, lvl := range levels {
-		if v := lvl.TotalVol(); v.Compare(maxVol) > 0 {
-			maxVol = v
+		if v := lvl.TotalVol(); v.Compare(pocVol) > 0 {
+			pocVol = v
 			pocPrice = lvl.Price
 			pocIdx = idx
 		}
 		totalDelta = totalDelta.Add(lvl.Delta())
 	}
-	if maxVol.IsZero() {
+	if pocVol.IsZero() {
 		return
 	}
 
+	// Calculate the canvas area
 	inner := w.Inner
 
 	infoColWidth := deltaColWidth + volColWidth
@@ -136,7 +140,7 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 		maxBarHalfWidth = 1
 	}
 
-	availableHeight := inner.Max.Y - inner.Min.Y - 2
+	availableHeight := inner.Dy() - 2
 
 	// Show at most maxOrderFlowSideLevels above and below the POC, shrinking
 	// further if the terminal cannot fit that many rows.
@@ -152,12 +156,31 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 	}
 
 	start := pocIdx - side
+	end := pocIdx + side + 1
 	if start < 0 {
 		start = 0
 	}
-	end := pocIdx + side + 1
 	if end > len(levels) {
 		end = len(levels)
+	}
+	if w.visibleLevelsOffset != 0 {
+		// adjust the start and end by the offset
+		start += w.visibleLevelsOffset
+		end += w.visibleLevelsOffset
+		if start < 0 {
+			start = 0
+			end = start + 2*side + 1
+			if end > len(levels) {
+				end = len(levels)
+			}
+		}
+		if end > len(levels) {
+			start = len(levels) - 2*side
+			if start < 0 {
+				start = 0
+			}
+			end = len(levels)
+		}
 	}
 	visibleLevels := levels[start:end]
 	hiddenBelow := len(levels) - end
@@ -273,7 +296,7 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 	}
 	summary := fmt.Sprintf(
 		" Total Δ: %.4f | POC: %.5f (Vol %.5f)",
-		totalDelta.Float64(), pocPrice.Float64(), maxVol.Float64())
+		totalDelta.Float64(), pocPrice.Float64(), pocVol.Float64())
 	if lastTrade != nil {
 		pocRel := "= POC"
 		switch lastTrade.Price.Compare(pocPrice) {
@@ -282,7 +305,7 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 		case -1:
 			pocRel = "↓ POC"
 		}
-		summary += fmt.Sprintf(" | Last Trade: %s %s@%.5f (%s)",
+		summary += fmt.Sprintf(" | Last Trade: %s %s @ %.5f (%s)",
 			lastTrade.Side,
 			lastTrade.Quantity,
 			lastTrade.Price.Float64(),
@@ -300,7 +323,19 @@ func (w *OrderFlowWidget) Draw(buf *ui.Buffer) {
 		image.Pt(inner.Min.X, summaryY-1),
 	)
 	buf.SetString(summary, ui.NewStyle(deltaColor), image.Pt(inner.Min.X, summaryY))
-	buf.SetString(" [q] quit", ui.NewStyle(ui.ColorWhite), image.Pt(inner.Max.X-10, summaryY))
+	cmdString := " [↑/↓] scroll [r] reset [q] quit"
+	buf.SetString(cmdString, ui.NewStyle(ui.ColorWhite), image.Pt(inner.Max.X-len(cmdString), summaryY))
+}
+
+func (w *OrderFlowWidget) HandleKeyboardEvent(e ui.Event) {
+	switch e.ID {
+	case "<Up>":
+		w.visibleLevelsOffset--
+	case "<Down>":
+		w.visibleLevelsOffset++
+	case "r":
+		w.visibleLevelsOffset = 0
+	}
 }
 
 func setPaddedString(buf *ui.Buffer, s string, style ui.Style, point image.Point, width int) {
