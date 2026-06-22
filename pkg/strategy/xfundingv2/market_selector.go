@@ -102,6 +102,7 @@ type FuturesInfoService interface {
 	QueryDepth(context.Context, string) (types.SliceOrderBook, int64, error)
 	QueryFuturesFundingInfo(context.Context) ([]binanceapi.FuturesFundingInfo, error)
 	QueryTicker(context.Context, string) (*types.Ticker, error)
+	QueryFuturesAdlRisk(ctx context.Context, symbol string) (map[string]*binanceapi.AdlRisk, error)
 }
 
 // MarketSelector selects the best market based on funding rate and liquidity
@@ -134,7 +135,13 @@ func (s *MarketSelector) SelectMarkets(ctx context.Context, symbols []string) ([
 		return nil, err
 	}
 
-	// Step 3: Filter candidates
+	// Step 3: Get ADL risks
+	adlRisks, err := s.service.QueryFuturesAdlRisk(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+
+	// Step 4: Filter candidates
 	candidates := make([]MarketCandidate, 0, len(indices))
 	// query the volume data
 	takerQuoteVolumes := make(map[string]fixedpoint.Value)
@@ -199,6 +206,12 @@ func (s *MarketSelector) SelectMarkets(ctx context.Context, symbols []string) ([
 			continue
 		}
 		if takerQuoteVol.Compare(s.RequiredTakerQuoteVolume24h) < 0 {
+			continue
+		}
+
+		// if the symbol has no ADL risk found, we assume it's low risk.
+		adlRisk, found := adlRisks[idx.Symbol]
+		if found && adlRisk.RiskLevel != binanceapi.AdlRiskLevelLow {
 			continue
 		}
 
