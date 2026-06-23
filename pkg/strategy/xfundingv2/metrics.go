@@ -55,3 +55,11 @@ var roundPositionFilledRatioMetrics = promauto.NewGaugeVec(
 	},
 	[]string{"strategy_type", "strategy_id", "symbol", "accountType"},
 )
+
+var roundPositionMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_round_position",
+		Help: "Spot position of the arbitrage round",
+	},
+	[]string{"strategy_type", "strategy_id", "symbol", "accountType"},
+)

@@ -566,12 +566,8 @@ func (s *Strategy) CrossRun(
 			if round.HasOrder(trade.OrderID) {
 				round.HandleSpotTrade(trade, trade.Time.Time())
 
-				spotOrderBook := s.spotOrderBooks[round.SpotSymbol()].Copy()
-				futuresOrderBook := s.futuresOrderBooks[round.FuturesSymbol()].Copy()
-				round.Tick(trade.Time.Time(), spotOrderBook, futuresOrderBook)
-
 				spotFilledPosition := round.SpotWorker().FilledPosition()
-				filledRatio := spotFilledPosition.Div(round.TriggeredFundingRate()).Abs()
+				filledRatio := spotFilledPosition.Div(round.TriggeredTargetPosition()).Abs()
 				if round.State() == RoundClosing {
 					filledRatio = fixedpoint.One.Sub(filledRatio)
 				}
@@ -595,7 +591,7 @@ func (s *Strategy) CrossRun(
 				round.HandleFuturesTrade(trade, trade.Time.Time())
 
 				futuresFilledPosition := round.FuturesWorker().FilledPosition()
-				filledRatio := futuresFilledPosition.Div(round.TriggeredFundingRate()).Abs()
+				filledRatio := futuresFilledPosition.Div(round.TriggeredTargetPosition()).Abs()
 				if round.State() == RoundClosing {
 					filledRatio = fixedpoint.One.Sub(filledRatio)
 				}
@@ -662,23 +658,49 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		// spot and futures position should be close to each other at all time.
 		spotFilled := round.SpotWorker().FilledPosition()
 		futuresFilled := round.FuturesWorker().FilledPosition()
+		// record the round spot/futures positions
+		roundPositionMetrics.With(
+			prometheus.Labels{
+				"strategy_type": s.ID(),
+				"strategy_id":   s.InstanceID(),
+				"symbol":        round.SpotSymbol(),
+				"accountType":   "spot",
+			},
+		).Set(spotFilled.Float64())
+		roundPositionMetrics.With(
+			prometheus.Labels{
+				"strategy_type": s.ID(),
+				"strategy_id":   s.InstanceID(),
+				"symbol":        round.FuturesSymbol(),
+				"accountType":   "futures",
+			},
+		).Set(futuresFilled.Float64())
 		// calculate the deviation of the unhedged position
-		deviation := fixedpoint.One.Sub(futuresFilled.Div(spotFilled)).Abs()
+		spotFuturesRatio := fixedpoint.One
+		// when closing, the spotFilled may reach zero
+		if !spotFilled.IsZero() {
+			spotFuturesRatio = futuresFilled.Div(spotFilled)
+		}
+		deviation := fixedpoint.One.Sub(spotFuturesRatio).Abs()
 		deviationTooLarge := deviation.Compare(s.CriticalErrorConfig.MaxHedgeDeviation) > 0
 		roundSymbol := round.SpotSymbol()
 		if !halted && deviationTooLarge {
 			// the round is originally not halted but the deviation is too large -> we need to halt the round
 			round.Halt(tickTime)
-			s.logger.Warnf("round %s halted due to large hedge deviation: %s, spot filled: %s, futures filled: %s",
+			s.logger.Warnf("round %s halted due to large hedge deviation: %s > %s, spot filled: %s, futures filled: %s",
 				roundSymbol,
 				deviation,
+				s.CriticalErrorConfig.MaxHedgeDeviation,
 				spotFilled,
 				futuresFilled,
 			)
-			bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required.",
+			bbgo.Notify("💥 Round %s halted due to large hedge deviation (%s > %s). Manual intervention is required.",
 				roundSymbol,
+				deviation,
+				s.CriticalErrorConfig.MaxHedgeDeviation,
 				round.NewCriticalNotification(),
 			)
+			continue
 		} else if halted && !deviationTooLarge {
 			// the deviation is back to normal, resume the round
 			haltedAt := round.HaltedAt()
