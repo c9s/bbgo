@@ -328,6 +328,9 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 		return nil
 	}
 
+	market := w.Market()
+	midPrice := getMidPrice(orderBook)
+
 	// check if deadline exceeded
 	deadlineExceeded := !currentTime.Before(w.syncState.EndTime)
 	orderOptions := TWAPExecuteOrderOptions{
@@ -343,6 +346,10 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 				return nil
 			}
 			w.syncAndResetActiveOrder()
+		}
+		// the remaining quantity is dust, do nothing
+		if !midPrice.IsZero() && market.IsDustQuantity(remaining, midPrice) {
+			return nil
 		}
 		createdOrder, err := w.syncState.TWAPExecutor.PlaceOrder(
 			remaining.Abs(),
@@ -360,7 +367,11 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 
 	// we don't have an active order, place a new one
 	if w.syncState.ActiveOrder == nil {
-		sliceQty := w.calculateSliceQuantity(currentTime, remaining, false)
+		sliceQty := w.calculateSliceQuantity(currentTime, remaining, false, market, midPrice)
+		// the slice quantity is dust, do nothing
+		if !midPrice.IsZero() && market.IsDustQuantity(sliceQty, midPrice) {
+			return nil
+		}
 		createdOrder, err := w.syncState.TWAPExecutor.PlaceOrder(
 			sliceQty,
 			orderSide(remaining),
@@ -382,6 +393,11 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 			return nil
 		}
 		w.syncState.LastCheckTime = currentTime
+
+		// the remaining quantity of the active order is dust, no need to update
+		if !midPrice.IsZero() && market.IsDustQuantity(w.syncState.ActiveOrder.GetRemainingQuantity(), midPrice) {
+			return nil
+		}
 
 		if err := w.syncState.TWAPExecutor.CancelOrder(w.ctx, *w.syncState.ActiveOrder); err != nil {
 			w.logger.WithError(err).Warn("[TWAP tick] failed to cancel active order")
@@ -424,7 +440,11 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 	w.syncAndResetActiveOrder()
 
 	// calculate slice quantity
-	sliceQty := w.calculateSliceQuantity(currentTime, remaining, deadlineExceeded)
+	sliceQty := w.calculateSliceQuantity(currentTime, remaining, deadlineExceeded, market, midPrice)
+	// the slice quantity is dust, do nothing
+	if !midPrice.IsZero() && market.IsDustQuantity(sliceQty, midPrice) {
+		return nil
+	}
 	createdOrder, err := w.syncState.TWAPExecutor.PlaceOrder(
 		sliceQty,
 		orderSide(remaining),
@@ -432,14 +452,14 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 		orderOptions,
 	)
 	if err != nil || createdOrder == nil {
-		return fmt.Errorf("failed to place order for next slice: %w", err)
+		return fmt.Errorf("failed to place order for the next slice: %w", err)
 	}
 	w.syncState.ActiveOrder = createdOrder
 
 	return nil
 }
 
-func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fixedpoint.Value, deadlineExceeded bool) fixedpoint.Value {
+func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fixedpoint.Value, deadlineExceeded bool, market types.Market, price fixedpoint.Value) fixedpoint.Value {
 	remaining = remaining.Abs()
 
 	if deadlineExceeded {
@@ -475,6 +495,19 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 	// cap at remaining
 	if sliceQty.Compare(remaining) > 0 {
 		sliceQty = remaining
+	}
+
+	if !price.IsZero() && market.IsDustQuantity(sliceQty, price) {
+		minQty := fixedpoint.Max(
+			market.MinQuantity,
+			market.AdjustQuantityByMinNotional(fixedpoint.Zero, price),
+		)
+		n := remaining.Div(minQty).Floor()
+		if n.Sign() > 0 {
+			sliceQty = remaining.Div(n)
+		} else {
+			sliceQty = remaining
+		}
 	}
 
 	return sliceQty

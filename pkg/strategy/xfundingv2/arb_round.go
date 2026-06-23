@@ -862,8 +862,22 @@ func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBo
 	}
 
 	// it's opening or closing, tick the workers
-	r.spotWorker.Tick(currentTime, spotOrderBook)
-	r.futuresWorker.Tick(currentTime, futuresOrderBook)
+	if err := r.spotWorker.Tick(currentTime, spotOrderBook); err != nil {
+		r.logger.
+			WithError(err).
+			Warnf(
+				"failed to tick %s spot worker at %s",
+				r.SpotSymbol(), currentTime.Format(time.RFC3339),
+			)
+	}
+	if err := r.futuresWorker.Tick(currentTime, futuresOrderBook); err != nil {
+		r.logger.
+			WithError(err).
+			Warnf(
+				"failed to tick %s futures worker at %s",
+				r.FuturesSymbol(), currentTime.Format(time.RFC3339),
+			)
+	}
 
 	// get mid price
 	spotMidPrice := getMidPrice(spotOrderBook)
