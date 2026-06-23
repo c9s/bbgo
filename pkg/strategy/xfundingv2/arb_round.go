@@ -585,6 +585,7 @@ func (r *ArbitrageRound) SetRetryDuration(d time.Duration) {
 	r.syncState.RetryDuration = d
 }
 
+// HandleSpotTrade handles a spot trade, including update filled position, transfer collateral and sync futures position if the round is opening.
 func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, currentTime time.Time) {
 	// lock the round to ensure the state is updated correctly when receiving trade updates from spot worker
 	r.mu.Lock()
@@ -657,6 +658,7 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, currentTime t
 	}
 }
 
+// HandleFuturesTrade handles a futures trade, including update filled position, transfer collateral and sync spot position if the round is closing.
 func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, currentTime time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -838,6 +840,7 @@ func (r *ArbitrageRound) AnnualizedRate() fixedpoint.Value {
 	return AnnualizedRate(r.syncState.TriggeredFundingRate, r.syncState.FundingIntervalHours)
 }
 
+// Tick is called to tick the underlying spot and futures workers and update the round state
 func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBook, futuresOrderBook types.OrderBook) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
