@@ -571,7 +571,7 @@ func (s *Strategy) CrossRun(
 				round.Tick(trade.Time.Time(), spotOrderBook, futuresOrderBook)
 
 				spotFilledPosition := round.SpotWorker().FilledPosition()
-				filledRatio := spotFilledPosition.Div(round.TriggeredFundingRate()).Abs()
+				filledRatio := spotFilledPosition.Div(round.TriggeredTargetPosition()).Abs()
 				if round.State() == RoundClosing {
 					filledRatio = fixedpoint.One.Sub(filledRatio)
 				}
@@ -595,7 +595,7 @@ func (s *Strategy) CrossRun(
 				round.HandleFuturesTrade(trade, trade.Time.Time())
 
 				futuresFilledPosition := round.FuturesWorker().FilledPosition()
-				filledRatio := futuresFilledPosition.Div(round.TriggeredFundingRate()).Abs()
+				filledRatio := futuresFilledPosition.Div(round.TriggeredTargetPosition()).Abs()
 				if round.State() == RoundClosing {
 					filledRatio = fixedpoint.One.Sub(filledRatio)
 				}
@@ -679,6 +679,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				roundSymbol,
 				round.NewCriticalNotification(),
 			)
+			continue
 		} else if halted && !deviationTooLarge {
 			// the deviation is back to normal, resume the round
 			haltedAt := round.HaltedAt()
