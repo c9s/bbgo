@@ -658,6 +658,23 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		// spot and futures position should be close to each other at all time.
 		spotFilled := round.SpotWorker().FilledPosition()
 		futuresFilled := round.FuturesWorker().FilledPosition()
+		// record the round spot/futures positions
+		roundPositionMetrics.With(
+			prometheus.Labels{
+				"strategy_type": s.ID(),
+				"strategy_id":   s.InstanceID(),
+				"symbol":        round.SpotSymbol(),
+				"accountType":   "spot",
+			},
+		).Set(spotFilled.Float64())
+		roundPositionMetrics.With(
+			prometheus.Labels{
+				"strategy_type": s.ID(),
+				"strategy_id":   s.InstanceID(),
+				"symbol":        round.FuturesSymbol(),
+				"accountType":   "futures",
+			},
+		).Set(futuresFilled.Float64())
 		// calculate the deviation of the unhedged position
 		spotFuturesRatio := fixedpoint.One
 		// when closing, the spotFilled may reach zero
