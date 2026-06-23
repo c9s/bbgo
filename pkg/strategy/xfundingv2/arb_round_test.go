@@ -26,6 +26,21 @@ type mockFuturesService struct {
 	incomeHistory []binanceapi.FuturesIncome
 	incomeErr     error
 	transferErr   error
+	transfers     []transferCall
+}
+
+type transferCall struct {
+	Asset     string
+	Amount    fixedpoint.Value
+	Direction types.TransferDirection
+}
+
+func (m *mockFuturesService) Transfers() []transferCall {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]transferCall, len(m.transfers))
+	copy(out, m.transfers)
+	return out
 }
 
 func (m *mockFuturesService) ResetIncomeError() {
@@ -54,7 +69,13 @@ func (m *mockFuturesService) QueryFuturesIncomeHistory(
 func (m *mockFuturesService) TransferFuturesAccountAsset(
 	ctx context.Context, asset string, amount fixedpoint.Value, direction types.TransferDirection,
 ) error {
-	return m.transferErr
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.transferErr != nil {
+		return m.transferErr
+	}
+	m.transfers = append(m.transfers, transferCall{Asset: asset, Amount: amount, Direction: direction})
+	return nil
 }
 
 func (m *mockFuturesService) QueryPremiumIndex(ctx context.Context, symbol string) (*types.PremiumIndex, error) {
@@ -87,7 +108,8 @@ func newTestArbitrageRound(t *testing.T, ctrl *gomock.Controller, fundingInterva
 	round := NewArbitrageRound(
 		fundingRate,
 		types.ExchangeBinance, types.ExchangeBinance,
-		minHoldingIntervals, fundingIntervalHours, spotWorker, futuresWorker, mockService)
+		minHoldingIntervals, fundingIntervalHours, spotWorker, futuresWorker, mockService,
+		types.PositionShort)
 	return round, mockService
 }
 
@@ -261,7 +283,95 @@ func TestArbitrageRound_TotalFundingIncome(t *testing.T) {
 	})
 }
 
-func TestArbitrageRound_DeltaNeutral(t *testing.T) {
+// arbSpotTrade builds a spot trade for arb-round tests, populating QuoteQuantity
+// from price*quantity so that LONG-direction transfers (which use QuoteQuantity)
+// behave realistically.
+func arbSpotTrade(id, orderID uint64, side types.SideType, price, quantity fixedpoint.Value) types.Trade {
+	t := makeTrade(id, orderID, side, price, quantity)
+	t.QuoteQuantity = price.Mul(quantity)
+	return t
+}
+
+// arbFuturesTrade is the futures counterpart of arbSpotTrade. The IsFutures
+// flag is required for syncSpotPosition (called on the closing leg) to update
+// the spot target instead of bailing out early.
+func arbFuturesTrade(id, orderID uint64, side types.SideType, price, quantity fixedpoint.Value) types.Trade {
+	t := arbSpotTrade(id, orderID, side, price, quantity)
+	t.IsFutures = true
+	return t
+}
+
+type directionScenario struct {
+	name         string
+	direction    types.PositionType
+	collateral   string
+	spotTarget   fixedpoint.Value
+	spotOpenSide types.SideType // side spot uses to open the position
+	// futuresCloseSide is the side futures uses to close (opposite of its open).
+	futuresCloseSide types.SideType
+	// expectedFuturesTargetAfterFirstSpotFill is the target the round syncs onto
+	// the futures leg after the first spot fill of half the position.
+	expectedFuturesTargetAfterFirstSpotFill fixedpoint.Value
+	// expectedSpotTargetAfterFirstFuturesClose is the target the round syncs onto
+	// the spot leg after the first futures-close fill.
+	expectedSpotTargetAfterFirstFuturesClose fixedpoint.Value
+	// expectedTransferAmount returns the asset amount the round should transfer
+	// when given the trade's price and quantity. For SHORT it's the base
+	// quantity; for LONG it's the quote notional.
+	expectedTransferAmount func(price, quantity fixedpoint.Value) fixedpoint.Value
+}
+
+// TestArbitrageRound_DirectionalLeaderFollower exercises both SHORT and LONG
+// futures directions and verifies the leader/follower contract:
+//
+//	Opening: the spot leg is the leader. Each spot fill triggers a TransferIn
+//	         of the collateral asset to futures, and only afterwards is the
+//	         futures target advanced so it can place its offsetting slice.
+//	Closing: the futures leg is the leader. Each futures-close fill triggers
+//	         a TransferOut of the freed collateral back to spot, and only
+//	         afterwards is the spot target advanced so it can place its
+//	         offsetting slice.
+func TestArbitrageRound_DirectionalLeaderFollower(t *testing.T) {
+	scenarios := []directionScenario{
+		{
+			name:                                     "ShortFutures",
+			direction:                                types.PositionShort,
+			collateral:                               "BTC",
+			spotTarget:                               Number(10.0),
+			spotOpenSide:                             types.SideTypeBuy,
+			futuresCloseSide:                         types.SideTypeBuy,
+			expectedFuturesTargetAfterFirstSpotFill:  Number(-5.0),
+			expectedSpotTargetAfterFirstFuturesClose: Number(5.0),
+			expectedTransferAmount: func(_, quantity fixedpoint.Value) fixedpoint.Value {
+				return quantity
+			},
+		},
+		{
+			name:                                     "LongFutures",
+			direction:                                types.PositionLong,
+			collateral:                               "USDT",
+			spotTarget:                               Number(-10.0),
+			spotOpenSide:                             types.SideTypeSell,
+			futuresCloseSide:                         types.SideTypeSell,
+			expectedFuturesTargetAfterFirstSpotFill:  Number(5.0),
+			expectedSpotTargetAfterFirstFuturesClose: Number(-5.0),
+			expectedTransferAmount: func(price, quantity fixedpoint.Value) fixedpoint.Value {
+				// Fees are paid in BNB in these tests, so the transfer amount
+				// is exactly the quote notional (no fee deduction).
+				return price.Mul(quantity)
+			},
+		},
+	}
+
+	for _, sc := range scenarios {
+		sc := sc
+		t.Run(sc.name, func(t *testing.T) {
+			runLeaderFollowerScenario(t, sc)
+		})
+	}
+}
+
+func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -279,11 +389,9 @@ func TestArbitrageRound_DeltaNeutral(t *testing.T) {
 	spotWorker, spotMockExchange, spotMockOrderQuery, spotGeneralExecutor := newTestTWAPWorker(t, ctrl, config)
 	futuresWorker, futuresMockExchange, futuresMockOrderQuery, futuresGeneralExecutor := newTestTWAPWorker(t, ctrl, config)
 
-	targetPosition := Number(10.0)
-	spotWorker.SetTargetPosition(targetPosition)
+	spotWorker.SetTargetPosition(sc.spotTarget)
 
 	mockService := &mockFuturesService{}
-
 	fundingRate := &types.PremiumIndex{
 		LastFundingRate: Number(0.001),
 		NextFundingTime: nextFundingTime,
@@ -292,180 +400,182 @@ func TestArbitrageRound_DeltaNeutral(t *testing.T) {
 	round := NewArbitrageRound(
 		fundingRate,
 		types.ExchangeBinance, types.ExchangeBinance,
-		3, 8, spotWorker, futuresWorker, mockService)
-	round.SetLogger(logrus.WithField("test", "delta_neutral"))
+		3, 8, spotWorker, futuresWorker, mockService,
+		sc.direction)
+	round.SetLogger(logrus.WithField("test", sc.name))
+
+	assert.Equal(t, sc.collateral, round.CollateralAsset())
+	assert.Equal(t, sc.direction, round.syncState.DirectionPolicy.Direction)
 
 	spotOrderID := uint64(1000)
 	setupDeltaNeutralMockExchange(spotMockExchange, spotMockOrderQuery, &spotOrderID)
-
 	futuresOrderID := uint64(2000)
 	setupDeltaNeutralMockExchange(futuresMockExchange, futuresMockOrderQuery, &futuresOrderID)
 
 	assertDeltaNeutral := func(t *testing.T, msg string) {
 		t.Helper()
-		spotFilled := spotWorker.FilledPosition()
-		futuresFilled := futuresWorker.FilledPosition()
-		netDelta := spotFilled.Add(futuresFilled)
-		assert.True(t, netDelta.IsZero(),
+		net := spotWorker.FilledPosition().Add(futuresWorker.FilledPosition())
+		assert.True(t, net.IsZero(),
 			"%s: delta-neutral violated, spot=%s, futures=%s, net=%s",
-			msg, spotFilled, futuresFilled, netDelta)
-	}
-
-	assertFuturesTargetMatchesSpot := func(t *testing.T, msg string) {
-		t.Helper()
-		spotFilled := spotWorker.FilledPosition()
-		futuresTarget := futuresWorker.TargetPosition()
-		expected := spotFilled.Neg()
-		assert.Equal(t, expected, futuresTarget,
-			"%s: futures target should be negation of spot filled, spot=%s, futuresTarget=%s",
-			msg, spotFilled, futuresTarget)
+			msg, spotWorker.FilledPosition(), futuresWorker.FilledPosition(), net)
 	}
 
 	orderBook := newOrderBook(76990.0, 100.0, 77010.0, 100.0)
+	openPrice := Number(77010.0)
+	closePrice := Number(76990.0)
+	sliceQty := Number(5.0)
+	futuresOpenSide := oppositeSide(sc.spotOpenSide)
+	futuresCloseSide := sc.futuresCloseSide
+	spotCloseSide := oppositeSide(sc.spotOpenSide)
 
-	// ==========================================
-	// Phase 1: Start the round (Opening)
-	// ==========================================
 	ctx := context.Background()
-	err := round.Start(ctx, startTime)
-	assert.NoError(t, err)
+	assert.NoError(t, round.Start(ctx, startTime))
 	assert.Equal(t, RoundOpening, round.State())
 	assertDeltaNeutral(t, "after start")
 
-	// ==========================================
-	// Phase 2: Opening - buy spot in slices, verify futures stays delta-neutral
-	// ==========================================
+	// =========================================================================
+	// Opening: spot is the leader.
+	//   1. Spot worker places & fills a slice.
+	//   2. HandleSpotTrade transfers collateral spot -> futures (TransferIn).
+	//   3. Futures target is synced *after* the transfer succeeds; only then
+	//      can the futures worker tick its own slice.
+	// =========================================================================
 
-	// Tick spot worker -> places first slice order (10/2 = 5 BTC)
-	err = spotWorker.Tick(startTime, orderBook)
-	assert.NoError(t, err)
+	assert.True(t, futuresWorker.TargetPosition().IsZero(),
+		"futures target should be zero before any spot fill")
+
+	// --- opening slice 1 ---
+	assert.NoError(t, spotWorker.Tick(startTime, orderBook))
 	assert.NotNil(t, spotWorker.ActiveOrder())
 
-	// Spot trade 1: buy 5 BTC
-	spotTrade1 := makeTrade(1, spotWorker.ActiveOrder().OrderID, types.SideTypeBuy, Number(77010.0), Number(5.0))
+	transfersBefore := len(mockService.Transfers())
+	spotTrade1 := arbSpotTrade(1, spotWorker.ActiveOrder().OrderID, sc.spotOpenSide, openPrice, sliceQty)
 	processTrade(spotWorker, spotGeneralExecutor, spotTrade1)
 	round.HandleSpotTrade(spotTrade1, startTime)
 
-	assertFuturesTargetMatchesSpot(t, "after spot trade 1")
-	assert.Equal(t, Number(-5.0), futuresWorker.TargetPosition())
+	transfers := mockService.Transfers()
+	if assert.Len(t, transfers, transfersBefore+1, "spot fill must trigger exactly one transfer") {
+		call := transfers[len(transfers)-1]
+		assert.Equal(t, sc.collateral, call.Asset)
+		assert.Equal(t, types.TransferIn, call.Direction)
+		assert.Equal(t, sc.expectedTransferAmount(openPrice, sliceQty), call.Amount)
+	}
+	assert.Equal(t, sc.expectedFuturesTargetAfterFirstSpotFill, futuresWorker.TargetPosition(),
+		"futures target must be advanced after the spot->futures transfer")
 
-	// Tick futures worker -> places order matching synced target
-	err = futuresWorker.Tick(startTime, orderBook)
-	assert.NoError(t, err)
+	// Futures (the follower) can now place and fill its slice.
+	assert.NoError(t, futuresWorker.Tick(startTime, orderBook))
 	assert.NotNil(t, futuresWorker.ActiveOrder())
 
-	// Futures trade 1: sell 5 BTC
-	futuresTrade1 := makeTrade(101, futuresWorker.ActiveOrder().OrderID, types.SideTypeSell, Number(77010.0), Number(5.0))
+	futuresTrade1 := arbFuturesTrade(101, futuresWorker.ActiveOrder().OrderID, futuresOpenSide, openPrice, sliceQty)
 	processTrade(futuresWorker, futuresGeneralExecutor, futuresTrade1)
 	round.HandleFuturesTrade(futuresTrade1, startTime)
 
-	assertDeltaNeutral(t, "after opening trade 1")
-	assert.Equal(t, Number(5.0), spotWorker.FilledPosition())
-	assert.Equal(t, Number(-5.0), futuresWorker.FilledPosition())
+	assert.Len(t, mockService.Transfers(), transfersBefore+1,
+		"futures fill during opening must not trigger a transfer (spot is the leader)")
+	assertDeltaNeutral(t, "after opening slice 1")
 
-	// Tick spot worker -> places second slice order (remaining 5/1 = 5 BTC)
+	// --- opening slice 2 ---
 	tick2 := startTime.Add(5 * time.Minute)
-	err = spotWorker.Tick(tick2, orderBook)
-	assert.NoError(t, err)
+	assert.NoError(t, spotWorker.Tick(tick2, orderBook))
 
-	// Spot trade 2: buy 5 BTC more
-	spotTrade2 := makeTrade(2, spotWorker.ActiveOrder().OrderID, types.SideTypeBuy, Number(77010.0), Number(5.0))
+	spotTrade2 := arbSpotTrade(2, spotWorker.ActiveOrder().OrderID, sc.spotOpenSide, openPrice, sliceQty)
 	processTrade(spotWorker, spotGeneralExecutor, spotTrade2)
 	round.HandleSpotTrade(spotTrade2, tick2)
 
-	assertFuturesTargetMatchesSpot(t, "after spot trade 2")
-	assert.Equal(t, Number(-10.0), futuresWorker.TargetPosition())
+	assert.Len(t, mockService.Transfers(), transfersBefore+2)
+	assert.Equal(t, sc.spotTarget.Neg(), futuresWorker.TargetPosition())
 
-	// Tick futures worker -> fills remaining
-	err = futuresWorker.Tick(tick2, orderBook)
-	assert.NoError(t, err)
-
-	futuresTrade2 := makeTrade(102, futuresWorker.ActiveOrder().OrderID, types.SideTypeSell, Number(77010.0), Number(5.0))
+	assert.NoError(t, futuresWorker.Tick(tick2, orderBook))
+	futuresTrade2 := arbFuturesTrade(102, futuresWorker.ActiveOrder().OrderID, futuresOpenSide, openPrice, sliceQty)
 	processTrade(futuresWorker, futuresGeneralExecutor, futuresTrade2)
 	round.HandleFuturesTrade(futuresTrade2, tick2)
+	assertDeltaNeutral(t, "after opening slice 2 (fully opened)")
 
-	assertDeltaNeutral(t, "after opening trade 2 (fully opened)")
-	assert.Equal(t, Number(10.0), spotWorker.FilledPosition())
-	assert.Equal(t, Number(-10.0), futuresWorker.FilledPosition())
-
-	// ==========================================
-	// Phase 3: Tick round to transition to RoundReady
-	// ==========================================
-	tickReady := startTime.Add(6 * time.Minute)
-	round.Tick(tickReady, orderBook, orderBook)
+	// Transition to RoundReady.
+	round.Tick(startTime.Add(6*time.Minute), orderBook, orderBook)
 	assert.Equal(t, RoundReady, round.State())
 	assertDeltaNeutral(t, "at RoundReady")
+	assert.Equal(t, sc.spotTarget, spotWorker.FilledPosition(),
+		"spot leg should be fully opened to its target")
+	assert.Equal(t, sc.spotTarget.Neg(), futuresWorker.FilledPosition(),
+		"futures leg should fully mirror the spot fill")
 
-	// ==========================================
-	// Phase 4: Set closing
-	// ==========================================
+	// =========================================================================
+	// Closing: futures is the leader.
+	//   1. Futures worker places & fills a buy-back/sell-back slice.
+	//   2. HandleFuturesTrade transfers freed collateral futures -> spot
+	//      (TransferOut).
+	//   3. Spot target is synced *after* the transfer succeeds; only then can
+	//      the spot worker tick its own closing slice.
+	// =========================================================================
 	closeTime := startTime.Add(20 * time.Minute)
-	closeDuration := types.Duration(10 * time.Minute)
-	round.SetClosing(closeTime, closeDuration)
+	round.SetClosing(closeTime, types.Duration(10*time.Minute))
 	assert.Equal(t, RoundClosing, round.State())
-	assert.Equal(t, fixedpoint.Zero, spotWorker.TargetPosition())
+	assert.Equal(t, fixedpoint.Zero, futuresWorker.TargetPosition(),
+		"SetClosing drives the futures target to zero so it leads the close")
+	assert.Equal(t, sc.spotTarget, spotWorker.TargetPosition(),
+		"spot target stays put until syncSpotPosition advances it per fill")
 	assertDeltaNeutral(t, "after SetClosing (before closing trades)")
 
-	// ==========================================
-	// Phase 5: Closing - sell spot, buy back futures
-	// ==========================================
+	transfersBeforeClose := len(mockService.Transfers())
 
-	// Tick spot worker -> places sell order (remaining = -10, slice = 10/2 = 5)
-	err = spotWorker.Tick(closeTime, orderBook)
-	assert.NoError(t, err)
+	// --- closing slice 1 ---
+	assert.NoError(t, futuresWorker.Tick(closeTime, orderBook))
+	assert.NotNil(t, futuresWorker.ActiveOrder())
 
-	// Spot close trade 1: sell 5 BTC
-	spotCloseTrade1 := makeTrade(3, spotWorker.ActiveOrder().OrderID, types.SideTypeSell, Number(76990.0), Number(5.0))
-	processTrade(spotWorker, spotGeneralExecutor, spotCloseTrade1)
-	round.HandleSpotTrade(spotCloseTrade1, closeTime)
-
-	assertFuturesTargetMatchesSpot(t, "after spot close trade 1")
-	assert.Equal(t, Number(5.0), spotWorker.FilledPosition())
-	assert.Equal(t, Number(-5.0), futuresWorker.TargetPosition())
-
-	// Tick futures worker -> places buy-back order
-	err = futuresWorker.Tick(closeTime, orderBook)
-	assert.NoError(t, err)
-
-	futuresCloseTrade1 := makeTrade(103, futuresWorker.ActiveOrder().OrderID, types.SideTypeBuy, Number(76990.0), Number(5.0))
+	futuresCloseTrade1 := arbFuturesTrade(103, futuresWorker.ActiveOrder().OrderID, futuresCloseSide, closePrice, sliceQty)
 	processTrade(futuresWorker, futuresGeneralExecutor, futuresCloseTrade1)
 	round.HandleFuturesTrade(futuresCloseTrade1, closeTime)
 
-	assertDeltaNeutral(t, "after closing trade 1")
+	transfers = mockService.Transfers()
+	if assert.Len(t, transfers, transfersBeforeClose+1, "futures close fill must trigger exactly one transfer") {
+		call := transfers[len(transfers)-1]
+		assert.Equal(t, sc.collateral, call.Asset)
+		assert.Equal(t, types.TransferOut, call.Direction)
+		assert.Equal(t, sc.expectedTransferAmount(closePrice, sliceQty), call.Amount)
+	}
+	assert.Equal(t, sc.expectedSpotTargetAfterFirstFuturesClose, spotWorker.TargetPosition(),
+		"spot target must be advanced after the futures->spot transfer")
+	// Spot (the follower) can now place and fill its closing slice.
+	assert.NoError(t, spotWorker.Tick(closeTime, orderBook))
+	spotCloseTrade1 := arbSpotTrade(3, spotWorker.ActiveOrder().OrderID, spotCloseSide, closePrice, sliceQty)
+	processTrade(spotWorker, spotGeneralExecutor, spotCloseTrade1)
+	round.HandleSpotTrade(spotCloseTrade1, closeTime)
 
-	// Tick spot worker -> places second sell order
+	assert.Len(t, mockService.Transfers(), transfersBeforeClose+1,
+		"spot fill during closing must not trigger a transfer (futures is the leader)")
+	assertDeltaNeutral(t, "after closing slice 1")
+
+	// --- closing slice 2 ---
 	tick5 := closeTime.Add(5 * time.Minute)
-	err = spotWorker.Tick(tick5, orderBook)
-	assert.NoError(t, err)
-
-	// Spot close trade 2: sell remaining 5 BTC
-	spotCloseTrade2 := makeTrade(4, spotWorker.ActiveOrder().OrderID, types.SideTypeSell, Number(76990.0), Number(5.0))
-	processTrade(spotWorker, spotGeneralExecutor, spotCloseTrade2)
-	round.HandleSpotTrade(spotCloseTrade2, tick5)
-
-	assertFuturesTargetMatchesSpot(t, "after spot close trade 2")
-	assert.True(t, spotWorker.FilledPosition().IsZero())
-	assert.True(t, futuresWorker.TargetPosition().IsZero())
-
-	// Tick futures worker -> places final buy-back order
-	err = futuresWorker.Tick(tick5, orderBook)
-	assert.NoError(t, err)
-
-	futuresCloseTrade2 := makeTrade(104, futuresWorker.ActiveOrder().OrderID, types.SideTypeBuy, Number(76990.0), Number(5.0))
+	assert.NoError(t, futuresWorker.Tick(tick5, orderBook))
+	futuresCloseTrade2 := arbFuturesTrade(104, futuresWorker.ActiveOrder().OrderID, futuresCloseSide, closePrice, sliceQty)
 	processTrade(futuresWorker, futuresGeneralExecutor, futuresCloseTrade2)
 	round.HandleFuturesTrade(futuresCloseTrade2, tick5)
 
-	assertDeltaNeutral(t, "after closing trade 2 (fully closed)")
+	assert.True(t, futuresWorker.FilledPosition().IsZero())
+	assert.True(t, spotWorker.TargetPosition().IsZero())
+
+	assert.NoError(t, spotWorker.Tick(tick5, orderBook))
+	spotCloseTrade2 := arbSpotTrade(4, spotWorker.ActiveOrder().OrderID, spotCloseSide, closePrice, sliceQty)
+	processTrade(spotWorker, spotGeneralExecutor, spotCloseTrade2)
+	round.HandleSpotTrade(spotCloseTrade2, tick5)
+
+	assertDeltaNeutral(t, "after closing slice 2 (fully closed)")
 	assert.True(t, spotWorker.FilledPosition().IsZero())
 	assert.True(t, futuresWorker.FilledPosition().IsZero())
 
-	// ==========================================
-	// Phase 6: Tick round to transition to RoundClosed
-	// ==========================================
-	tickClosed := closeTime.Add(6 * time.Minute)
-	round.Tick(tickClosed, orderBook, orderBook)
+	round.Tick(closeTime.Add(6*time.Minute), orderBook, orderBook)
 	assert.Equal(t, RoundClosed, round.State())
 	assertDeltaNeutral(t, "at RoundClosed")
+}
+
+func oppositeSide(s types.SideType) types.SideType {
+	if s == types.SideTypeBuy {
+		return types.SideTypeSell
+	}
+	return types.SideTypeBuy
 }
 
 func setupDeltaNeutralMockExchange(mockExchange *mocks.MockExchange, mockOrderQuery *mocks.MockExchangeOrderQueryService, orderID *uint64) {

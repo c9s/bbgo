@@ -953,6 +953,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 				spotTwap,
 				futuresTwap,
 				s.futuresService,
+				s.MarketSelectionConfig.FuturesDirection,
 			)
 			round.SetLogger(s.logger)
 			round.SetSpotExchangeFeeRates(
@@ -1234,16 +1235,11 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 		return fmt.Errorf("[handleClosedRound] failed to close remaining positions for the futures: %w", err)
 	}
 
-	// transfer asset back to spot account
-	var asset string
-	switch s.MarketSelectionConfig.FuturesDirection {
-	case types.PositionShort:
-		// short futures -> transfer base currency
-		asset = round.FuturesMarket().BaseCurrency
-	case types.PositionLong:
-		// long futures -> transfer quote currency
-		asset = round.FuturesMarket().QuoteCurrency
-	}
+	// transfer any residual collateral back to the spot account. The bulk of
+	// the collateral is moved per-trade in handleFuturesTradeForClose; this
+	// block is a safety sweep for any leftover (e.g. PnL on the futures leg or
+	// residual after dust handling).
+	asset := round.CollateralAsset()
 	account, err := s.futuresSession.UpdateAccount(ctx)
 	if err != nil {
 		return fmt.Errorf("[handleClosedRound] failed to update futures account when handling round exit: %w", err)

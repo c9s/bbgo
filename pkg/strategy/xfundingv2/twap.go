@@ -330,10 +330,10 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 
 	// check if deadline exceeded
 	deadlineExceeded := !currentTime.Before(w.syncState.EndTime)
-	closing := w.syncState.TargetPosition.IsZero()
 	orderOptions := TWAPExecuteOrderOptions{
 		DeadlineExceeded: deadlineExceeded,
-		ReduceOnly:       closing,
+		// use reduce-only if we are closing the position
+		ReduceOnly: w.syncState.TargetPosition.Compare(w.FilledPosition()) < 0,
 	}
 	// if deadline exceeded, we want to place a final order for the remaining quantity
 	if deadlineExceeded {
