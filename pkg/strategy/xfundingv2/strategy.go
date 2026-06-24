@@ -774,6 +774,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		if err := s.handleClosedRound(closeRoundCtx, task, tickTime); err != nil {
 			s.logger.WithError(err).Errorf("failed to handle closed round: %s", task.Round)
 		} else {
+			s.closedRoundStats(task.Round, tickTime)
 			bbgo.Notify("✅ Successfully handled closed round: %s", round.String(), round.NewNotification())
 			s.logger.Infof("successfully handled closed round: %s", task.Round)
 			delete(s.closedRoundTasks, task.Round.SpotSymbol())
@@ -1295,15 +1296,19 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 			round,
 		)
 	}
-
-	// PnL calculation and record keeping
+	// set fee average cost
 	if executor, ok := s.spotGeneralOrderExecutors[s.FeeSymbol]; ok {
 		feeAvgCost := executor.Position().AverageCost
 		round.SetAvgFeeCost(s.FeeSymbol, feeAvgCost)
 	}
+	// sync funding fee records for the round
 	if err := round.SyncFundingFeeRecords(ctx, tickTime); err != nil {
 		return fmt.Errorf("[handleClosedRound] failed to sync funding fee records for round %s: %w", round, err)
 	}
+	return nil
+}
+
+func (s *Strategy) closedRoundStats(round *ArbitrageRound, tickTime time.Time) {
 	pnl := round.PnL()
 	bbgo.Notify("Round PnL %s", round.SpotSymbol(), pnl)
 	if breaker, found := s.CircuitBreakers[round.SpotSymbol()]; found {
@@ -1321,7 +1326,6 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 	)
 	roundNetPnLMetrics.With(labels).Set(pnl.NetPnL().Float64())
 	// TODO: insert closed round records into database
-	return nil
 }
 
 func (s *Strategy) transferAmountForClosedRound(task *CloseRoundTask, balance types.Balance, asset string) fixedpoint.Value {
