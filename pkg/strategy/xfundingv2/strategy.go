@@ -573,10 +573,9 @@ func (s *Strategy) CrossRun(
 				}
 				roundPositionFilledRatioMetrics.With(
 					prometheus.Labels{
-						"strategy_type": s.ID(),
-						"strategy_id":   s.InstanceID(),
-						"symbol":        round.SpotSymbol(),
-						"accountType":   "spot",
+						"strategy_id": s.InstanceID(),
+						"symbol":      round.SpotSymbol(),
+						"accountType": "spot",
 					},
 				).Set(filledRatio.Float64())
 			}
@@ -597,10 +596,9 @@ func (s *Strategy) CrossRun(
 				}
 				roundPositionFilledRatioMetrics.With(
 					prometheus.Labels{
-						"strategy_type": s.ID(),
-						"strategy_id":   s.InstanceID(),
-						"symbol":        round.SpotSymbol(),
-						"accountType":   "futures",
+						"strategy_id": s.InstanceID(),
+						"symbol":      round.SpotSymbol(),
+						"accountType": "futures",
 					},
 				).Set(filledRatio.Float64())
 			}
@@ -661,18 +659,16 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		// record the round spot/futures positions
 		roundPositionMetrics.With(
 			prometheus.Labels{
-				"strategy_type": s.ID(),
-				"strategy_id":   s.InstanceID(),
-				"symbol":        round.SpotSymbol(),
-				"accountType":   "spot",
+				"strategy_id": s.InstanceID(),
+				"symbol":      round.SpotSymbol(),
+				"accountType": "spot",
 			},
 		).Set(spotFilled.Float64())
 		roundPositionMetrics.With(
 			prometheus.Labels{
-				"strategy_type": s.ID(),
-				"strategy_id":   s.InstanceID(),
-				"symbol":        round.FuturesSymbol(),
-				"accountType":   "futures",
+				"strategy_id": s.InstanceID(),
+				"symbol":      round.FuturesSymbol(),
+				"accountType": "futures",
 			},
 		).Set(futuresFilled.Float64())
 		// calculate the deviation of the unhedged position
@@ -994,9 +990,8 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			round.SetSlackAlert(s.SlackAlert)
 			roundAnnualizedTriggerRateMetrics.With(
 				prometheus.Labels{
-					"strategy_type": s.ID(),
-					"strategy_id":   s.InstanceID(),
-					"symbol":        selectedCandidate.Symbol,
+					"strategy_id": s.InstanceID(),
+					"symbol":      selectedCandidate.Symbol,
 				},
 			).Set(round.AnnualizedRate().Float64())
 			// save as pending round for the fee asset preparation
@@ -1317,9 +1312,8 @@ func (s *Strategy) closedRoundStats(round *ArbitrageRound, tickTime time.Time) {
 		s.logger.Warnf("circuit breaker not found for symbol %s when recording profit: %s", round.SpotSymbol(), pnl)
 	}
 	labels := prometheus.Labels{
-		"strategy_type": s.ID(),
-		"strategy_id":   s.InstanceID(),
-		"symbol":        round.SpotSymbol(),
+		"strategy_id": s.InstanceID(),
+		"symbol":      round.SpotSymbol(),
 	}
 	roundHoldingIntervalMetrics.With(labels).Set(
 		float64(round.NumHoldingIntervals(tickTime)),
