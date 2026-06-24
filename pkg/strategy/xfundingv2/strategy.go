@@ -573,10 +573,9 @@ func (s *Strategy) CrossRun(
 				}
 				roundPositionFilledRatioMetrics.With(
 					prometheus.Labels{
-						"strategy_type": s.ID(),
-						"strategy_id":   s.InstanceID(),
-						"symbol":        round.SpotSymbol(),
-						"accountType":   "spot",
+						"strategy_id": s.InstanceID(),
+						"symbol":      round.SpotSymbol(),
+						"accountType": "spot",
 					},
 				).Set(filledRatio.Float64())
 			}
@@ -597,10 +596,9 @@ func (s *Strategy) CrossRun(
 				}
 				roundPositionFilledRatioMetrics.With(
 					prometheus.Labels{
-						"strategy_type": s.ID(),
-						"strategy_id":   s.InstanceID(),
-						"symbol":        round.SpotSymbol(),
-						"accountType":   "futures",
+						"strategy_id": s.InstanceID(),
+						"symbol":      round.SpotSymbol(),
+						"accountType": "futures",
 					},
 				).Set(filledRatio.Float64())
 			}
@@ -661,18 +659,16 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		// record the round spot/futures positions
 		roundPositionMetrics.With(
 			prometheus.Labels{
-				"strategy_type": s.ID(),
-				"strategy_id":   s.InstanceID(),
-				"symbol":        round.SpotSymbol(),
-				"accountType":   "spot",
+				"strategy_id": s.InstanceID(),
+				"symbol":      round.SpotSymbol(),
+				"accountType": "spot",
 			},
 		).Set(spotFilled.Float64())
 		roundPositionMetrics.With(
 			prometheus.Labels{
-				"strategy_type": s.ID(),
-				"strategy_id":   s.InstanceID(),
-				"symbol":        round.FuturesSymbol(),
-				"accountType":   "futures",
+				"strategy_id": s.InstanceID(),
+				"symbol":      round.FuturesSymbol(),
+				"accountType": "futures",
 			},
 		).Set(futuresFilled.Float64())
 		// calculate the deviation of the unhedged position
@@ -774,6 +770,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		if err := s.handleClosedRound(closeRoundCtx, task, tickTime); err != nil {
 			s.logger.WithError(err).Errorf("failed to handle closed round: %s", task.Round)
 		} else {
+			s.closedRoundStats(task.Round, tickTime)
 			bbgo.Notify("✅ Successfully handled closed round: %s", round.String(), round.NewNotification())
 			s.logger.Infof("successfully handled closed round: %s", task.Round)
 			delete(s.closedRoundTasks, task.Round.SpotSymbol())
@@ -930,8 +927,8 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 	}
 
 	// Only open new round when there is no active round
-	// TODO: support multiple active rounds for different symbols concurrently (e.g BTCUSDT and ETHUSDT)
-	if len(s.activeRounds) == 0 {
+	// TODO: support multiple rounds for different symbols concurrently (e.g BTCUSDT and ETHUSDT)
+	if len(s.allRounds()) == 0 {
 		candidates, err := s.preliminaryMarketSelector.SelectMarkets(ctx, s.candidateSymbols)
 		if err != nil {
 			s.logger.WithError(err).Warn("failed to select market candidates")
@@ -993,9 +990,8 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			round.SetSlackAlert(s.SlackAlert)
 			roundAnnualizedTriggerRateMetrics.With(
 				prometheus.Labels{
-					"strategy_type": s.ID(),
-					"strategy_id":   s.InstanceID(),
-					"symbol":        selectedCandidate.Symbol,
+					"strategy_id": s.InstanceID(),
+					"symbol":      selectedCandidate.Symbol,
 				},
 			).Set(round.AnnualizedRate().Float64())
 			// save as pending round for the fee asset preparation
@@ -1221,11 +1217,14 @@ type CloseRoundTask struct {
 	Notified      bool            `json:"notified"`
 }
 
+// handleClosedRound handles the cleanup of a closed round
+// the returned error of this function will be considered as a critical error
 func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, tickTime time.Time) error {
 	round := task.Round
 	futuresOrderbook := s.futuresOrderBooks[round.FuturesSymbol()].Copy()
 	futuresMidPrice := getMidPrice(futuresOrderbook)
-	// if the remaining quantity is too large, return an critical error and do not remove the round from active rounds, to prevent creating new round on the same symbol
+	// if the remaining quantity is too large, return an critical error
+	// the error will prevent the round being removed from closed rounds and stop creating new round on the same symbol
 	remainingNotional := round.FuturesWorker().RemainingQuantity().Mul(futuresMidPrice)
 	if remainingNotional.Abs().Compare(s.CriticalErrorConfig.MaxRemainingNotional) >= 0 {
 		return fmt.Errorf(
@@ -1266,12 +1265,16 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 	if err != nil {
 		return fmt.Errorf("[handleClosedRound] failed to update futures account when handling round exit: %w", err)
 	}
+	// get balance
 	balance, ok := account.Balance(asset)
 	if !ok {
 		return fmt.Errorf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round)
-	} else if balance.Available.Sign() > 0 {
-		// transfer the remaining balance back to spot account if there is any
-		if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, balance.Available, types.TransferOut); err != nil {
+	}
+	// compute the amount to transfer back to spot account
+	transferAmount := s.transferAmountForClosedRound(task, balance, asset)
+	if balance.Available.Compare(transferAmount) >= 0 {
+		// transfer the collateral back to spot account when the available balance is sufficient
+		if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, transferAmount, types.TransferOut); err != nil {
 			return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
 		} else {
 			bbgo.Notify("⬅️ Transferred %s %s back to spot account",
@@ -1280,16 +1283,27 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 				round.NewNotification(),
 			)
 		}
+	} else {
+		return fmt.Errorf("[handleClosedRound] insufficient balance %s %s (required %s) to transfer back to spot account during round exit: %s",
+			balance.Available,
+			asset,
+			transferAmount,
+			round,
+		)
 	}
-
-	// PnL calculation and record keeping
+	// set fee average cost
 	if executor, ok := s.spotGeneralOrderExecutors[s.FeeSymbol]; ok {
 		feeAvgCost := executor.Position().AverageCost
 		round.SetAvgFeeCost(s.FeeSymbol, feeAvgCost)
 	}
+	// sync funding fee records for the round
 	if err := round.SyncFundingFeeRecords(ctx, tickTime); err != nil {
 		return fmt.Errorf("[handleClosedRound] failed to sync funding fee records for round %s: %w", round, err)
 	}
+	return nil
+}
+
+func (s *Strategy) closedRoundStats(round *ArbitrageRound, tickTime time.Time) {
 	pnl := round.PnL()
 	bbgo.Notify("Round PnL %s", round.SpotSymbol(), pnl)
 	if breaker, found := s.CircuitBreakers[round.SpotSymbol()]; found {
@@ -1298,16 +1312,38 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 		s.logger.Warnf("circuit breaker not found for symbol %s when recording profit: %s", round.SpotSymbol(), pnl)
 	}
 	labels := prometheus.Labels{
-		"strategy_type": s.ID(),
-		"strategy_id":   s.InstanceID(),
-		"symbol":        round.SpotSymbol(),
+		"strategy_id": s.InstanceID(),
+		"symbol":      round.SpotSymbol(),
 	}
 	roundHoldingIntervalMetrics.With(labels).Set(
 		float64(round.NumHoldingIntervals(tickTime)),
 	)
 	roundNetPnLMetrics.With(labels).Set(pnl.NetPnL().Float64())
 	// TODO: insert closed round records into database
-	return nil
+}
+
+func (s *Strategy) transferAmountForClosedRound(task *CloseRoundTask, balance types.Balance, asset string) fixedpoint.Value {
+	market := task.Round.FuturesWorker().Executor().Market()
+	amount := fixedpoint.Zero
+	if asset == market.BaseCurrency {
+		amount = balance.Available
+	} else {
+		spotTrades := task.Round.SpotWorker().Executor().AllTrades()
+		spotCost := fixedpoint.Zero
+		for _, trade := range spotTrades {
+			spotCost = spotCost.Add(trade.Quantity.Mul(trade.Price))
+		}
+		futuresCost := fixedpoint.Zero
+		futuresTrades := task.Round.FuturesWorker().Executor().AllTrades()
+		for _, trade := range futuresTrades {
+			futuresCost = futuresCost.Add(trade.Quantity.Mul(trade.Price))
+		}
+		amount = fixedpoint.Min(spotCost, futuresCost)
+		if balance.Available.Compare(amount) < 0 {
+			amount = balance.Available
+		}
+	}
+	return amount
 }
 
 func (s *Strategy) canOpenRound(symbol string, currentTime time.Time) bool {

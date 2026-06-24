@@ -29,7 +29,7 @@ var roundAnnualizedTriggerRateMetrics = promauto.NewGaugeVec(
 		Name: "xfundingv2_round_annualized_trigger_rate",
 		Help: "Annualized triggering funding rate of the arbitrage round",
 	},
-	[]string{"strategy_type", "strategy_id", "symbol"},
+	[]string{"strategy_id", "symbol"},
 )
 
 var roundHoldingIntervalMetrics = promauto.NewGaugeVec(
@@ -37,7 +37,7 @@ var roundHoldingIntervalMetrics = promauto.NewGaugeVec(
 		Name: "xfundingv2_round_holding_interval",
 		Help: "Holding interval of the arbitrage round in seconds",
 	},
-	[]string{"strategy_type", "strategy_id", "symbol"},
+	[]string{"strategy_id", "symbol"},
 )
 
 var roundNetPnLMetrics = promauto.NewGaugeVec(
@@ -45,7 +45,7 @@ var roundNetPnLMetrics = promauto.NewGaugeVec(
 		Name: "xfundingv2_round_net_pnl",
 		Help: "Net PnL of the arbitrage round",
 	},
-	[]string{"strategy_type", "strategy_id", "symbol"},
+	[]string{"strategy_id", "symbol"},
 )
 
 var roundPositionFilledRatioMetrics = promauto.NewGaugeVec(
@@ -53,7 +53,7 @@ var roundPositionFilledRatioMetrics = promauto.NewGaugeVec(
 		Name: "xfundingv2_round_position_filled_ratio",
 		Help: "Filled ratio of the position in the arbitrage round. It should be increasing up to 1 when round is opening and decreasing down to 0 when round is closing",
 	},
-	[]string{"strategy_type", "strategy_id", "symbol", "accountType"},
+	[]string{"strategy_id", "symbol", "accountType"},
 )
 
 var roundPositionMetrics = promauto.NewGaugeVec(
@@ -61,5 +61,5 @@ var roundPositionMetrics = promauto.NewGaugeVec(
 		Name: "xfundingv2_round_position",
 		Help: "Spot position of the arbitrage round",
 	},
-	[]string{"strategy_type", "strategy_id", "symbol", "accountType"},
+	[]string{"strategy_id", "symbol", "accountType"},
 )
