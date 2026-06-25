@@ -334,7 +334,6 @@ func (s *Strategy) CrossRun(
 	if len(candidateSymbols) == 0 {
 		return errors.New("no candidate symbols after filtering")
 	}
-
 	// market checking and setup the general order executors
 	// NOTE: the executors should be created first before anything else to ensure the executors get updated first.
 	// The twap executors rely on the state of the general order executors to determine the filled quantity.
@@ -604,6 +603,12 @@ func (s *Strategy) CrossRun(
 			}
 		}
 	})
+
+	bbgo.Notify("✅ Strategy %s is up and running with %d candidate symbols: %v",
+		s.InstanceID(),
+		len(s.candidateSymbols),
+		s.candidateSymbols,
+	)
 
 	// Register shutdown handler to persist state
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
@@ -926,7 +931,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 		return
 	}
 
-	// Only open new round when there is no active round
+	// Only open new round when there is none
 	// TODO: support multiple rounds for different symbols concurrently (e.g BTCUSDT and ETHUSDT)
 	if len(s.allRounds()) == 0 {
 		candidates, err := s.preliminaryMarketSelector.SelectMarkets(ctx, s.candidateSymbols)
@@ -939,15 +944,18 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			return
 		}
 
-		selectedCandidate := s.selectMostProfitableMarket(candidates)
+		var legitCandidates []MarketCandidate
+		for _, candidate := range candidates {
+			if s.canOpenRound(candidate.Symbol, currentTime) {
+				legitCandidates = append(legitCandidates, candidate)
+			}
+		}
+		selectedCandidate := s.selectMostProfitableMarket(legitCandidates)
 		if selectedCandidate == nil {
 			// no profitable candidate found, nothing to do
 			return
 		}
-		if !s.canOpenRound(selectedCandidate.Symbol, currentTime) {
-			// already has pending or active round for the symbol, skip
-			return
-		}
+
 		// open new round if the estimated break-even holding interval is within the max holding hours
 		if selectedCandidate.MinHoldingDuration <= s.MarketSelectionConfig.MaxHoldingHours.Duration() {
 			spotExecutor := s.spotGeneralOrderExecutors[selectedCandidate.Symbol]
