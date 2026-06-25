@@ -13,6 +13,17 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type UserDataStreamType string
+
+const (
+	UserDataStreamUnknown        UserDataStreamType = "unknown"
+	UserDataStreamEd25519Auth    UserDataStreamType = "ed25519_auth"
+	UserDataStreamSpot           UserDataStreamType = "spot"
+	UserDataStreamMargin         UserDataStreamType = "margin"
+	UserDataStreamIsolatedMargin UserDataStreamType = "isolated_margin"
+	UserDataStreamFutures        UserDataStreamType = "futures"
+)
+
 func (s *Stream) handleConnect() {
 	if s.PublicOnly {
 		// market data stream
@@ -43,8 +54,9 @@ func (s *Stream) handleConnect() {
 		}
 	} else {
 		// user data stream
-		if s.canUseWsApiEndpoint() {
-
+		userStreamType := s.getUserDataStreamType()
+		switch userStreamType {
+		case UserDataStreamEd25519Auth:
 			if err := s.sendEd25519LoginCommand(); err != nil {
 				log.WithError(err).Error("ed25519 auth error")
 			}
@@ -60,10 +72,9 @@ func (s *Stream) handleConnect() {
 
 			// TODO: ensure that we receive an authorized event to trigger this auth event
 			go s.EmitAuth()
-		} else if s.exchange.IsFutures {
-
+		case UserDataStreamFutures:
 			go s.EmitAuth()
-		} else if !s.exchange.useListenKey && s.exchange.IsMargin {
+		case UserDataStreamMargin, UserDataStreamIsolatedMargin:
 			// Skip subscription if listenToken is missing or expired
 			if len(s.listenToken) == 0 || time.Now().After(s.listenTokenExpiration) {
 				return
@@ -76,20 +87,40 @@ func (s *Stream) handleConnect() {
 			}
 
 			go s.EmitAuth()
-		} else if !s.exchange.useListenKey && !s.exchange.IsMargin && !s.exchange.IsIsolatedMargin {
+		case UserDataStreamSpot:
 			// spot trading
 			if err := s.sendSpotHmacUserDataStreamCommand(); err != nil {
 				log.WithError(err).Error("spot hmac user data stream subscribe error")
 			}
 
 			go s.EmitAuth()
-		} else {
+		default:
 			// Emit Auth before establishing the connection to prevent the caller from missing the Update data after
 			// creating the order.
 			// spawn a goroutine to emit auth event to prevent blocking the main event loop
+			log.Warnf("unknown user data stream type: %s", userStreamType)
 			go s.EmitAuth()
 		}
 	}
+}
+
+func (s *Stream) getUserDataStreamType() UserDataStreamType {
+	if s.canUseWsApiEndpoint() {
+		return UserDataStreamEd25519Auth
+	}
+	if s.exchange.IsFutures {
+		return UserDataStreamFutures
+	}
+	if !s.exchange.useListenKey {
+		if s.exchange.IsMargin {
+			return UserDataStreamMargin
+		}
+		if s.exchange.IsIsolatedMargin {
+			return UserDataStreamIsolatedMargin
+		}
+		return UserDataStreamSpot
+	}
+	return UserDataStreamUnknown
 }
 
 // writeSpecificSubscriptions sends a SUBSCRIBE command for a given set of subscriptions
