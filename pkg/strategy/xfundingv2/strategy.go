@@ -189,10 +189,14 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Initialize() error {
-	s.logger = logrus.WithFields(logrus.Fields{
-		"strategy":    ID,
-		"strategy_id": s.InstanceID(),
-	})
+	if os.Getenv("DEBUG_XFUNDINGV2") != "" {
+		s.logger = s.newDebugLogger()
+	} else {
+		s.logger = logrus.WithFields(logrus.Fields{
+			"strategy":    ID,
+			"strategy_id": s.InstanceID(),
+		})
+	}
 
 	if apiKey := os.Getenv("COINMARKETCAP_API_KEY"); apiKey == "" {
 		s.logger.Warn("CoinMarketCap API key not set, top cap market filtering will be disabled")
@@ -838,6 +842,7 @@ func (s *Strategy) transitRoundState(ctx context.Context, round *ArbitrageRound,
 	case RoundClosing:
 		s.transitClosingRound(ctx, round, currentTime)
 	}
+	s.logger.Debugf("transit state for round %s: %s -> %s", round.SpotSymbol(), oriState, round.State())
 	round.SetUpdateTime(currentTime)
 }
 
@@ -853,6 +858,8 @@ func (s *Strategy) transitOpeningOrReadyRound(ctx context.Context, round *Arbitr
 
 	// the funding rate has flipped
 	if round.TriggeredFundingRate().Sign()*fundingRate.LastFundingRate.Sign() <= 0 {
+		s.logger.Debugf("[transitOpeningOrReadyRound] funding rate flipped %s -> %s: %s",
+			round.TriggeredFundingRate(), fundingRate.LastFundingRate, round)
 		rateDiffAbs := fundingRate.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
 		if rateDiffAbs.Compare(s.CriticalErrorConfig.MaxFundingRateFlip) > 0 {
 			bbgo.Notify("🚨 Round funding rate flip is too large: %s -> %s (threshold %s)",
@@ -945,6 +952,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			// no candidates, nothing to do
 			return
 		}
+		s.logger.Debugf("candidates: %+v", candidates)
 
 		var legitCandidates []MarketCandidate
 		for _, candidate := range candidates {
@@ -952,11 +960,13 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 				legitCandidates = append(legitCandidates, candidate)
 			}
 		}
+		s.logger.Debugf("legit candidates: %+v", legitCandidates)
 		selectedCandidate := s.selectMostProfitableMarket(legitCandidates)
 		if selectedCandidate == nil {
 			// no profitable candidate found, nothing to do
 			return
 		}
+		s.logger.Debugf("most profitable candidate for new round: %+v", selectedCandidate)
 
 		// open new round if the estimated break-even holding interval is within the max holding hours
 		if selectedCandidate.MinHoldingDuration <= s.MarketSelectionConfig.MaxHoldingHours.Duration() {
@@ -1376,4 +1386,15 @@ func (s *Strategy) canOpenRound(symbol string, currentTime time.Time) bool {
 		}
 	}
 	return !pending && !active && !closed && !isHalted
+}
+
+func (s *Strategy) newDebugLogger() *logrus.Entry {
+	logger := logrus.New()
+	logger.SetFormatter(logrus.StandardLogger().Formatter)
+	logger.SetOutput(logrus.StandardLogger().Out)
+	logger.SetLevel(logrus.DebugLevel)
+	return logger.WithFields(logrus.Fields{
+		"strategy":    ID,
+		"strategy_id": s.InstanceID(),
+	})
 }
