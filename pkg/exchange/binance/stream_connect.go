@@ -54,7 +54,7 @@ func (s *Stream) handleConnect() {
 		}
 	} else {
 		// user data stream
-		userStreamType := s.getUserDataStreamType()
+		userStreamType := s.detectUserDataStreamType()
 		switch userStreamType {
 		case UserDataStreamEd25519Auth:
 			if err := s.sendEd25519LoginCommand(); err != nil {
@@ -104,7 +104,7 @@ func (s *Stream) handleConnect() {
 	}
 }
 
-func (s *Stream) getUserDataStreamType() UserDataStreamType {
+func (s *Stream) detectUserDataStreamType() UserDataStreamType {
 	if s.canUseWsApiEndpoint() {
 		return UserDataStreamEd25519Auth
 	}
