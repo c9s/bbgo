@@ -63,6 +63,9 @@ type Strategy struct {
 	PreferredQuoteCurrencies *QuoteCurrencyPreference    `json:"quoteCurrencies"`
 	ExpectedBalances         map[string]fixedpoint.Value `json:"expectedBalances"`
 	UseTakerOrder            bool                        `json:"useTakerOrder"`
+	UseDepthPrice            bool                        `json:"useDepthPrice"`
+	DepthInQuote             fixedpoint.Value            `json:"depthInQuote"`
+	TakerOrderTicks          fixedpoint.Value            `json:"takerOrderTicks"` // ex: 3 -> 3 ticks above/below the best price for taker order
 	DryRun                   bool                        `json:"dryRun"`
 	BalanceToleranceRange    fixedpoint.Value            `json:"balanceToleranceRange"`
 	Duration                 types.Duration              `json:"for"`
@@ -218,6 +221,10 @@ func (s *Strategy) Validate() error {
 		return errors.New("expectedBalances is not defined")
 	}
 
+	if s.TakerOrderTicks.Sign() < 0 {
+		return errors.New("takerOrderTicks must be greater than or equal to 0")
+	}
+
 	return nil
 }
 
@@ -312,12 +319,22 @@ func (s *Strategy) selectSessionForCurrency(
 
 			case types.SideTypeBuy:
 				var price fixedpoint.Value
-				if taker {
-					price = ticker.Sell
-				} else if spread.Compare(market.TickSize) > 0 {
-					price = ticker.Sell.Sub(market.TickSize)
-				} else {
-					price = ticker.Buy
+				if s.UseDepthPrice {
+					if depthPrice, ok := s.queryDepthPrice(ctx, session, symbol, types.SideTypeBuy); ok {
+						price = depthPrice
+					}
+				}
+				if price.IsZero() {
+					if taker {
+						price = ticker.Sell
+					} else if spread.Compare(market.TickSize) > 0 {
+						price = ticker.Sell.Sub(market.TickSize)
+					} else {
+						price = ticker.Buy
+					}
+					if !s.TakerOrderTicks.IsZero() {
+						price = price.Add(market.TickSize.Mul(s.TakerOrderTicks))
+					}
 				}
 
 				quoteBalance, ok := account.Balance(quoteCurrency)
@@ -377,12 +394,19 @@ func (s *Strategy) selectSessionForCurrency(
 
 			case types.SideTypeSell:
 				var price fixedpoint.Value
-				if taker {
-					price = ticker.Buy
-				} else if spread.Compare(market.TickSize) > 0 {
-					price = ticker.Buy.Add(market.TickSize)
-				} else {
-					price = ticker.Sell
+				if s.UseDepthPrice {
+					if depthPrice, ok := s.queryDepthPrice(ctx, session, symbol, types.SideTypeSell); ok {
+						price = depthPrice
+					}
+				}
+				if price.IsZero() {
+					if taker {
+						price = ticker.Buy
+					} else if spread.Compare(market.TickSize) > 0 {
+						price = ticker.Buy.Add(market.TickSize)
+					} else {
+						price = ticker.Sell
+					}
 				}
 
 				if reversed {
