@@ -267,6 +267,7 @@ func (s *Stream) handleBeforeConnect(ctx context.Context) error {
 
 func (s *Stream) handleConnect() {
 	if s.PublicOnly {
+		// market data stream
 		if s.exchange.IsFutures {
 			// Determine which subscriptions to send on the main connection:
 			//   - mixed or market-only → main conn is /market → send futuresMarketSubs
@@ -292,48 +293,51 @@ func (s *Stream) handleConnect() {
 				log.WithError(err).Error("subscribe error")
 			}
 		}
-	} else if s.canUseWsApiEndpoint() {
-
-		if err := s.sendEd25519LoginCommand(); err != nil {
-			log.WithError(err).Error("ed25519 auth error")
-		}
-
-		time.Sleep(1 * time.Second)
-
-		// futures does not support ed25519 login on WsApi
-		if !s.exchange.IsFutures {
-			if err := s.sendSubscribeUserDataStreamCommand(); err != nil {
-				log.WithError(err).Error("subscribe user data stream error")
-			}
-		}
-
-		// TODO: ensure that we receive an authorized event to trigger this auth event
-		go s.EmitAuth()
-	} else if !s.exchange.useListenKey && s.exchange.IsMargin {
-		// Skip subscription if listenToken is missing or expired
-		if len(s.listenToken) == 0 || time.Now().After(s.listenTokenExpiration) {
-			return
-		}
-
-		// Use new listenToken subscription method (recommended as of 2025-10-06)
-		// This still uses the WebSocket API endpoint but with listenToken instead of ed25519 auth
-		if err := s.sendListenTokenSubscribeCommand(); err != nil {
-			log.WithError(err).Error("listenToken subscribe error")
-		}
-
-		go s.EmitAuth()
-	} else if !s.exchange.useListenKey && !s.exchange.IsMargin && !s.exchange.IsIsolatedMargin {
-		// spot trading
-		if err := s.sendSpotHmacUserDataStreamCommand(); err != nil {
-			log.WithError(err).Error("spot hmac user data stream subscribe error")
-		}
-
-		go s.EmitAuth()
 	} else {
-		// Emit Auth before establishing the connection to prevent the caller from missing the Update data after
-		// creating the order.
-		// spawn a goroutine to emit auth event to prevent blocking the main event loop
-		go s.EmitAuth()
+		// user data stream
+		if s.canUseWsApiEndpoint() {
+
+			if err := s.sendEd25519LoginCommand(); err != nil {
+				log.WithError(err).Error("ed25519 auth error")
+			}
+
+			time.Sleep(1 * time.Second)
+
+			// futures does not support ed25519 login on WsApi
+			if !s.exchange.IsFutures {
+				if err := s.sendSubscribeUserDataStreamCommand(); err != nil {
+					log.WithError(err).Error("subscribe user data stream error")
+				}
+			}
+
+			// TODO: ensure that we receive an authorized event to trigger this auth event
+			go s.EmitAuth()
+		} else if !s.exchange.useListenKey && s.exchange.IsMargin {
+			// Skip subscription if listenToken is missing or expired
+			if len(s.listenToken) == 0 || time.Now().After(s.listenTokenExpiration) {
+				return
+			}
+
+			// Use new listenToken subscription method (recommended as of 2025-10-06)
+			// This still uses the WebSocket API endpoint but with listenToken instead of ed25519 auth
+			if err := s.sendListenTokenSubscribeCommand(); err != nil {
+				log.WithError(err).Error("listenToken subscribe error")
+			}
+
+			go s.EmitAuth()
+		} else if !s.exchange.useListenKey && !s.exchange.IsMargin && !s.exchange.IsIsolatedMargin {
+			// spot trading
+			if err := s.sendSpotHmacUserDataStreamCommand(); err != nil {
+				log.WithError(err).Error("spot hmac user data stream subscribe error")
+			}
+
+			go s.EmitAuth()
+		} else {
+			// Emit Auth before establishing the connection to prevent the caller from missing the Update data after
+			// creating the order.
+			// spawn a goroutine to emit auth event to prevent blocking the main event loop
+			go s.EmitAuth()
+		}
 	}
 }
 
