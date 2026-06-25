@@ -2,6 +2,9 @@ package binance
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/url"
@@ -319,6 +322,13 @@ func (s *Stream) handleConnect() {
 		}
 
 		go s.EmitAuth()
+	} else if !s.exchange.useListenKey && !s.exchange.IsMargin && !s.exchange.IsIsolatedMargin {
+		// spot trading
+		if err := s.sendSpotHmacUserDataStreamCommand(); err != nil {
+			log.WithError(err).Error("spot hmac user data stream subscribe error")
+		}
+
+		go s.EmitAuth()
 	} else {
 		// Emit Auth before establishing the connection to prevent the caller from missing the Update data after
 		// creating the order.
@@ -364,6 +374,38 @@ func (s *Stream) sendEd25519LoginCommand() error {
 			APIKey:    s.client.APIKey,
 			Signature: signature,
 			Timestamp: timestamp,
+		},
+	})
+}
+
+type SpotHmacSubscribeParams struct {
+	Key       string `json:"apiKey"`
+	Timestamp int64  `json:"timestamp"`
+	Signature string `json:"signature,omitempty"`
+}
+
+func (s *Stream) sendSpotHmacUserDataStreamCommand() error {
+	mac := hmac.New(
+		sha256.New, []byte(s.exchange.secret),
+	)
+
+	timestamp := time.Now().UnixMilli()
+	payload := url.Values{}
+	payload.Add("apiKey", s.exchange.key)
+	payload.Add("timestamp", strconv.FormatInt(timestamp, 10))
+	payloadBytes := []byte(payload.Encode())
+	if _, err := mac.Write(payloadBytes); err != nil {
+		return err
+	}
+	signature := hex.EncodeToString(mac.Sum(nil))
+
+	return s.Conn.WriteJSON(&WebSocketCommand{
+		ID:     2,
+		Method: "userDataStream.subscribe.signature",
+		Params: SpotHmacSubscribeParams{
+			Key:       s.exchange.key,
+			Timestamp: timestamp,
+			Signature: signature,
 		},
 	})
 }
@@ -660,6 +702,10 @@ func (s *Stream) createUserDataStreamEndpointWithListenKey(ctx context.Context) 
 	if err != nil {
 		return "", err
 	}
+	// listenKey is empty -> spot trading
+	if listenKey == "" {
+		return WsSpotWebSocketURL, nil
+	}
 
 	debug("listen key is created, starting listen key keep alive worker: %s", util.MaskKey(listenKey))
 	go s.listenKeyKeepAlive(ctx, listenKey)
@@ -788,8 +834,11 @@ func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 		return req.Do(ctx)
 	}
 
+	// listenKey is removed for spot trading (POST /api/v3/userDataStream)
+	// See: https://www.binance.com/en/support/announcement/detail/80b38c8954bf4965b21eeb3c5fc6edfa
 	debug("spot mode is enabled, requesting user stream listen key...")
-	return s.client.NewStartUserStreamService().Do(ctx)
+	// return s.client.NewStartUserStreamService().Do(ctx)
+	return "", nil
 }
 
 func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error {
