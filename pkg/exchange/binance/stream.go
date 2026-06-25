@@ -312,6 +312,9 @@ func (s *Stream) handleConnect() {
 
 			// TODO: ensure that we receive an authorized event to trigger this auth event
 			go s.EmitAuth()
+		} else if s.exchange.IsFutures {
+
+			go s.EmitAuth()
 		} else if !s.exchange.useListenKey && s.exchange.IsMargin {
 			// Skip subscription if listenToken is missing or expired
 			if len(s.listenToken) == 0 || time.Now().After(s.listenTokenExpiration) {
