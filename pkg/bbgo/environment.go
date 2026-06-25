@@ -726,6 +726,10 @@ func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSe
 func (environ *Environment) syncSession(
 	ctx context.Context, session *ExchangeSession, syncStartTime time.Time, defaultSymbols ...string,
 ) error {
+	if session.IsInMaintenance() {
+		log.Infof("session %s is in maintenance mode, skipping sync", session.Name)
+		return nil
+	}
 	symbols, err := session.getSessionSymbols(defaultSymbols...)
 	if err != nil {
 		return err
