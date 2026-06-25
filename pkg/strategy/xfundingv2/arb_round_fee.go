@@ -87,6 +87,13 @@ func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Ti
 }
 
 func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*ArbitrageRound) error {
+	if s.DryRun {
+		s.logger.Infof(
+			"[acquireFeeAssetAndTransfer] dry run mode, would have acquired fee asset and transfer for %d rounds",
+			len(rounds),
+		)
+		return nil
+	}
 	var requiredSpotFeeAmount, requiredFuturesFeeAmount fixedpoint.Value
 	for _, round := range rounds {
 		roundSpotFee, roundFuturesFee := round.RequiredFeeAssetAmounts()

@@ -2,6 +2,7 @@ package xfundingv2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,6 +18,7 @@ type TWAPExecutor struct {
 	executor *bbgo.GeneralOrderExecutor
 
 	syncState TWAPExecutorSyncState
+	dryRun    bool
 
 	logger logrus.FieldLogger
 }
@@ -51,6 +53,10 @@ func NewTWAPExecutor(
 
 func (o *TWAPExecutor) SetLogger(logger logrus.FieldLogger) {
 	o.logger = logger
+}
+
+func (o *TWAPExecutor) SetDryRun(dryRun bool) {
+	o.dryRun = dryRun
 }
 
 func (o *TWAPExecutor) Market() types.Market {
@@ -168,6 +174,12 @@ func (o *TWAPExecutor) PlaceOrder(quantity fixedpoint.Value, side types.SideType
 	order := o.buildSubmitOrder(quantity, price, side, options)
 	if order.Type != types.OrderTypeMarket && o.syncState.Market.IsDustQuantity(order.Quantity, order.Price) {
 		return nil, fmt.Errorf("order is of dust quantity: %s", quantity)
+	}
+
+	if o.dryRun {
+		msg := fmt.Sprintf("[TWAPExecutor] dry run mode, would have submitted order: %+v", order)
+		o.logger.Warn(msg)
+		return nil, errors.New(msg)
 	}
 
 	timedCtx, cancel := context.WithTimeout(o.ctx, 500*time.Millisecond)

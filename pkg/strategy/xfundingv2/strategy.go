@@ -52,6 +52,8 @@ type Strategy struct {
 	// lock before update the strategy state, such as current round, selected market, etc
 	mu sync.Mutex
 
+	DryRun bool `json:"dryRun"`
+
 	// Session configuration
 	SpotSession    string `json:"spotSession"`
 	FuturesSession string `json:"futuresSession"`
@@ -960,6 +962,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 		if selectedCandidate.MinHoldingDuration <= s.MarketSelectionConfig.MaxHoldingHours.Duration() {
 			spotExecutor := s.spotGeneralOrderExecutors[selectedCandidate.Symbol]
 			spotTwap, err := NewTWAPWorker(ctx, selectedCandidate.Symbol, s.spotSession, spotExecutor, s.TWAPWorkerConfig)
+			spotTwap.Executor().SetDryRun(s.DryRun)
 			if err != nil || spotTwap == nil {
 				s.logger.WithError(err).Errorf("failed to create TWAP worker for spot %s", selectedCandidate.Symbol)
 				return
@@ -967,6 +970,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			spotTwap.SetTargetPosition(selectedCandidate.TargetFuturesPosition.Neg())
 			futuresExecutor := s.futuresGeneralOrderExecutors[selectedCandidate.Symbol]
 			futuresTwap, err := NewTWAPWorker(ctx, selectedCandidate.Symbol, s.futuresSession, futuresExecutor, s.TWAPWorkerConfig)
+			futuresTwap.Executor().SetDryRun(s.DryRun)
 			if err != nil || futuresTwap == nil {
 				s.logger.WithError(err).Errorf("failed to create TWAP worker for futures %s", selectedCandidate.Symbol)
 				return
@@ -1002,11 +1006,17 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 					"symbol":      selectedCandidate.Symbol,
 				},
 			).Set(round.AnnualizedRate().Float64())
-			// save as pending round for the fee asset preparation
+			// enqueue the new round to pending rounds for further processing
 			s.PendingRounds[selectedCandidate.Symbol] = &PendingRound{
 				Round: round,
 			}
 			bbgo.Notify("🆕 Created new pending round: %s", round.SpotSymbol(), round.NewNotification())
+		} else {
+			s.logger.Debugf("selected candidate %s min holding duration too long: %s > %s, skipping",
+				selectedCandidate.Symbol,
+				selectedCandidate.MinHoldingDuration,
+				s.MarketSelectionConfig.MaxHoldingHours.Duration(),
+			)
 		}
 	}
 }
