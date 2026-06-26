@@ -607,6 +607,16 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 		}
 	}
 
+	if err := verifyRecords(
+		ctx,
+		environ.sessions,
+		environ.OrderService,
+		environ.TradeService,
+		userConfig,
+	); err != nil {
+		log.WithError(err).Warn("trade record verification failed")
+	}
+
 	return nil
 }
 
