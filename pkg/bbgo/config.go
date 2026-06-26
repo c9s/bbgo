@@ -333,6 +333,7 @@ type SyncConfig struct {
 
 	Verify *struct {
 		Enabled  bool           `json:"enabled" yaml:"enabled"`
+		Since    *types.Time    `json:"since,omitempty" yaml:"since,omitempty"`
 		Period   types.Duration `json:"period" yaml:"period"`
 		Action   VerifyAction   `json:"action" yaml:"action"`
 		Sessions []string       `json:"sessions,omitempty" yaml:"sessions,omitempty"`
