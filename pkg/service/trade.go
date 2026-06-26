@@ -498,6 +498,25 @@ func (s *TradeService) DeleteAll() error {
 	return err
 }
 
+func (s *TradeService) DeleteByGID(ctx context.Context, gids []int64) error {
+	if len(gids) == 0 {
+		return nil
+	}
+
+	const batchSize = 100
+	for i := 0; i < len(gids); i += batchSize {
+		end := min(i+batchSize, len(gids))
+		sql, args, err := sq.Delete("trades").Where(sq.Eq{"gid": gids[i:end]}).ToSql()
+		if err != nil {
+			return err
+		}
+		if _, err := s.DB.ExecContext(ctx, sql, args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func SelectLastTrades(ex types.ExchangeName, symbol string, isMargin, isFutures, isIsolated bool, limit uint64) sq.SelectBuilder {
 	return sq.Select("*").
 		From("trades").
