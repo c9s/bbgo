@@ -117,16 +117,27 @@ type QueryOrdersOptions struct {
 	Symbol   string
 	LastGID  int64
 	Ordering string
+	Since    *time.Time
+	Until    *time.Time
+	Limit    int
 }
 
 func (s *OrderService) Query(options QueryOrdersOptions) ([]AggOrder, error) {
 	sql := genOrderSQL(s.DB.DriverName(), options)
 
-	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
+	params := map[string]interface{}{
 		"exchange": options.Exchange,
 		"symbol":   options.Symbol,
 		"gid":      options.LastGID,
-	})
+	}
+	if options.Since != nil {
+		params["since"] = *options.Since
+	}
+	if options.Until != nil {
+		params["until"] = *options.Until
+	}
+
+	rows, err := s.DB.NamedQuery(sql, params)
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +172,12 @@ func genOrderSQL(driver string, options QueryOrdersOptions) string {
 	if len(options.Symbol) > 0 {
 		where = append(where, "orders.symbol = :symbol")
 	}
+	if options.Since != nil {
+		where = append(where, "orders.created_at >= :since")
+	}
+	if options.Until != nil {
+		where = append(where, "orders.created_at < :until")
+	}
 
 	var selColumns []string
 	if driver == "mysql" {
@@ -190,7 +207,11 @@ func genOrderSQL(driver string, options QueryOrdersOptions) string {
 	}
 	sql += ` GROUP BY orders.gid `
 	sql += ` ORDER BY orders.gid ` + ordering
-	sql += ` LIMIT ` + strconv.Itoa(500)
+	limit := 500
+	if options.Limit > 0 {
+		limit = options.Limit
+	}
+	sql += ` LIMIT ` + strconv.Itoa(limit)
 
 	log.Info(sql)
 	return sql
@@ -237,4 +258,23 @@ func (s *OrderService) Insert(order types.Order) (err error) {
 	`, order)
 
 	return err
+}
+
+func (s *OrderService) DeleteByGID(ctx context.Context, gids []uint64) error {
+	if len(gids) == 0 {
+		return nil
+	}
+
+	const batchSize = 100
+	for i := 0; i < len(gids); i += batchSize {
+		end := min(i+batchSize, len(gids))
+		sql, args, err := sq.Delete("orders").Where(sq.Eq{"gid": gids[i:end]}).ToSql()
+		if err != nil {
+			return err
+		}
+		if _, err := s.DB.ExecContext(ctx, sql, args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
