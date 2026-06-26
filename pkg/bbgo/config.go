@@ -291,6 +291,13 @@ func categorizeSyncSymbol(slice []SyncSymbol) (map[string][]string, []string) {
 	return m, rest
 }
 
+type VerifyAction string
+
+const (
+	VerifyActionWarn   VerifyAction = "warn"
+	VerifyActionDelete VerifyAction = "delete"
+)
+
 type SyncConfig struct {
 	// Sessions to sync, if ignored, all defined sessions will sync
 	Sessions []string `json:"sessions,omitempty" yaml:"sessions,omitempty"`
@@ -323,6 +330,13 @@ type SyncConfig struct {
 		FuturesPosition             bool           `json:"futuresPosition,omitempty" yaml:"futuresPosition,omitempty"`
 		FuturesPositionSyncInterval types.Duration `json:"futuresPositionSyncInterval,omitempty" yaml:"futuresPositionSyncInterval,omitempty"`
 	} `json:"userDataStream,omitempty" yaml:"userDataStream,omitempty"`
+
+	Verify *struct {
+		Enabled  bool           `json:"enabled" yaml:"enabled"`
+		Period   types.Duration `json:"period" yaml:"period"`
+		Action   VerifyAction   `json:"action" yaml:"action"`
+		Sessions []string       `json:"sessions,omitempty" yaml:"sessions,omitempty"`
+	} `json:"verify,omitempty" yaml:"verify,omitempty"`
 }
 
 type GoogleSpreadSheetServiceConfig struct {
