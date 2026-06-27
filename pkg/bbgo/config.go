@@ -332,11 +332,11 @@ type SyncConfig struct {
 	} `json:"userDataStream,omitempty" yaml:"userDataStream,omitempty"`
 
 	Verify *struct {
-		Enabled  bool           `json:"enabled" yaml:"enabled"`
-		Since    *types.Time    `json:"since,omitempty" yaml:"since,omitempty"`
-		Period   types.Duration `json:"period" yaml:"period"`
-		Action   VerifyAction   `json:"action" yaml:"action"`
-		Sessions []string       `json:"sessions,omitempty" yaml:"sessions,omitempty"`
+		Enabled  bool                   `json:"enabled" yaml:"enabled"`
+		Since    *types.LooseFormatTime `json:"since,omitempty" yaml:"since,omitempty"`
+		Period   types.Duration         `json:"period" yaml:"period"`
+		Action   VerifyAction           `json:"action" yaml:"action"`
+		Sessions []string               `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 	} `json:"verify,omitempty" yaml:"verify,omitempty"`
 }
 
