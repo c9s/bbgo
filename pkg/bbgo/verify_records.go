@@ -44,10 +44,16 @@ func verifyRecords(ctx context.Context, sessions map[string]*ExchangeSession, or
 		return nil
 	}
 
-	now := time.Now()
-	since := now.Add(-period)
+	var since, until time.Time
+	if verifyCfg.Since != nil {
+		since = verifyCfg.Since.Time()
+		until = since.Add(period)
+	} else {
+		until = time.Now()
+		since = until.Add(-period)
+	}
 
-	log.Infof("verifying records from %s to %s", since.Format(time.RFC3339), now.Format(time.RFC3339))
+	log.Infof("verifying records from %s to %s", since.Format(time.RFC3339), until.Format(time.RFC3339))
 
 	var verifySessions []*ExchangeSession
 	if len(verifyCfg.Sessions) > 0 {
@@ -91,7 +97,7 @@ func verifyRecords(ctx context.Context, sessions map[string]*ExchangeSession, or
 		})
 		for _, symbol := range symbols {
 			// verify orders
-			orphanOrders, err := verifyOrdersForSymbol(ctx, orderService, api, session.Exchange.Name(), symbol, since, now)
+			orphanOrders, err := verifyOrdersForSymbol(ctx, orderService, api, session.Exchange.Name(), symbol, since, until)
 			if err != nil {
 				logger.WithError(err).Warnf("order verification query failed: %s", symbol)
 			} else if len(orphanOrders) > 0 {
@@ -119,7 +125,7 @@ func verifyRecords(ctx context.Context, sessions map[string]*ExchangeSession, or
 			}
 
 			// verify trades
-			orphanTrades, err := verifyTradesForSymbol(ctx, tradeService, api, session.Exchange.Name(), symbol, since, now)
+			orphanTrades, err := verifyTradesForSymbol(ctx, tradeService, api, session.Exchange.Name(), symbol, since, until)
 			if err != nil {
 				logger.WithError(err).Warnf("trade verification query failed: %s", symbol)
 			} else if len(orphanTrades) > 0 {
