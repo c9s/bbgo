@@ -181,6 +181,7 @@ func genOrderSQL(driver string, options QueryOrdersOptions) string {
 
 	var selColumns []string
 	if driver == "mysql" {
+		selColumns = append(selColumns, "orders.symbol", "orders.side", "orders.order_type", "orders.quantity", "orders.price")
 		to := reflect.TypeOf(types.Order{})
 		for i := 0; i < to.NumField(); i++ {
 			field := to.Field(i)
