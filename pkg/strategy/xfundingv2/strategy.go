@@ -1375,17 +1375,20 @@ func (s *Strategy) transferAmountForClosedRound(task *CloseRoundTask, balance ty
 }
 
 func (s *Strategy) canOpenRound(symbol string, currentTime time.Time) bool {
+	// cannot open new round for the symbol if it's halted
+	if breaker, found := s.CircuitBreakers[symbol]; found {
+		if reason, halted := breaker.IsHalted(currentTime); halted {
+			s.logger.Warnf("[canOpenRound] circuit breaker is triggered for symbol %s: %s", symbol, reason)
+			return false
+		}
+	}
+
+	// can only open new round for the symbol if there is none
 	_, pending := s.PendingRounds[symbol]
 	_, active := s.ActiveRounds[symbol]
 	_, closed := s.ClosedRoundTasks[symbol]
-	var isHalted bool
-	if breaker, found := s.CircuitBreakers[symbol]; found {
-		if reason, halted := breaker.IsHalted(currentTime); halted {
-			isHalted = true
-			s.logger.Warnf("circuit breaker is triggered for symbol %s: %s", symbol, reason)
-		}
-	}
-	return !pending && !active && !closed && !isHalted
+
+	return !pending && !active && !closed
 }
 
 func (s *Strategy) newDebugLogger() *logrus.Entry {
