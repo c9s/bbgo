@@ -876,7 +876,7 @@ func (s *Strategy) transitOpeningOrReadyRound(ctx context.Context, round *Arbitr
 				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round)
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
 			return
-		} else if currentTime.Sub(round.StartTime()) >= s.MarketSelectionConfig.MaxHoldingHours.Duration() {
+		} else if currentTime.Sub(round.StartTime()) >= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound %s] max holding hours reached, transit state %s -> closing, current funding rate %s: %s",
 				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round,
@@ -969,7 +969,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 		s.logger.Debugf("most profitable candidate for new round: %+v", selectedCandidate)
 
 		// open new round if the estimated break-even holding interval is within the max holding hours
-		if selectedCandidate.MinHoldingDuration <= s.MarketSelectionConfig.MaxHoldingHours.Duration() {
+		if selectedCandidate.MinHoldingDuration <= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
 			spotExecutor := s.spotGeneralOrderExecutors[selectedCandidate.Symbol]
 			spotTwap, err := NewTWAPWorker(ctx, selectedCandidate.Symbol, s.spotSession, spotExecutor, s.TWAPWorkerConfig)
 			spotTwap.Executor().SetDryRun(s.DryRun)
@@ -1025,7 +1025,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			s.logger.Debugf("selected candidate %s min holding duration too long: %s > %s, skipping",
 				selectedCandidate.Symbol,
 				selectedCandidate.MinHoldingDuration,
-				s.MarketSelectionConfig.MaxHoldingHours.Duration(),
+				s.MarketSelectionConfig.MaxHoldingDuration.Duration(),
 			)
 		}
 	}

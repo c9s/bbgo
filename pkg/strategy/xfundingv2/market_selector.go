@@ -26,7 +26,7 @@ func getPostionSign(positionType types.PositionType) int {
 type MarketSelectionConfig struct {
 	FuturesDirection types.PositionType `json:"futuresDirection"`
 
-	MaxHoldingHours types.Duration `json:"maxHoldingHours"`
+	MaxHoldingDuration types.Duration `json:"maxHoldingDuration"`
 	// TradeBalanceRatio is the ratio of the asset balance to be invested on the spot market.
 	TradeBalanceRatio fixedpoint.Value `json:"tradeBalanceRatio"`
 
@@ -50,8 +50,8 @@ func (c *MarketSelectionConfig) Defaults() {
 	if c.FuturesDirection == "" {
 		c.FuturesDirection = types.PositionShort
 	}
-	if c.MaxHoldingHours == 0 {
-		c.MaxHoldingHours = types.Duration(time.Hour * 48)
+	if c.MaxHoldingDuration == 0 {
+		c.MaxHoldingDuration = types.Duration(time.Hour * 48)
 	}
 	if c.TradeBalanceRatio.IsZero() {
 		c.TradeBalanceRatio = fixedpoint.NewFromFloat(0.999)
