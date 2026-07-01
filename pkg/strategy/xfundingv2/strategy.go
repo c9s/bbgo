@@ -1020,7 +1020,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			s.PendingRounds[selectedCandidate.Symbol] = &PendingRound{
 				Round: round,
 			}
-			bbgo.Notify("🆕 Created new pending round: %s", round.SpotSymbol(), round.NewNotification())
+			bbgo.Notify("🆕 Created new pending round: %s", round.SpotSymbol())
 		} else {
 			s.logger.Debugf("selected candidate %s min holding duration too long: %s > %s, skipping",
 				selectedCandidate.Symbol,
