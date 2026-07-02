@@ -19,10 +19,10 @@ type PendingRound struct {
 
 func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Time) {
 	var pendingRounds []*PendingRound
-	for _, pendingRound := range s.pendingRounds {
+	for _, pendingRound := range s.PendingRounds {
 		// moving round out from the pending list
 		if pendingRound.RetryCount >= s.MaxPendingRoundRetry {
-			delete(s.pendingRounds, pendingRound.Round.SpotSymbol())
+			delete(s.PendingRounds, pendingRound.Round.SpotSymbol())
 			continue
 		}
 		// the pending round is over the grace period, it is ready for another retry
@@ -49,7 +49,7 @@ func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Ti
 			allRounds = append(allRounds, pendingRound.Round)
 		}
 		// include the active rounds into fee asset preparation
-		for _, activeRound := range s.activeRounds {
+		for _, activeRound := range s.ActiveRounds {
 			allRounds = append(allRounds, activeRound)
 		}
 		if err := s.acquireFeeAssetAndTransfer(ctx, allRounds); err != nil {
@@ -80,13 +80,22 @@ func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Ti
 			continue
 		}
 		// move to active round list
-		s.activeRounds[round.SpotSymbol()] = round
-		delete(s.pendingRounds, round.SpotSymbol())
+		s.ActiveRounds[round.SpotSymbol()] = round
+		delete(s.PendingRounds, round.SpotSymbol())
 		bbgo.Notify("🚀 Round started: %s", round.SpotSymbol(), round.NewNotification())
 	}
 }
 
 func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*ArbitrageRound) error {
+	if s.DryRun {
+		if len(rounds) > 0 {
+			s.logger.Infof(
+				"[acquireFeeAssetAndTransfer] dry run mode, would have acquired fee asset and transfer: %+v",
+				rounds,
+			)
+		}
+		return nil
+	}
 	var requiredSpotFeeAmount, requiredFuturesFeeAmount fixedpoint.Value
 	for _, round := range rounds {
 		roundSpotFee, roundFuturesFee := round.RequiredFeeAssetAmounts()

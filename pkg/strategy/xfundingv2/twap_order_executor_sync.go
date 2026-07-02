@@ -19,6 +19,7 @@ type TWAPExecutorSyncState struct {
 
 func (o *TWAPExecutor) Initialize(s *Strategy) error {
 	o.SetLogger(s.logger)
+	o.dryRun = s.DryRun
 	var session *bbgo.ExchangeSession
 	var executor *bbgo.GeneralOrderExecutor
 	if o.syncState.IsFutures {
