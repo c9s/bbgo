@@ -52,7 +52,8 @@ type Strategy struct {
 	// lock before update the strategy state, such as current round, selected market, etc
 	mu sync.Mutex
 
-	DryRun bool `json:"dryRun"`
+	DryRun              bool `json:"dryRun"`
+	ClosingAllOnStartup bool `json:"closingAllOnStartup"`
 
 	// Session configuration
 	SpotSession    string `json:"spotSession"`
@@ -618,6 +619,17 @@ func (s *Strategy) CrossRun(
 		}
 	})
 
+	// strategy is ready for running
+	if !bbgo.IsBackTesting && s.ClosingAllOnStartup {
+		s.mu.Lock()
+		s.logger.Info("closing all active rounds and clearing pending rounds on startup")
+		// set all active rounds to closing state and clear the pending rounds
+		for _, round := range s.ActiveRounds {
+			round.SetClosing(time.Now(), s.TWAPWorkerConfig.ClosingDuration)
+		}
+		s.PendingRounds = make(map[string]*PendingRound)
+		s.mu.Unlock()
+	}
 	bbgo.Notify("✅ Strategy %s is up and running with %d candidate symbols: %v",
 		s.InstanceID(),
 		len(s.candidateSymbols),
