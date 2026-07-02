@@ -69,8 +69,9 @@ type Strategy struct {
 	TickSymbol   string         `json:"tickSymbol"`
 	TickInterval types.Interval `json:"tickInterval"`
 
-	FeeSymbol     string `json:"feeSymbol"`
-	QuoteCurrency string `json:"quoteCurrency"`
+	FeeSymbol       string           `json:"feeSymbol"`
+	FeeDiscountRate fixedpoint.Value `json:"feeDiscountRate"`
+	QuoteCurrency   string           `json:"quoteCurrency"`
 
 	PendingRoundGracePeriod types.Duration   `json:"pendingRoundGracePeriod"`
 	MaxPendingRoundRetry    int              `json:"maxPendingRoundRetry"`
@@ -240,6 +241,9 @@ func (s *Strategy) Validate() error {
 			return fmt.Errorf("maxPositionExposure should be positive: %s", symbol)
 		}
 	}
+	if s.FeeDiscountRate.Sign() < 0 || s.FeeDiscountRate.Compare(fixedpoint.One) > 0 {
+		return fmt.Errorf("feeDiscountRate should be between 0 and 1: %s", s.FeeDiscountRate)
+	}
 	return nil
 }
 
@@ -326,16 +330,25 @@ func (s *Strategy) CrossRun(
 	}
 
 	// initialize cost estimator
+	futuresFeeRate := types.ExchangeFee{
+		MakerFeeRate: s.futuresSession.MakerFeeRate,
+		TakerFeeRate: s.futuresSession.TakerFeeRate,
+	}
+	spotFeeRate := types.ExchangeFee{
+		MakerFeeRate: s.spotSession.MakerFeeRate,
+		TakerFeeRate: s.spotSession.TakerFeeRate,
+	}
+	if !s.FeeDiscountRate.IsZero() {
+		discountFactor := fixedpoint.One.Sub(s.FeeDiscountRate)
+		for _, feeRate := range []*types.ExchangeFee{&futuresFeeRate, &spotFeeRate} {
+			feeRate.MakerFeeRate = feeRate.MakerFeeRate.Mul(discountFactor)
+			feeRate.TakerFeeRate = feeRate.TakerFeeRate.Mul(discountFactor)
+		}
+	}
 	s.costEstimator = NewCostEstimator()
 	s.costEstimator.
-		SetFuturesFeeRate(types.ExchangeFee{
-			MakerFeeRate: s.futuresSession.MakerFeeRate,
-			TakerFeeRate: s.futuresSession.TakerFeeRate,
-		}).
-		SetSpotFeeRate(types.ExchangeFee{
-			MakerFeeRate: s.spotSession.MakerFeeRate,
-			TakerFeeRate: s.spotSession.TakerFeeRate,
-		})
+		SetFuturesFeeRate(futuresFeeRate).
+		SetSpotFeeRate(spotFeeRate)
 
 	// static filters
 	var candidateSymbols []string
@@ -1024,16 +1037,10 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			)
 			round.SetLogger(s.logger)
 			round.SetSpotExchangeFeeRates(
-				types.ExchangeFee{
-					MakerFeeRate: s.spotSession.MakerFeeRate,
-					TakerFeeRate: s.spotSession.TakerFeeRate,
-				},
+				s.costEstimator.GetSpotFeeRate(),
 			)
 			round.SetFuturesExchangeFeeRates(
-				types.ExchangeFee{
-					MakerFeeRate: s.futuresSession.MakerFeeRate,
-					TakerFeeRate: s.futuresSession.TakerFeeRate,
-				},
+				s.costEstimator.GetFuturesFeeRate(),
 			)
 			round.SetSlackAlert(s.SlackAlert)
 			roundAnnualizedTriggerRateMetrics.With(
