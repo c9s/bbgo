@@ -1150,6 +1150,10 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 	spotAccount := s.spotSession.GetAccount()
 	breakevenIntervals := make(map[string]fixedpoint.Value)
 	targetFuturePositions := make(map[string]fixedpoint.Value)
+	// totalQuoteAmount = price * targetSize * feeRateFactor, where feeRateFactor = 1 + 2*feeRate (buy and sell fee)
+	// so the targetSize = totalQuoteAmount / (price * feeRateFactor)
+	feeRate := s.costEstimator.GetSpotFeeRate().TakerFeeRate
+	feeRateFactor := fixedpoint.One.Add(feeRate.Mul(fixedpoint.Two))
 	for _, candidate := range candidates {
 		spotMarket, ok := s.spotSession.Market(candidate.Symbol)
 		if !ok {
@@ -1165,11 +1169,12 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 			if !ok {
 				continue
 			}
-			tradeQuoteBalance := quoteBalance.Available.Mul(s.MarketSelectionConfig.TradeBalanceRatio)
+			totalQuoteAmount := quoteBalance.Available.Mul(s.MarketSelectionConfig.TradeBalanceRatio)
 			// long spot -> trade on the sell side of the order book
+			// targetSize = totalQuoteAmount / (price * feeRateFactor)
 			sellBook := s.spotOrderBooks[candidate.Symbol].SideBook(types.SideTypeSell)
-			spotPrice := sellBook.AverageDepthPriceByQuote(tradeQuoteBalance, 0)
-			targetSize := tradeQuoteBalance.Div(spotPrice)
+			spotPrice := sellBook.AverageDepthPriceByQuote(totalQuoteAmount, 0)
+			targetSize := totalQuoteAmount.Div(spotPrice.Mul(feeRateFactor))
 			// short futures -> trade on the buy side of the order book
 			buyBook := s.futuresOrderBooks[candidate.Symbol].SideBook(types.SideTypeBuy)
 			futuresPrice := buyBook.AverageDepthPrice(targetSize)
@@ -1189,12 +1194,15 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 			if !ok {
 				continue
 			}
-			targetSize := baseBalance.Available.Mul(s.MarketSelectionConfig.TradeBalanceRatio)
+			// totalQuoteAmount = price * totalBase and targetSize = totalQuoteAmount / (price * feeRateFactor)
+			// so targetSize = totalBase / feeRateFactor
+			totalBase := baseBalance.Available.Mul(s.MarketSelectionConfig.TradeBalanceRatio)
+			targetSize := totalBase.Div(feeRateFactor)
 			// long futures -> trade on the sell side of the order book
 			sellBook := s.futuresOrderBooks[candidate.Symbol].SideBook(types.SideTypeSell)
 			futuresPrice := sellBook.AverageDepthPrice(targetSize)
 			// long futures -> target future position should be positive
-			breakEvenIntervals, err := s.calculateMinHoldingIntervals(candidate, futuresPrice, targetSize)
+			breakEvenIntervals, err := s.calculateMinHoldingIntervals(candidate, futuresPrice, totalBase)
 			if err != nil {
 				continue
 			}
