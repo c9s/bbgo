@@ -120,6 +120,10 @@ type Strategy struct {
 	SpotPositions    map[string]*types.Position `persistence:"spotPositions"`
 	FuturesPositions map[string]*types.Position `persistence:"futuresPositions"`
 
+	// StatsDuration controls the duration of logging the stats of the strategy, such as the number of active rounds, pending rounds, closed rounds, etc.
+	StatsDuration types.Duration `json:"statsDuration"`
+	lastStatsTime time.Time
+
 	// order executors for each symbol
 	// we need to cache the executors as map at startup since the executors are bound to the user data stream (via `.Bind()`).
 	// if we do no reuse them and create new executor at each round, the callbacks of the user data stream will be full of stale executors.
@@ -184,6 +188,10 @@ func (s *Strategy) Defaults() error {
 		s.HaltRoundNotificationInterval = types.Duration(time.Minute * 30)
 	}
 	s.CriticalErrorConfig.Defaults()
+
+	if s.StatsDuration.Duration() == 0 {
+		s.StatsDuration = types.Duration(time.Hour * 2)
+	}
 
 	return nil
 }
@@ -801,6 +809,12 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		futuresOrderBook := s.futuresOrderBooks[round.FuturesSymbol()].Copy()
 		round.Tick(tickTime, spotOrderBook, futuresOrderBook)
 	}
+
+	// 6. log stats
+	if s.lastStatsTime.IsZero() || tickTime.Sub(s.lastStatsTime) >= s.StatsDuration.Duration() {
+		s.notifyStats()
+		s.lastStatsTime = tickTime
+	}
 }
 
 func (s *Strategy) transitRoundState(ctx context.Context, round *ArbitrageRound, currentTime time.Time) {
@@ -1400,4 +1414,28 @@ func (s *Strategy) newDebugLogger() *logrus.Entry {
 		"strategy":    ID,
 		"strategy_id": s.InstanceID(),
 	})
+}
+
+func (s *Strategy) notifyStats() {
+	var activeRoundNotifications []any
+	for _, round := range s.ActiveRounds {
+		activeRoundNotifications = append(activeRoundNotifications, round.NewNotification())
+	}
+
+	var pendingRoundNotifications []any
+	for _, pendingRound := range s.PendingRounds {
+		pendingRoundNotifications = append(pendingRoundNotifications, pendingRound.Round.NewNotification())
+	}
+
+	bbgo.Notify("📊 Round stats: %d active rounds, %d pending rounds",
+		len(s.ActiveRounds),
+		len(s.PendingRounds),
+	)
+	if len(activeRoundNotifications) > 0 {
+		bbgo.Notify("Active Rounds", activeRoundNotifications...)
+	}
+	if len(pendingRoundNotifications) > 0 {
+		bbgo.Notify("Pending Rounds", pendingRoundNotifications...)
+	}
+
 }
