@@ -346,6 +346,8 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				Short: true,
 			})
 	} else if n.HasStarted() {
+		minHoldingHours := n.syncState.MinHoldingIntervals * n.syncState.FundingIntervalHours
+		expectedClosingTime := n.syncState.FundingIntervalStart.Add(time.Duration(minHoldingHours) * time.Hour)
 		fields = append(fields,
 			slack.AttachmentField{
 				Title: "Start Time",
@@ -353,22 +355,26 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 			slack.AttachmentField{
+				Title: "Last Update Time",
+				Value: n.syncState.LastUpdateTime.Format(time.RFC3339),
+				Short: true,
+			},
+			slack.AttachmentField{
 				Title: "Min Holding Intervals",
 				Value: fmt.Sprintf("%d", n.syncState.MinHoldingIntervals),
 				Short: true,
-			})
+			},
+			slack.AttachmentField{
+				Title: "Funding Interval Start",
+				Value: n.syncState.FundingIntervalStart.Format(time.RFC3339),
+				Short: true,
+			},
+			slack.AttachmentField{
+				Title: "Expected Closing Time",
+				Value: expectedClosingTime.Format(time.RFC3339),
+			},
+		)
 	}
-	fields = append(fields,
-		slack.AttachmentField{
-			Title: "Funding Interval Start",
-			Value: n.syncState.FundingIntervalStart.Format(time.RFC3339),
-			Short: true,
-		},
-		slack.AttachmentField{
-			Title: "Funding Interval End",
-			Value: n.syncState.FundingIntervalEnd.Format(time.RFC3339),
-			Short: true,
-		})
 	text := "Arbitrage Round Details"
 	if n.IsCritical && len(n.slackAlert.Mentions) > 0 {
 		text += "cc " + strings.Join(n.slackAlert.Mentions, " ")
