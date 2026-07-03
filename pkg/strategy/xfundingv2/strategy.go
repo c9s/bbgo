@@ -703,13 +703,21 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	s.lastTickTime = tickTime
 
 	// start processing
-	// 1. transit active rounds
+	// 1. tick existing active rounds
+	// We need to tick the active rounds first since we need to proceed the underlying workers to update the positions.
+	// So that the following checks can accurately reflect the current status of the rounds.
+	for _, round := range s.ActiveRounds {
+		spotOrderBook := s.spotOrderBooks[round.SpotSymbol()].Copy()
+		futuresOrderBook := s.futuresOrderBooks[round.FuturesSymbol()].Copy()
+		round.Tick(tickTime, spotOrderBook, futuresOrderBook)
+	}
+	// 2. transit active rounds
 	for _, round := range s.ActiveRounds {
 		// check if the round is halted or should be halted
 		halted := round.IsHalted()
-		// spot and futures position should be close to each other at all time.
-		spotFilled := round.SpotWorker().FilledPosition()
-		futuresFilled := round.FuturesWorker().FilledPosition()
+		spotFilled, futuresFilled, deviation := round.CheckPositionDeviation(
+			tickTime, s.CriticalErrorConfig.MaxHedgeDeviation,
+		)
 		// record the round spot/futures positions
 		roundPositionMetrics.With(
 			prometheus.Labels{
@@ -725,16 +733,9 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				"accountType": "futures",
 			},
 		).Set(futuresFilled.Float64())
-		// calculate the deviation of the unhedged position
-		spotFuturesRatio := fixedpoint.One
-		// when closing, the spotFilled may reach zero
-		if !spotFilled.IsZero() {
-			spotFuturesRatio = futuresFilled.Div(spotFilled)
-		}
-		deviation := fixedpoint.One.Sub(spotFuturesRatio).Abs()
-		deviationTooLarge := deviation.Compare(s.CriticalErrorConfig.MaxHedgeDeviation) > 0
+		deviatedTooLong := round.DeviatedTooLong(tickTime, 10*time.Minute)
 		roundSymbol := round.SpotSymbol()
-		if !halted && deviationTooLarge {
+		if !halted && deviatedTooLong {
 			// the round is originally not halted but the deviation is too large -> we need to halt the round
 			round.Halt(tickTime)
 			s.logger.Warnf("round %s halted due to large hedge deviation: %s > %s, spot filled: %s, futures filled: %s",
@@ -751,7 +752,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				round.NewCriticalNotification(),
 			)
 			continue
-		} else if halted && !deviationTooLarge {
+		} else if halted && !deviatedTooLong {
 			// the deviation is back to normal, resume the round
 			haltedAt := round.HaltedAt()
 			round.Resume()
@@ -802,7 +803,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		}
 	}
 
-	// 2. process closed round tasks
+	// 3. process closed round tasks
 	closeRoundCtx, cancelCloseRound := context.WithTimeout(ctx, 15*time.Second)
 	for _, task := range s.ClosedRoundTasks {
 		round := task.Round
@@ -832,18 +833,11 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	}
 	cancelCloseRound()
 
-	// 3. check if new round can be opened or existing round needs to be adjusted
+	// 4. check if new round can be opened or existing round needs to be adjusted
 	s.checkOpenNewRound(ctx, tickTime)
 
-	// 4. process pending rounds that are waiting for fee asset preparation
+	// 5. process pending rounds that are waiting for fee asset preparation
 	s.processPendingRounds(ctx, tickTime)
-
-	// 5. tick existing active rounds
-	for _, round := range s.ActiveRounds {
-		spotOrderBook := s.spotOrderBooks[round.SpotSymbol()].Copy()
-		futuresOrderBook := s.futuresOrderBooks[round.FuturesSymbol()].Copy()
-		round.Tick(tickTime, spotOrderBook, futuresOrderBook)
-	}
 
 	// 6. log stats
 	if s.lastStatsTime.IsZero() || tickTime.Sub(s.lastStatsTime) >= s.StatsPeriod.Duration() {

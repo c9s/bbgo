@@ -925,6 +925,35 @@ func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBo
 	}
 }
 
+func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxDeviation fixedpoint.Value) (spotFilled, futuresFilled, deviation fixedpoint.Value) {
+	// spot and futures position should be close to each other at all time.
+	spotFilled = r.SpotWorker().FilledPosition()
+	futuresFilled = r.FuturesWorker().FilledPosition()
+	// calculate the deviation of the unhedged position
+	spotFuturesRatio := fixedpoint.One
+	// when closing, the spotFilled may reach zero
+	if !spotFilled.IsZero() {
+		spotFuturesRatio = futuresFilled.Div(spotFilled)
+	}
+	deviation = fixedpoint.One.Sub(spotFuturesRatio).Abs()
+	deviationTooLarge := deviation.Compare(maxDeviation) > 0
+	if deviationTooLarge {
+		if r.syncState.LargeDeviationStartTime.IsZero() {
+			r.syncState.LargeDeviationStartTime = currentTime
+		}
+	} else {
+		r.syncState.LargeDeviationStartTime = time.Time{}
+	}
+	return spotFilled, futuresFilled, deviation
+}
+
+func (r *ArbitrageRound) DeviatedTooLong(currentTime time.Time, duration time.Duration) bool {
+	if r.syncState.LargeDeviationStartTime.IsZero() {
+		return false
+	}
+	return currentTime.Sub(r.syncState.LargeDeviationStartTime) > duration
+}
+
 func (r *ArbitrageRound) syncFuturesPosition(spotTrade types.Trade) {
 	// sanity check
 	if r.spotWorker.Symbol() != spotTrade.Symbol || spotTrade.IsFutures {

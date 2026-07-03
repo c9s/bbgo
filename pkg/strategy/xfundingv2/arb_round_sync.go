@@ -100,6 +100,8 @@ type ArbitrageRoundSyncState struct {
 	ClosingDuration types.Duration `json:"closingDuration"`
 	// LastUpdateTime is the last time when the round is updated
 	LastUpdateTime time.Time `json:"lastUpdateTime"`
+
+	LargeDeviationStartTime time.Time `json:"largeDeviationStartTime"`
 }
 
 func (r *ArbitrageRound) MarshalJSON() ([]byte, error) {
