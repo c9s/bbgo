@@ -52,7 +52,8 @@ type Strategy struct {
 	// lock before update the strategy state, such as current round, selected market, etc
 	mu sync.Mutex
 
-	DryRun bool `json:"dryRun"`
+	DryRun              bool `json:"dryRun"`
+	ClosingAllOnStartup bool `json:"closingAllOnStartup"`
 
 	// Session configuration
 	SpotSession    string `json:"spotSession"`
@@ -68,8 +69,9 @@ type Strategy struct {
 	TickSymbol   string         `json:"tickSymbol"`
 	TickInterval types.Interval `json:"tickInterval"`
 
-	FeeSymbol     string `json:"feeSymbol"`
-	QuoteCurrency string `json:"quoteCurrency"`
+	FeeSymbol       string           `json:"feeSymbol"`
+	FeeDiscountRate fixedpoint.Value `json:"feeDiscountRate"`
+	QuoteCurrency   string           `json:"quoteCurrency"`
 
 	PendingRoundGracePeriod types.Duration   `json:"pendingRoundGracePeriod"`
 	MaxPendingRoundRetry    int              `json:"maxPendingRoundRetry"`
@@ -119,6 +121,10 @@ type Strategy struct {
 	// the positions are shared across rounds and the executors of the same symbol.
 	SpotPositions    map[string]*types.Position `persistence:"spotPositions"`
 	FuturesPositions map[string]*types.Position `persistence:"futuresPositions"`
+
+	// StatsPeriod controls the duration of logging the stats of the strategy, such as the number of active rounds, pending rounds, closed rounds, etc.
+	StatsPeriod   types.Duration `json:"statsPeriod"`
+	lastStatsTime time.Time
 
 	// order executors for each symbol
 	// we need to cache the executors as map at startup since the executors are bound to the user data stream (via `.Bind()`).
@@ -185,6 +191,10 @@ func (s *Strategy) Defaults() error {
 	}
 	s.CriticalErrorConfig.Defaults()
 
+	if s.StatsPeriod.Duration() == 0 {
+		s.StatsPeriod = types.Duration(time.Hour * 2)
+	}
+
 	return nil
 }
 
@@ -230,6 +240,9 @@ func (s *Strategy) Validate() error {
 		if maxExposure.Sign() < 0 {
 			return fmt.Errorf("maxPositionExposure should be positive: %s", symbol)
 		}
+	}
+	if s.FeeDiscountRate.Sign() < 0 || s.FeeDiscountRate.Compare(fixedpoint.One) > 0 {
+		return fmt.Errorf("feeDiscountRate should be between 0 and 1: %s", s.FeeDiscountRate)
 	}
 	return nil
 }
@@ -317,16 +330,25 @@ func (s *Strategy) CrossRun(
 	}
 
 	// initialize cost estimator
+	futuresFeeRate := types.ExchangeFee{
+		MakerFeeRate: s.futuresSession.MakerFeeRate,
+		TakerFeeRate: s.futuresSession.TakerFeeRate,
+	}
+	spotFeeRate := types.ExchangeFee{
+		MakerFeeRate: s.spotSession.MakerFeeRate,
+		TakerFeeRate: s.spotSession.TakerFeeRate,
+	}
+	if !s.FeeDiscountRate.IsZero() {
+		discountFactor := fixedpoint.One.Sub(s.FeeDiscountRate)
+		for _, feeRate := range []*types.ExchangeFee{&futuresFeeRate, &spotFeeRate} {
+			feeRate.MakerFeeRate = feeRate.MakerFeeRate.Mul(discountFactor)
+			feeRate.TakerFeeRate = feeRate.TakerFeeRate.Mul(discountFactor)
+		}
+	}
 	s.costEstimator = NewCostEstimator()
 	s.costEstimator.
-		SetFuturesFeeRate(types.ExchangeFee{
-			MakerFeeRate: s.futuresSession.MakerFeeRate,
-			TakerFeeRate: s.futuresSession.TakerFeeRate,
-		}).
-		SetSpotFeeRate(types.ExchangeFee{
-			MakerFeeRate: s.spotSession.MakerFeeRate,
-			TakerFeeRate: s.spotSession.TakerFeeRate,
-		})
+		SetFuturesFeeRate(futuresFeeRate).
+		SetSpotFeeRate(spotFeeRate)
 
 	// static filters
 	var candidateSymbols []string
@@ -610,6 +632,17 @@ func (s *Strategy) CrossRun(
 		}
 	})
 
+	// strategy is ready for running
+	if !bbgo.IsBackTesting && s.ClosingAllOnStartup {
+		s.mu.Lock()
+		s.logger.Info("closing all active rounds and clearing pending rounds on startup")
+		// set all active rounds to closing state and clear the pending rounds
+		for _, round := range s.ActiveRounds {
+			round.SetClosing(time.Now(), s.TWAPWorkerConfig.ClosingDuration)
+		}
+		s.PendingRounds = make(map[string]*PendingRound)
+		s.mu.Unlock()
+	}
 	bbgo.Notify("✅ Strategy %s is up and running with %d candidate symbols: %v",
 		s.InstanceID(),
 		len(s.candidateSymbols),
@@ -800,6 +833,12 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		spotOrderBook := s.spotOrderBooks[round.SpotSymbol()].Copy()
 		futuresOrderBook := s.futuresOrderBooks[round.FuturesSymbol()].Copy()
 		round.Tick(tickTime, spotOrderBook, futuresOrderBook)
+	}
+
+	// 6. log stats
+	if s.lastStatsTime.IsZero() || tickTime.Sub(s.lastStatsTime) >= s.StatsPeriod.Duration() {
+		s.notifyStats()
+		s.lastStatsTime = tickTime
 	}
 }
 
@@ -998,16 +1037,10 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			)
 			round.SetLogger(s.logger)
 			round.SetSpotExchangeFeeRates(
-				types.ExchangeFee{
-					MakerFeeRate: s.spotSession.MakerFeeRate,
-					TakerFeeRate: s.spotSession.TakerFeeRate,
-				},
+				s.costEstimator.GetSpotFeeRate(),
 			)
 			round.SetFuturesExchangeFeeRates(
-				types.ExchangeFee{
-					MakerFeeRate: s.futuresSession.MakerFeeRate,
-					TakerFeeRate: s.futuresSession.TakerFeeRate,
-				},
+				s.costEstimator.GetFuturesFeeRate(),
 			)
 			round.SetSlackAlert(s.SlackAlert)
 			roundAnnualizedTriggerRateMetrics.With(
@@ -1117,6 +1150,10 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 	spotAccount := s.spotSession.GetAccount()
 	breakevenIntervals := make(map[string]fixedpoint.Value)
 	targetFuturePositions := make(map[string]fixedpoint.Value)
+	// totalQuoteAmount = price * targetSize * feeRateFactor, where feeRateFactor = 1 + 2*feeRate (buy and sell fee)
+	// so the targetSize = totalQuoteAmount / (price * feeRateFactor)
+	feeRate := s.costEstimator.GetSpotFeeRate().TakerFeeRate
+	feeRateFactor := fixedpoint.One.Add(feeRate.Mul(fixedpoint.Two))
 	for _, candidate := range candidates {
 		spotMarket, ok := s.spotSession.Market(candidate.Symbol)
 		if !ok {
@@ -1132,11 +1169,12 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 			if !ok {
 				continue
 			}
-			tradeQuoteBalance := quoteBalance.Available.Mul(s.MarketSelectionConfig.TradeBalanceRatio)
+			totalQuoteAmount := quoteBalance.Available.Mul(s.MarketSelectionConfig.TradeBalanceRatio)
 			// long spot -> trade on the sell side of the order book
+			// targetSize = totalQuoteAmount / (price * feeRateFactor)
 			sellBook := s.spotOrderBooks[candidate.Symbol].SideBook(types.SideTypeSell)
-			spotPrice := sellBook.AverageDepthPriceByQuote(tradeQuoteBalance, 0)
-			targetSize := tradeQuoteBalance.Div(spotPrice)
+			spotPrice := sellBook.AverageDepthPriceByQuote(totalQuoteAmount, 0)
+			targetSize := totalQuoteAmount.Div(spotPrice.Mul(feeRateFactor))
 			// short futures -> trade on the buy side of the order book
 			buyBook := s.futuresOrderBooks[candidate.Symbol].SideBook(types.SideTypeBuy)
 			futuresPrice := buyBook.AverageDepthPrice(targetSize)
@@ -1156,12 +1194,15 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 			if !ok {
 				continue
 			}
-			targetSize := baseBalance.Available.Mul(s.MarketSelectionConfig.TradeBalanceRatio)
+			// totalQuoteAmount = price * totalBase and targetSize = totalQuoteAmount / (price * feeRateFactor)
+			// so targetSize = totalBase / feeRateFactor
+			totalBase := baseBalance.Available.Mul(s.MarketSelectionConfig.TradeBalanceRatio)
+			targetSize := totalBase.Div(feeRateFactor)
 			// long futures -> trade on the sell side of the order book
 			sellBook := s.futuresOrderBooks[candidate.Symbol].SideBook(types.SideTypeSell)
 			futuresPrice := sellBook.AverageDepthPrice(targetSize)
 			// long futures -> target future position should be positive
-			breakEvenIntervals, err := s.calculateMinHoldingIntervals(candidate, futuresPrice, targetSize)
+			breakEvenIntervals, err := s.calculateMinHoldingIntervals(candidate, futuresPrice, totalBase)
 			if err != nil {
 				continue
 			}
@@ -1400,4 +1441,28 @@ func (s *Strategy) newDebugLogger() *logrus.Entry {
 		"strategy":    ID,
 		"strategy_id": s.InstanceID(),
 	})
+}
+
+func (s *Strategy) notifyStats() {
+	var activeRoundNotifications []any
+	for _, round := range s.ActiveRounds {
+		activeRoundNotifications = append(activeRoundNotifications, round.NewNotification())
+	}
+
+	var pendingRoundNotifications []any
+	for _, pendingRound := range s.PendingRounds {
+		pendingRoundNotifications = append(pendingRoundNotifications, pendingRound.Round.NewNotification())
+	}
+
+	bbgo.Notify("📊 Round stats: %d active rounds, %d pending rounds",
+		len(s.ActiveRounds),
+		len(s.PendingRounds),
+	)
+	if len(activeRoundNotifications) > 0 {
+		bbgo.Notify("Active Rounds", activeRoundNotifications...)
+	}
+	if len(pendingRoundNotifications) > 0 {
+		bbgo.Notify("Pending Rounds", pendingRoundNotifications...)
+	}
+
 }
