@@ -1343,6 +1343,15 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 	if err := round.Cleanup(ctx, futuresOrderbook); err != nil {
 		return fmt.Errorf("[handleClosedRound] failed to close remaining positions for the futures: %w", err)
 	}
+	// remove the orders from the order store
+	spotExecutor := s.spotGeneralOrderExecutors[round.SpotSymbol()]
+	for _, order := range round.SpotWorker().Executor().AllOrders() {
+		spotExecutor.OrderStore().Remove(order)
+	}
+	futuresExecutor := s.futuresGeneralOrderExecutors[round.FuturesSymbol()]
+	for _, order := range round.FuturesWorker().Executor().AllOrders() {
+		futuresExecutor.OrderStore().Remove(order)
+	}
 
 	// transfer any residual collateral back to the spot account. The bulk of
 	// the collateral is moved per-trade in handleFuturesTradeForClose; this
