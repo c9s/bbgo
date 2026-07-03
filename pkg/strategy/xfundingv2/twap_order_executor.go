@@ -201,7 +201,7 @@ func (o *TWAPExecutor) buildSubmitOrder(quantity, price fixedpoint.Value, side t
 			Side:       side,
 			Type:       types.OrderTypeMarket,
 			Quantity:   quantity,
-			ReduceOnly: true,
+			ReduceOnly: options.ReduceOnly,
 		}
 	}
 	orderType := types.OrderTypeLimitMaker
