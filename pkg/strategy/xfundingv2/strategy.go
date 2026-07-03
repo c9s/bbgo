@@ -663,6 +663,16 @@ func (s *Strategy) CrossRun(
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		s.logger.Infof("shutting down %s", s.InstanceID())
+		for symbol, executor := range s.spotGeneralOrderExecutors {
+			if err := executor.GracefulCancel(ctx); err != nil {
+				s.logger.WithError(err).Errorf("failed to gracefully cancel spot orders: %s", symbol)
+			}
+		}
+		for symbol, executor := range s.futuresGeneralOrderExecutors {
+			if err := executor.GracefulCancel(ctx); err != nil {
+				s.logger.WithError(err).Errorf("failed to gracefully cancel futures orders: %s", symbol)
+			}
+		}
 		// persist state
 		bbgo.Sync(ctx, s)
 		s.logger.Infof("state persisted for %s", s.InstanceID())

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 func (w *TWAPWorker) Initialize(ctx context.Context, s *Strategy) error {
@@ -20,9 +19,6 @@ func (w *TWAPWorker) Initialize(ctx context.Context, s *Strategy) error {
 	w.SetLogger(s.logger)
 	if err := w.syncState.TWAPExecutor.Initialize(ctx, s); err != nil {
 		return fmt.Errorf("[TWAPWorker] failed to load TWAPExecutor: %w", err)
-	}
-	if w.syncState.ActiveOrder != nil {
-		return w.syncState.TWAPExecutor.SyncOrder(*w.syncState.ActiveOrder)
 	}
 	return nil
 }
@@ -41,7 +37,6 @@ type TWAPWorkerSyncState struct {
 	PlaceOrderInterval   time.Duration    `json:"placeOrderInterval"`
 
 	Symbol       string        `json:"symbol"`
-	ActiveOrder  *types.Order  `json:"activeOrder,omitempty"`
 	TWAPExecutor *TWAPExecutor `json:"executor,omitempty"`
 }
 
