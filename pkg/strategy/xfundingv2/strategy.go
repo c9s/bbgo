@@ -12,6 +12,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datasource/coinmarketcap"
+	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
@@ -293,6 +294,15 @@ func (s *Strategy) CrossRun(
 	} else if !futuresEx.GetFuturesSettings().IsFutures {
 		return fmt.Errorf("session %s is not configured for futures trading", s.futuresSession.Name)
 	}
+
+	// extra setup for Binance exchange
+	if err := s.setupBinance(ctx, s.futuresSession); err != nil {
+		return err
+	}
+	if err := s.setupBinance(ctx, s.spotSession); err != nil {
+		return err
+	}
+	s.logger.Infof("fee symbol: %s, fee discount rate: %s", s.FeeSymbol, s.FeeDiscountRate.Percentage())
 
 	if futuresService, ok := s.futuresSession.Exchange.(FuturesService); !ok {
 		return fmt.Errorf("futures session exchange does not support futures service: %s", s.futuresSession.ExchangeName)
@@ -1465,4 +1475,31 @@ func (s *Strategy) notifyStats() {
 		bbgo.Notify("Pending Rounds", pendingRoundNotifications...)
 	}
 
+}
+
+func (s *Strategy) setupBinance(ctx context.Context, session *bbgo.ExchangeSession) error {
+	binanceEx, ok := session.Exchange.(*binance.Exchange)
+	if !ok {
+		s.logger.Infof("[setupBinance] session %s is not a binance exchange, skipping", session.Name)
+		return nil
+	}
+
+	enabled, err := binanceEx.QueryBnbBurnStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("[setupBinance] failed to query BNB burn status for %s: %w", session.Name, err)
+	}
+	if enabled {
+		s.logger.Infof("[setupBinance] BNB burn is enabled for %s", session.Name)
+		if s.FeeSymbol == "" {
+			s.logger.Infof("[setupBinance] overriding fee symbol to %s", s.FeeSymbol)
+			s.FeeSymbol = "BNB" + s.QuoteCurrency
+		}
+		if s.FeeDiscountRate.IsZero() {
+			// default to 10% discount
+			defaultRate := fixedpoint.NewFromFloat(0.1)
+			s.logger.Infof("[setupBinance] overriding fee discount rate to %s", defaultRate.Percentage())
+			s.FeeDiscountRate = defaultRate
+		}
+	}
+	return nil
 }
