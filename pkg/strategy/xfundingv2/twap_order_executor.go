@@ -94,7 +94,12 @@ func (o *TWAPExecutor) Stop() error {
 // it's not thread-safe
 func (o *TWAPExecutor) SyncOrder(order types.Order) error {
 	storeOrder, exists := o.executor.OrderStore().Get(order.OrderID)
-	if exists && storeOrder.GetRemainingQuantity().IsZero() {
+	if !exists {
+		o.logger.Warnf("[SyncOrder] order not found in the order store, skipping sync: %s", order)
+		return nil
+	}
+
+	if storeOrder.GetRemainingQuantity().IsZero() {
 		return nil
 	}
 
@@ -109,18 +114,14 @@ func (o *TWAPExecutor) SyncOrder(order types.Order) error {
 	if err != nil {
 		return fmt.Errorf("failed to query order: %v", query)
 	}
+	orderStore := o.executor.OrderStore()
+	orderStore.HandleOrderUpdate(*updatedOrder)
 
 	trades, err := o.exchange.QueryOrderTrades(timedCtx, query)
 	if err != nil {
 		return fmt.Errorf("failed to query order trades: %v, %v", query, err)
 	}
 
-	orderStore := o.executor.OrderStore()
-	if !exists {
-		orderStore.AddOrderUpdate = true
-	}
-	orderStore.HandleOrderUpdate(*updatedOrder)
-	orderStore.AddOrderUpdate = false
 	tradeCollector := o.executor.TradeCollector()
 	for _, trade := range trades {
 		tradeCollector.ProcessTrade(trade)
