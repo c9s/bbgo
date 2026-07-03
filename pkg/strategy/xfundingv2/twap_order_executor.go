@@ -205,7 +205,7 @@ func (o *TWAPExecutor) buildSubmitOrder(quantity, price fixedpoint.Value, side t
 		}
 	}
 	orderType := types.OrderTypeLimitMaker
-	timeInForce := types.TimeInForceGTC
+	var timeInForce types.TimeInForce
 
 	if o.syncState.Config.OrderType == TWAPOrderTypeTaker {
 		orderType = types.OrderTypeLimit

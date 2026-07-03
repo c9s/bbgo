@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -133,17 +134,43 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 		}
 	}
 	if !buyQuantity.IsZero() {
-		orderExecutor, found := s.spotGeneralOrderExecutors[s.FeeSymbol]
-		if !found {
-			return fmt.Errorf("no order executor found for fee symbol %s", s.FeeSymbol)
-		}
-		if _, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		orderBook := s.spotOrderBooks[s.FeeSymbol]
+		midPrice := getMidPrice(orderBook.Copy())
+		buyQuantity = fixedpoint.Max(buyQuantity, market.MinNotional.Div(midPrice))
+		buyQuantity = market.TruncateQuantity(buyQuantity)
+		orderForm := types.SubmitOrder{
 			Symbol:   s.FeeSymbol,
 			Side:     types.SideTypeBuy,
 			Type:     types.OrderTypeMarket,
 			Quantity: buyQuantity,
-		}); err != nil {
+		}
+		if market.IsDustQuantity(buyQuantity, midPrice) {
+			orderForm.Quantity = market.MinNotional.Mul(fixedpoint.NewFromFloat(1.05)).Div(midPrice)
+		}
+		orderExecutor, found := s.spotGeneralOrderExecutors[s.FeeSymbol]
+		if !found {
+			return fmt.Errorf("no order executor found for fee symbol %s", s.FeeSymbol)
+		}
+		s.logger.Debugf("fee order form: %+v", orderForm)
+		if createdOrders, err := orderExecutor.SubmitOrders(ctx, orderForm); err != nil {
 			return fmt.Errorf("failed to buy fee asset for pending rounds: %w", err)
+		} else {
+			timedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			defer cancel()
+
+			createdOrder := createdOrders[0]
+			s.logger.Debugf("fee order created: %+v", createdOrder)
+			if service, ok := s.spotSession.Exchange.(types.ExchangeOrderQueryService); ok {
+				_, err := retry.QueryOrderUntilFilled(timedCtx, service, createdOrder.AsQuery())
+				if err != nil {
+					return fmt.Errorf("failed to wait for fee order to be filled: %w", err)
+				}
+			} else {
+				// simple hack to wait for the market order to be filled
+				if !bbgo.IsBackTesting {
+					time.Sleep(5 * time.Second)
+				}
+			}
 		}
 	}
 	if !transferAmount.IsZero() {
