@@ -585,7 +585,8 @@ func TestTWAPOrderExecutor_CancelOrder(t *testing.T) {
 		config := TWAPWorkerConfig{}
 		executor, _, mockExchange := testExecutorSetup(t, ctrl, config)
 
-		order := types.Order{OrderID: 12345}
+		order := types.Order{OrderID: 12345, SubmitOrder: types.SubmitOrder{Symbol: "BTCUSDT"}}
+		executor.syncState.Orders[order.OrderID] = order.AsQuery()
 
 		mockExchange.EXPECT().
 			CancelOrders(gomock.Any(), order).
@@ -597,26 +598,25 @@ func TestTWAPOrderExecutor_CancelOrder(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("cancel failure returns error", func(t *testing.T) {
+	t.Run("cancel exchange error is gracefully ignored", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{}
 		executor, _, mockExchange := testExecutorSetup(t, ctrl, config)
 
-		order := types.Order{OrderID: 12345}
-		expectedErr := errors.New("cancel failed")
+		order := types.Order{OrderID: 12345, SubmitOrder: types.SubmitOrder{Symbol: "BTCUSDT"}}
+		executor.syncState.Orders[order.OrderID] = order.AsQuery()
 
-		// GeneralOrderExecutor.CancelOrders retries once on failure
+		// GracefulCancel logs CancelOrders errors but does not propagate them
 		mockExchange.EXPECT().
 			CancelOrders(gomock.Any(), order).
-			Return(expectedErr).
-			Times(2)
+			Return(errors.New("cancel failed")).
+			Times(1)
 
 		ctx := context.Background()
 		err := executor.CancelOrder(ctx, order)
-		assert.Error(t, err)
-		assert.Equal(t, expectedErr, err)
+		assert.NoError(t, err)
 	})
 }
 
