@@ -818,7 +818,7 @@ func (r *ArbitrageRound) Cleanup(ctx context.Context, orderBook types.OrderBook)
 	}
 	createdOrder, err := w.Executor().PlaceOrder(
 		remaining.Abs(),
-		orderSide(remaining),
+		orderSide(remaining).Reverse(),
 		orderBook,
 		orderOptions,
 	)
