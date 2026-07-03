@@ -889,7 +889,7 @@ func TestTWAPWorker_Misc(t *testing.T) {
 		})
 
 		t.Run("better buy price triggers update", func(t *testing.T) {
-			worker.syncState.ActiveOrder = &types.Order{
+			worker.activeOrder = &types.Order{
 				OrderID: 1,
 				SubmitOrder: types.SubmitOrder{
 					Side:     types.SideTypeBuy,
@@ -904,7 +904,7 @@ func TestTWAPWorker_Misc(t *testing.T) {
 		})
 
 		t.Run("worse buy price does not trigger update", func(t *testing.T) {
-			worker.syncState.ActiveOrder = &types.Order{
+			worker.activeOrder = &types.Order{
 				OrderID: 1,
 				SubmitOrder: types.SubmitOrder{
 					Side:     types.SideTypeBuy,
@@ -920,7 +920,7 @@ func TestTWAPWorker_Misc(t *testing.T) {
 
 		t.Run("better sell price triggers update", func(t *testing.T) {
 			worker.SetTargetPosition(Number(-1.0))
-			worker.syncState.ActiveOrder = &types.Order{
+			worker.activeOrder = &types.Order{
 				OrderID: 1,
 				SubmitOrder: types.SubmitOrder{
 					Side:     types.SideTypeSell,
@@ -956,7 +956,7 @@ func TestTWAPWorker_Misc(t *testing.T) {
 		err := worker.Start(ctx, startTime)
 		assert.NoError(t, err)
 
-		worker.syncState.ActiveOrder = &types.Order{
+		worker.activeOrder = &types.Order{
 			OrderID: 1,
 			SubmitOrder: types.SubmitOrder{
 				Side:     types.SideTypeBuy,

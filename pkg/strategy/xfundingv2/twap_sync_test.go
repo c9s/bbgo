@@ -16,15 +16,6 @@ import (
 func TestTWAPWorker_MarshalJSON(t *testing.T) {
 	t.Run("all fields present", func(t *testing.T) {
 		now := time.Now().Truncate(time.Second)
-		order := &types.Order{
-			SubmitOrder: types.SubmitOrder{
-				Symbol:   "BTCUSDT",
-				Side:     types.SideTypeBuy,
-				Quantity: fixedpoint.NewFromFloat(0.1),
-			},
-			OrderID: 12345,
-		}
-
 		w := &TWAPWorker{
 			syncState: TWAPWorkerSyncState{
 				Config: TWAPWorkerConfig{
@@ -42,7 +33,6 @@ func TestTWAPWorker_MarshalJSON(t *testing.T) {
 				CurrentIntervalEnd:   now.Add(2 * time.Minute),
 				LastCheckTime:        now.Add(1 * time.Minute),
 				Symbol:               "BTCUSDT",
-				ActiveOrder:          order,
 			},
 		}
 
@@ -55,7 +45,6 @@ func TestTWAPWorker_MarshalJSON(t *testing.T) {
 
 		assert.Contains(t, raw, "config")
 		assert.Contains(t, raw, "symbol")
-		assert.Contains(t, raw, "activeOrder")
 	})
 
 	t.Run("nil active order omitted", func(t *testing.T) {
@@ -86,15 +75,6 @@ func TestTWAPWorker_MarshalJSON(t *testing.T) {
 func TestTWAPWorker_UnmarshalJSON(t *testing.T) {
 	t.Run("round trip", func(t *testing.T) {
 		now := time.Now().Truncate(time.Second)
-		order := &types.Order{
-			SubmitOrder: types.SubmitOrder{
-				Symbol:   "BTCUSDT",
-				Side:     types.SideTypeBuy,
-				Quantity: fixedpoint.NewFromFloat(0.1),
-			},
-			OrderID:  12345,
-			Exchange: types.ExchangeBinance,
-		}
 
 		market := Market("BTCUSDT")
 		market.Exchange = types.ExchangeBinance
@@ -131,7 +111,6 @@ func TestTWAPWorker_UnmarshalJSON(t *testing.T) {
 				CurrentIntervalEnd:   now.Add(2 * time.Minute),
 				LastCheckTime:        now.Add(1 * time.Minute),
 				Symbol:               "BTCUSDT",
-				ActiveOrder:          order,
 				TWAPExecutor:         executor,
 			},
 		}
@@ -147,8 +126,6 @@ func TestTWAPWorker_UnmarshalJSON(t *testing.T) {
 		assert.Equal(t, original.syncState.TargetPosition, restored.syncState.TargetPosition)
 		assert.Equal(t, original.syncState.State, restored.syncState.State)
 		assert.Equal(t, original.syncState.Symbol, restored.syncState.Symbol)
-		require.NotNil(t, restored.syncState.ActiveOrder)
-		assert.Equal(t, original.syncState.ActiveOrder.OrderID, restored.syncState.ActiveOrder.OrderID)
 		require.NotNil(t, restored.syncState.TWAPExecutor)
 		assert.True(t, restored.syncState.TWAPExecutor.syncState.IsFutures)
 	})
@@ -177,7 +154,6 @@ func TestTWAPWorker_UnmarshalJSON(t *testing.T) {
 		assert.Equal(t, original.syncState.TargetPosition, restored.syncState.TargetPosition)
 		assert.Equal(t, original.syncState.State, restored.syncState.State)
 		assert.Equal(t, original.syncState.Symbol, restored.syncState.Symbol)
-		assert.Nil(t, restored.syncState.ActiveOrder)
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {

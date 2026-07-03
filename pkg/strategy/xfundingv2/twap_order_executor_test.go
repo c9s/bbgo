@@ -283,7 +283,7 @@ func TestTWAPOrderExecutor_BuildSubmitOrder(t *testing.T) {
 		assert.Equal(t, types.OrderTypeLimitMaker, order.Type)
 		assert.Equal(t, Number(1.5), order.Quantity)
 		assert.Equal(t, Number(50000.0), order.Price)
-		assert.Equal(t, types.TimeInForceGTC, order.TimeInForce)
+		assert.Equal(t, types.TimeInForce(""), order.TimeInForce)
 	})
 
 	t.Run("taker order creates limit with IOC", func(t *testing.T) {
