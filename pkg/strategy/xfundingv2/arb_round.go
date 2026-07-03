@@ -601,6 +601,7 @@ func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, currentTime time.Tim
 		// the trade does not belong to the spot worker, skip
 		return
 	}
+
 	if r.syncState.State == RoundOpening {
 		r.logger.Infof("handling spot trade (open): %s", trade)
 		r.handleSpotTradeForOpen(trade, currentTime)

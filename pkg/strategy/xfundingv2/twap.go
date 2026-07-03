@@ -522,6 +522,10 @@ func (w *TWAPWorker) shouldUpdateActiveOrder(orderBook types.OrderBook) bool {
 		return false
 	}
 
+	if w.syncState.ActiveOrder.GetRemainingQuantity().IsZero() {
+		return false
+	}
+
 	// taker orders are IOC — always refresh
 	if w.syncState.Config.OrderType == TWAPOrderTypeTaker {
 		return true
