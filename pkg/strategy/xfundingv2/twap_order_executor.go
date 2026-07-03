@@ -310,8 +310,28 @@ func (o *TWAPExecutor) getMakerPrice(side types.SideType, orderBook types.OrderB
 
 // cancel order
 func (o *TWAPExecutor) CancelOrder(ctx context.Context, order types.Order) error {
-	timedCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-	defer cancel()
+	if _, found := o.syncState.Orders[order.OrderID]; !found {
+		o.logger.Warnf("[TWAPExecutor] order not found, skipping cancel: %s", order)
+		return nil
+	}
 
-	return o.executor.CancelOrders(timedCtx, order)
+	// NOTE: GracefulCancel will ensure the order is canceled before returning. That is, it may keep trying forever.
+	// Add a notification ticker to notify if it takes too long to cancel the order.
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	// do GracefulCancel
+	cancelErrC := make(chan error, 1)
+	go func() {
+		cancelErrC <- o.executor.GracefulCancel(ctx, order)
+	}()
+
+	for {
+		select {
+		case <-ticker.C:
+			bbgo.Notify("[TWAPExecutor] taking too long to cancel order: %s", order)
+		case err := <-cancelErrC:
+			return err
+		}
+	}
 }
