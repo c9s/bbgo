@@ -1,6 +1,7 @@
 package xfundingv2
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,9 +18,10 @@ type TWAPExecutorSyncState struct {
 	Trades    map[uint64]types.Trade      `json:"trades,omitempty"`
 }
 
-func (o *TWAPExecutor) Initialize(s *Strategy) error {
+func (o *TWAPExecutor) Initialize(ctx context.Context, s *Strategy) error {
 	o.SetLogger(s.logger)
 	o.dryRun = s.DryRun
+	o.ctx = ctx
 	var session *bbgo.ExchangeSession
 	var executor *bbgo.GeneralOrderExecutor
 	if o.syncState.IsFutures {

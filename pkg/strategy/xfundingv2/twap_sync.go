@@ -18,7 +18,7 @@ func (w *TWAPWorker) Initialize(ctx context.Context, s *Strategy) error {
 
 	w.ctx = ctx
 	w.SetLogger(s.logger)
-	if err := w.syncState.TWAPExecutor.Initialize(s); err != nil {
+	if err := w.syncState.TWAPExecutor.Initialize(ctx, s); err != nil {
 		return fmt.Errorf("[TWAPWorker] failed to load TWAPExecutor: %w", err)
 	}
 	if w.syncState.ActiveOrder != nil {
