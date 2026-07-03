@@ -11,9 +11,18 @@ type FuturesToggleBnbBurnRequest struct {
 	FeeBurn string `param:"feeBurn"` // "true" or "false"
 }
 
+//go:generate requestgen -method GET -url "/fapi/v1/feeBurn" -type FuturesBnbBurnStatusRequest -responseType FuturesBnbBurnStatusResponse
+type FuturesBnbBurnStatusRequest struct {
+	client requestgen.AuthenticatedAPIClient
+}
+
 type FuturesToggleBnbBurnResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"msg"`
+}
+
+type FuturesBnbBurnStatusResponse struct {
+	FeeBurn bool `json:"feeBurn"`
 }
 
 func (c *FuturesRestClient) NewFuturesToggleBnbBurnRequest(feeBurn bool) *FuturesToggleBnbBurnRequest {
@@ -24,6 +33,13 @@ func (c *FuturesRestClient) NewFuturesToggleBnbBurnRequest(feeBurn bool) *Future
 		req.SetFeeBurn("true")
 	} else {
 		req.SetFeeBurn("false")
+	}
+	return req
+}
+
+func (c *FuturesRestClient) NewFuturesBnbBurnStatusRequest() *FuturesBnbBurnStatusRequest {
+	req := &FuturesBnbBurnStatusRequest{
+		client: c,
 	}
 	return req
 }

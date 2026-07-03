@@ -1692,6 +1692,27 @@ func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (
 	return &rate, nil
 }
 
+func (e *Exchange) QueryBnbBurnStatus(ctx context.Context) (bool, error) {
+	if e.IsFutures {
+		req := e.futuresClient2.NewFuturesBnbBurnStatusRequest()
+		resp, err := req.Do(ctx)
+		if err != nil {
+			return false, err
+		}
+
+		return resp.FeeBurn, nil
+	}
+	req := e.client2.NewBnbBurnStatusRequest()
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return false, err
+	}
+	if e.IsMargin || e.IsIsolatedMargin {
+		return resp.InterestBNBBurn, nil
+	}
+	return resp.SpotBNBBurn, nil
+}
+
 // QueryTakerBuySellVolumes queries the taker buy/sell volumes for a symbol and interval. It is only supported for futures.
 func (e *Exchange) QueryTakerBuySellVolumes(ctx context.Context, symbol string, period types.Interval, options types.TradeQueryOptions) ([]binanceapi.FuturesTakerBuySellVolume, error) {
 	req := e.futuresClient2.NewFuturesTakerBuySellVolumeRequest().
