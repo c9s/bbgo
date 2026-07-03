@@ -13,6 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datasource/coinmarketcap"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
@@ -293,6 +294,10 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("session %s does not support futures", s.futuresSession.Name)
 	} else if !futuresEx.GetFuturesSettings().IsFutures {
 		return fmt.Errorf("session %s is not configured for futures trading", s.futuresSession.Name)
+	}
+
+	if err := s.checkAndFixMarginMode(ctx); err != nil {
+		return fmt.Errorf("failed to check and fix margin mode: %w", err)
 	}
 
 	// extra setup for Binance exchange
@@ -1505,5 +1510,33 @@ func (s *Strategy) setupBinance(ctx context.Context, session *bbgo.ExchangeSessi
 			s.FeeDiscountRate = defaultRate
 		}
 	}
+	return nil
+}
+
+func (s *Strategy) checkAndFixMarginMode(ctx context.Context) error {
+	binanceFutures, ok := s.futuresSession.Exchange.(*binance.Exchange)
+	if !ok {
+		s.logger.Infof("[checkAndFixMarginMode] futures session %s is not a binance exchange, skipping", s.futuresSession.Name)
+		return nil
+	}
+	futuresClient := binanceFutures.GetFuturesClient()
+	req := futuresClient.NewFuturesGetMultiAssetsModeRequest()
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
+
+	if resp.MultiAssetsMargin {
+		return nil
+	}
+
+	fixReq := futuresClient.NewFuturesChangeMultiAssetsModeRequest()
+	fixReq.MultiAssetsMargin(binanceapi.MultiAssetsMarginModeOn)
+	fixResp, err := fixReq.Do(ctx)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Infof("changeMultiAssetsMode response: %+v", fixResp)
 	return nil
 }
