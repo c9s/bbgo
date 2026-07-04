@@ -586,6 +586,15 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("failed to connect spot stream books: %w", err)
 	}
 
+	if !bbgo.IsBackTesting {
+		// simple hack to ensure the stream books are ready
+		time.Sleep(10 * time.Second)
+		// NOTE: must prepare the rounds after the stream books are connected
+		if err := s.prepareRounds(ctx); err != nil {
+			return err
+		}
+	}
+
 	// setup metrics for positions
 	for _, position := range s.SpotPositions {
 		position.Strategy = s.ID()
@@ -1551,5 +1560,15 @@ func (s *Strategy) checkAndFixMarginMode(ctx context.Context) error {
 	}
 
 	s.logger.Infof("changeMultiAssetsMode response: %+v", fixResp)
+	return nil
+}
+
+func (s *Strategy) prepareRounds(ctx context.Context) error {
+	for symbol, round := range s.ActiveRounds {
+		err := round.Prepare(ctx, s.spotSession, s.futuresSession)
+		if err != nil {
+			return fmt.Errorf("fail to prepare round %s: %w", symbol, err)
+		}
+	}
 	return nil
 }

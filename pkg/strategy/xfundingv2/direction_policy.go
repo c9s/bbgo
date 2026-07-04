@@ -44,6 +44,9 @@ func (p directionPolicy) CollateralAsset() string {
 func (p directionPolicy) TransferAmountFromSpotTrade(t types.Trade) fixedpoint.Value {
 	if p.Direction == types.PositionLong {
 		amount := t.QuoteQuantity
+		if amount.IsZero() {
+			amount = t.Price.Mul(t.Quantity)
+		}
 		if t.FeeCurrency == p.Market.QuoteCurrency {
 			amount = amount.Sub(t.Fee)
 		}

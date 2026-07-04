@@ -70,6 +70,8 @@ func (r *ArbitrageRound) Initialize(ctx context.Context, s *Strategy) error {
 type ArbitrageRoundSyncState struct {
 	TriggeredFundingRate        fixedpoint.Value     `json:"triggeredFundingRate"`
 	TriggeredSpotTargetPosition fixedpoint.Value     `json:"triggeredSpotTargetPosition"`
+	TransferInAmount            fixedpoint.Value     `json:"transferInAmount"`
+	TransferOutAmount           fixedpoint.Value     `json:"transferOutAmount"`
 	MinHoldingIntervals         int                  `json:"minHoldingIntervals"`
 	FundingIntervalHours        int                  `json:"fundingIntervalHours"`
 	FundingIntervalStart        time.Time            `json:"fundingIntervalStart"`

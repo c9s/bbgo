@@ -139,6 +139,10 @@ func (w *TWAPWorker) State() TWAPWorkerState {
 	return w.syncState.State
 }
 
+func (w *TWAPWorker) Duration() types.Duration {
+	return w.syncState.Config.Duration
+}
+
 func (w *TWAPWorker) IsDone() bool {
 	return w.syncState.State == TWAPWorkerStateDone
 }
