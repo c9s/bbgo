@@ -546,6 +546,12 @@ func (w *TWAPWorker) shouldUpdateActiveOrder(orderBook types.OrderBook) bool {
 		return false
 	}
 
+	// remaining is not dust but canceled
+	if w.activeOrder.Status == types.OrderStatusCanceled {
+		w.logger.Debugf("[TWAP shouldUpdateOrder] non-dust active order is canceled: %s", w.activeOrder)
+		return true
+	}
+
 	newPriceBtter := false
 	switch w.activeOrder.Side {
 	case types.SideTypeBuy:
