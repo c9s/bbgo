@@ -602,6 +602,11 @@ func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, currentTime time.Tim
 		return
 	}
 
+	activeOrder := r.spotWorker.ActiveOrder()
+	if activeOrder.OrderID == trade.OrderID {
+		activeOrder.ExecutedQuantity = activeOrder.ExecutedQuantity.Add(trade.Quantity)
+	}
+
 	if r.syncState.State == RoundOpening {
 		r.logger.Infof("handling spot trade (open): %s", trade)
 		r.handleSpotTradeForOpen(trade, currentTime)
@@ -673,6 +678,11 @@ func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, currentTime time.
 	if ok := r.futuresWorker.Executor().AddTrade(trade); !ok {
 		// the trade does not belong to the futures worker, skip
 		return
+	}
+
+	activeOrder := r.futuresWorker.ActiveOrder()
+	if activeOrder.OrderID == trade.OrderID {
+		activeOrder.ExecutedQuantity = activeOrder.ExecutedQuantity.Add(trade.Quantity)
 	}
 
 	if r.syncState.State == RoundClosing {

@@ -329,6 +329,7 @@ func (o *TWAPExecutor) CancelOrder(ctx context.Context, order types.Order) error
 		return nil
 	}
 
+	o.logger.Debugf("[TWAPExecutor] canceling order: %s", order)
 	// NOTE: GracefulCancel will ensure the order is canceled before returning. That is, it may keep trying forever.
 	// Add a notification ticker to notify if it takes too long to cancel the order.
 	ticker := time.NewTicker(5 * time.Minute)

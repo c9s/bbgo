@@ -399,13 +399,10 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 
 		// the remaining quantity of the active order is dust, no need to update
 		remaining := w.activeOrder.GetRemainingQuantity()
-		if !midPrice.IsZero() && market.IsDustQuantity(remaining, midPrice) {
-			return nil
-		}
 		w.logger.Debugf("active order remaining quantity: %s", remaining)
 
 		if err := w.syncState.TWAPExecutor.CancelOrder(w.ctx, *w.activeOrder); err != nil {
-			w.logger.WithError(err).Warn("[TWAP tick] failed to cancel active order")
+			w.logger.WithError(err).Warnf("[TWAP tick] failed to cancel active order: %s", w.activeOrder)
 			return nil
 		}
 		// find the better price and submit new order
@@ -449,6 +446,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 	sliceQty := w.calculateSliceQuantity(currentTime, remaining, deadlineExceeded, market, midPrice)
 	// the slice quantity is dust, do nothing
 	if !midPrice.IsZero() && market.IsDustQuantity(sliceQty, midPrice) {
+		w.logger.Debugf("[TWAP tick] slice quantity is dust, skipping order placement: %s@%s", sliceQty, midPrice)
 		return nil
 	}
 	createdOrder, err := w.syncState.TWAPExecutor.PlaceOrder(
@@ -540,7 +538,7 @@ func (w *TWAPWorker) shouldUpdateActiveOrder(orderBook types.OrderBook) bool {
 
 	remaining := w.activeOrder.GetRemainingQuantity()
 	if w.Market().IsDustQuantity(remaining, newPrice) {
-		w.logger.Debugf("active order is dust, skip updating order: %s@%s", remaining, newPrice)
+		w.logger.Debugf("[TWAP shouldUpdateOrder] active order is dust, should not update order: %s@%s", remaining, newPrice)
 		return false
 	}
 
