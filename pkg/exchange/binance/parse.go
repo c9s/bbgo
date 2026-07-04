@@ -466,6 +466,11 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
+	case "indexPrice_kline":
+		var event IndexPriceKLineEvent
+		err = json.Unmarshal([]byte(message), &event)
+		return &event, err
+
 	// futures user data stream
 	// ========================================================
 	case "ORDER_TRADE_UPDATE":
@@ -952,6 +957,39 @@ type ContinuousKLineEvent struct {
     "q":"3715253.19494",    // Quote asset volume
     "V":"184.769",          // Taker buy volume
     "Q":"3472925.84746",    //Taker buy quote asset volume
+    "B":"0"                 // Ignore
+  }
+}
+*/
+
+type IndexPriceKLineEvent struct {
+	EventBase
+	Symbol string `json:"ps"`
+	KLine  KLine  `json:"k,omitempty"`
+}
+
+/*
+{
+  "e":"indexPrice_kline",   // Event type
+  "E":1591267070033,        // Event time
+  "ps":"BTCUSD",            // Pair
+  "k":{
+    "t":1591267020000,      // Kline start time
+    "T":1591267079999,      // Kline close time
+    "s":"0",                // Ignore, placeholder for kline symbol
+    "i":"1m",               // Interval
+    "f":1591267020000,      // First updated time
+    "L":1591267070000,      // Last updated time
+    "o":"9542.21900000",    // Open price
+    "c":"9542.50440000",    // Close price
+    "h":"9542.71640000",    // High price
+    "l":"9542.21040000",    // Low price
+    "v":"0",                // Ignore
+    "n": 51,                // Ignore
+    "x":false,              // Is this kline closed?
+    "q":"0",                // Ignore
+    "V":"0",                // Ignore
+    "Q":"0",                // Ignore
     "B":"0"                 // Ignore
   }
 }

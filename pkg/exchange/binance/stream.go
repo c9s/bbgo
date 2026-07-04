@@ -95,6 +95,9 @@ type Stream struct {
 	markPriceUpdateEventCallbacks       []func(e *MarkPriceUpdateEvent)
 	continuousKLineEventCallbacks       []func(e *ContinuousKLineEvent)
 	continuousKLineClosedEventCallbacks []func(e *ContinuousKLineEvent)
+	indexPriceKLineEventCallbacks       []func(e *IndexPriceKLineEvent)
+	indexPriceKLineCallbacks            []func(kline types.KLine)
+	indexPriceKLineClosedCallbacks      []func(kline types.KLine)
 
 	// futures user data stream event callbacks
 	orderTradeUpdateEventCallbacks    []func(e *OrderTradeUpdateEvent)
@@ -187,6 +190,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnBookTickerEvent(stream.handleBookTickerEvent)
 	stream.OnExecutionReportEvent(stream.handleExecutionReportEvent)
 	stream.OnContinuousKLineEvent(stream.handleContinuousKLineEvent)
+	stream.OnIndexPriceKLineEvent(stream.handleIndexPriceKLineEvent)
 	stream.OnMarketTradeEvent(stream.handleMarketTradeEvent)
 	stream.OnAggTradeEvent(stream.handleAggTradeEvent)
 	stream.OnForceOrderEvent(stream.handleForceOrderEvent)
@@ -303,6 +307,16 @@ func (s *Stream) handleContinuousKLineEvent(e *ContinuousKLineEvent) {
 		s.EmitKLineClosed(kline)
 	} else {
 		s.EmitKLine(kline)
+	}
+}
+
+func (s *Stream) handleIndexPriceKLineEvent(e *IndexPriceKLineEvent) {
+	kline := e.KLine.KLine()
+	kline.Symbol = e.Symbol // "k.s" is a Binance placeholder, not the real pair
+	if e.KLine.Closed {
+		s.EmitIndexPriceKLineClosed(kline)
+	} else {
+		s.EmitIndexPriceKLine(kline)
 	}
 }
 
@@ -582,6 +596,9 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *ContinuousKLineEvent:
 		s.EmitContinuousKLineEvent(e)
+
+	case *IndexPriceKLineEvent:
+		s.EmitIndexPriceKLineEvent(e)
 
 	case *OrderTradeUpdateEvent:
 		s.EmitOrderTradeUpdateEvent(e)
