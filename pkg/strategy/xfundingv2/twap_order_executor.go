@@ -90,7 +90,6 @@ func (o *TWAPExecutor) Stop() error {
 }
 
 // SyncOrder queries the latest order status and updates the internal store and trades.
-// it's designed to be called to restore the state of the executor after a restart or to sync a existing order.
 // it's not thread-safe
 func (o *TWAPExecutor) SyncOrder(order types.Order) error {
 	storeOrder, exists := o.executor.OrderStore().Get(order.OrderID)
@@ -115,7 +114,7 @@ func (o *TWAPExecutor) SyncOrder(order types.Order) error {
 		return fmt.Errorf("failed to query order: %v", query)
 	}
 	orderStore := o.executor.OrderStore()
-	orderStore.HandleOrderUpdate(*updatedOrder)
+	orderStore.Add(*updatedOrder)
 
 	trades, err := o.exchange.QueryOrderTrades(timedCtx, query)
 	if err != nil {
@@ -133,9 +132,23 @@ func (o *TWAPExecutor) SyncOrder(order types.Order) error {
 
 func (o *TWAPExecutor) GetOrder(orderID uint64) (types.Order, bool) {
 	if _, exists := o.syncState.Orders[orderID]; !exists {
+		o.logger.Debugf("[GetOrder] order not exists: %d", orderID)
 		return types.Order{}, false
 	}
-	return o.executor.OrderStore().Get(orderID)
+	orderStore := o.executor.OrderStore()
+	order, found := orderStore.Get(orderID)
+	if found {
+		return order, true
+	}
+
+	query := o.syncState.Orders[orderID]
+	updatedOrder, err := o.exchange.QueryOrder(o.ctx, query)
+	if err != nil {
+		o.logger.Debugf("[GetOrder] failed to query order: %+v", query)
+		return types.Order{}, false
+	}
+	orderStore.Add(*updatedOrder)
+	return *updatedOrder, true
 }
 
 func (o *TWAPExecutor) CancelOpenOrders(ctx context.Context) error {

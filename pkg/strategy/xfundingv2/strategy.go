@@ -420,6 +420,7 @@ func (s *Strategy) CrossRun(
 			s.InstanceID(),
 			spotPosition,
 		)
+		spotExecutor.OrderStore().AddOrderUpdate = true
 		spotExecutor.DisableNotify()
 		spotExecutor.Bind()
 		if openOrders, err := s.spotSession.Exchange.QueryOpenOrders(ctx, symbol); err != nil {
@@ -440,6 +441,7 @@ func (s *Strategy) CrossRun(
 		} else if len(openOrders) > 0 {
 			futuresExecutor.ActiveMakerOrders().Add(openOrders...)
 		}
+		futuresExecutor.OrderStore().AddOrderUpdate = true
 		futuresExecutor.DisableNotify()
 		futuresExecutor.Bind()
 		s.futuresGeneralOrderExecutors[symbol] = futuresExecutor
