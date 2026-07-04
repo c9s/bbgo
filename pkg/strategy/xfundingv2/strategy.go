@@ -1032,6 +1032,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 		if selectedCandidate.MinHoldingDuration <= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
 			spotExecutor := s.spotGeneralOrderExecutors[selectedCandidate.Symbol]
 			spotTwap, err := NewTWAPWorker(ctx, selectedCandidate.Symbol, s.spotSession, spotExecutor, s.TWAPWorkerConfig)
+			spotTwap.SetLogger(s.logger)
 			spotTwap.Executor().SetDryRun(s.DryRun)
 			if err != nil || spotTwap == nil {
 				s.logger.WithError(err).Errorf("failed to create TWAP worker for spot %s", selectedCandidate.Symbol)
@@ -1040,6 +1041,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			spotTwap.SetTargetPosition(selectedCandidate.TargetFuturesPosition.Neg())
 			futuresExecutor := s.futuresGeneralOrderExecutors[selectedCandidate.Symbol]
 			futuresTwap, err := NewTWAPWorker(ctx, selectedCandidate.Symbol, s.futuresSession, futuresExecutor, s.TWAPWorkerConfig)
+			futuresTwap.SetLogger(s.logger)
 			futuresTwap.Executor().SetDryRun(s.DryRun)
 			if err != nil || futuresTwap == nil {
 				s.logger.WithError(err).Errorf("failed to create TWAP worker for futures %s", selectedCandidate.Symbol)
