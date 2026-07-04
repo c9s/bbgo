@@ -685,6 +685,36 @@ func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, currentTime time.
 	}
 }
 
+func (r *ArbitrageRound) HandleSpotOrderUpdate(update types.Order) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if !r.hasOrder(update.OrderID) {
+		return
+	}
+
+	handleOrderUpdate(r.spotWorker, update)
+}
+
+func (r *ArbitrageRound) HandleFuturesOrderUpdate(update types.Order) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if !r.hasOrder(update.OrderID) {
+		return
+	}
+
+	handleOrderUpdate(r.futuresWorker, update)
+}
+
+func handleOrderUpdate(twapWorker *TWAPWorker, update types.Order) {
+	activeOrder := twapWorker.ActiveOrder()
+	if activeOrder != nil && activeOrder.OrderID == update.OrderID {
+		activeOrder.Update(update)
+	}
+	twapWorker.Executor().UpdateOrder(update)
+}
+
 // handleFuturesTradeForClose is the mirror of handleSpotTradeForOpen: during
 // closing, futures is the leader. After each futures fill reduces the position,
 // the freed collateral asset is transferred back to spot and the spot worker's

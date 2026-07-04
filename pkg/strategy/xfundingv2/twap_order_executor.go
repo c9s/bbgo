@@ -151,6 +151,15 @@ func (o *TWAPExecutor) GetOrder(orderID uint64) (types.Order, bool) {
 	return *updatedOrder, true
 }
 
+func (o *TWAPExecutor) UpdateOrder(update types.Order) {
+	if _, exists := o.syncState.Orders[update.OrderID]; !exists {
+		o.logger.Debugf("[UpdateOrder] order not exists: %d", update.OrderID)
+		return
+	}
+	orderStore := o.executor.OrderStore()
+	orderStore.Update(update)
+}
+
 func (o *TWAPExecutor) CancelOpenOrders(ctx context.Context) error {
 	activeOrderBook := o.executor.ActiveMakerOrders()
 	return o.executor.GracefulCancelActiveOrderBook(ctx, activeOrderBook)

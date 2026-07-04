@@ -610,6 +610,7 @@ func (s *Strategy) CrossRun(
 		s.tick(ctx, kline.EndTime.Time())
 	}))
 
+	// trade update callbacks
 	s.spotSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 		// lock the strategy to ensure all the updates to the active rounds are seen
 		s.mu.Lock()
@@ -656,6 +657,24 @@ func (s *Strategy) CrossRun(
 				).Set(filledRatio.Float64())
 			}
 		}
+	})
+
+	// order update callbacks
+	s.spotSession.UserDataStream.OnOrderUpdate(func(update types.Order) {
+		round, found := s.ActiveRounds[update.Symbol]
+		if !found {
+			return
+		}
+		s.logger.Debugf("spot order update: %s", update)
+		round.HandleSpotOrderUpdate(update)
+	})
+	s.futuresSession.UserDataStream.OnOrderUpdate(func(update types.Order) {
+		round, found := s.ActiveRounds[update.Symbol]
+		if !found {
+			return
+		}
+		s.logger.Debugf("futures order update: %s", update)
+		round.HandleFuturesOrderUpdate(update)
 	})
 
 	// strategy is ready for running
