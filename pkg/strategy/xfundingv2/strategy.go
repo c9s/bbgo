@@ -71,9 +71,9 @@ type Strategy struct {
 	TickSymbol   string         `json:"tickSymbol"`
 	TickInterval types.Interval `json:"tickInterval"`
 
-	FeeSymbol       string           `json:"feeSymbol"`
-	FeeDiscountRate fixedpoint.Value `json:"feeDiscountRate"`
-	QuoteCurrency   string           `json:"quoteCurrency"`
+	FeeSymbol       string                      `json:"feeSymbol"`
+	FeeDiscountRate map[string]fixedpoint.Value `json:"feeDiscountRate"`
+	QuoteCurrency   string                      `json:"quoteCurrency"`
 
 	PendingRoundGracePeriod types.Duration   `json:"pendingRoundGracePeriod"`
 	MaxPendingRoundRetry    int              `json:"maxPendingRoundRetry"`
@@ -197,6 +197,16 @@ func (s *Strategy) Defaults() error {
 		s.StatsPeriod = types.Duration(time.Hour * 2)
 	}
 
+	if s.FeeDiscountRate == nil {
+		s.FeeDiscountRate = make(map[string]fixedpoint.Value)
+	}
+	if _, ok := s.FeeDiscountRate["spot"]; !ok {
+		s.FeeDiscountRate["spot"] = fixedpoint.NewFromFloat(0.25)
+	}
+	if _, ok := s.FeeDiscountRate["futures"]; !ok {
+		s.FeeDiscountRate["futures"] = fixedpoint.NewFromFloat(0.10)
+	}
+
 	return nil
 }
 
@@ -243,8 +253,10 @@ func (s *Strategy) Validate() error {
 			return fmt.Errorf("maxPositionExposure should be positive: %s", symbol)
 		}
 	}
-	if s.FeeDiscountRate.Sign() < 0 || s.FeeDiscountRate.Compare(fixedpoint.One) > 0 {
-		return fmt.Errorf("feeDiscountRate should be between 0 and 1: %s", s.FeeDiscountRate)
+	for feeType, rate := range s.FeeDiscountRate {
+		if rate.Sign() < 0 || rate.Compare(fixedpoint.One) > 0 {
+			return fmt.Errorf("feeDiscountRate[%s] should be between 0 and 1: %s", feeType, rate)
+		}
 	}
 	return nil
 }
@@ -307,7 +319,10 @@ func (s *Strategy) CrossRun(
 	if err := s.setupBinance(ctx, s.spotSession); err != nil {
 		return err
 	}
-	s.logger.Infof("fee symbol: %s, fee discount rate: %s", s.FeeSymbol, s.FeeDiscountRate.Percentage())
+	s.logger.Infof("fee symbol: %s, fee discount rate: spot=%s futures=%s",
+		s.FeeSymbol,
+		s.FeeDiscountRate["spot"].Percentage(),
+		s.FeeDiscountRate["futures"].Percentage())
 
 	if futuresService, ok := s.futuresSession.Exchange.(FuturesService); !ok {
 		return fmt.Errorf("futures session exchange does not support futures service: %s", s.futuresSession.ExchangeName)
@@ -353,12 +368,15 @@ func (s *Strategy) CrossRun(
 		MakerFeeRate: s.spotSession.MakerFeeRate,
 		TakerFeeRate: s.spotSession.TakerFeeRate,
 	}
-	if !s.FeeDiscountRate.IsZero() {
-		discountFactor := fixedpoint.One.Sub(s.FeeDiscountRate)
-		for _, feeRate := range []*types.ExchangeFee{&futuresFeeRate, &spotFeeRate} {
-			feeRate.MakerFeeRate = feeRate.MakerFeeRate.Mul(discountFactor)
-			feeRate.TakerFeeRate = feeRate.TakerFeeRate.Mul(discountFactor)
-		}
+	if r, ok := s.FeeDiscountRate["futures"]; ok && !r.IsZero() {
+		discountFactor := fixedpoint.One.Sub(r)
+		futuresFeeRate.MakerFeeRate = futuresFeeRate.MakerFeeRate.Mul(discountFactor)
+		futuresFeeRate.TakerFeeRate = futuresFeeRate.TakerFeeRate.Mul(discountFactor)
+	}
+	if r, ok := s.FeeDiscountRate["spot"]; ok && !r.IsZero() {
+		discountFactor := fixedpoint.One.Sub(r)
+		spotFeeRate.MakerFeeRate = spotFeeRate.MakerFeeRate.Mul(discountFactor)
+		spotFeeRate.TakerFeeRate = spotFeeRate.TakerFeeRate.Mul(discountFactor)
 	}
 	s.costEstimator = NewCostEstimator()
 	s.costEstimator.
@@ -1527,6 +1545,8 @@ func (s *Strategy) notifyStats() {
 
 }
 
+// Fee rate and BNB discount.
+// See: https://www.binance.com/en/fee/futureFee
 func (s *Strategy) setupBinance(ctx context.Context, session *bbgo.ExchangeSession) error {
 	binanceEx, ok := session.Exchange.(*binance.Exchange)
 	if !ok {
@@ -1544,11 +1564,20 @@ func (s *Strategy) setupBinance(ctx context.Context, session *bbgo.ExchangeSessi
 			s.logger.Infof("[setupBinance] overriding fee symbol to %s", s.FeeSymbol)
 			s.FeeSymbol = "BNB" + s.QuoteCurrency
 		}
-		if s.FeeDiscountRate.IsZero() {
-			// default to 10% discount
-			defaultRate := fixedpoint.NewFromFloat(0.1)
-			s.logger.Infof("[setupBinance] overriding fee discount rate to %s", defaultRate.Percentage())
-			s.FeeDiscountRate = defaultRate
+		accountType := "spot"
+		if binanceEx.IsFutures {
+			accountType = "futures"
+		}
+		if _, found := s.FeeDiscountRate[accountType]; !found {
+			var defaultRate fixedpoint.Value
+			switch accountType {
+			case "spot":
+				defaultRate = fixedpoint.NewFromFloat(0.25)
+			case "futures":
+				defaultRate = fixedpoint.NewFromFloat(0.1)
+			}
+			s.logger.Infof("[setupBinance] overriding %s fee discount rate to %s", accountType, defaultRate.Percentage())
+			s.FeeDiscountRate[accountType] = defaultRate
 		}
 	}
 	return nil
