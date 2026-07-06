@@ -743,6 +743,13 @@ func TestTWAPWorker_Misc(t *testing.T) {
 			assert.Equal(t, Number(0.5), sliceQty)
 		})
 
+		t.Run("large remaining capped at max slice size", func(t *testing.T) {
+			// remaining = 20.0, time left = 10 min, interval = 2 min, remaining_slices = 5
+			// dynamic slice = 20.0 / 5 = 4.0, but max = 0.5 so it caps at 0.5
+			sliceQty := worker.calculateSliceQuantity(startTime, Number(20.0), false, market, fixedpoint.Zero)
+			assert.Equal(t, Number(0.5), sliceQty)
+		})
+
 		t.Run("respects min slice size", func(t *testing.T) {
 			// remaining = 0.5, remaining_slices = 5
 			// expected = 0.5 / 5 = 0.1
