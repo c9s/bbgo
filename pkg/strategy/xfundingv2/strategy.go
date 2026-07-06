@@ -780,8 +780,6 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	}
 	// 2. transit active rounds
 	for _, round := range s.ActiveRounds {
-		// check if the round is halted or should be halted
-		halted := round.IsHalted()
 		posDeviation := round.CheckPositionDeviation(
 			tickTime,
 			s.CriticalErrorConfig.MaxMoqDeviation,
@@ -809,54 +807,58 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			},
 		).Set(posDeviation.DeviatedQuantity.Float64())
 
-		roundSymbol := round.SpotSymbol()
-		if !halted && posDeviation.DeviateTooLong {
-			// the round is originally not halted but the deviation is too large -> we need to halt the round
-			round.Halt(tickTime)
-			s.logger.Warnf("round %s halted due to large hedge deviation: spot filled %s, futures filled %s (value deviation %s)",
-				roundSymbol,
-				posDeviation.SpotFilled,
-				posDeviation.FuturesFilled,
-				posDeviation.DeviatedQuantity,
-			)
-			bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required: spot filled %s, futures filled %s (value deviation: %s)",
-				roundSymbol,
-				posDeviation.SpotFilled, posDeviation.FuturesFilled,
-				posDeviation.DeviatedQuantity,
-				round.NewCriticalNotification(),
-			)
-			continue
-		} else if halted && !posDeviation.DeviateTooLong {
-			// the deviation is back to normal, resume the round
-			haltedAt := round.HaltedAt()
-			round.Resume()
-			s.logger.Infof("round %s resumed as hedge deviation back to normal: spot filled %s, futures filled %s",
-				roundSymbol,
-				posDeviation.SpotFilled,
-				posDeviation.FuturesFilled,
-			)
-			bbgo.Notify("✅ Round %s resumed as hedge deviation back to normal. It was halted at %s.",
-				roundSymbol,
-				haltedAt.Format(time.RFC3339),
-				round.NewNotification(),
-			)
-		}
-
-		// round is still halted, skip the rest of the processing
-		if round.IsHalted() {
-			haltedAt := round.HaltedAt()
-			elapsed := tickTime.Sub(haltedAt)
-			limiter, found := s.haltNotificationLimiters[round.SpotSymbol()]
-			if found && limiter.AllowN(tickTime, 1) {
-				// send notification for rounds that have been halted for a while.
-				bbgo.Notify("💥 Round %s halted for %s (since %s). Manual intervention is required",
+		if round.State() != RoundReady {
+			// check if the round is halted or should be halted
+			halted := round.IsHalted()
+			roundSymbol := round.SpotSymbol()
+			if !halted && posDeviation.DeviateTooLong {
+				// the round is originally not halted but the deviation is too large -> we need to halt the round
+				round.Halt(tickTime)
+				s.logger.Warnf("round %s halted due to large hedge deviation: spot filled %s, futures filled %s (value deviation %s)",
 					roundSymbol,
-					elapsed.String(),
-					haltedAt.Format(time.RFC3339),
+					posDeviation.SpotFilled,
+					posDeviation.FuturesFilled,
+					posDeviation.DeviatedQuantity,
+				)
+				bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required: spot filled %s, futures filled %s (value deviation: %s)",
+					roundSymbol,
+					posDeviation.SpotFilled, posDeviation.FuturesFilled,
+					posDeviation.DeviatedQuantity,
 					round.NewCriticalNotification(),
 				)
+				continue
+			} else if halted && !posDeviation.DeviateTooLong {
+				// the deviation is back to normal, resume the round
+				haltedAt := round.HaltedAt()
+				round.Resume()
+				s.logger.Infof("round %s resumed as hedge deviation back to normal: spot filled %s, futures filled %s",
+					roundSymbol,
+					posDeviation.SpotFilled,
+					posDeviation.FuturesFilled,
+				)
+				bbgo.Notify("✅ Round %s resumed as hedge deviation back to normal. It was halted at %s.",
+					roundSymbol,
+					haltedAt.Format(time.RFC3339),
+					round.NewNotification(),
+				)
 			}
-			continue
+
+			// round is still halted, skip the rest of the processing
+			if round.IsHalted() {
+				haltedAt := round.HaltedAt()
+				elapsed := tickTime.Sub(haltedAt)
+				limiter, found := s.haltNotificationLimiters[round.SpotSymbol()]
+				if found && limiter.AllowN(tickTime, 1) {
+					// send notification for rounds that have been halted for a while.
+					bbgo.Notify("💥 Round %s halted for %s (since %s). Manual intervention is required",
+						roundSymbol,
+						elapsed.String(),
+						haltedAt.Format(time.RFC3339),
+						round.NewCriticalNotification(),
+					)
+				}
+				continue
+			}
 		}
 
 		s.transitRoundState(ctx, round, tickTime)
