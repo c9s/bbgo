@@ -49,10 +49,7 @@ func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Ti
 			processedRounds = append(processedRounds, pendingRound)
 			allRounds = append(allRounds, pendingRound.Round)
 		}
-		// include the active rounds into fee asset preparation
-		for _, activeRound := range s.ActiveRounds {
-			allRounds = append(allRounds, activeRound)
-		}
+
 		if err := s.acquireFeeAssetAndTransfer(ctx, allRounds); err != nil {
 			s.logger.WithError(err).Error("failed to acquire fee asset and transfer for pending rounds")
 			for _, pendingRound := range pendingRounds {
