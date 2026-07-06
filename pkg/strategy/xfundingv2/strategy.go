@@ -30,9 +30,9 @@ func init() {
 }
 
 type CriticalErrorConfig struct {
-	MaxRemainingNotional fixedpoint.Value `json:"maxRemainingNotional"`
-	MaxFundingRateFlip   fixedpoint.Value `json:"maxFundingRateFlip"`
-	MaxHedgeDeviation    fixedpoint.Value `json:"maxHedgeDeviation"`
+	MaxRemainingNotional       fixedpoint.Value `json:"maxRemainingNotional"`
+	MaxFundingRateFlip         fixedpoint.Value `json:"maxFundingRateFlip"`
+	MaxHedgedNotionalDeviation fixedpoint.Value `json:"maxHedgedNotionalDeviation"`
 }
 
 func (c *CriticalErrorConfig) Defaults() {
@@ -42,8 +42,9 @@ func (c *CriticalErrorConfig) Defaults() {
 	if c.MaxFundingRateFlip.IsZero() {
 		c.MaxFundingRateFlip = fixedpoint.NewFromFloat(0.0003) // 0.03%
 	}
-	if c.MaxHedgeDeviation.IsZero() {
-		c.MaxHedgeDeviation = fixedpoint.NewFromFloat(0.3) // 30%
+	if c.MaxHedgedNotionalDeviation.IsZero() {
+		// max tolerance of $500 deviation between spot and futures position value
+		c.MaxHedgedNotionalDeviation = fixedpoint.NewFromInt(500)
 	}
 }
 
@@ -686,6 +687,7 @@ func (s *Strategy) CrossRun(
 		}
 		s.logger.Debugf("spot order update: %s", update)
 		round.HandleSpotOrderUpdate(update)
+		bbgo.Notify("📝 Round spot order update: %s", round.String(), update)
 	})
 	s.futuresSession.UserDataStream.OnOrderUpdate(func(update types.Order) {
 		round, found := s.ActiveRounds[update.Symbol]
@@ -694,6 +696,7 @@ func (s *Strategy) CrossRun(
 		}
 		s.logger.Debugf("futures order update: %s", update)
 		round.HandleFuturesOrderUpdate(update)
+		bbgo.Notify("📝 Round futures order update: %s", round.String(), update)
 	})
 
 	// strategy is ready for running
@@ -779,8 +782,13 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	for _, round := range s.ActiveRounds {
 		// check if the round is halted or should be halted
 		halted := round.IsHalted()
-		spotFilled, futuresFilled := round.CheckPositionDeviation(
-			tickTime, s.CriticalErrorConfig.MaxHedgeDeviation,
+		spotOrderBook := s.spotOrderBooks[round.SpotSymbol()].Copy()
+		futuresOrderBook := s.futuresOrderBooks[round.FuturesSymbol()].Copy()
+		posDeviation := round.CheckPositionDeviation(
+			tickTime,
+			spotOrderBook, futuresOrderBook,
+			s.CriticalErrorConfig.MaxHedgedNotionalDeviation,
+			time.Minute*15,
 		)
 		// record the round spot/futures positions
 		roundPositionMetrics.With(
@@ -789,38 +797,46 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				"symbol":      round.SpotSymbol(),
 				"accountType": "spot",
 			},
-		).Set(spotFilled.Float64())
+		).Set(posDeviation.SpotFilled.Float64())
 		roundPositionMetrics.With(
 			prometheus.Labels{
 				"strategy_id": s.InstanceID(),
 				"symbol":      round.FuturesSymbol(),
 				"accountType": "futures",
 			},
-		).Set(futuresFilled.Float64())
-		deviatedTooLong := round.DeviatedTooLong(tickTime, 10*time.Minute)
+		).Set(posDeviation.FuturesFilled.Float64())
+		roundValueDeviationMetrics.With(
+			prometheus.Labels{
+				"strategy_id": s.InstanceID(),
+				"symbol":      round.SpotSymbol(),
+			},
+		).Set(posDeviation.ValueDeviation.Float64())
+
 		roundSymbol := round.SpotSymbol()
-		if !halted && deviatedTooLong {
+		if !halted && posDeviation.DeviateTooLong {
 			// the round is originally not halted but the deviation is too large -> we need to halt the round
 			round.Halt(tickTime)
-			s.logger.Warnf("round %s halted due to large hedge deviation: spot filled %s, futures filled %s",
+			s.logger.Warnf("round %s halted due to large hedge deviation: spot filled %s, futures filled %s (value deviation %s)",
 				roundSymbol,
-				spotFilled,
-				futuresFilled,
+				posDeviation.SpotFilled,
+				posDeviation.FuturesFilled,
+				posDeviation.ValueDeviation,
 			)
-			bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required: spot filled %s, futures filled %s",
+			bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required: spot filled %s, futures filled %s (value deviation: %s)",
 				roundSymbol,
-				spotFilled, futuresFilled,
+				posDeviation.SpotFilled, posDeviation.FuturesFilled,
+				posDeviation.ValueDeviation,
 				round.NewCriticalNotification(),
 			)
 			continue
-		} else if halted && !deviatedTooLong {
+		} else if halted && !posDeviation.DeviateTooLong {
 			// the deviation is back to normal, resume the round
 			haltedAt := round.HaltedAt()
 			round.Resume()
 			s.logger.Infof("round %s resumed as hedge deviation back to normal: spot filled %s, futures filled %s",
 				roundSymbol,
-				spotFilled,
-				futuresFilled,
+				posDeviation.SpotFilled,
+				posDeviation.FuturesFilled,
 			)
 			bbgo.Notify("✅ Round %s resumed as hedge deviation back to normal. It was halted at %s.",
 				roundSymbol,

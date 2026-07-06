@@ -379,9 +379,10 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 	}
 	if spotActiveOrder != nil {
 		spotOrderField.Value = fmt.Sprintf(
-			"%s %s@%s",
+			"%s %s(executed: %s)@%s",
 			spotActiveOrder.Side,
 			spotActiveOrder.Quantity,
+			spotActiveOrder.ExecutedQuantity,
 			spotActiveOrder.Price,
 		)
 	}
@@ -393,9 +394,10 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 	}
 	if futuresActiveOrder != nil {
 		futuresOrderField.Value = fmt.Sprintf(
-			"%s %s@%s",
+			"%s %s(executed: %s)@%s",
 			futuresActiveOrder.Side,
 			futuresActiveOrder.Quantity,
+			futuresActiveOrder.ExecutedQuantity,
 			futuresActiveOrder.Price,
 		)
 	}
@@ -642,6 +644,11 @@ func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, currentTime time.Tim
 		return
 	}
 
+	activeOrder := r.spotWorker.ActiveOrder()
+	if activeOrder != nil && activeOrder.OrderID == trade.OrderID {
+		activeOrder.ExecutedQuantity = activeOrder.ExecutedQuantity.Add(trade.Quantity)
+	}
+
 	if r.syncState.State == RoundOpening {
 		r.logger.Infof("handling spot trade (open): %s", trade)
 		r.handleSpotTradeForOpen(trade, currentTime)
@@ -714,6 +721,11 @@ func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, currentTime time.
 	if ok := r.futuresWorker.Executor().AddTrade(trade); !ok {
 		// the trade does not belong to the futures worker, skip
 		return
+	}
+
+	activeOrder := r.futuresWorker.ActiveOrder()
+	if activeOrder != nil && activeOrder.OrderID == trade.OrderID {
+		activeOrder.ExecutedQuantity = activeOrder.ExecutedQuantity.Add(trade.Quantity)
 	}
 
 	if r.syncState.State == RoundClosing {
@@ -1121,17 +1133,23 @@ func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBo
 	}
 }
 
-func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxDeviation fixedpoint.Value) (spotFilled, futuresFilled fixedpoint.Value) {
+type PositionDeviation struct {
+	SpotFilled     fixedpoint.Value
+	FuturesFilled  fixedpoint.Value
+	ValueDeviation fixedpoint.Value
+	DeviateTooLong bool
+}
+
+func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, spotOrderBook, futuresOrderBook types.OrderBook, maxDeviation fixedpoint.Value, duration time.Duration) PositionDeviation {
 	// spot and futures position should be close to each other at all time.
-	spotFilled = r.SpotWorker().FilledPosition()
-	futuresFilled = r.FuturesWorker().FilledPosition()
+	spotFilled := r.SpotWorker().FilledPosition()
+	futuresFilled := r.FuturesWorker().FilledPosition()
 	// calculate the deviation of the unhedged position
-	spotFuturesRatio := fixedpoint.One
-	// when closing, the spotFilled may reach zero
-	if !spotFilled.IsZero() {
-		spotFuturesRatio = futuresFilled.Div(spotFilled)
-	}
-	deviation := fixedpoint.One.Sub(spotFuturesRatio).Abs()
+	spotMidPrice := getMidPrice(spotOrderBook)
+	futuresMidPrice := getMidPrice(futuresOrderBook)
+	spotValue := spotFilled.Mul(spotMidPrice)
+	futuresValue := futuresFilled.Mul(futuresMidPrice)
+	deviation := spotValue.Sub(futuresValue).Abs()
 	deviationTooLarge := deviation.Compare(maxDeviation) > 0
 	if deviationTooLarge {
 		if r.syncState.LargeDeviationStartTime.IsZero() {
@@ -1140,14 +1158,16 @@ func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxDeviat
 	} else {
 		r.syncState.LargeDeviationStartTime = time.Time{}
 	}
-	return spotFilled, futuresFilled
-}
-
-func (r *ArbitrageRound) DeviatedTooLong(currentTime time.Time, duration time.Duration) bool {
-	if r.syncState.LargeDeviationStartTime.IsZero() {
-		return false
+	deviateTooLong := false
+	if !r.syncState.LargeDeviationStartTime.IsZero() && currentTime.Sub(r.syncState.LargeDeviationStartTime) > duration {
+		deviateTooLong = true
 	}
-	return currentTime.Sub(r.syncState.LargeDeviationStartTime) > duration
+	return PositionDeviation{
+		SpotFilled:     spotFilled,
+		FuturesFilled:  futuresFilled,
+		ValueDeviation: deviation,
+		DeviateTooLong: deviateTooLong,
+	}
 }
 
 func (r *ArbitrageRound) syncFuturesPosition(spotTrade types.Trade) {

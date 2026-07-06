@@ -63,3 +63,11 @@ var roundPositionMetrics = promauto.NewGaugeVec(
 	},
 	[]string{"strategy_id", "symbol", "accountType"},
 )
+
+var roundValueDeviationMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_round_value_deviation",
+		Help: "Value deviation of the arbitrage round. It is the difference between spot and futures position value",
+	},
+	[]string{"strategy_id", "symbol"},
+)
