@@ -313,7 +313,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 	title := fmt.Sprintf("Arbitrage Round %s (%s)", n.SpotSymbol(), n.syncState.State)
 	fields := []slack.AttachmentField{
 		{
-			Title: "Target Spot Position",
+			Title: "Triggered Spot Position",
 			Value: n.syncState.TriggeredSpotTargetPosition.String(),
 			Short: true,
 		},
@@ -355,9 +355,8 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 			slack.AttachmentField{
-				Title: "Last Update Time",
-				Value: n.syncState.LastUpdateTime.Format(time.RFC3339),
-				Short: true,
+				Title: "Expected Closing Time",
+				Value: expectedClosingTime.Format(time.RFC3339),
 			},
 			slack.AttachmentField{
 				Title: "Min Holding Intervals",
@@ -369,12 +368,53 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				Value: n.syncState.FundingIntervalStart.Format(time.RFC3339),
 				Short: true,
 			},
-			slack.AttachmentField{
-				Title: "Expected Closing Time",
-				Value: expectedClosingTime.Format(time.RFC3339),
-			},
 		)
 	}
+
+	spotActiveOrder := n.spotWorker.activeOrder
+	spotOrderField := slack.AttachmentField{
+		Title: "Spot Active Order",
+		Value: "NONE",
+		Short: true,
+	}
+	if spotActiveOrder != nil {
+		spotOrderField.Value = fmt.Sprintf(
+			"%s %s@%s",
+			spotActiveOrder.Side,
+			spotActiveOrder.Quantity,
+			spotActiveOrder.Price,
+		)
+	}
+	futuresActiveOrder := n.futuresWorker.activeOrder
+	futuresOrderField := slack.AttachmentField{
+		Title: "Futures Active Order",
+		Value: "NONE",
+		Short: true,
+	}
+	if futuresActiveOrder != nil {
+		futuresOrderField.Value = fmt.Sprintf(
+			"%s %s@%s",
+			futuresActiveOrder.Side,
+			futuresActiveOrder.Quantity,
+			futuresActiveOrder.Price,
+		)
+	}
+
+	fields = append(fields,
+		slack.AttachmentField{
+			Title: "Spot Filled Position",
+			Value: n.spotWorker.FilledPosition().String(),
+			Short: true,
+		},
+		slack.AttachmentField{
+			Title: "Futures Filled Position",
+			Value: n.futuresWorker.FilledPosition().String(),
+			Short: true,
+		},
+		spotOrderField,
+		futuresOrderField,
+	)
+
 	text := "Arbitrage Round Details"
 	if n.IsCritical && len(n.slackAlert.Mentions) > 0 {
 		text += "cc " + strings.Join(n.slackAlert.Mentions, " ")
