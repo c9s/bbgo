@@ -120,7 +120,14 @@ func (w *TWAPWorker) SetTargetPosition(targetPosition fixedpoint.Value) {
 }
 
 func (w *TWAPWorker) SetLogger(logger logrus.FieldLogger) {
-	w.logger = logger
+	accountType := "spot"
+	if w.syncState.TWAPExecutor.IsFutures() {
+		accountType = "futures"
+	}
+	w.logger = logger.WithFields(logrus.Fields{
+		"component":   "TWAPWorker",
+		"accountType": accountType,
+	})
 }
 
 func (w *TWAPWorker) Symbol() string {
@@ -376,6 +383,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 		sliceQty := w.calculateSliceQuantity(currentTime, remaining, false, market, midPrice)
 		// the slice quantity is dust, do nothing
 		if !midPrice.IsZero() && market.IsDustQuantity(sliceQty, midPrice) {
+			w.logger.Debugf("slice quantity is dust, skipping order placement: %s@%s", sliceQty, midPrice)
 			return nil
 		}
 		createdOrder, err := w.syncState.TWAPExecutor.PlaceOrder(
@@ -388,6 +396,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 			return fmt.Errorf("failed to place order: %w", err)
 		}
 		w.activeOrder = createdOrder
+		w.logger.Infof("[TWAP tick] new active order created: %s", createdOrder)
 		return nil
 	}
 	// from here, active order is not nil

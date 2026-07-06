@@ -63,6 +63,10 @@ func (o *TWAPExecutor) Market() types.Market {
 	return o.syncState.Market
 }
 
+func (o *TWAPExecutor) IsFutures() bool {
+	return o.syncState.IsFutures
+}
+
 func (o *TWAPExecutor) Start() {
 	if o.logger == nil {
 		o.logger = logrus.WithFields(

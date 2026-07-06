@@ -292,6 +292,7 @@ func (s *Strategy) CrossRun(
 	if s.ClosedRoundTasks == nil {
 		s.ClosedRoundTasks = make(map[string]*CloseRoundTask)
 	}
+	s.logger.Debugf("active rounds: %d, pending rounds: %d, closed rounds: %d", len(s.ActiveRounds), len(s.PendingRounds), len(s.ClosedRoundTasks))
 
 	s.spotSession = sessions[s.SpotSession]
 	s.futuresSession = sessions[s.FuturesSession]
