@@ -30,9 +30,9 @@ func init() {
 }
 
 type CriticalErrorConfig struct {
-	MaxRemainingNotional       fixedpoint.Value `json:"maxRemainingNotional"`
-	MaxFundingRateFlip         fixedpoint.Value `json:"maxFundingRateFlip"`
-	MaxHedgedNotionalDeviation fixedpoint.Value `json:"maxHedgedNotionalDeviation"`
+	MaxRemainingNotional fixedpoint.Value `json:"maxRemainingNotional"`
+	MaxFundingRateFlip   fixedpoint.Value `json:"maxFundingRateFlip"`
+	MaxMoqDeviation      fixedpoint.Value `json:"maxMoqDeviation"`
 }
 
 func (c *CriticalErrorConfig) Defaults() {
@@ -42,9 +42,9 @@ func (c *CriticalErrorConfig) Defaults() {
 	if c.MaxFundingRateFlip.IsZero() {
 		c.MaxFundingRateFlip = fixedpoint.NewFromFloat(0.0003) // 0.03%
 	}
-	if c.MaxHedgedNotionalDeviation.IsZero() {
-		// max tolerance of $500 deviation between spot and futures position value
-		c.MaxHedgedNotionalDeviation = fixedpoint.NewFromInt(500)
+	if c.MaxMoqDeviation.IsZero() {
+		// max tolerance of 5x of the minium order quantity of the market.
+		c.MaxMoqDeviation = fixedpoint.NewFromInt(5)
 	}
 }
 
@@ -782,12 +782,9 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	for _, round := range s.ActiveRounds {
 		// check if the round is halted or should be halted
 		halted := round.IsHalted()
-		spotOrderBook := s.spotOrderBooks[round.SpotSymbol()].Copy()
-		futuresOrderBook := s.futuresOrderBooks[round.FuturesSymbol()].Copy()
 		posDeviation := round.CheckPositionDeviation(
 			tickTime,
-			spotOrderBook, futuresOrderBook,
-			s.CriticalErrorConfig.MaxHedgedNotionalDeviation,
+			s.CriticalErrorConfig.MaxMoqDeviation,
 			time.Minute*15,
 		)
 		// record the round spot/futures positions
@@ -810,7 +807,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				"strategy_id": s.InstanceID(),
 				"symbol":      round.SpotSymbol(),
 			},
-		).Set(posDeviation.ValueDeviation.Float64())
+		).Set(posDeviation.DeviatedQuantity.Float64())
 
 		roundSymbol := round.SpotSymbol()
 		if !halted && posDeviation.DeviateTooLong {
@@ -820,12 +817,12 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				roundSymbol,
 				posDeviation.SpotFilled,
 				posDeviation.FuturesFilled,
-				posDeviation.ValueDeviation,
+				posDeviation.DeviatedQuantity,
 			)
 			bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required: spot filled %s, futures filled %s (value deviation: %s)",
 				roundSymbol,
 				posDeviation.SpotFilled, posDeviation.FuturesFilled,
-				posDeviation.ValueDeviation,
+				posDeviation.DeviatedQuantity,
 				round.NewCriticalNotification(),
 			)
 			continue

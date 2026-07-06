@@ -1134,23 +1134,25 @@ func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBo
 }
 
 type PositionDeviation struct {
-	SpotFilled     fixedpoint.Value
-	FuturesFilled  fixedpoint.Value
-	ValueDeviation fixedpoint.Value
-	DeviateTooLong bool
+	SpotFilled       fixedpoint.Value
+	FuturesFilled    fixedpoint.Value
+	DeviatedQuantity fixedpoint.Value
+	DeviateTooLong   bool
 }
 
-func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, spotOrderBook, futuresOrderBook types.OrderBook, maxDeviation fixedpoint.Value, duration time.Duration) PositionDeviation {
+func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxMoqDeviation fixedpoint.Value, duration time.Duration) PositionDeviation {
+	// MOQ: minimum order quantity
+	spotMOQ := r.spotWorker.Market().MinQuantity
+	futuresMOQ := r.futuresWorker.Market().MinQuantity
+	thresMOQ := fixedpoint.Max(spotMOQ, futuresMOQ)
+	// calculate the deviation of the unhedged position
+	thresholdQuantity := thresMOQ.Mul(maxMoqDeviation)
+
 	// spot and futures position should be close to each other at all time.
 	spotFilled := r.SpotWorker().FilledPosition()
 	futuresFilled := r.FuturesWorker().FilledPosition()
-	// calculate the deviation of the unhedged position
-	spotMidPrice := getMidPrice(spotOrderBook)
-	futuresMidPrice := getMidPrice(futuresOrderBook)
-	spotValue := spotFilled.Mul(spotMidPrice)
-	futuresValue := futuresFilled.Mul(futuresMidPrice)
-	deviation := spotValue.Sub(futuresValue).Abs()
-	deviationTooLarge := deviation.Compare(maxDeviation) > 0
+	deviation := spotFilled.Sub(futuresFilled).Abs()
+	deviationTooLarge := deviation.Compare(thresholdQuantity) >= 0
 	if deviationTooLarge {
 		if r.syncState.LargeDeviationStartTime.IsZero() {
 			r.syncState.LargeDeviationStartTime = currentTime
@@ -1163,10 +1165,10 @@ func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, spotOrder
 		deviateTooLong = true
 	}
 	return PositionDeviation{
-		SpotFilled:     spotFilled,
-		FuturesFilled:  futuresFilled,
-		ValueDeviation: deviation,
-		DeviateTooLong: deviateTooLong,
+		SpotFilled:       spotFilled,
+		FuturesFilled:    futuresFilled,
+		DeviatedQuantity: deviation,
+		DeviateTooLong:   deviateTooLong,
 	}
 }
 
