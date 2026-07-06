@@ -52,7 +52,14 @@ func NewTWAPExecutor(
 }
 
 func (o *TWAPExecutor) SetLogger(logger logrus.FieldLogger) {
-	o.logger = logger
+	accountType := "spot"
+	if o.syncState.IsFutures {
+		accountType = "futures"
+	}
+	o.logger = logger.WithFields(logrus.Fields{
+		"component":   "TWAPExecutor",
+		"accountType": accountType,
+	})
 }
 
 func (o *TWAPExecutor) SetDryRun(dryRun bool) {
@@ -193,6 +200,7 @@ func (o *TWAPExecutor) PlaceOrder(quantity fixedpoint.Value, side types.SideType
 	// find the better price and submit new order
 	quantity = o.syncState.Market.TruncateQuantity(quantity)
 	price, err := o.GetPrice(side, orderBook)
+	o.logger.Debugf("quantity: %s, price: %s, side: %s", quantity, price, side)
 	if err != nil {
 		o.logger.WithError(err).Warn("[TWAP tick] failed to get price for active order update")
 		return nil, err

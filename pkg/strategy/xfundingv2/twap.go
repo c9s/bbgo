@@ -483,6 +483,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 
 func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fixedpoint.Value, deadlineExceeded bool, market types.Market, price fixedpoint.Value) fixedpoint.Value {
 	remaining = remaining.Abs()
+	w.logger.Debugf("remaining quantity: %s@%s", remaining, price)
 
 	if deadlineExceeded {
 		return remaining
@@ -537,6 +538,7 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 		}
 	}
 
+	w.logger.Debugf("sliceQty: %s@%s", sliceQty, price)
 	return sliceQty
 }
 
