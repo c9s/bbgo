@@ -802,7 +802,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				"accountType": "futures",
 			},
 		).Set(posDeviation.FuturesFilled.Float64())
-		roundValueDeviationMetrics.With(
+		roundQuantityDeviationMetrics.With(
 			prometheus.Labels{
 				"strategy_id": s.InstanceID(),
 				"symbol":      round.SpotSymbol(),

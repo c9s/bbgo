@@ -1151,7 +1151,7 @@ func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxMoqDev
 	// spot and futures position should be close to each other at all time.
 	spotFilled := r.SpotWorker().FilledPosition()
 	futuresFilled := r.FuturesWorker().FilledPosition()
-	deviation := spotFilled.Sub(futuresFilled).Abs()
+	deviation := spotFilled.Add(futuresFilled).Abs()
 	deviationTooLarge := deviation.Compare(thresholdQuantity) >= 0
 	if deviationTooLarge {
 		if r.syncState.LargeDeviationStartTime.IsZero() {
