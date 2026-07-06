@@ -778,7 +778,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	for _, round := range s.ActiveRounds {
 		// check if the round is halted or should be halted
 		halted := round.IsHalted()
-		spotFilled, futuresFilled, deviation := round.CheckPositionDeviation(
+		spotFilled, futuresFilled := round.CheckPositionDeviation(
 			tickTime, s.CriticalErrorConfig.MaxHedgeDeviation,
 		)
 		// record the round spot/futures positions
@@ -801,17 +801,14 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		if !halted && deviatedTooLong {
 			// the round is originally not halted but the deviation is too large -> we need to halt the round
 			round.Halt(tickTime)
-			s.logger.Warnf("round %s halted due to large hedge deviation: %s > %s, spot filled: %s, futures filled: %s",
+			s.logger.Warnf("round %s halted due to large hedge deviation: spot filled %s, futures filled %s",
 				roundSymbol,
-				deviation,
-				s.CriticalErrorConfig.MaxHedgeDeviation,
 				spotFilled,
 				futuresFilled,
 			)
-			bbgo.Notify("💥 Round %s halted due to large hedge deviation (%s > %s). Manual intervention is required.",
+			bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required: spot filled %s, futures filled %s",
 				roundSymbol,
-				deviation,
-				s.CriticalErrorConfig.MaxHedgeDeviation,
+				spotFilled, futuresFilled,
 				round.NewCriticalNotification(),
 			)
 			continue
@@ -819,9 +816,8 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			// the deviation is back to normal, resume the round
 			haltedAt := round.HaltedAt()
 			round.Resume()
-			s.logger.Infof("round %s resumed as hedge deviation back to normal: %s, spot filled: %s, futures filled: %s",
+			s.logger.Infof("round %s resumed as hedge deviation back to normal: spot filled %s, futures filled %s",
 				roundSymbol,
-				deviation,
 				spotFilled,
 				futuresFilled,
 			)

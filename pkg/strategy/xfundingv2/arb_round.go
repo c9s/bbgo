@@ -1121,7 +1121,7 @@ func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBo
 	}
 }
 
-func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxDeviation fixedpoint.Value) (spotFilled, futuresFilled, deviation fixedpoint.Value) {
+func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxDeviation fixedpoint.Value) (spotFilled, futuresFilled fixedpoint.Value) {
 	// spot and futures position should be close to each other at all time.
 	spotFilled = r.SpotWorker().FilledPosition()
 	futuresFilled = r.FuturesWorker().FilledPosition()
@@ -1131,7 +1131,7 @@ func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxDeviat
 	if !spotFilled.IsZero() {
 		spotFuturesRatio = futuresFilled.Div(spotFilled)
 	}
-	deviation = fixedpoint.One.Sub(spotFuturesRatio).Abs()
+	deviation := fixedpoint.One.Sub(spotFuturesRatio).Abs()
 	deviationTooLarge := deviation.Compare(maxDeviation) > 0
 	if deviationTooLarge {
 		if r.syncState.LargeDeviationStartTime.IsZero() {
@@ -1140,7 +1140,7 @@ func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxDeviat
 	} else {
 		r.syncState.LargeDeviationStartTime = time.Time{}
 	}
-	return spotFilled, futuresFilled, deviation
+	return spotFilled, futuresFilled
 }
 
 func (r *ArbitrageRound) DeviatedTooLong(currentTime time.Time, duration time.Duration) bool {
