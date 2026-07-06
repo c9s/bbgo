@@ -135,8 +135,12 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 	}
 	if !buyQuantity.IsZero() {
 		orderBook := s.spotOrderBooks[s.FeeSymbol]
-		midPrice := getMidPrice(orderBook.Copy())
-		buyQuantity = fixedpoint.Max(buyQuantity, market.MinNotional.Div(midPrice))
+		bestAsk, ok := orderBook.BestAsk()
+		if !ok {
+			return fmt.Errorf("no ask price available for %s", s.FeeSymbol)
+		}
+		bestAskPrice := bestAsk.Price
+		buyQuantity = fixedpoint.Max(buyQuantity, market.MinNotional.Div(bestAskPrice))
 		buyQuantity = market.TruncateQuantity(buyQuantity)
 		orderForm := types.SubmitOrder{
 			Symbol:   s.FeeSymbol,
@@ -144,8 +148,8 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 			Type:     types.OrderTypeMarket,
 			Quantity: buyQuantity,
 		}
-		if market.IsDustQuantity(buyQuantity, midPrice) {
-			orderForm.Quantity = market.MinNotional.Mul(fixedpoint.NewFromFloat(1.05)).Div(midPrice)
+		if market.IsDustQuantity(buyQuantity, bestAskPrice) {
+			orderForm.Quantity = market.MinNotional.Mul(fixedpoint.NewFromFloat(1.05)).Div(bestAskPrice)
 		}
 		orderExecutor, found := s.spotGeneralOrderExecutors[s.FeeSymbol]
 		if !found {
