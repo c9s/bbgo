@@ -814,13 +814,13 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			if !halted && posDeviation.DeviateTooLong {
 				// the round is originally not halted but the deviation is too large -> we need to halt the round
 				round.Halt(tickTime)
-				s.logger.Warnf("round %s halted due to large hedge deviation: spot filled %s, futures filled %s (value deviation %s)",
+				s.logger.Warnf("round %s halted due to large hedge deviation: spot filled %s, futures filled %s (deviation %s)",
 					roundSymbol,
 					posDeviation.SpotFilled,
 					posDeviation.FuturesFilled,
 					posDeviation.DeviatedQuantity,
 				)
-				bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required: spot filled %s, futures filled %s (value deviation: %s)",
+				bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required: spot filled %s, futures filled %s (deviation: %s)",
 					roundSymbol,
 					posDeviation.SpotFilled, posDeviation.FuturesFilled,
 					posDeviation.DeviatedQuantity,
@@ -1236,11 +1236,15 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 	feeRate := s.costEstimator.GetSpotFeeRate().TakerFeeRate
 	feeRateFactor := fixedpoint.One.Add(feeRate.Mul(fixedpoint.Two))
 	for _, candidate := range candidates {
-		spotMarket, ok := s.spotSession.Market(candidate.Symbol)
-		if !ok {
+		spotMarket, spotOk := s.spotSession.Market(candidate.Symbol)
+		futuresMarket, futuresOk := s.futuresSession.Market(candidate.Symbol)
+		if !spotOk || !futuresOk {
 			continue
 		}
+		var targetSize, minHoldingIntervals fixedpoint.Value
+		var negPosition bool
 		if s.MarketSelectionConfig.FuturesDirection == types.PositionShort {
+			negPosition = true
 			if candidate.PremiumIndex.LastFundingRate.Sign() <= 0 {
 				// the funding rate is not favorable for short futures, skip
 				continue
@@ -1255,18 +1259,18 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 			// targetSize = totalQuoteAmount / (price * feeRateFactor)
 			sellBook := s.spotOrderBooks[candidate.Symbol].SideBook(types.SideTypeSell)
 			spotPrice := sellBook.AverageDepthPriceByQuote(totalQuoteAmount, 0)
-			targetSize := totalQuoteAmount.Div(spotPrice.Mul(feeRateFactor))
+			targetSize = totalQuoteAmount.Div(spotPrice.Mul(feeRateFactor))
 			// short futures -> trade on the buy side of the order book
 			buyBook := s.futuresOrderBooks[candidate.Symbol].SideBook(types.SideTypeBuy)
 			futuresPrice := buyBook.AverageDepthPrice(targetSize)
 			// short futures -> target future position should be negative
-			breakEvenIntervals, err := s.calculateMinHoldingIntervals(candidate, futuresPrice, targetSize.Neg())
+			holdingIntervals, err := s.calculateMinHoldingIntervals(candidate, futuresPrice, targetSize.Neg())
 			if err != nil {
 				continue
 			}
-			breakevenIntervals[candidate.Symbol] = breakEvenIntervals
-			targetFuturePositions[candidate.Symbol] = targetSize.Neg()
+			minHoldingIntervals = holdingIntervals
 		} else if s.MarketSelectionConfig.FuturesDirection == types.PositionLong {
+			negPosition = false
 			if candidate.PremiumIndex.LastFundingRate.Sign() >= 0 {
 				// the funding rate is not favorable for long futures, skip
 				continue
@@ -1278,20 +1282,28 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 			// totalQuoteAmount = price * totalBase and targetSize = totalQuoteAmount / (price * feeRateFactor)
 			// so targetSize = totalBase / feeRateFactor
 			totalBase := baseBalance.Available.Mul(s.MarketSelectionConfig.TradeBalanceRatio)
-			targetSize := totalBase.Div(feeRateFactor)
+			targetSize = totalBase.Div(feeRateFactor)
 			// long futures -> trade on the sell side of the order book
 			sellBook := s.futuresOrderBooks[candidate.Symbol].SideBook(types.SideTypeSell)
 			futuresPrice := sellBook.AverageDepthPrice(targetSize)
 			// long futures -> target future position should be positive
-			breakEvenIntervals, err := s.calculateMinHoldingIntervals(candidate, futuresPrice, totalBase)
+			holdingIntervals, err := s.calculateMinHoldingIntervals(candidate, futuresPrice, totalBase)
 			if err != nil {
 				continue
 			}
-			breakevenIntervals[candidate.Symbol] = breakEvenIntervals
-			targetFuturePositions[candidate.Symbol] = targetSize
+			minHoldingIntervals = holdingIntervals
 		} else {
 			return nil
 		}
+		targetSize = fixedpoint.Min(
+			spotMarket.TruncateQuantity(targetSize),
+			futuresMarket.TruncateQuantity(targetSize),
+		)
+		breakevenIntervals[candidate.Symbol] = minHoldingIntervals
+		if negPosition {
+			targetSize = targetSize.Neg()
+		}
+		targetFuturePositions[candidate.Symbol] = targetSize
 	}
 	if len(breakevenIntervals) == 0 {
 		return nil
