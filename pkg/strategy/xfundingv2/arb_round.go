@@ -419,7 +419,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 
 	text := "Arbitrage Round Details"
 	if n.IsCritical && len(n.slackAlert.Mentions) > 0 {
-		text += "cc " + strings.Join(n.slackAlert.Mentions, " ")
+		text += " cc " + strings.Join(n.slackAlert.Mentions, " ")
 	}
 	return slack.Attachment{
 		Title:  title,
