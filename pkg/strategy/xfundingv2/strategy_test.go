@@ -74,6 +74,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"USDT": Balance("USDT", Number(10000)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		// Both bids and asks are needed: asks for entry (buy spot), bids for exit (sell spot)
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
@@ -137,6 +138,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"ETH": Balance("ETH", Number(5)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"BTCUSDT": newTestStreamOrderBook("BTCUSDT",
@@ -188,6 +190,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 		markets := types.MarketMap{"BTCUSDT": btcMarket}
 		balances := types.BalanceMap{}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"BTCUSDT": newTestStreamOrderBook("BTCUSDT",
@@ -224,6 +227,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"USDT": Balance("USDT", Number(10000)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{}
 		s.futuresOrderBooks = map[string]*types.StreamOrderBook{}
 
@@ -251,6 +255,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"USDT": Balance("USDT", Number(10000)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"BTCUSDT": newTestStreamOrderBook("BTCUSDT",
 				[]types.PriceVolume{{Price: Number(49900), Volume: Number(10)}},
@@ -290,6 +295,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"USDT": Balance("USDT", Number(10000)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"ETHUSDT": newTestStreamOrderBook("ETHUSDT",
@@ -332,6 +338,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"ETH": Balance("ETH", Number(5)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"ETHUSDT": newTestStreamOrderBook("ETHUSDT",
@@ -371,6 +378,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"USDT": Balance("USDT", Number(10000)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"BTCUSDT": newTestStreamOrderBook("BTCUSDT",
@@ -408,6 +416,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"USDT": Balance("USDT", Number(10000)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"ETHUSDT": newTestStreamOrderBook("ETHUSDT",
