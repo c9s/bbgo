@@ -601,6 +601,7 @@ func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, currentTime time.Tim
 		// the trade does not belong to the spot worker, skip
 		return
 	}
+
 	if r.syncState.State == RoundOpening {
 		r.logger.Infof("handling spot trade (open): %s", trade)
 		r.handleSpotTradeForOpen(trade, currentTime)
@@ -650,6 +651,7 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, currentTime t
 		return
 	}
 	// transfer succeeded, remove from retry list if exists
+	r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(transferAmount)
 	delete(r.syncState.RetryTransfers, trade.ID)
 	bbgo.Notify("➡️ Transfered %s %s from spot to futures",
 		transferAmount.String(),
@@ -681,6 +683,36 @@ func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, currentTime time.
 		// the round is opening or ready, just log the futures trade
 		r.logger.Infof("received futures trade: %s", trade)
 	}
+}
+
+func (r *ArbitrageRound) HandleSpotOrderUpdate(update types.Order) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if !r.hasOrder(update.OrderID) {
+		return
+	}
+
+	handleOrderUpdate(r.spotWorker, update)
+}
+
+func (r *ArbitrageRound) HandleFuturesOrderUpdate(update types.Order) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if !r.hasOrder(update.OrderID) {
+		return
+	}
+
+	handleOrderUpdate(r.futuresWorker, update)
+}
+
+func handleOrderUpdate(twapWorker *TWAPWorker, update types.Order) {
+	activeOrder := twapWorker.ActiveOrder()
+	if activeOrder != nil && activeOrder.OrderID == update.OrderID {
+		activeOrder.Update(update)
+	}
+	twapWorker.Executor().UpdateOrder(update)
 }
 
 // handleFuturesTradeForClose is the mirror of handleSpotTradeForOpen: during
@@ -725,8 +757,9 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, currentTi
 		return
 	}
 	// transfer succeeded, remove from retry list if exists
+	r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferAmount)
 	delete(r.syncState.RetryTransfers, trade.ID)
-	bbgo.Notify("⬅️ Transferred %s %s from futures to spot",
+	bbgo.Notify("⬅️ Transfered %s %s from futures to spot",
 		transferAmount.String(),
 		asset,
 		trade,
@@ -737,6 +770,128 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, currentTi
 		r.syncSpotPosition(trade)
 		r.syncState.SyncedFuturesTrades[trade.ID] = struct{}{}
 	}
+}
+
+func (r *ArbitrageRound) Prepare(
+	ctx context.Context,
+	spotSession, futuresSession *bbgo.ExchangeSession,
+) error {
+	timedCtx, cancel := context.WithTimeout(
+		ctx,
+		time.Second*20,
+	)
+	defer cancel()
+
+	switch r.syncState.State {
+	case RoundOpening:
+		return r.prepareOpening(timedCtx, spotSession)
+	case RoundClosing:
+		return r.prepareClosing(timedCtx, futuresSession)
+	}
+
+	return nil
+}
+
+func (r *ArbitrageRound) prepareOpening(
+	ctx context.Context,
+	spotSession *bbgo.ExchangeSession,
+) error {
+	now := time.Now()
+	var expectedTransferIn fixedpoint.Value
+	trades := r.spotWorker.Executor().AllTrades()
+	var spotSide types.SideType
+	for idx, trade := range trades {
+		if idx == 0 {
+			spotSide = trade.Side
+		} else if spotSide != trade.Side {
+			return fmt.Errorf("all spot trades should have the same side when opening: %s vs %s", spotSide, trade.Side)
+		}
+		amount := r.syncState.DirectionPolicy.TransferAmountFromSpotTrade(trade)
+		expectedTransferIn = expectedTransferIn.Add(amount)
+	}
+	transferDiff := expectedTransferIn.Sub(r.syncState.TransferInAmount)
+	asset := r.syncState.DirectionPolicy.CollateralAsset()
+	balance := spotSession.GetAccount().Balances()[asset]
+	if transferDiff.Sign() > 0 && balance.Available.Compare(transferDiff) > 0 {
+		r.logger.Infof("expected transfer in amount: %s, actual transfer in amount: %s, diff: %s, available: %s",
+			expectedTransferIn,
+			r.syncState.TransferInAmount,
+			transferDiff,
+			balance.Available,
+		)
+		if err := r.futuresService.TransferFuturesAccountAsset(ctx, asset, transferDiff, types.TransferIn); err != nil {
+			return fmt.Errorf("failed to transfer in %s %s: %w", transferDiff.String(), asset, err)
+		}
+	}
+	// transfer succeeded, need to sync the futures position to keep delta-neutral
+	targetPosition := r.spotWorker.FilledPosition().Neg()
+	r.futuresWorker.SetTargetPosition(targetPosition)
+	// don't place order but reset the time to let the TWAP worker to sync the position
+	// For example, considering the case where:
+	// 1. the futures worker's active order is not filled but the target position is high
+	// 2. the active order is canceled when the strategy shut down
+	// 3. the round is restore and remains in opening state when the strategy is restarted
+	// If we place order directly, we may place a large order to sync the position, which may cause a large slippage.
+	r.spotWorker.ResetTime(now, r.spotWorker.Duration())
+	r.futuresWorker.ResetTime(now, r.futuresWorker.Duration())
+	r.Resume()
+	r.syncState.LargeDeviationStartTime = time.Time{}
+
+	return nil
+}
+
+func (r *ArbitrageRound) prepareClosing(
+	ctx context.Context,
+	futuresSession *bbgo.ExchangeSession,
+) error {
+	now := time.Now()
+	var expectedTransferOut fixedpoint.Value
+	trades := r.futuresWorker.Executor().AllTrades()
+	// if we are long futures -> we should do transfer for the sell trades
+	// if we are short futures -> we should do transfer for the buy trades
+	var closingTradeSide types.SideType
+	longFutures := r.syncState.TriggeredSpotTargetPosition.Sign() < 0
+	if longFutures {
+		closingTradeSide = types.SideTypeSell
+	} else {
+		closingTradeSide = types.SideTypeBuy
+	}
+	for _, trade := range trades {
+		if trade.Side != closingTradeSide {
+			continue
+		}
+		amount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
+		expectedTransferOut = expectedTransferOut.Add(amount)
+	}
+	transferDiff := expectedTransferOut.Sub(r.syncState.TransferOutAmount)
+	asset := r.syncState.DirectionPolicy.CollateralAsset()
+	balance := futuresSession.GetAccount().Balances()[asset]
+	if transferDiff.Sign() > 0 && balance.Available.Compare(transferDiff) >= 0 {
+		r.logger.Infof("expected transfer out amount: %s, actual transfer out amount: %s, diff: %s, available: %s",
+			expectedTransferOut,
+			r.syncState.TransferOutAmount,
+			transferDiff,
+			balance.Available,
+		)
+		if err := r.futuresService.TransferFuturesAccountAsset(ctx, asset, transferDiff, types.TransferOut); err != nil {
+			return fmt.Errorf("failed to transfer out %s %s: %w", transferDiff.String(), asset, err)
+		}
+	}
+	// transfer succeeded, need to sync the spot position to keep delta-neutral
+	targetPosition := r.futuresWorker.FilledPosition().Neg()
+	r.spotWorker.SetTargetPosition(targetPosition)
+	// don't place order but reset the time to let the TWAP worker to sync the position
+	// For example, considering the case where:
+	// 1. the spot worker's active order is not filled and the target position is high.
+	// 2. the active order is canceled when the strategy shut down
+	// 3. the round is set to closing when the strategy is restarted
+	// If we place order directly, we may place a large order to sync the position, which may cause a large slippage.
+	r.spotWorker.ResetTime(now, r.spotWorker.Duration())
+	r.futuresWorker.ResetTime(now, r.futuresWorker.Duration())
+	r.Resume()
+	r.syncState.LargeDeviationStartTime = time.Time{}
+
+	return nil
 }
 
 func (r *ArbitrageRound) SetLogger(logger logrus.FieldLogger) {
@@ -817,7 +972,7 @@ func (r *ArbitrageRound) Cleanup(ctx context.Context, orderBook types.OrderBook)
 	}
 	createdOrder, err := w.Executor().PlaceOrder(
 		remaining.Abs(),
-		orderSide(remaining),
+		orderSide(remaining).Reverse(),
 		orderBook,
 		orderOptions,
 	)
@@ -914,6 +1069,7 @@ func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBo
 	if r.syncState.State == RoundClosing {
 		spotFilled := r.spotWorker.FilledPosition()
 		futuresFilled := r.futuresWorker.FilledPosition()
+		r.logger.Debugf("[Tick] spot filled: %s, futures filled: %s", spotFilled, futuresFilled)
 		spotIsDust := r.spotWorker.Market().IsDustQuantity(spotFilled.Abs(), spotMidPrice)
 		futuresIsDust := r.futuresWorker.Market().IsDustQuantity(futuresFilled.Abs(), futuresMidPrice)
 
@@ -923,6 +1079,35 @@ func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBo
 		}
 		return
 	}
+}
+
+func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxDeviation fixedpoint.Value) (spotFilled, futuresFilled, deviation fixedpoint.Value) {
+	// spot and futures position should be close to each other at all time.
+	spotFilled = r.SpotWorker().FilledPosition()
+	futuresFilled = r.FuturesWorker().FilledPosition()
+	// calculate the deviation of the unhedged position
+	spotFuturesRatio := fixedpoint.One
+	// when closing, the spotFilled may reach zero
+	if !spotFilled.IsZero() {
+		spotFuturesRatio = futuresFilled.Div(spotFilled)
+	}
+	deviation = fixedpoint.One.Sub(spotFuturesRatio).Abs()
+	deviationTooLarge := deviation.Compare(maxDeviation) > 0
+	if deviationTooLarge {
+		if r.syncState.LargeDeviationStartTime.IsZero() {
+			r.syncState.LargeDeviationStartTime = currentTime
+		}
+	} else {
+		r.syncState.LargeDeviationStartTime = time.Time{}
+	}
+	return spotFilled, futuresFilled, deviation
+}
+
+func (r *ArbitrageRound) DeviatedTooLong(currentTime time.Time, duration time.Duration) bool {
+	if r.syncState.LargeDeviationStartTime.IsZero() {
+		return false
+	}
+	return currentTime.Sub(r.syncState.LargeDeviationStartTime) > duration
 }
 
 func (r *ArbitrageRound) syncFuturesPosition(spotTrade types.Trade) {

@@ -889,22 +889,7 @@ func TestTWAPWorker_Misc(t *testing.T) {
 		})
 
 		t.Run("better buy price triggers update", func(t *testing.T) {
-			worker.syncState.ActiveOrder = &types.Order{
-				OrderID: 1,
-				SubmitOrder: types.SubmitOrder{
-					Side:     types.SideTypeBuy,
-					Price:    Number(99.01),
-					Quantity: Number(1.0),
-				},
-			}
-			// New best bid is higher, so improved price would be 99.51
-			orderBook := newOrderBook(99.5, 100.0, 100.0, 100.0)
-			result := worker.shouldUpdateActiveOrder(orderBook)
-			assert.True(t, result)
-		})
-
-		t.Run("worse buy price does not trigger update", func(t *testing.T) {
-			worker.syncState.ActiveOrder = &types.Order{
+			worker.activeOrder = &types.Order{
 				OrderID: 1,
 				SubmitOrder: types.SubmitOrder{
 					Side:     types.SideTypeBuy,
@@ -912,26 +897,57 @@ func TestTWAPWorker_Misc(t *testing.T) {
 					Quantity: Number(1.0),
 				},
 			}
-			// New best bid is lower
+			// New best bid is lower, so computed price 99.0+0.01=99.01 < 99.51 → better (cheaper)
 			orderBook := newOrderBook(99.0, 100.0, 100.0, 100.0)
+			result := worker.shouldUpdateActiveOrder(orderBook)
+			assert.True(t, result)
+		})
+
+		t.Run("worse buy price does not trigger update", func(t *testing.T) {
+			worker.activeOrder = &types.Order{
+				OrderID: 1,
+				SubmitOrder: types.SubmitOrder{
+					Side:     types.SideTypeBuy,
+					Price:    Number(99.01),
+					Quantity: Number(1.0),
+				},
+			}
+			// New best bid is higher, computed price 99.5+0.01=99.51 > 99.01 → not better
+			orderBook := newOrderBook(99.5, 100.0, 100.0, 100.0)
 			result := worker.shouldUpdateActiveOrder(orderBook)
 			assert.False(t, result)
 		})
 
 		t.Run("better sell price triggers update", func(t *testing.T) {
 			worker.SetTargetPosition(Number(-1.0))
-			worker.syncState.ActiveOrder = &types.Order{
+			worker.activeOrder = &types.Order{
 				OrderID: 1,
 				SubmitOrder: types.SubmitOrder{
 					Side:     types.SideTypeSell,
-					Price:    Number(99.98),
+					Price:    Number(99.49),
 					Quantity: Number(1.0),
 				},
 			}
-			// New best ask is lower, so improved price would be 99.49
-			orderBook := newOrderBook(99.0, 100.0, 99.5, 100.0)
+			// New best ask is higher, computed price 100.0-0.01=99.99 > 99.49 → better (more expensive)
+			orderBook := newOrderBook(99.0, 100.0, 100.0, 100.0)
 			result := worker.shouldUpdateActiveOrder(orderBook)
 			assert.True(t, result)
+		})
+
+		t.Run("worse sell price does not trigger update", func(t *testing.T) {
+			worker.SetTargetPosition(Number(-1.0))
+			worker.activeOrder = &types.Order{
+				OrderID: 1,
+				SubmitOrder: types.SubmitOrder{
+					Side:     types.SideTypeSell,
+					Price:    Number(99.99),
+					Quantity: Number(1.0),
+				},
+			}
+			// New best ask is lower, computed price 99.5-0.01=99.49 < 99.99 → not better
+			orderBook := newOrderBook(99.0, 100.0, 99.5, 100.0)
+			result := worker.shouldUpdateActiveOrder(orderBook)
+			assert.False(t, result)
 		})
 	})
 
@@ -956,7 +972,7 @@ func TestTWAPWorker_Misc(t *testing.T) {
 		err := worker.Start(ctx, startTime)
 		assert.NoError(t, err)
 
-		worker.syncState.ActiveOrder = &types.Order{
+		worker.activeOrder = &types.Order{
 			OrderID: 1,
 			SubmitOrder: types.SubmitOrder{
 				Side:     types.SideTypeBuy,

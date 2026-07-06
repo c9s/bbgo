@@ -90,11 +90,15 @@ func (o *TWAPExecutor) Stop() error {
 }
 
 // SyncOrder queries the latest order status and updates the internal store and trades.
-// it's designed to be called to restore the state of the executor after a restart or to sync a existing order.
 // it's not thread-safe
 func (o *TWAPExecutor) SyncOrder(order types.Order) error {
 	storeOrder, exists := o.executor.OrderStore().Get(order.OrderID)
-	if exists && storeOrder.GetRemainingQuantity().IsZero() {
+	if !exists {
+		o.logger.Warnf("[SyncOrder] order not found in the order store, skipping sync: %s", order)
+		return nil
+	}
+
+	if storeOrder.GetRemainingQuantity().IsZero() {
 		return nil
 	}
 
@@ -109,18 +113,14 @@ func (o *TWAPExecutor) SyncOrder(order types.Order) error {
 	if err != nil {
 		return fmt.Errorf("failed to query order: %v", query)
 	}
+	orderStore := o.executor.OrderStore()
+	orderStore.Add(*updatedOrder)
 
 	trades, err := o.exchange.QueryOrderTrades(timedCtx, query)
 	if err != nil {
 		return fmt.Errorf("failed to query order trades: %v, %v", query, err)
 	}
 
-	orderStore := o.executor.OrderStore()
-	if !exists {
-		orderStore.AddOrderUpdate = true
-	}
-	orderStore.HandleOrderUpdate(*updatedOrder)
-	orderStore.AddOrderUpdate = false
 	tradeCollector := o.executor.TradeCollector()
 	for _, trade := range trades {
 		tradeCollector.ProcessTrade(trade)
@@ -132,9 +132,32 @@ func (o *TWAPExecutor) SyncOrder(order types.Order) error {
 
 func (o *TWAPExecutor) GetOrder(orderID uint64) (types.Order, bool) {
 	if _, exists := o.syncState.Orders[orderID]; !exists {
+		o.logger.Debugf("[GetOrder] order not exists: %d", orderID)
 		return types.Order{}, false
 	}
-	return o.executor.OrderStore().Get(orderID)
+	orderStore := o.executor.OrderStore()
+	order, found := orderStore.Get(orderID)
+	if found {
+		return order, true
+	}
+
+	query := o.syncState.Orders[orderID]
+	updatedOrder, err := o.exchange.QueryOrder(o.ctx, query)
+	if err != nil {
+		o.logger.Debugf("[GetOrder] failed to query order: %+v", query)
+		return types.Order{}, false
+	}
+	orderStore.Add(*updatedOrder)
+	return *updatedOrder, true
+}
+
+func (o *TWAPExecutor) UpdateOrder(update types.Order) {
+	if _, exists := o.syncState.Orders[update.OrderID]; !exists {
+		o.logger.Debugf("[UpdateOrder] order not exists: %d", update.OrderID)
+		return
+	}
+	orderStore := o.executor.OrderStore()
+	orderStore.Update(update)
 }
 
 func (o *TWAPExecutor) CancelOpenOrders(ctx context.Context) error {
@@ -201,11 +224,11 @@ func (o *TWAPExecutor) buildSubmitOrder(quantity, price fixedpoint.Value, side t
 			Side:       side,
 			Type:       types.OrderTypeMarket,
 			Quantity:   quantity,
-			ReduceOnly: true,
+			ReduceOnly: options.ReduceOnly,
 		}
 	}
 	orderType := types.OrderTypeLimitMaker
-	timeInForce := types.TimeInForceGTC
+	var timeInForce types.TimeInForce
 
 	if o.syncState.Config.OrderType == TWAPOrderTypeTaker {
 		orderType = types.OrderTypeLimit
@@ -315,6 +338,7 @@ func (o *TWAPExecutor) CancelOrder(ctx context.Context, order types.Order) error
 		return nil
 	}
 
+	o.logger.Debugf("[TWAPExecutor] canceling order: %s", order)
 	// NOTE: GracefulCancel will ensure the order is canceled before returning. That is, it may keep trying forever.
 	// Add a notification ticker to notify if it takes too long to cancel the order.
 	ticker := time.NewTicker(5 * time.Minute)

@@ -72,7 +72,8 @@ func (c *TWAPWorkerConfig) Defaults() {
 }
 
 type TWAPWorker struct {
-	syncState TWAPWorkerSyncState
+	syncState   TWAPWorkerSyncState
+	activeOrder *types.Order
 
 	ctx    context.Context
 	logger logrus.FieldLogger
@@ -138,6 +139,10 @@ func (w *TWAPWorker) State() TWAPWorkerState {
 	return w.syncState.State
 }
 
+func (w *TWAPWorker) Duration() types.Duration {
+	return w.syncState.Config.Duration
+}
+
 func (w *TWAPWorker) IsDone() bool {
 	return w.syncState.State == TWAPWorkerStateDone
 }
@@ -173,7 +178,7 @@ func (w *TWAPWorker) TotalFee() map[string]fixedpoint.Value {
 }
 
 func (w *TWAPWorker) ActiveOrder() *types.Order {
-	return w.syncState.ActiveOrder
+	return w.activeOrder
 }
 
 func (w *TWAPWorker) RemainingQuantity() fixedpoint.Value {
@@ -248,10 +253,10 @@ func (w *TWAPWorker) ResetTime(currentTime time.Time, duration types.Duration) {
 // Stop stops the TWAP worker and cancels any active order on the exchange.
 func (w *TWAPWorker) Stop() {
 	if w.syncState.State == TWAPWorkerStateRunning || w.syncState.State == TWAPWorkerStatePending {
-		if w.syncState.ActiveOrder != nil {
-			err := w.syncState.TWAPExecutor.CancelOrder(w.ctx, *w.syncState.ActiveOrder)
+		if w.activeOrder != nil {
+			err := w.syncState.TWAPExecutor.CancelOrder(w.ctx, *w.activeOrder)
 			if err != nil {
-				w.logger.WithError(err).Warnf("[TWAP Stop] failed to cancel active order: %s", w.syncState.ActiveOrder)
+				w.logger.WithError(err).Warnf("[TWAP Stop] failed to cancel active order: %s", w.activeOrder)
 			}
 		}
 
@@ -261,7 +266,7 @@ func (w *TWAPWorker) Stop() {
 		}
 
 		w.syncState.State = TWAPWorkerStateDone
-		w.syncState.ActiveOrder = nil
+		w.activeOrder = nil
 		w.logger.Infof(
 			"[TWAP Stop] stopped: filled=%s / target=%s",
 			w.FilledPosition(), w.syncState.TargetPosition,
@@ -273,18 +278,18 @@ func (w *TWAPWorker) Stop() {
 // its trades via REST API, updates ordersMap and tradesMap accordingly, then
 // resets activeOrder to nil. Must be called under lock.
 func (w *TWAPWorker) syncAndResetActiveOrder() *types.Order {
-	if w.syncState.ActiveOrder == nil {
+	if w.activeOrder == nil {
 		return nil
 	}
 
-	if err := w.syncState.TWAPExecutor.SyncOrder(*w.syncState.ActiveOrder); err != nil {
-		w.logger.WithError(err).Warnf("[TWAP syncAndResetActiveOrder] fail to sync active order, resetting: %s", w.syncState.ActiveOrder.String())
-		w.syncState.ActiveOrder = nil
+	if err := w.syncState.TWAPExecutor.SyncOrder(*w.activeOrder); err != nil {
+		w.logger.WithError(err).Warnf("[TWAP syncAndResetActiveOrder] fail to sync active order, resetting: %s", w.activeOrder.String())
+		w.activeOrder = nil
 		return nil
 	}
 
-	oriActiveOrder, _ := w.syncState.TWAPExecutor.GetOrder(w.syncState.ActiveOrder.OrderID)
-	w.syncState.ActiveOrder = nil
+	oriActiveOrder, _ := w.syncState.TWAPExecutor.GetOrder(w.activeOrder.OrderID)
+	w.activeOrder = nil
 	return &oriActiveOrder
 }
 
@@ -336,12 +341,12 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 	orderOptions := TWAPExecuteOrderOptions{
 		DeadlineExceeded: deadlineExceeded,
 		// use reduce-only if we are closing the position
-		ReduceOnly: w.syncState.TargetPosition.Compare(w.FilledPosition()) < 0,
+		ReduceOnly: w.syncState.TargetPosition.Abs().Compare(w.FilledPosition().Abs()) < 0,
 	}
 	// if deadline exceeded, we want to place a final order for the remaining quantity
 	if deadlineExceeded {
-		if w.syncState.ActiveOrder != nil {
-			if err := w.syncState.TWAPExecutor.CancelOrder(w.ctx, *w.syncState.ActiveOrder); err != nil {
+		if w.activeOrder != nil {
+			if err := w.syncState.TWAPExecutor.CancelOrder(w.ctx, *w.activeOrder); err != nil {
 				w.logger.WithError(err).Warn("[TWAP tick] failed to cancel active order when deadline exceeded")
 				return nil
 			}
@@ -360,13 +365,14 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 		if err != nil || createdOrder == nil {
 			return fmt.Errorf("failed to place final order when deadline exceeded: %w", err)
 		}
-		w.syncState.ActiveOrder = createdOrder
+		w.activeOrder = createdOrder
 		return nil
 	}
 	// from here, deadline not exceeded
 
 	// we don't have an active order, place a new one
-	if w.syncState.ActiveOrder == nil {
+	if w.activeOrder == nil {
+		w.logger.Debugf("no active order, placing new order: %s", w.Symbol())
 		sliceQty := w.calculateSliceQuantity(currentTime, remaining, false, market, midPrice)
 		// the slice quantity is dust, do nothing
 		if !midPrice.IsZero() && market.IsDustQuantity(sliceQty, midPrice) {
@@ -381,7 +387,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 		if err != nil || createdOrder == nil {
 			return fmt.Errorf("failed to place order: %w", err)
 		}
-		w.syncState.ActiveOrder = createdOrder
+		w.activeOrder = createdOrder
 		return nil
 	}
 	// from here, active order is not nil
@@ -393,20 +399,20 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 			return nil
 		}
 		w.syncState.LastCheckTime = currentTime
+		w.logger.Debugf("try to update active order: %s", w.activeOrder)
 
 		// the remaining quantity of the active order is dust, no need to update
-		if !midPrice.IsZero() && market.IsDustQuantity(w.syncState.ActiveOrder.GetRemainingQuantity(), midPrice) {
-			return nil
-		}
+		remaining := w.activeOrder.GetRemainingQuantity()
+		w.logger.Debugf("active order remaining quantity: %s", remaining)
 
-		if err := w.syncState.TWAPExecutor.CancelOrder(w.ctx, *w.syncState.ActiveOrder); err != nil {
-			w.logger.WithError(err).Warn("[TWAP tick] failed to cancel active order")
+		if err := w.syncState.TWAPExecutor.CancelOrder(w.ctx, *w.activeOrder); err != nil {
+			w.logger.WithError(err).Warnf("[TWAP tick] failed to cancel active order: %s", w.activeOrder)
 			return nil
 		}
 		// find the better price and submit new order
 		createdOrder, err := w.syncState.TWAPExecutor.PlaceOrder(
-			w.syncState.ActiveOrder.GetRemainingQuantity(),
-			w.syncState.ActiveOrder.Side,
+			remaining,
+			w.activeOrder.Side,
 			orderBook,
 			orderOptions,
 		)
@@ -414,7 +420,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 			return fmt.Errorf("failed to place replacement order: %w", err)
 		}
 		oriActiveOrder := w.syncAndResetActiveOrder()
-		w.syncState.ActiveOrder = createdOrder
+		w.activeOrder = createdOrder
 		w.logger.Infof("[TWAP tick] active order updated: %s %s qty=%s(executed: %s)->%s price=%s->%s",
 			createdOrder.Side,
 			createdOrder.Type,
@@ -444,6 +450,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 	sliceQty := w.calculateSliceQuantity(currentTime, remaining, deadlineExceeded, market, midPrice)
 	// the slice quantity is dust, do nothing
 	if !midPrice.IsZero() && market.IsDustQuantity(sliceQty, midPrice) {
+		w.logger.Debugf("[TWAP tick] slice quantity is dust, skipping order placement: %s@%s", sliceQty, midPrice)
 		return nil
 	}
 	createdOrder, err := w.syncState.TWAPExecutor.PlaceOrder(
@@ -455,7 +462,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 	if err != nil || createdOrder == nil {
 		return fmt.Errorf("failed to place order for the next slice: %w", err)
 	}
-	w.syncState.ActiveOrder = createdOrder
+	w.activeOrder = createdOrder
 
 	return nil
 }
@@ -518,7 +525,7 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 // with a better price. For taker orders (IOC), always update. For maker orders,
 // compare the current order price against the best computed maker price.
 func (w *TWAPWorker) shouldUpdateActiveOrder(orderBook types.OrderBook) bool {
-	if w.syncState.ActiveOrder == nil {
+	if w.activeOrder == nil {
 		return false
 	}
 
@@ -527,21 +534,33 @@ func (w *TWAPWorker) shouldUpdateActiveOrder(orderBook types.OrderBook) bool {
 		return true
 	}
 
-	newPrice, err := w.syncState.TWAPExecutor.GetPrice(w.syncState.ActiveOrder.Side, orderBook)
+	newPrice, err := w.syncState.TWAPExecutor.GetPrice(w.activeOrder.Side, orderBook)
 	if err != nil {
 		w.logger.WithError(err).Warn("[TWAP shouldUpdateOrder] failed to get price for order update check")
 		return false
 	}
 
-	newPriceBtter := false
-	switch w.syncState.ActiveOrder.Side {
-	case types.SideTypeBuy:
-		newPriceBtter = newPrice.Compare(w.syncState.ActiveOrder.Price) > 0
-	case types.SideTypeSell:
-		newPriceBtter = newPrice.Compare(w.syncState.ActiveOrder.Price) < 0
+	remaining := w.activeOrder.GetRemainingQuantity()
+	if w.Market().IsDustQuantity(remaining, newPrice) {
+		w.logger.Debugf("[TWAP shouldUpdateOrder] active order is dust, should not update order: %s@%s", remaining, newPrice)
+		return false
 	}
-	w.logger.Infof("[TWAP shouldUpdateOrder] order update check: current price=%s, new price=%s, better=%t",
-		w.syncState.ActiveOrder.Price.String(), newPrice.String(), newPriceBtter)
+
+	// remaining is not dust but canceled
+	if w.activeOrder.Status == types.OrderStatusCanceled {
+		w.logger.Debugf("[TWAP shouldUpdateOrder] non-dust active order is canceled: %s", w.activeOrder)
+		return true
+	}
+
+	newPriceBtter := false
+	switch w.activeOrder.Side {
+	case types.SideTypeBuy:
+		newPriceBtter = newPrice.Compare(w.activeOrder.Price) < 0
+	case types.SideTypeSell:
+		newPriceBtter = newPrice.Compare(w.activeOrder.Price) > 0
+	}
+	w.logger.Debugf("[TWAP shouldUpdateOrder] order update check: current price=%s, new price=%s, better=%t",
+		w.activeOrder.Price.String(), newPrice.String(), newPriceBtter)
 	return newPriceBtter
 }
 

@@ -70,6 +70,8 @@ func (r *ArbitrageRound) Initialize(ctx context.Context, s *Strategy) error {
 type ArbitrageRoundSyncState struct {
 	TriggeredFundingRate        fixedpoint.Value     `json:"triggeredFundingRate"`
 	TriggeredSpotTargetPosition fixedpoint.Value     `json:"triggeredSpotTargetPosition"`
+	TransferInAmount            fixedpoint.Value     `json:"transferInAmount"`
+	TransferOutAmount           fixedpoint.Value     `json:"transferOutAmount"`
 	MinHoldingIntervals         int                  `json:"minHoldingIntervals"`
 	FundingIntervalHours        int                  `json:"fundingIntervalHours"`
 	FundingIntervalStart        time.Time            `json:"fundingIntervalStart"`
@@ -100,6 +102,8 @@ type ArbitrageRoundSyncState struct {
 	ClosingDuration types.Duration `json:"closingDuration"`
 	// LastUpdateTime is the last time when the round is updated
 	LastUpdateTime time.Time `json:"lastUpdateTime"`
+
+	LargeDeviationStartTime time.Time `json:"largeDeviationStartTime"`
 }
 
 func (r *ArbitrageRound) MarshalJSON() ([]byte, error) {

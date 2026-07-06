@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -92,12 +93,21 @@ func TestStrategy_AquireFeeAssetAndTransfer(t *testing.T) {
 		})
 		feeExecutor := bbgo.NewGeneralOrderExecutor(spotSession, "BNBUSDT", "xfundingv2", "test", position)
 
+		spotOrderBooks := map[string]*types.StreamOrderBook{
+			"BNBUSDT": newStreamOrderBookWithData("BNBUSDT",
+				types.PriceVolumeSlice{{Price: Number(600), Volume: Number(100)}},
+				types.PriceVolumeSlice{{Price: Number(601), Volume: Number(100)}},
+			),
+		}
+
 		s := &Strategy{
 			FeeSymbol:                 "BNBUSDT",
 			spotSession:               spotSession,
 			futuresSession:            futuresSession,
 			futuresService:            mockService,
 			spotGeneralOrderExecutors: map[string]*bbgo.GeneralOrderExecutor{"BNBUSDT": feeExecutor},
+			spotOrderBooks:            spotOrderBooks,
+			logger:                    logrus.StandardLogger(),
 		}
 
 		return s, mockExchange, mockService
