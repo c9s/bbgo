@@ -707,6 +707,9 @@ func (s *Strategy) CrossRun(
 		s.logger.Info("closing all active rounds and clearing pending rounds on startup")
 		// set all active rounds to closing state and clear the pending rounds
 		for _, round := range s.ActiveRounds {
+			if round.State() == RoundClosing {
+				continue
+			}
 			round.SetClosing(time.Now(), s.TWAPWorkerConfig.ClosingDuration)
 			bbgo.Notify("⚠️ Round is set to closing state on startup", round.NewNotification())
 		}
@@ -1440,10 +1443,7 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 		futuresExecutor.OrderStore().Remove(order)
 	}
 
-	// transfer any residual collateral back to the spot account. The bulk of
-	// the collateral is moved per-trade in handleFuturesTradeForClose; this
-	// block is a safety sweep for any leftover (e.g. PnL on the futures leg or
-	// residual after dust handling).
+	// transfer any residual collateral back to the spot account.
 	asset := round.CollateralAsset()
 	account, err := s.futuresSession.UpdateAccount(ctx)
 	if err != nil {
@@ -1455,17 +1455,19 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 		return fmt.Errorf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round)
 	}
 	// compute the amount to transfer back to spot account
-	transferAmount := s.transferAmountForClosedRound(task, balance, asset)
+	residualAmount := s.computeResidualCollateral(task, balance, asset)
 
 	// transfer the collateral back to spot account when the available balance is sufficient
-	if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, transferAmount, types.TransferOut); err != nil {
-		return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
-	} else {
-		bbgo.Notify("⬅️ Transferred %s %s back to spot account",
-			balance.Available,
-			asset,
-			round.NewNotification(),
-		)
+	if residualAmount.Sign() > 0 {
+		if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
+			return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
+		} else {
+			bbgo.Notify("⬅️ Transferred %s %s back to spot account",
+				balance.Available,
+				asset,
+				round.NewNotification(),
+			)
+		}
 	}
 
 	// set fee average cost
@@ -1499,31 +1501,27 @@ func (s *Strategy) closedRoundStats(round *ArbitrageRound, tickTime time.Time) {
 	// TODO: insert closed round records into database
 }
 
-func (s *Strategy) transferAmountForClosedRound(task *CloseRoundTask, balance types.Balance, asset string) fixedpoint.Value {
-	market := task.Round.FuturesWorker().Executor().Market()
+func (s *Strategy) computeResidualCollateral(task *CloseRoundTask, balance types.Balance, asset string) fixedpoint.Value {
 	amount := fixedpoint.Zero
-	if asset == market.BaseCurrency {
-		amount = balance.Available
+	var closingSide types.SideType
+	if task.Round.TriggeredTargetPosition().Sign() > 0 {
+		// short futures
+		// closing trade side is buy
+		closingSide = types.SideTypeBuy
 	} else {
-		spotTrades := task.Round.SpotWorker().Executor().AllTrades()
-		spotCost := fixedpoint.Zero
-		for _, trade := range spotTrades {
-			spotCost = spotCost.Add(trade.Quantity.Mul(trade.Price))
-		}
-		futuresCost := fixedpoint.Zero
-		futuresTrades := task.Round.FuturesWorker().Executor().AllTrades()
-		for _, trade := range futuresTrades {
-			futuresCost = futuresCost.Add(trade.Quantity.Mul(trade.Price))
-		}
-		amount = fixedpoint.Min(spotCost, futuresCost)
-		// the amount may be larger than the available balance due to negative round net PnL
-		amount = fixedpoint.Min(amount, balance.Available)
+		// long futures
+		// closing trade side is sell
+		closingSide = types.SideTypeSell
 	}
-	// the max withdraw amount may be smaller due to the negative PnL on the futures leg
-	if balance.MaxWithdrawAmount != nil {
-		amount = fixedpoint.Min(amount, *balance.MaxWithdrawAmount)
+
+	for _, trade := range task.Round.FuturesWorker().Executor().AllTrades() {
+		if trade.Side != closingSide {
+			continue
+		}
+		amount = amount.Add(task.Round.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade))
 	}
-	return amount
+	diffAmount := amount.Sub(task.Round.syncState.TransferOutAmount)
+	return fixedpoint.Min(diffAmount, balance.Net())
 }
 
 func (s *Strategy) canOpenRound(symbol string, currentTime time.Time) bool {
