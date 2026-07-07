@@ -68,7 +68,11 @@ func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Ti
 	// start the processed rounds and move them to active round list
 	for _, pendingRound := range processedRounds {
 		round := pendingRound.Round
-		if err := round.Start(ctx, currentTime); err != nil {
+		if err := round.Start(
+			ctx,
+			s.spotSession,
+			s.futuresSession,
+			currentTime); err != nil {
 			s.logger.WithError(err).Errorf(
 				"failed to start round after fee asset preparation: %s",
 				round,

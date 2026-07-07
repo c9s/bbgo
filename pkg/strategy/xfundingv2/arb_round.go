@@ -55,7 +55,8 @@ type ArbitrageRound struct {
 	futuresService                                FuturesService
 	spotExchangeFeeRates, futuresExchangeFeeRates map[types.ExchangeName]types.ExchangeFee
 
-	retryTransferTickC chan time.Time
+	spotSession, futuresSession *bbgo.ExchangeSession
+	retryTransferTickC          chan time.Time
 
 	logger     logrus.FieldLogger
 	slackAlert slackalert.SlackAlert
@@ -225,6 +226,13 @@ func (r *ArbitrageRound) StartTime() time.Time {
 }
 
 func (r *ArbitrageRound) HasStarted() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.hasStarted()
+}
+
+func (r *ArbitrageRound) hasStarted() bool {
 	return !r.syncState.StartTime.IsZero()
 }
 
@@ -551,7 +559,10 @@ func (r *ArbitrageRound) syncFundingFeeRecords(ctx context.Context, currentTime 
 	}
 }
 
-func (r *ArbitrageRound) Start(ctx context.Context, currentTime time.Time) error {
+func (r *ArbitrageRound) Start(ctx context.Context,
+	spotSession, futuresSession *bbgo.ExchangeSession,
+	currentTime time.Time,
+) error {
 	if r.syncState.StartTime.IsZero() {
 		if currentTime.After(r.syncState.FundingIntervalEnd) {
 			// the round is triggered after the funding interval -> error
@@ -603,7 +614,7 @@ func (r *ArbitrageRound) doRetryTransfers(currentTime time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.syncState.State != RoundOpening && r.syncState.State != RoundClosing {
+	if !r.hasStarted() {
 		return
 	}
 
@@ -619,10 +630,12 @@ func (r *ArbitrageRound) doRetryTransfers(currentTime time.Time) {
 		switch transfer.Direction {
 		case types.TransferOut:
 			// the round should be in closing state
-			r.handleFuturesTradeForClose(transfer.Trade, currentTime)
+			futuresBalance := r.futuresSession.Account.Balances()
+			r.handleFuturesTradeForClose(transfer.Trade, futuresBalance, currentTime)
 		case types.TransferIn:
 			// the round should be in opening state
-			r.handleSpotTradeForOpen(transfer.Trade, currentTime)
+			spotBalance := r.spotSession.Account.Balances()
+			r.handleSpotTradeForOpen(transfer.Trade, spotBalance, currentTime)
 		default:
 			r.logger.Warnf("unknown transfer direction for retry: %s", transfer.Direction)
 		}
@@ -676,10 +689,12 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotBalance t
 	if trade.FeeCurrency == asset {
 		transferAmount = transferAmount.Sub(trade.Fee)
 	}
-	transferAmount = fixedpoint.Min(transferAmount, spotBalance[asset].Available)
+	available := spotBalance[asset].Available
+	transferAmount = fixedpoint.Min(transferAmount, available)
 
 	if transferAmount.Sign() <= 0 {
-		// nothing left to transfer (e.g. fees ate the entire fill); still record sync
+		// nothing left to transfer (e.g. fees ate the entire fill)
+		r.logger.Warnf("no collateral asset available to transfer to futures: %s (available: %s %s)", trade.Symbol, available, asset)
 		delete(r.syncState.RetryTransfers, trade.ID)
 		return
 	}
@@ -787,11 +802,13 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresBa
 	if asset == trade.FeeCurrency {
 		transferAmount = transferAmount.Sub(trade.Fee)
 	}
-	transferAmount = fixedpoint.Min(transferAmount, futuresBalance[asset].Available)
+	available := futuresBalance[asset].Available
+	transferAmount = fixedpoint.Min(transferAmount, available)
 
 	if transferAmount.Sign() <= 0 {
 		// nothing left to transfer
 		// remove from retry list if exists
+		r.logger.Warnf("no collateral asset available to transfer back to spot: %s (available: %s %s)", trade.Symbol, available, asset)
 		delete(r.syncState.RetryTransfers, trade.ID)
 		return
 	}

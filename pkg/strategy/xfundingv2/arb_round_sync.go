@@ -34,9 +34,11 @@ func (r *ArbitrageRound) Initialize(ctx context.Context, s *Strategy) error {
 		},
 	)
 	r.retryTransferTickC = make(chan time.Time, 100)
-	if r.HasStarted() {
+	if r.hasStarted() {
 		// the round has been started before, we need to start the retry worker
 		go r.retryTransferWorker(ctx, r.retryTransferTickC)
+		r.spotSession = s.spotSession
+		r.futuresSession = s.futuresSession
 	}
 	if service, ok := s.futuresSession.Exchange.(FuturesService); ok {
 		r.futuresService = service
