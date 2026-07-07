@@ -428,6 +428,13 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	futuresCloseSide := sc.futuresCloseSide
 	spotCloseSide := oppositeSide(sc.spotOpenSide)
 
+	// collateralBalance holds far more of the collateral asset than any single
+	// transfer needs, so the balance clamp in HandleSpotTrade/HandleFuturesTrade
+	// never reduces the transfer amount below the expected value.
+	collateralBalance := types.BalanceMap{
+		sc.collateral: Balance(sc.collateral, Number(1e12)),
+	}
+
 	ctx := context.Background()
 	assert.NoError(t, round.Start(ctx, startTime))
 	assert.Equal(t, RoundOpening, round.State())
@@ -451,7 +458,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	transfersBefore := len(mockService.Transfers())
 	spotTrade1 := arbSpotTrade(1, spotWorker.ActiveOrder().OrderID, sc.spotOpenSide, openPrice, sliceQty)
 	processTrade(spotWorker, spotGeneralExecutor, spotTrade1)
-	round.HandleSpotTrade(spotTrade1, startTime)
+	round.HandleSpotTrade(spotTrade1, collateralBalance, startTime)
 
 	transfers := mockService.Transfers()
 	if assert.Len(t, transfers, transfersBefore+1, "spot fill must trigger exactly one transfer") {
@@ -469,7 +476,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 
 	futuresTrade1 := arbFuturesTrade(101, futuresWorker.ActiveOrder().OrderID, futuresOpenSide, openPrice, sliceQty)
 	processTrade(futuresWorker, futuresGeneralExecutor, futuresTrade1)
-	round.HandleFuturesTrade(futuresTrade1, startTime)
+	round.HandleFuturesTrade(futuresTrade1, collateralBalance, startTime)
 
 	assert.Len(t, mockService.Transfers(), transfersBefore+1,
 		"futures fill during opening must not trigger a transfer (spot is the leader)")
@@ -481,7 +488,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 
 	spotTrade2 := arbSpotTrade(2, spotWorker.ActiveOrder().OrderID, sc.spotOpenSide, openPrice, sliceQty)
 	processTrade(spotWorker, spotGeneralExecutor, spotTrade2)
-	round.HandleSpotTrade(spotTrade2, tick2)
+	round.HandleSpotTrade(spotTrade2, collateralBalance, tick2)
 
 	assert.Len(t, mockService.Transfers(), transfersBefore+2)
 	assert.Equal(t, sc.spotTarget.Neg(), futuresWorker.TargetPosition())
@@ -489,7 +496,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	assert.NoError(t, futuresWorker.Tick(tick2, orderBook))
 	futuresTrade2 := arbFuturesTrade(102, futuresWorker.ActiveOrder().OrderID, futuresOpenSide, openPrice, sliceQty)
 	processTrade(futuresWorker, futuresGeneralExecutor, futuresTrade2)
-	round.HandleFuturesTrade(futuresTrade2, tick2)
+	round.HandleFuturesTrade(futuresTrade2, collateralBalance, tick2)
 	assertDeltaNeutral(t, "after opening slice 2 (fully opened)")
 
 	// Transition to RoundReady.
@@ -526,7 +533,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 
 	futuresCloseTrade1 := arbFuturesTrade(103, futuresWorker.ActiveOrder().OrderID, futuresCloseSide, closePrice, sliceQty)
 	processTrade(futuresWorker, futuresGeneralExecutor, futuresCloseTrade1)
-	round.HandleFuturesTrade(futuresCloseTrade1, closeTime)
+	round.HandleFuturesTrade(futuresCloseTrade1, collateralBalance, closeTime)
 
 	transfers = mockService.Transfers()
 	if assert.Len(t, transfers, transfersBeforeClose+1, "futures close fill must trigger exactly one transfer") {
@@ -541,7 +548,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	assert.NoError(t, spotWorker.Tick(closeTime, orderBook))
 	spotCloseTrade1 := arbSpotTrade(3, spotWorker.ActiveOrder().OrderID, spotCloseSide, closePrice, sliceQty)
 	processTrade(spotWorker, spotGeneralExecutor, spotCloseTrade1)
-	round.HandleSpotTrade(spotCloseTrade1, closeTime)
+	round.HandleSpotTrade(spotCloseTrade1, collateralBalance, closeTime)
 
 	assert.Len(t, mockService.Transfers(), transfersBeforeClose+1,
 		"spot fill during closing must not trigger a transfer (futures is the leader)")
@@ -552,7 +559,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	assert.NoError(t, futuresWorker.Tick(tick5, orderBook))
 	futuresCloseTrade2 := arbFuturesTrade(104, futuresWorker.ActiveOrder().OrderID, futuresCloseSide, closePrice, sliceQty)
 	processTrade(futuresWorker, futuresGeneralExecutor, futuresCloseTrade2)
-	round.HandleFuturesTrade(futuresCloseTrade2, tick5)
+	round.HandleFuturesTrade(futuresCloseTrade2, collateralBalance, tick5)
 
 	assert.True(t, futuresWorker.FilledPosition().IsZero())
 	assert.True(t, spotWorker.TargetPosition().IsZero())
@@ -560,7 +567,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	assert.NoError(t, spotWorker.Tick(tick5, orderBook))
 	spotCloseTrade2 := arbSpotTrade(4, spotWorker.ActiveOrder().OrderID, spotCloseSide, closePrice, sliceQty)
 	processTrade(spotWorker, spotGeneralExecutor, spotCloseTrade2)
-	round.HandleSpotTrade(spotCloseTrade2, tick5)
+	round.HandleSpotTrade(spotCloseTrade2, collateralBalance, tick5)
 
 	assertDeltaNeutral(t, "after closing slice 2 (fully closed)")
 	assert.True(t, spotWorker.FilledPosition().IsZero())
