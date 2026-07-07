@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -195,11 +196,11 @@ func TestArbitrageRound_TotalFundingIncome(t *testing.T) {
 	nextFundingTime := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
 	round, mockService := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
 
-	t.Run("returns zero when startTime is zero", func(t *testing.T) {
+	t.Run("returns error when startTime is zero", func(t *testing.T) {
 		ctx := context.Background()
 		currentTime := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
 		err := round.SyncFundingFeeRecords(ctx, currentTime)
-		assert.NoError(t, err)
+		assert.Error(t, err)
 		result := round.TotalFundingIncome()
 		assert.Equal(t, fixedpoint.Zero, result)
 	})
@@ -412,6 +413,15 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	futuresOrderID := uint64(2000)
 	setupDeltaNeutralMockExchange(futuresMockExchange, futuresMockOrderQuery, &futuresOrderID)
 
+	// rebalance() (invoked from round.Tick while closing) queries both accounts.
+	// Return empty accounts so the net quote balance is zero and no rebalancing
+	// transfer is attempted.
+	spotMockExchange.EXPECT().QueryAccount(gomock.Any()).Return(types.NewAccount(), nil).AnyTimes()
+	futuresMockExchange.EXPECT().QueryAccount(gomock.Any()).Return(types.NewAccount(), nil).AnyTimes()
+
+	spotSession := &bbgo.ExchangeSession{Exchange: spotMockExchange}
+	futuresSession := &bbgo.ExchangeSession{Exchange: futuresMockExchange}
+
 	assertDeltaNeutral := func(t *testing.T, msg string) {
 		t.Helper()
 		net := spotWorker.FilledPosition().Add(futuresWorker.FilledPosition())
@@ -436,7 +446,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	}
 
 	ctx := context.Background()
-	assert.NoError(t, round.Start(ctx, startTime))
+	assert.NoError(t, round.Start(ctx, spotSession, futuresSession, startTime))
 	assert.Equal(t, RoundOpening, round.State())
 	assertDeltaNeutral(t, "after start")
 
@@ -500,7 +510,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	assertDeltaNeutral(t, "after opening slice 2 (fully opened)")
 
 	// Transition to RoundReady.
-	round.Tick(startTime.Add(6*time.Minute), orderBook, orderBook)
+	round.Tick(ctx, startTime.Add(6*time.Minute), orderBook, orderBook)
 	assert.Equal(t, RoundReady, round.State())
 	assertDeltaNeutral(t, "at RoundReady")
 	assert.Equal(t, sc.spotTarget, spotWorker.FilledPosition(),
@@ -573,7 +583,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	assert.True(t, spotWorker.FilledPosition().IsZero())
 	assert.True(t, futuresWorker.FilledPosition().IsZero())
 
-	round.Tick(closeTime.Add(6*time.Minute), orderBook, orderBook)
+	round.Tick(ctx, closeTime.Add(6*time.Minute), orderBook, orderBook)
 	assert.Equal(t, RoundClosed, round.State())
 	assertDeltaNeutral(t, "at RoundClosed")
 }
