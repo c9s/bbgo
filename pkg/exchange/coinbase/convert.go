@@ -184,7 +184,7 @@ func toGlobalBalance(cur string, cbBalance *api.Balance) types.Balance {
 		LongAvailableCredit:  fixedpoint.Zero,
 		ShortAvailableCredit: fixedpoint.Zero,
 		NetAsset:             cbBalance.Balance,
-		MaxWithdrawAmount:    fixedpoint.Zero,
+		MaxWithdrawAmount:    nil,
 	}
 }
 

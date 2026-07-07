@@ -19,7 +19,7 @@ func toGlobalBalance(asset v2.AccountAsset) types.Balance {
 		Borrowed:          fixedpoint.Zero,
 		Interest:          fixedpoint.Zero,
 		NetAsset:          fixedpoint.Zero,
-		MaxWithdrawAmount: fixedpoint.Zero,
+		MaxWithdrawAmount: nil,
 	}
 }
 

@@ -38,7 +38,7 @@ func Test_toGlobalBalance(t *testing.T) {
 		Borrowed:          fixedpoint.Zero,
 		Interest:          fixedpoint.Zero,
 		NetAsset:          fixedpoint.Zero,
-		MaxWithdrawAmount: fixedpoint.Zero,
+		MaxWithdrawAmount: nil,
 	}, toGlobalBalance(asset))
 }
 

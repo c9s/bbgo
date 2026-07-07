@@ -433,7 +433,7 @@ func TestExchange_QueryAccount(t *testing.T) {
 				Borrowed:          fixedpoint.Zero,
 				Interest:          fixedpoint.Zero,
 				NetAsset:          fixedpoint.Zero,
-				MaxWithdrawAmount: fixedpoint.Zero,
+				MaxWithdrawAmount: nil,
 			},
 			"USDT": {
 				Currency:          "USDT",
@@ -442,7 +442,7 @@ func TestExchange_QueryAccount(t *testing.T) {
 				Borrowed:          fixedpoint.Zero,
 				Interest:          fixedpoint.Zero,
 				NetAsset:          fixedpoint.Zero,
-				MaxWithdrawAmount: fixedpoint.Zero,
+				MaxWithdrawAmount: nil,
 			},
 		}
 	)
@@ -497,7 +497,7 @@ func TestExchange_QueryAccountBalances(t *testing.T) {
 				Borrowed:          fixedpoint.Zero,
 				Interest:          fixedpoint.Zero,
 				NetAsset:          fixedpoint.Zero,
-				MaxWithdrawAmount: fixedpoint.Zero,
+				MaxWithdrawAmount: nil,
 			},
 			"USDT": {
 				Currency:          "USDT",
@@ -506,7 +506,7 @@ func TestExchange_QueryAccountBalances(t *testing.T) {
 				Borrowed:          fixedpoint.Zero,
 				Interest:          fixedpoint.Zero,
 				NetAsset:          fixedpoint.Zero,
-				MaxWithdrawAmount: fixedpoint.Zero,
+				MaxWithdrawAmount: nil,
 			},
 		}
 	)
