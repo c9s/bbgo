@@ -874,7 +874,7 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 			LongAvailableCredit:  fixedpoint.Zero,
 			ShortAvailableCredit: fixedpoint.Zero,
 			NetAsset:             fixedpoint.Zero,
-			MaxWithdrawAmount:    fixedpoint.Zero,
+			MaxWithdrawAmount:    nil,
 		}
 	}
 

@@ -33,7 +33,7 @@ type Balance struct {
 	// NetAsset = (Available + Locked) - Borrowed - Interest
 	NetAsset fixedpoint.Value `json:"net,omitempty"`
 
-	MaxWithdrawAmount fixedpoint.Value `json:"maxWithdrawAmount,omitempty"`
+	MaxWithdrawAmount *fixedpoint.Value `json:"maxWithdrawAmount,omitempty"`
 }
 
 func NewBalance(currency string, aval fixedpoint.Value) Balance {
@@ -52,7 +52,7 @@ func NewZeroBalance(currency string) Balance {
 		LongAvailableCredit:  fixedpoint.Zero,
 		ShortAvailableCredit: fixedpoint.Zero,
 		NetAsset:             fixedpoint.Zero,
-		MaxWithdrawAmount:    fixedpoint.Zero,
+		MaxWithdrawAmount:    nil,
 	}
 }
 
@@ -343,7 +343,7 @@ func (b *Balance) Validate() error {
 	if b.NetAsset.Sign() < 0 {
 		return fmt.Errorf("net asset cannot be negative")
 	}
-	if b.MaxWithdrawAmount.Sign() < 0 {
+	if b.MaxWithdrawAmount != nil && b.MaxWithdrawAmount.Sign() < 0 {
 		return fmt.Errorf("max withdraw amount cannot be negative")
 	}
 	return nil

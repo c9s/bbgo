@@ -134,7 +134,7 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 			Currency:          b.Asset,
 			Available:         b.AvailableBalance,                                  // AvailableBalance here is the available margin, like how much quantity/notional you can SHORT/LONG, not what you can withdraw
 			Locked:            b.Balance.Sub(b.AvailableBalance.Sub(b.CrossUnPnl)), // FIXME: AvailableBalance is the available margin balance, it could be re-calculated by the current formula.
-			MaxWithdrawAmount: b.MaxWithdrawAmount,
+			MaxWithdrawAmount: &b.MaxWithdrawAmount,
 		}
 	}
 
