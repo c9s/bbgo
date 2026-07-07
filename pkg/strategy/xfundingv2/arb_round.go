@@ -1264,7 +1264,7 @@ func (r *ArbitrageRound) rebalance(ctx context.Context) error {
 	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
 	if shortFutures {
 		// rebalance the short futures leg
-		// the quote currency balance should be non-negative
+		// 1. check the quote currency balance should be non-negative
 		// negative quote balance on futures account will decrease the collateral available for transfer back to spot
 		// this will cause the spot leg to be unable to close its position
 		futuresMarket := r.futuresWorker.Market()
@@ -1285,26 +1285,34 @@ func (r *ArbitrageRound) rebalance(ctx context.Context) error {
 			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, quoteAsset, transferAmount, types.TransferIn); err != nil {
 				return fmt.Errorf("failed to transfer %s %s from spot to futures: %w", transferAmount.String(), quoteAsset, err)
 			}
-			// transfer the base asset from futures to spot
-			accTransferOut := r.syncState.TransferOutAmount
-			expectedTransferOut := fixedpoint.Zero
-			for _, trade := range r.futuresWorker.Executor().AllTrades() {
-				if trade.Side != types.SideTypeSell {
-					continue
-				}
-				amount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
-				expectedTransferOut = expectedTransferOut.Add(amount)
-			}
-			transferDiff := expectedTransferOut.Sub(accTransferOut)
-			if transferDiff.Sign() <= 0 {
-				r.logger.Debugf("transferDiff: %s", transferDiff)
-				return nil
-			}
-			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, transferDiff, types.TransferOut); err != nil {
-				return fmt.Errorf("failed to transfer %s %s from futures to spot: %w", baseAssetBalance.Available, baseAsset, err)
-			}
-			r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
 		}
+		// 2. transfer the base asset from futures to spot
+		// check the accumulated transfer out amount and the expected one
+		// if the expected transfer amount is larger than the accumulated one, transfer the difference back to spot
+		// NOTE: need to check the max withdraw
+		accTransferOut := r.syncState.TransferOutAmount
+		expectedTransferOut := fixedpoint.Zero
+		for _, trade := range r.futuresWorker.Executor().AllTrades() {
+			if trade.Side != types.SideTypeSell {
+				continue
+			}
+			amount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
+			expectedTransferOut = expectedTransferOut.Add(amount)
+		}
+		transferDiff := expectedTransferOut.Sub(accTransferOut)
+		maxWithdraw := baseAssetBalance.MaxWithdrawAmount
+		if maxWithdraw != nil && maxWithdraw.Sign() > 0 {
+			transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
+		}
+		if transferDiff.Sign() <= 0 {
+			r.logger.Debugf("transferDiff: %s", transferDiff)
+			return nil
+		}
+		// 3. transfer the base asset from futures to spot
+		if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, transferDiff, types.TransferOut); err != nil {
+			return fmt.Errorf("failed to transfer %s %s from futures to spot: %w", transferDiff, baseAsset, err)
+		}
+		r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
 	} else {
 		// TODO: rebalance the long futures leg
 	}
