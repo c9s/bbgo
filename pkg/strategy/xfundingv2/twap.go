@@ -345,6 +345,18 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 		return nil
 	}
 
+	// the existing active order is in the opposite direction of the remaining quantity
+	if w.activeOrder != nil && remaining.Sign()*orderSide(remaining).Int() < 0 {
+		if !w.activeOrder.GetRemainingQuantity().IsZero() {
+			// cancel the active order
+			w.logger.Infof("[TWAP tick] active order of opposite direction detected, canceling: %s", w.activeOrder)
+			if err := w.syncState.TWAPExecutor.CancelOrder(w.ctx, *w.activeOrder); err != nil {
+				return fmt.Errorf("[TWAP tick] failed to cancel partially filled active order in opposite direction: %w", err)
+			}
+		}
+		w.syncAndResetActiveOrder()
+	}
+
 	market := w.Market()
 	midPrice := getMidPrice(orderBook)
 
