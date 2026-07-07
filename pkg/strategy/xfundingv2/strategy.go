@@ -889,7 +889,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			}
 		}
 
-		s.transitRoundState(ctx, round, tickTime)
+		s.transitRound(ctx, round, tickTime)
 
 		// enque closed active rounds
 		if round.State() == RoundClosed {
@@ -949,7 +949,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	}
 }
 
-func (s *Strategy) transitRoundState(ctx context.Context, round *ArbitrageRound, currentTime time.Time) {
+func (s *Strategy) transitRound(ctx context.Context, round *ArbitrageRound, currentTime time.Time) {
 	// still in the first funding interval, do not transit
 	if round.NumHoldingIntervals(currentTime) <= 1 {
 		if round.LastUpdateTime().IsZero() {
@@ -970,9 +970,9 @@ func (s *Strategy) transitRoundState(ctx context.Context, round *ArbitrageRound,
 	oriState := round.State()
 	switch oriState {
 	case RoundOpening:
-		s.transitOpeningOrReadyRound(ctx, round, currentTime)
+		s.transitOpeningOrReadyRoundToClosing(ctx, round, currentTime)
 	case RoundReady:
-		s.transitOpeningOrReadyRound(ctx, round, currentTime)
+		s.transitOpeningOrReadyRoundToClosing(ctx, round, currentTime)
 	case RoundClosing:
 		s.transitClosingRound(ctx, round, currentTime)
 	}
@@ -980,7 +980,7 @@ func (s *Strategy) transitRoundState(ctx context.Context, round *ArbitrageRound,
 	round.SetUpdateTime(currentTime)
 }
 
-func (s *Strategy) transitOpeningOrReadyRound(ctx context.Context, round *ArbitrageRound, currentTime time.Time) {
+func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, round *ArbitrageRound, currentTime time.Time) {
 	// if the current funding rate is still favorable, stay in current state, otherwise transit to closing
 	timedCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
 	defer cancel()
