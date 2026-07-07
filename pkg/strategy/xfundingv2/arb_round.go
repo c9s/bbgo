@@ -929,14 +929,14 @@ func (r *ArbitrageRound) prepareClosing(
 	now := time.Now()
 	var expectedTransferOut fixedpoint.Value
 	trades := r.futuresWorker.Executor().AllTrades()
-	// if we are long futures -> we should do transfer for the sell trades
-	// if we are short futures -> we should do transfer for the buy trades
+	// if we are short futures -> closing trades are buy trades
+	// if we are long futures -> closing trades are sell trades
 	var closingTradeSide types.SideType
-	longFutures := r.syncState.TriggeredSpotTargetPosition.Sign() < 0
-	if longFutures {
-		closingTradeSide = types.SideTypeSell
-	} else {
+	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
+	if shortFutures {
 		closingTradeSide = types.SideTypeBuy
+	} else {
+		closingTradeSide = types.SideTypeSell
 	}
 	for _, trade := range trades {
 		if trade.Side != closingTradeSide {
@@ -948,13 +948,17 @@ func (r *ArbitrageRound) prepareClosing(
 	transferDiff := expectedTransferOut.Sub(r.syncState.TransferOutAmount)
 	asset := r.syncState.DirectionPolicy.CollateralAsset()
 	balance := futuresSession.GetAccount().Balances()[asset]
-	if transferDiff.Sign() > 0 && balance.Available.Compare(transferDiff) >= 0 {
-		r.logger.Infof("expected transfer out amount: %s, actual transfer out amount: %s, diff: %s, available: %s",
+	if transferDiff.Sign() > 0 {
+		maxWithdraw := balance.MaxWithdrawAmount
+		r.logger.Infof("expected transfer out amount: %s, actual transfer out amount: %s, diff: %s, max withdraw: %s",
 			expectedTransferOut,
 			r.syncState.TransferOutAmount,
 			transferDiff,
-			balance.Available,
+			maxWithdraw,
 		)
+		if maxWithdraw != nil {
+			transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
+		}
 		if err := r.futuresService.TransferFuturesAccountAsset(ctx, asset, transferDiff, types.TransferOut); err != nil {
 			return fmt.Errorf("failed to transfer out %s %s: %w", transferDiff.String(), asset, err)
 		}
