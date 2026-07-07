@@ -708,6 +708,7 @@ func (s *Strategy) CrossRun(
 		// set all active rounds to closing state and clear the pending rounds
 		for _, round := range s.ActiveRounds {
 			round.SetClosing(time.Now(), s.TWAPWorkerConfig.ClosingDuration)
+			bbgo.Notify("⚠️ Round is set to closing state on startup", round.NewNotification())
 		}
 		s.PendingRounds = make(map[string]*PendingRound)
 		s.mu.Unlock()
@@ -778,7 +779,29 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	for _, round := range s.ActiveRounds {
 		spotOrderBook := s.spotOrderBooks[round.SpotSymbol()].Copy()
 		futuresOrderBook := s.futuresOrderBooks[round.FuturesSymbol()].Copy()
-		round.Tick(tickTime, spotOrderBook, futuresOrderBook)
+		oriState := round.State()
+		round.Tick(ctx, tickTime, spotOrderBook, futuresOrderBook)
+		currentState := round.State()
+		if oriState != currentState {
+			switch currentState {
+			case RoundReady:
+				bbgo.Notify("🟢 Round entered ready state: %s",
+					round.SpotSymbol(),
+					round.NewNotification(),
+				)
+			case RoundClosing:
+				bbgo.Notify("🟡 Round is closing: %s",
+					round.SpotSymbol(),
+					round.NewNotification(),
+				)
+			case RoundClosed:
+				bbgo.Notify("🔴 Round is closed: %s",
+					round.SpotSymbol(),
+					round.NewNotification(),
+				)
+			}
+		}
+
 	}
 	// 2. transit active rounds
 	for _, round := range s.ActiveRounds {
@@ -945,20 +968,8 @@ func (s *Strategy) transitRoundState(ctx context.Context, round *ArbitrageRound,
 	switch oriState {
 	case RoundOpening:
 		s.transitOpeningOrReadyRound(ctx, round, currentTime)
-		if round.State() == RoundReady {
-			bbgo.Notify("🟢 Round entered ready state: %s",
-				round.SpotSymbol(),
-				round.NewNotification(),
-			)
-		}
 	case RoundReady:
 		s.transitOpeningOrReadyRound(ctx, round, currentTime)
-		if round.State() == RoundClosing {
-			bbgo.Notify("🔴 Round is closing: %s",
-				round.SpotSymbol(),
-				round.NewNotification(),
-			)
-		}
 	case RoundClosing:
 		s.transitClosingRound(ctx, round, currentTime)
 	}

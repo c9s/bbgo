@@ -692,7 +692,9 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotBalance t
 		transferAmount = transferAmount.Sub(trade.Fee)
 	}
 	available := spotBalance[asset].Available
-	transferAmount = fixedpoint.Min(transferAmount, available)
+	if !available.IsZero() {
+		transferAmount = fixedpoint.Min(transferAmount, available)
+	}
 
 	if transferAmount.Sign() <= 0 {
 		// nothing left to transfer (e.g. fees ate the entire fill)
@@ -804,13 +806,15 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresBa
 	if asset == trade.FeeCurrency {
 		transferAmount = transferAmount.Sub(trade.Fee)
 	}
-	available := futuresBalance[asset].Available
-	transferAmount = fixedpoint.Min(transferAmount, available)
+	if w := futuresBalance[asset].MaxWithdrawAmount; w != nil {
+		r.logger.Debugf("max withdraw amount on futures account: %s %s", w.String(), asset)
+		transferAmount = fixedpoint.Min(transferAmount, *w)
+	}
 
 	if transferAmount.Sign() <= 0 {
 		// nothing left to transfer
 		// remove from retry list if exists
-		r.logger.Warnf("no collateral asset available to transfer back to spot: %s (available: %s %s)", trade.Symbol, available, asset)
+		r.logger.Warnf("no collateral asset available to transfer back to spot: %s", asset)
 		delete(r.syncState.RetryTransfers, trade.ID)
 		return
 	}
@@ -1087,7 +1091,7 @@ func (r *ArbitrageRound) AnnualizedRate() fixedpoint.Value {
 }
 
 // Tick is called to tick the underlying spot and futures workers and update the round state
-func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBook, futuresOrderBook types.OrderBook) {
+func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOrderBook types.OrderBook, futuresOrderBook types.OrderBook) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -1111,6 +1115,10 @@ func (r *ArbitrageRound) Tick(currentTime time.Time, spotOrderBook types.OrderBo
 	case r.retryTransferTickC <- currentTime:
 	default:
 		r.logger.Warnf("retry transfer tick channel is full, skipping retry tick at %s", currentTime.Format(time.RFC3339))
+	}
+
+	if err := r.rebalance(ctx); err != nil {
+		r.logger.WithError(err).Warnf("failed to rebalance round: %s", r.String())
 	}
 
 	// it's opening or closing, tick the workers
@@ -1207,7 +1215,7 @@ func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxMoqDev
 
 func (r *ArbitrageRound) syncFuturesPosition(spotTrade types.Trade) {
 	// sanity check
-	if r.spotWorker.Symbol() != spotTrade.Symbol || spotTrade.IsFutures {
+	if _, ok := r.spotWorker.Executor().GetOrder(spotTrade.OrderID); !ok {
 		return
 	}
 	// the filled spot position can be positive or negative
@@ -1225,7 +1233,7 @@ func (r *ArbitrageRound) syncFuturesPosition(spotTrade types.Trade) {
 
 func (r *ArbitrageRound) syncSpotPosition(futuresTrade types.Trade) {
 	// sanity check
-	if r.futuresWorker.Symbol() != futuresTrade.Symbol || !futuresTrade.IsFutures {
+	if _, ok := r.futuresWorker.Executor().GetOrder(futuresTrade.OrderID); !ok {
 		return
 	}
 
@@ -1236,4 +1244,9 @@ func (r *ArbitrageRound) syncSpotPosition(futuresTrade types.Trade) {
 	oriSpotTarget := r.spotWorker.TargetPosition()
 	r.logger.Infof("syncing spot target on close %s -> %s: %s", oriSpotTarget, spotTarget, futuresTrade)
 	r.spotWorker.SetTargetPosition(spotTarget)
+}
+
+func (r *ArbitrageRound) rebalance(ctx context.Context) error {
+	// TODO: rebalance spot/futures balances
+	return nil
 }
