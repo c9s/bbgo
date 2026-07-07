@@ -521,7 +521,9 @@ func (r *ArbitrageRound) hasOrder(orderID uint64) bool {
 
 func (r *ArbitrageRound) syncFundingFeeRecords(ctx context.Context, currentTime time.Time) error {
 	if r.syncState.StartTime.IsZero() || r.syncState.StartTime.After(currentTime) {
-		return nil
+		return fmt.Errorf("query time is before the round start time: current %s v.s start %s",
+			currentTime.Format(time.RFC3339), r.syncState.StartTime.Format(time.RFC3339),
+		)
 	}
 
 	q := batch.BinanceFuturesIncomeBatchQuery{

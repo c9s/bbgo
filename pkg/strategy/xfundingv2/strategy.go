@@ -1445,25 +1445,18 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 	}
 	// compute the amount to transfer back to spot account
 	transferAmount := s.transferAmountForClosedRound(task, balance, asset)
-	if balance.Available.Compare(transferAmount) >= 0 {
-		// transfer the collateral back to spot account when the available balance is sufficient
-		if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, transferAmount, types.TransferOut); err != nil {
-			return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
-		} else {
-			bbgo.Notify("⬅️ Transferred %s %s back to spot account",
-				balance.Available,
-				asset,
-				round.NewNotification(),
-			)
-		}
+
+	// transfer the collateral back to spot account when the available balance is sufficient
+	if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, transferAmount, types.TransferOut); err != nil {
+		return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
 	} else {
-		return fmt.Errorf("[handleClosedRound] insufficient balance %s %s (required %s) to transfer back to spot account during round exit: %s",
+		bbgo.Notify("⬅️ Transferred %s %s back to spot account",
 			balance.Available,
 			asset,
-			transferAmount,
-			round,
+			round.NewNotification(),
 		)
 	}
+
 	// set fee average cost
 	if executor, ok := s.spotGeneralOrderExecutors[s.FeeSymbol]; ok {
 		feeAvgCost := executor.Position().AverageCost
@@ -1512,9 +1505,12 @@ func (s *Strategy) transferAmountForClosedRound(task *CloseRoundTask, balance ty
 			futuresCost = futuresCost.Add(trade.Quantity.Mul(trade.Price))
 		}
 		amount = fixedpoint.Min(spotCost, futuresCost)
-		if balance.Available.Compare(amount) < 0 {
-			amount = balance.Available
-		}
+		// the amount may be larger than the available balance due to negative round net PnL
+		amount = fixedpoint.Min(amount, balance.Available)
+	}
+	// the max withdraw amount may be smaller due to the negative PnL on the futures leg
+	if balance.MaxWithdrawAmount != nil {
+		amount = fixedpoint.Min(amount, *balance.MaxWithdrawAmount)
 	}
 	return amount
 }
