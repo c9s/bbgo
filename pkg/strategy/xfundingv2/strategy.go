@@ -636,9 +636,10 @@ func (s *Strategy) CrossRun(
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
+		balance := s.spotSession.Account.Balances()
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
-				round.HandleSpotTrade(trade, trade.Time.Time())
+				round.HandleSpotTrade(trade, balance, trade.Time.Time())
 
 				spotFilledPosition := round.SpotWorker().FilledPosition()
 				filledRatio := spotFilledPosition.Div(round.TriggeredTargetPosition()).Abs()
@@ -659,9 +660,10 @@ func (s *Strategy) CrossRun(
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
+		balance := s.futuresSession.Account.Balances()
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
-				round.HandleFuturesTrade(trade, trade.Time.Time())
+				round.HandleFuturesTrade(trade, balance, trade.Time.Time())
 
 				futuresFilledPosition := round.FuturesWorker().FilledPosition()
 				filledRatio := futuresFilledPosition.Div(round.TriggeredTargetPosition()).Abs()

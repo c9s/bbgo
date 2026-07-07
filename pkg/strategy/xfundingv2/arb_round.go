@@ -634,7 +634,7 @@ func (r *ArbitrageRound) SetRetryDuration(d time.Duration) {
 }
 
 // HandleSpotTrade handles a spot trade, including update filled position, transfer collateral and sync futures position if the round is opening.
-func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, currentTime time.Time) {
+func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, spotBalance types.BalanceMap, currentTime time.Time) {
 	// lock the round to ensure the state is updated correctly when receiving trade updates from spot worker
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -643,6 +643,7 @@ func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, currentTime time.Tim
 		// the trade does not belong to the spot worker, skip
 		return
 	}
+	r.logger.Debugf("round spot trade: %s", trade)
 
 	activeOrder := r.spotWorker.ActiveOrder()
 	if activeOrder != nil && activeOrder.OrderID == trade.OrderID {
@@ -651,7 +652,7 @@ func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, currentTime time.Tim
 
 	if r.syncState.State == RoundOpening {
 		r.logger.Infof("handling spot trade (open): %s", trade)
-		r.handleSpotTradeForOpen(trade, currentTime)
+		r.handleSpotTradeForOpen(trade, spotBalance, currentTime)
 	} else {
 		// the round is ready or closing, just log the spot trade
 		r.logger.Infof("received spot trade: %s", trade)
@@ -661,21 +662,28 @@ func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, currentTime time.Tim
 // handleSpotTradeForOpen is the mirror of handleFuturesTradeForClose: during opening, spot is the leader.
 // After each spot fill, the futures position is synced to keep delta-neutral and the collateral asset is
 // transferred to futures so the futures leg can use it as collateral for its offsetting trade.
-func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, currentTime time.Time) {
+func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotBalance types.BalanceMap, currentTime time.Time) {
 	// move the collateral asset received from the spot fill onto the futures
 	// account so the futures leg can use it as margin.
 	transferAmount := r.syncState.DirectionPolicy.TransferAmountFromSpotTrade(trade)
-	if transferAmount.Sign() <= 0 {
-		// nothing left to transfer (e.g. fees ate the entire fill); still record sync
-		delete(r.syncState.RetryTransfers, trade.ID)
-		return
-	}
+
 	timedCtx, cancel := context.WithTimeout(
 		r.spotWorker.ctx,
 		time.Second*20,
 	)
 	defer cancel()
 	asset := r.syncState.DirectionPolicy.CollateralAsset()
+	if trade.FeeCurrency == asset {
+		transferAmount = transferAmount.Sub(trade.Fee)
+	}
+	transferAmount = fixedpoint.Min(transferAmount, spotBalance[asset].Available)
+
+	if transferAmount.Sign() <= 0 {
+		// nothing left to transfer (e.g. fees ate the entire fill); still record sync
+		delete(r.syncState.RetryTransfers, trade.ID)
+		return
+	}
+
 	if err := r.futuresService.TransferFuturesAccountAsset(
 		timedCtx, asset, transferAmount, types.TransferIn,
 	); err != nil {
@@ -714,7 +722,7 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, currentTime t
 }
 
 // HandleFuturesTrade handles a futures trade, including update filled position, transfer collateral and sync spot position if the round is closing.
-func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, currentTime time.Time) {
+func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, futuresBalance types.BalanceMap, currentTime time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -730,7 +738,7 @@ func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, currentTime time.
 
 	if r.syncState.State == RoundClosing {
 		r.logger.Infof("handling future trade (closing): %s", trade)
-		r.handleFuturesTradeForClose(trade, currentTime)
+		r.handleFuturesTradeForClose(trade, futuresBalance, currentTime)
 	} else {
 		// the round is opening or ready, just log the futures trade
 		r.logger.Infof("received futures trade: %s", trade)
@@ -771,10 +779,16 @@ func handleOrderUpdate(twapWorker *TWAPWorker, update types.Order) {
 // closing, futures is the leader. After each futures fill reduces the position,
 // the freed collateral asset is transferred back to spot and the spot worker's
 // target is advanced so it can execute its offsetting trade with that asset.
-func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, currentTime time.Time) {
+func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresBalance types.BalanceMap, currentTime time.Time) {
 	// transfer the freed collateral asset back to spot so the spot leg can use it to close its position.
 	transferAmount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
 	asset := r.syncState.DirectionPolicy.CollateralAsset()
+
+	if asset == trade.FeeCurrency {
+		transferAmount = transferAmount.Sub(trade.Fee)
+	}
+	transferAmount = fixedpoint.Min(transferAmount, futuresBalance[asset].Available)
+
 	if transferAmount.Sign() <= 0 {
 		// nothing left to transfer
 		// remove from retry list if exists
