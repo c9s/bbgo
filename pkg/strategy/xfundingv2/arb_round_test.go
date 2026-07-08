@@ -113,7 +113,7 @@ func newTestArbitrageRound(t *testing.T, ctrl *gomock.Controller, fundingInterva
 	round := NewArbitrageRound(
 		fundingRate,
 		types.ExchangeBinance, types.ExchangeBinance,
-		minHoldingIntervals, fundingIntervalHours, 3, spotWorker, futuresWorker, mockService,
+		minHoldingIntervals, fundingIntervalHours, Number(3), spotWorker, futuresWorker, mockService,
 		types.PositionShort)
 	return round, mockService
 }
@@ -405,7 +405,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	round := NewArbitrageRound(
 		fundingRate,
 		types.ExchangeBinance, types.ExchangeBinance,
-		3, 8, 3, spotWorker, futuresWorker, mockService,
+		3, 8, Number(3), spotWorker, futuresWorker, mockService,
 		sc.direction)
 	round.SetLogger(logrus.WithField("test", sc.name))
 
@@ -445,8 +445,15 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	// collateralBalance holds far more of the collateral asset than any single
 	// transfer needs, so the balance clamp in HandleSpotTrade/HandleFuturesTrade
 	// never reduces the transfer amount below the expected value.
+	//
+	// The magnitude must stay below the int64 fixedpoint ceiling (~9.2e10 in the
+	// non-dnum build); a value like 1e12 overflows int64 and, because
+	// out-of-range float->int64 conversion is implementation-defined in Go, it
+	// becomes +inf on some CPUs (arm64) and -inf on others (amd64). The latter
+	// makes fixedpoint.Min clamp the transfer to a negative amount. 1e9 is
+	// comfortably larger than any transfer here yet safely representable.
 	collateralBalance := types.BalanceMap{
-		sc.collateral: Balance(sc.collateral, Number(1e12)),
+		sc.collateral: Balance(sc.collateral, Number(1e9)),
 	}
 
 	ctx := context.Background()
