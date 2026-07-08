@@ -76,6 +76,7 @@ type ArbitrageRoundSyncState struct {
 	TransferOutAmount           fixedpoint.Value     `json:"transferOutAmount"`
 	MinHoldingIntervals         int                  `json:"minHoldingIntervals"`
 	FundingIntervalHours        int                  `json:"fundingIntervalHours"`
+	Leverage                    int                  `json:"leverage"`
 	FundingIntervalStart        time.Time            `json:"fundingIntervalStart"`
 	FundingIntervalEnd          time.Time            `json:"fundingIntervalEnd"`
 	FundingFeeRecords           map[int64]FundingFee `json:"fundingFeeRecords"`

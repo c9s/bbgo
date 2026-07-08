@@ -1137,6 +1137,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 				s.futuresSession.Exchange.Name(),
 				selectedCandidate.MinHoldingIntervals,
 				selectedCandidate.FundingIntervalHours,
+				s.Leverage,
 				spotTwap,
 				futuresTwap,
 				s.futuresService,
