@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -53,6 +54,11 @@ func newTestTWAPWorker(
 	ctx := context.Background()
 	worker, err := NewTWAPWorker(ctx, "BTCUSDT", session, generalExecutor, config)
 	assert.NoError(t, err)
+
+	// Attach a logger so methods called directly (without Start) don't panic on a nil logger.
+	logger := logrus.New()
+	logger.SetLevel(logrus.PanicLevel)
+	worker.SetLogger(logger)
 
 	return worker, mockExchange, mockOrderQuery, generalExecutor
 }
@@ -737,6 +743,13 @@ func TestTWAPWorker_Misc(t *testing.T) {
 			assert.Equal(t, Number(0.5), sliceQty)
 		})
 
+		t.Run("large remaining capped at max slice size", func(t *testing.T) {
+			// remaining = 20.0, time left = 10 min, interval = 2 min, remaining_slices = 5
+			// dynamic slice = 20.0 / 5 = 4.0, but max = 0.5 so it caps at 0.5
+			sliceQty := worker.calculateSliceQuantity(startTime, Number(20.0), false, market, fixedpoint.Zero)
+			assert.Equal(t, Number(0.5), sliceQty)
+		})
+
 		t.Run("respects min slice size", func(t *testing.T) {
 			// remaining = 0.5, remaining_slices = 5
 			// expected = 0.5 / 5 = 0.1
@@ -757,9 +770,10 @@ func TestTWAPWorker_Misc(t *testing.T) {
 
 		t.Run("dust slice re-sliced by minQty", func(t *testing.T) {
 			// BTCUSDT: MinNotional=10, MinQuantity=0.001
-			// price=100, so minQty = max(0.001, ceil(10/100)) = max(0.001, 0.1) = 0.1
-			// Use 20 slices so slice=1.0/20=0.05, notional=5<10 => dust
-			// n = floor(1.0 / 0.1) = 10, sliceQty = 1.0 / 10 = 0.1
+			// Use 20 slices so slice=1.0/20=0.05, notional=5<=10 => dust
+			// Re-slice adds MinQuantity (0.001) until not dust. Since IsDustQuantity
+			// treats notional<=MinNotional as dust, 0.1 (notional=10) is still dust,
+			// so the smallest non-dust quantity is 0.101 (notional=10.1).
 			dustConfig := TWAPWorkerConfig{
 				Duration:  types.Duration(10 * time.Minute),
 				NumSlices: 20,
@@ -769,7 +783,7 @@ func TestTWAPWorker_Misc(t *testing.T) {
 			dustWorker.ResetTime(startTime, dustConfig.Duration)
 
 			sliceQty := dustWorker.calculateSliceQuantity(startTime, Number(1.0), false, market, Number(100.0))
-			assert.Equal(t, Number(0.1), sliceQty)
+			assert.Equal(t, Number(0.101), sliceQty)
 		})
 
 		t.Run("remaining less than minQty returns remaining", func(t *testing.T) {

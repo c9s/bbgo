@@ -173,7 +173,7 @@ func TestTWAPOrderExecutor_GetTakerPrice(t *testing.T) {
 		// minPrice = 99.0 * (1 - 0.01) = 98.01
 		price, err := executor.GetPrice(types.SideTypeSell, orderBook)
 		assert.NoError(t, err)
-		assert.Equal(t, Number(98.01), price)
+		assert.Equal(t, Number("98.01"), price)
 	})
 
 	t.Run("empty order book returns error for buy", func(t *testing.T) {

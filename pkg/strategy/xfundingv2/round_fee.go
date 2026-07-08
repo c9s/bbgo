@@ -49,10 +49,7 @@ func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Ti
 			processedRounds = append(processedRounds, pendingRound)
 			allRounds = append(allRounds, pendingRound.Round)
 		}
-		// include the active rounds into fee asset preparation
-		for _, activeRound := range s.ActiveRounds {
-			allRounds = append(allRounds, activeRound)
-		}
+
 		if err := s.acquireFeeAssetAndTransfer(ctx, allRounds); err != nil {
 			s.logger.WithError(err).Error("failed to acquire fee asset and transfer for pending rounds")
 			for _, pendingRound := range pendingRounds {
@@ -71,7 +68,11 @@ func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Ti
 	// start the processed rounds and move them to active round list
 	for _, pendingRound := range processedRounds {
 		round := pendingRound.Round
-		if err := round.Start(ctx, currentTime); err != nil {
+		if err := round.Start(
+			ctx,
+			s.spotSession,
+			s.futuresSession,
+			currentTime); err != nil {
 			s.logger.WithError(err).Errorf(
 				"failed to start round after fee asset preparation: %s",
 				round,
@@ -135,8 +136,12 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 	}
 	if !buyQuantity.IsZero() {
 		orderBook := s.spotOrderBooks[s.FeeSymbol]
-		midPrice := getMidPrice(orderBook.Copy())
-		buyQuantity = fixedpoint.Max(buyQuantity, market.MinNotional.Div(midPrice))
+		bestAsk, ok := orderBook.BestAsk()
+		if !ok {
+			return fmt.Errorf("no ask price available for %s", s.FeeSymbol)
+		}
+		bestAskPrice := bestAsk.Price
+		buyQuantity = fixedpoint.Max(buyQuantity, market.MinNotional.Div(bestAskPrice))
 		buyQuantity = market.TruncateQuantity(buyQuantity)
 		orderForm := types.SubmitOrder{
 			Symbol:   s.FeeSymbol,
@@ -144,8 +149,8 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 			Type:     types.OrderTypeMarket,
 			Quantity: buyQuantity,
 		}
-		if market.IsDustQuantity(buyQuantity, midPrice) {
-			orderForm.Quantity = market.MinNotional.Mul(fixedpoint.NewFromFloat(1.05)).Div(midPrice)
+		if market.IsDustQuantity(buyQuantity, bestAskPrice) {
+			orderForm.Quantity = market.MinNotional.Mul(fixedpoint.NewFromFloat(1.05)).Div(bestAskPrice)
 		}
 		orderExecutor, found := s.spotGeneralOrderExecutors[s.FeeSymbol]
 		if !found {

@@ -63,3 +63,11 @@ var roundPositionMetrics = promauto.NewGaugeVec(
 	},
 	[]string{"strategy_id", "symbol", "accountType"},
 )
+
+var roundQuantityDeviationMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_round_quantity_deviation",
+		Help: "Quantity deviation of the arbitrage round",
+	},
+	[]string{"strategy_id", "symbol"},
+)

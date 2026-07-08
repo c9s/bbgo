@@ -34,9 +34,11 @@ func (r *ArbitrageRound) Initialize(ctx context.Context, s *Strategy) error {
 		},
 	)
 	r.retryTransferTickC = make(chan time.Time, 100)
-	if r.HasStarted() {
+	if r.hasStarted() {
 		// the round has been started before, we need to start the retry worker
 		go r.retryTransferWorker(ctx, r.retryTransferTickC)
+		r.spotSession = s.spotSession
+		r.futuresSession = s.futuresSession
 	}
 	if service, ok := s.futuresSession.Exchange.(FuturesService); ok {
 		r.futuresService = service
@@ -74,6 +76,7 @@ type ArbitrageRoundSyncState struct {
 	TransferOutAmount           fixedpoint.Value     `json:"transferOutAmount"`
 	MinHoldingIntervals         int                  `json:"minHoldingIntervals"`
 	FundingIntervalHours        int                  `json:"fundingIntervalHours"`
+	Leverage                    fixedpoint.Value     `json:"leverage"`
 	FundingIntervalStart        time.Time            `json:"fundingIntervalStart"`
 	FundingIntervalEnd          time.Time            `json:"fundingIntervalEnd"`
 	FundingFeeRecords           map[int64]FundingFee `json:"fundingFeeRecords"`

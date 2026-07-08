@@ -42,6 +42,8 @@ type TWAPWorkerConfig struct {
 	// CheckInterval is how often to check for price improvement for the active order.
 	CheckInterval types.Duration `json:"checkInterval,omitempty"`
 
+	MinSliceNotional fixedpoint.Value `json:"minSliceNotional,omitempty"`
+
 	// optional configs
 	// MaxSlippage is the maximum slippage ratio for taker orders (e.g. 0.001 = 0.1%)
 	MaxSlippage fixedpoint.Value `json:"maxSlippage,omitempty"`
@@ -68,6 +70,9 @@ func (c *TWAPWorkerConfig) Defaults() {
 	}
 	if c.CheckInterval == 0 {
 		c.CheckInterval = types.Duration(10 * time.Minute)
+	}
+	if c.MinSliceNotional.IsZero() {
+		c.MinSliceNotional = fixedpoint.NewFromFloat(500.0) // $500
 	}
 }
 
@@ -120,7 +125,14 @@ func (w *TWAPWorker) SetTargetPosition(targetPosition fixedpoint.Value) {
 }
 
 func (w *TWAPWorker) SetLogger(logger logrus.FieldLogger) {
-	w.logger = logger
+	accountType := "spot"
+	if w.syncState.TWAPExecutor.IsFutures() {
+		accountType = "futures"
+	}
+	w.logger = logger.WithFields(logrus.Fields{
+		"component":   "TWAPWorker",
+		"accountType": accountType,
+	})
 }
 
 func (w *TWAPWorker) Symbol() string {
@@ -333,6 +345,18 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 		return nil
 	}
 
+	// the existing active order is in the opposite direction of the remaining quantity
+	if w.activeOrder != nil && remaining.Sign()*orderSide(remaining).Int() < 0 {
+		if !w.activeOrder.GetRemainingQuantity().IsZero() {
+			// cancel the active order
+			w.logger.Infof("[TWAP tick] active order of opposite direction detected, canceling: %s", w.activeOrder)
+			if err := w.syncState.TWAPExecutor.CancelOrder(w.ctx, *w.activeOrder); err != nil {
+				return fmt.Errorf("[TWAP tick] failed to cancel partially filled active order in opposite direction: %w", err)
+			}
+		}
+		w.syncAndResetActiveOrder()
+	}
+
 	market := w.Market()
 	midPrice := getMidPrice(orderBook)
 
@@ -376,6 +400,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 		sliceQty := w.calculateSliceQuantity(currentTime, remaining, false, market, midPrice)
 		// the slice quantity is dust, do nothing
 		if !midPrice.IsZero() && market.IsDustQuantity(sliceQty, midPrice) {
+			w.logger.Infof("[TWAP tick] slice quantity is dust, skip creating active order: %s@%s", sliceQty, midPrice)
 			return nil
 		}
 		createdOrder, err := w.syncState.TWAPExecutor.PlaceOrder(
@@ -388,6 +413,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 			return fmt.Errorf("failed to place order: %w", err)
 		}
 		w.activeOrder = createdOrder
+		w.logger.Infof("[TWAP tick] new active order created: %s", createdOrder)
 		return nil
 	}
 	// from here, active order is not nil
@@ -450,7 +476,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 	sliceQty := w.calculateSliceQuantity(currentTime, remaining, deadlineExceeded, market, midPrice)
 	// the slice quantity is dust, do nothing
 	if !midPrice.IsZero() && market.IsDustQuantity(sliceQty, midPrice) {
-		w.logger.Debugf("[TWAP tick] slice quantity is dust, skipping order placement: %s@%s", sliceQty, midPrice)
+		w.logger.Infof("slice quantity is dust, skip creating new active order: %s@%s", sliceQty, midPrice)
 		return nil
 	}
 	createdOrder, err := w.syncState.TWAPExecutor.PlaceOrder(
@@ -469,13 +495,20 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 
 func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fixedpoint.Value, deadlineExceeded bool, market types.Market, price fixedpoint.Value) fixedpoint.Value {
 	remaining = remaining.Abs()
+	w.logger.Debugf("remaining quantity: %s@%s", remaining, price)
 
 	if deadlineExceeded {
 		return remaining
 	}
 
+	// the remaining quantity is very small, just place the remaining quantity
+	if !price.IsZero() && price.Mul(remaining).Compare(w.syncState.Config.MinSliceNotional) < 0 {
+		return remaining
+	}
+
 	// dynamic slice: remaining / remaining_slices
 	timeLeft := w.syncState.EndTime.Sub(currentTime)
+	w.logger.Debugf("time left: %s", timeLeft)
 	if timeLeft <= 0 {
 		return remaining
 	}
@@ -484,6 +517,7 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 	if remainingSlices <= 0 {
 		remainingSlices = 1
 	}
+	w.logger.Debugf("remaining slices: %d", remainingSlices)
 
 	sliceQty := remaining.Div(fixedpoint.NewFromInt(int64(remainingSlices)))
 
@@ -500,24 +534,22 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 		}
 	}
 
+	if !price.IsZero() && market.IsDustQuantity(sliceQty, price) && remaining.Compare(sliceQty) > 0 {
+		diff := remaining.Sub(sliceQty)
+		n := diff.Div(market.MinQuantity).Round(0, fixedpoint.Up).Int64()
+		for i := int64(0); i < n; i++ {
+			if !market.IsDustQuantity(sliceQty, price) {
+				break
+			}
+			sliceQty = sliceQty.Add(market.MinQuantity)
+		}
+	}
+
 	// cap at remaining
 	if sliceQty.Compare(remaining) > 0 {
 		sliceQty = remaining
 	}
-
-	if !price.IsZero() && market.IsDustQuantity(sliceQty, price) {
-		minQty := fixedpoint.Max(
-			market.MinQuantity,
-			market.AdjustQuantityByMinNotional(fixedpoint.Zero, price),
-		)
-		n := remaining.Div(minQty).Floor()
-		if n.Sign() > 0 {
-			sliceQty = remaining.Div(n)
-		} else {
-			sliceQty = remaining
-		}
-	}
-
+	w.logger.Debugf("sliceQty: %s@%s", sliceQty, price)
 	return sliceQty
 }
 
@@ -542,7 +574,7 @@ func (w *TWAPWorker) shouldUpdateActiveOrder(orderBook types.OrderBook) bool {
 
 	remaining := w.activeOrder.GetRemainingQuantity()
 	if w.Market().IsDustQuantity(remaining, newPrice) {
-		w.logger.Debugf("[TWAP shouldUpdateOrder] active order is dust, should not update order: %s@%s", remaining, newPrice)
+		w.logger.Debugf("[TWAP shouldUpdateOrder] remaining quantity of active order is dust, should not update order: %s@%s", remaining, newPrice)
 		return false
 	}
 

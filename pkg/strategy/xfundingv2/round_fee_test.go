@@ -139,8 +139,8 @@ func TestStrategy_AquireFeeAssetAndTransfer(t *testing.T) {
 		// Spot needs 1.0 BNB, has 0.2 BNB; Futures needs 0.8 BNB, has 0.1 BNB
 		// spotDeficit = 1.0 - 0.2 = 0.8, futuresDeficit = 0.8 - 0.1 = 0.7
 		// total deficit = 0.8 + 0.7 = 1.5 > 0 → buy 1.5, transfer max(0, 0.7) = 0.7 to futures
-		s, mockExchange, mockService := setup(Number(0.2), Number(0.1))
-		rounds := makeRounds(Number(1.0), Number(0.8))
+		s, mockExchange, mockService := setup(Number("0.2"), Number("0.1"))
+		rounds := makeRounds(Number("1.0"), Number("0.8"))
 
 		mockExchange.EXPECT().
 			SubmitOrder(gomock.Any(), gomock.Any()).
@@ -354,7 +354,7 @@ func TestStrategy_CalculateRoundFeeAsset(t *testing.T) {
 		round := NewArbitrageRound(
 			fundingRate,
 			types.ExchangeBinance, types.ExchangeBinance,
-			3, 8,
+			3, 8, Number(3),
 			spotWorker, futuresWorker, mockService,
 			types.PositionLong)
 
@@ -472,7 +472,7 @@ func TestStrategy_CalculateRoundFeeAsset(t *testing.T) {
 		round := NewArbitrageRound(
 			fundingRate,
 			types.ExchangeBinance, types.ExchangeBinance,
-			3, 8, spotWorker, futuresWorker, mockService,
+			3, 8, Number(3), spotWorker, futuresWorker, mockService,
 			types.PositionShort)
 
 		err := s.calculateRoundFeeAsset(round)
