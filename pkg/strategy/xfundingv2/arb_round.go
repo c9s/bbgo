@@ -68,7 +68,7 @@ func NewArbitrageRound(
 	fundingRate *types.PremiumIndex,
 	spotExchangeName, futuresExchangeName types.ExchangeName,
 	minHoldingIntervals, fundingIntervalHours int,
-	leverage int,
+	leverage fixedpoint.Value,
 	spotTwap, futuresTwap *TWAPWorker,
 	futuresService FuturesService,
 	direction types.PositionType,
@@ -1292,7 +1292,7 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to update spot account: %w", err)
 		}
-		requiredMargin := r.lastTickPrice.Mul(futuresRemaining).Div(fixedpoint.Value(r.syncState.Leverage))
+		requiredMargin := r.lastTickPrice.Mul(futuresRemaining).Div(r.syncState.Leverage)
 		futuresAvailable := futuresAccount.FuturesInfo.AvailableBalance
 		if futuresAvailable.Compare(requiredMargin) < 0 {
 			r.logger.Warnf("detected insufficient available balance on futures account to open %s position: required %s, available %s",

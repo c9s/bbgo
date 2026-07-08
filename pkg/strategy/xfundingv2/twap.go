@@ -536,7 +536,7 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 
 	if !price.IsZero() && market.IsDustQuantity(sliceQty, price) && remaining.Compare(sliceQty) > 0 {
 		diff := remaining.Sub(sliceQty)
-		n := diff.Div(market.MinQuantity).Ceil().Int64()
+		n := diff.Div(market.MinQuantity).Round(0, fixedpoint.Up).Int64()
 		for i := int64(0); i < n; i++ {
 			if !market.IsDustQuantity(sliceQty, price) {
 				break

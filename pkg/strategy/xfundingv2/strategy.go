@@ -92,7 +92,7 @@ type Strategy struct {
 
 	SlackAlert slackalert.SlackAlert `json:"slackAlert"`
 
-	Leverage int `json:"leverage"`
+	Leverage fixedpoint.Value `json:"leverage"`
 
 	spotSession, futuresSession *bbgo.ExchangeSession
 	futuresService              FuturesService
@@ -210,8 +210,8 @@ func (s *Strategy) Defaults() error {
 		s.FeeDiscountRate["futures"] = fixedpoint.NewFromFloat(0.10)
 	}
 
-	if s.Leverage == 0 {
-		s.Leverage = 2
+	if s.Leverage.IsZero() {
+		s.Leverage = fixedpoint.NewFromInt(2)
 	}
 
 	return nil
@@ -1679,7 +1679,7 @@ func (s *Strategy) prepareRounds(ctx context.Context) error {
 
 func (s *Strategy) setLeverage(ctx context.Context) error {
 	for _, symbol := range s.candidateSymbols {
-		if err := s.futuresService.SetLeverage(ctx, symbol, s.Leverage); err != nil {
+		if err := s.futuresService.SetLeverage(ctx, symbol, s.Leverage.Int()); err != nil {
 			return fmt.Errorf("failed to set leverage for symbol %s: %w", symbol, err)
 		}
 	}
