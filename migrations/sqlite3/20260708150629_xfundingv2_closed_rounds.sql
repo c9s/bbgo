@@ -4,6 +4,7 @@ CREATE TABLE `xfundingv2_closed_rounds`
 (
     `gid`                     INTEGER PRIMARY KEY AUTOINCREMENT,
 
+    `id`                      TEXT       NOT NULL DEFAULT '',
     `strategy_instance_id`    TEXT       NOT NULL,
     `spot_symbol`             TEXT       NOT NULL,
     `futures_symbol`          TEXT       NOT NULL,
@@ -38,11 +39,15 @@ CREATE INDEX `idx_xfundingv2_closed_rounds_instance` ON `xfundingv2_closed_round
 -- +end
 
 -- +begin
+CREATE INDEX `idx_xfundingv2_closed_rounds_round_id` ON `xfundingv2_closed_rounds` (`id`);
+-- +end
+
+-- +begin
 CREATE TABLE `xfundingv2_funding_fees`
 (
     `gid`        INTEGER PRIMARY KEY AUTOINCREMENT,
 
-    `round_gid`  INTEGER    NOT NULL,
+    `round_id`   TEXT       NOT NULL DEFAULT '',
     `asset`      TEXT       NOT NULL DEFAULT '',
     `amount`     REAL       NOT NULL DEFAULT 0,
     `txn`        INTEGER    NOT NULL DEFAULT 0,
@@ -51,7 +56,7 @@ CREATE TABLE `xfundingv2_funding_fees`
 -- +end
 
 -- +begin
-CREATE INDEX `idx_xfundingv2_funding_fees_round_gid` ON `xfundingv2_funding_fees` (`round_gid`);
+CREATE INDEX `idx_xfundingv2_funding_fees_round_id` ON `xfundingv2_funding_fees` (`round_id`);
 -- +end
 
 -- +down

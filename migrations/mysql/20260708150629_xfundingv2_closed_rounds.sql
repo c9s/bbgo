@@ -4,6 +4,7 @@ CREATE TABLE `xfundingv2_closed_rounds`
 (
     `gid`                     BIGINT UNSIGNED    NOT NULL AUTO_INCREMENT,
 
+    `id`                      VARCHAR(36)        NOT NULL DEFAULT '',
     `strategy_instance_id`    VARCHAR(64)        NOT NULL,
     `spot_symbol`             VARCHAR(32)        NOT NULL,
     `futures_symbol`          VARCHAR(32)        NOT NULL,
@@ -32,7 +33,8 @@ CREATE TABLE `xfundingv2_closed_rounds`
     `inserted_at`             DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
 
     PRIMARY KEY (`gid`),
-    KEY `idx_xfundingv2_closed_rounds_instance` (`strategy_instance_id`)
+    KEY `idx_xfundingv2_closed_rounds_instance` (`strategy_instance_id`),
+    KEY `idx_xfundingv2_closed_rounds_round_id` (`id`)
 );
 -- +end
 
@@ -41,14 +43,14 @@ CREATE TABLE `xfundingv2_funding_fees`
 (
     `gid`        BIGINT UNSIGNED    NOT NULL AUTO_INCREMENT,
 
-    `round_gid`  BIGINT UNSIGNED    NOT NULL,
+    `round_id`   VARCHAR(36)        NOT NULL DEFAULT '',
     `asset`      VARCHAR(20)        NOT NULL DEFAULT '',
     `amount`     DECIMAL(20, 8)     NOT NULL DEFAULT 0,
     `txn`        BIGINT             NOT NULL DEFAULT 0,
     `time`       DATETIME(3)        NOT NULL,
 
     PRIMARY KEY (`gid`),
-    KEY `idx_xfundingv2_funding_fees_round_gid` (`round_gid`)
+    KEY `idx_xfundingv2_funding_fees_round_id` (`round_id`)
 );
 -- +end
 
