@@ -955,7 +955,6 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		} else {
 			s.closedRoundStats(task.Round, tickTime)
 			bbgo.Notify("✅ Successfully handled closed round: %s", round.String(), round.NewNotification())
-			s.logger.Infof("successfully handled closed round: %s", task.Round)
 			delete(s.ClosedRoundTasks, task.Round.SpotSymbol())
 		}
 	}
