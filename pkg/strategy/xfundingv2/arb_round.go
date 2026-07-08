@@ -36,6 +36,7 @@ type FuturesService interface {
 	TransferFuturesAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error
 	QueryPremiumIndex(ctx context.Context, symbol string) (*types.PremiumIndex, error)
 	QueryPositionRisk(ctx context.Context, symbol ...string) ([]types.PositionRisk, error)
+	SetLeverage(ctx context.Context, symbol string, leverage int) error
 }
 
 type transferRetry struct {
@@ -1244,15 +1245,46 @@ func (r *ArbitrageRound) syncSpotPosition(futuresTrade types.Trade) {
 }
 
 func (r *ArbitrageRound) rebalance(ctx context.Context) error {
-	// only need to rebalance when the round is closing
-	if r.syncState.State != RoundClosing {
-		return nil
+	switch r.syncState.State {
+	case RoundOpening:
+		return r.rebalanceOpening(ctx)
+	case RoundClosing:
+		return r.rebalanceClosing(ctx)
 	}
+	return nil
+}
 
+func (r *ArbitrageRound) rebalanceOpening(ctx context.Context) error {
+	// timedCtx, cancel := context.WithTimeout(ctx, time.Second*20)
+	// defer cancel()
+
+	// futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to update futures account: %w", err)
+	// }
+	// spotAccount, err := r.spotSession.UpdateAccount(timedCtx)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to update spot account: %w", err)
+	// }
+
+	// futuresRemaining := r.futuresWorker.RemainingQuantity().Abs()
+	// if futuresRemaining.IsZero() {
+	// 	return nil
+	// }
+	// ticker, err := r.futuresSession.Exchange.QueryTicker(timedCtx, r.FuturesSymbol())
+	// if err != nil {
+	// 	return fmt.Errorf("failed to query ticker for %s: %w", r.FuturesSymbol(), err)
+	// }
+	// requiredMargin := ticker.Last.Mul(futuresRemaining).Div(r)
+	// futuresAccount.FuturesInfo.TotalMarginBalance
+	return nil
+}
+
+func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 	timedCtx, cancel := context.WithTimeout(ctx, time.Second*20)
 	defer cancel()
 
-	futuresAccount, err := r.futuresSession.UpdateAccount(ctx)
+	futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
 	if err != nil {
 		return fmt.Errorf("failed to update futures account: %w", err)
 	}

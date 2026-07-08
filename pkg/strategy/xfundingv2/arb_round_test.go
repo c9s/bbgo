@@ -87,6 +87,10 @@ func (m *mockFuturesService) QueryPositionRisk(ctx context.Context, symbol ...st
 	return nil, nil
 }
 
+func (m *mockFuturesService) SetLeverage(ctx context.Context, symbol string, leverage int) error {
+	return nil
+}
+
 func newTestArbitrageRound(t *testing.T, ctrl *gomock.Controller, fundingIntervalHours, minHoldingIntervals int, nextFundingTime time.Time) (*ArbitrageRound, *mockFuturesService) {
 	config := TWAPWorkerConfig{
 		Duration:  types.Duration(10 * time.Minute),

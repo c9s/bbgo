@@ -92,6 +92,8 @@ type Strategy struct {
 
 	SlackAlert slackalert.SlackAlert `json:"slackAlert"`
 
+	Leverage int `json:"leverage"`
+
 	spotSession, futuresSession *bbgo.ExchangeSession
 	futuresService              FuturesService
 
@@ -206,6 +208,10 @@ func (s *Strategy) Defaults() error {
 	}
 	if _, ok := s.FeeDiscountRate["futures"]; !ok {
 		s.FeeDiscountRate["futures"] = fixedpoint.NewFromFloat(0.10)
+	}
+
+	if s.Leverage == 0 {
+		s.Leverage = 2
 	}
 
 	return nil
@@ -401,6 +407,10 @@ func (s *Strategy) CrossRun(
 	// NOTE: the executors should be created first before anything else to ensure the executors get updated first.
 	// The twap executors rely on the state of the general order executors to determine the filled quantity.
 	s.candidateSymbols = candidateSymbols
+	// set leverage for all candidate symbols
+	if err := s.setLeverage(ctx); err != nil {
+		return err
+	}
 	setupGeneralExecutorsForSymbol := func(symbol string) error {
 		spotMarket, found := s.spotSession.Market(symbol)
 		if !found {
@@ -1647,6 +1657,15 @@ func (s *Strategy) prepareRounds(ctx context.Context) error {
 		err := round.Prepare(ctx, s.spotSession, s.futuresSession)
 		if err != nil {
 			return fmt.Errorf("fail to prepare round %s: %w", symbol, err)
+		}
+	}
+	return nil
+}
+
+func (s *Strategy) setLeverage(ctx context.Context) error {
+	for _, symbol := range s.candidateSymbols {
+		if err := s.futuresService.SetLeverage(ctx, symbol, s.Leverage); err != nil {
+			return fmt.Errorf("failed to set leverage for symbol %s: %w", symbol, err)
 		}
 	}
 	return nil
