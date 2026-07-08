@@ -274,8 +274,17 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		s.logger.Warnf("spot session %s not found, skip subscription", s.SpotSession)
 		return
 	}
+	futuresSession, ok := sessions[s.FuturesSession]
+	if !ok {
+		s.logger.Warnf("futures session %s not found, skip subscription", s.SpotSession)
+		return
+	}
 	// subscribe kline events for ticking the strategy
 	spotSession.Subscribe(types.KLineChannel, s.TickSymbol, types.SubscribeOptions{Interval: s.TickInterval})
+	// subscribe kline events for updating the tick price of the active rounds
+	for _, symbol := range s.CandidateSymbols {
+		futuresSession.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.TickInterval})
+	}
 }
 
 func (s *Strategy) CrossRun(
@@ -711,7 +720,7 @@ func (s *Strategy) CrossRun(
 		bbgo.Notify("📝 Round futures order update: %s", round.String(), update)
 	})
 	// market stream callbacks
-	s.spotSession.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+	s.futuresSession.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if round, found := s.ActiveRounds[kline.Symbol]; found {
 			round.SetTickPrice(kline.Close)
 		}

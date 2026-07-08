@@ -1126,10 +1126,6 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 		r.logger.Warnf("retry transfer tick channel is full, skipping retry tick at %s", currentTime.Format(time.RFC3339))
 	}
 
-	if err := r.rebalance(ctx); err != nil {
-		r.logger.WithError(err).Errorf("failed to rebalance round: %s", r.String())
-	}
-
 	// it's opening or closing, tick the workers
 	if err := r.spotWorker.Tick(currentTime, spotOrderBook); err != nil {
 		r.logger.
@@ -1146,6 +1142,10 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 				"failed to tick %s futures worker at %s",
 				r.FuturesSymbol(), currentTime.Format(time.RFC3339),
 			)
+	}
+
+	if err := r.rebalance(ctx); err != nil {
+		r.logger.WithError(err).Errorf("failed to rebalance round: %s", r.String())
 	}
 
 	// get mid price
@@ -1272,8 +1272,12 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context) error {
 	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
 	if shortFutures {
 		futuresRemaining := r.futuresWorker.RemainingQuantity().Abs()
-		if futuresRemaining.IsZero() {
-			r.logger.Debugf("the remaining quantity for futures is zero, no need for rebalance: %s", r)
+		if activeOrder := r.futuresWorker.ActiveOrder(); activeOrder != nil {
+			// deduct the active order remaining quantity from the futures remaining quantity
+			futuresRemaining = futuresRemaining.Sub(activeOrder.GetRemainingQuantity())
+		}
+		if futuresRemaining.Sign() <= 0 {
+			r.logger.Debugf("non-positive remaining quantity for futures, no need for rebalance: %s", r)
 			return nil
 		}
 		if r.lastTickPrice.IsZero() {
