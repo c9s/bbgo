@@ -130,17 +130,17 @@ func (s *RoundInsertService) InsertClosedRound(round *ArbitrageRound) error {
 	}
 	record, fees := s.newClosedRoundRecord(round)
 
-	if err := s.insert(record, fees); err != nil {
+	if err := s.insertClosedRound(record, fees); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// insert writes the round record and its funding-fee records in a single transaction.
+// insertClosedRound writes the round record and its funding-fee records in a single transaction.
 // The funding-fee rows are linked to the round via the round's own id (round_id), which
 // is known before insertion, so there is no need to read back the auto-incremented gid.
-func (s *RoundInsertService) insert(
+func (s *RoundInsertService) insertClosedRound(
 	record ClosedRoundRecord, fees []FundingFeeRecord,
 ) error {
 	tx, err := s.db.Beginx()

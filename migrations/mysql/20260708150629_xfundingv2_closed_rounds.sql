@@ -13,9 +13,9 @@ CREATE TABLE `xfundingv2_closed_rounds`
     `direction`               VARCHAR(10)        NOT NULL DEFAULT '',
     `collateral_asset`        VARCHAR(20)        NOT NULL DEFAULT '',
 
-    `leverage`                DECIMAL(16, 2)     NOT NULL DEFAULT 0,
-    `triggered_funding_rate`  DECIMAL(20, 8)     NOT NULL DEFAULT 0,
-    `annualized_rate`         DECIMAL(20, 8)     NOT NULL DEFAULT 0,
+    `leverage`                INT                NOT NULL DEFAULT 0,
+    `triggered_funding_rate`  FLOAT(8)           NOT NULL DEFAULT 0,
+    `annualized_rate`         FLOAT(8)           NOT NULL DEFAULT 0,
     `funding_income`          DECIMAL(20, 8)     NOT NULL DEFAULT 0,
 
     `spot_pnl`                DECIMAL(20, 8)     NOT NULL DEFAULT 0,
@@ -48,6 +48,7 @@ CREATE TABLE `xfundingv2_funding_fees`
     `amount`     DECIMAL(20, 8)     NOT NULL DEFAULT 0,
     `txn`        BIGINT             NOT NULL DEFAULT 0,
     `time`       DATETIME(3)        NOT NULL,
+    `inserted_at`             DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
 
     PRIMARY KEY (`gid`),
     KEY `idx_xfundingv2_funding_fees_round_id` (`round_id`)

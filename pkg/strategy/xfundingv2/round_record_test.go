@@ -94,7 +94,7 @@ func TestRoundInsertService(t *testing.T) {
 		{RoundID: roundID, Asset: "USDT", Amount: fixedpoint.NewFromFloat(6.25), Txn: 1002, Time: time.Now().Add(-8 * time.Hour)},
 	}
 
-	err = svc.insert(record, fees)
+	err = svc.insertClosedRound(record, fees)
 	require.NoError(t, err)
 
 	var roundCount int
@@ -127,7 +127,7 @@ func TestRoundInsertService_NoFundingFees(t *testing.T) {
 
 	svc := NewRoundInsertService(context.Background(), db, "xfundingv2-test-instance")
 
-	err = svc.insert(ClosedRoundRecord{
+	err = svc.insertClosedRound(ClosedRoundRecord{
 		ID:              "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		InstanceID:      svc.instanceID,
 		SpotSymbol:      "ETHUSDT",

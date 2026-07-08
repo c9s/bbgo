@@ -13,7 +13,7 @@ CREATE TABLE `xfundingv2_closed_rounds`
     `direction`               TEXT       NOT NULL DEFAULT '',
     `collateral_asset`        TEXT       NOT NULL DEFAULT '',
 
-    `leverage`                REAL       NOT NULL DEFAULT 0,
+    `leverage`                INTEGER    NOT NULL DEFAULT 0,
     `triggered_funding_rate`  REAL       NOT NULL DEFAULT 0,
     `annualized_rate`         REAL       NOT NULL DEFAULT 0,
     `funding_income`          REAL       NOT NULL DEFAULT 0,
