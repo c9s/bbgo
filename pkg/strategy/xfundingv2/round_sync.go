@@ -106,6 +106,12 @@ type ArbitrageRoundSyncState struct {
 	// LastUpdateTime is the last time when the round is updated
 	LastUpdateTime time.Time `json:"lastUpdateTime"`
 
+	// ReadyTime is the time when the round enters ready state
+	ReadyTime time.Time `json:"readyTime"`
+
+	// ClosedTime is the time when the round is closed
+	ClosedTime time.Time `json:"closedTime"`
+
 	LargeDeviationStartTime time.Time `json:"largeDeviationStartTime"`
 }
 

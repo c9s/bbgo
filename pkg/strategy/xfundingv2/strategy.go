@@ -141,6 +141,10 @@ type Strategy struct {
 	logLimiter *rate.Limiter
 
 	lastTickTime time.Time
+
+	// roundInsertService persists closed round records into the database.
+	// nil when no database is configured (e.g. backtesting).
+	roundInsertService *RoundInsertService
 }
 
 func (s *Strategy) ID() string {
@@ -345,6 +349,14 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("futures session exchange does not support futures service: %s", s.futuresSession.ExchangeName)
 	} else {
 		s.futuresService = futuresService
+	}
+
+	// setup the round insert service for persisting closed round records.
+	// the database service is nil when no database is configured (e.g. backtesting).
+	if !bbgo.IsBackTesting && s.Environment != nil && s.Environment.DatabaseService != nil && s.Environment.DatabaseService.DB != nil {
+		s.roundInsertService = NewRoundInsertService(ctx, s.Environment.DatabaseService.DB, s.InstanceID())
+	} else {
+		s.logger.Warn("no database service configured, closed round records will not be persisted")
 	}
 
 	if _, ok := s.spotSession.Exchange.(types.ExchangeOrderQueryService); !ok {
@@ -1523,7 +1535,13 @@ func (s *Strategy) closedRoundStats(round *ArbitrageRound, tickTime time.Time) {
 		float64(round.NumHoldingIntervals(tickTime)),
 	)
 	roundNetPnLMetrics.With(labels).Set(pnl.NetPnL().Float64())
-	// TODO: insert closed round records into database
+
+	// insert closed round records into database
+	if s.roundInsertService != nil {
+		if err := s.roundInsertService.InsertClosedRound(round); err != nil {
+			s.logger.WithError(err).Warnf("failed to insert closed round record for %s", round.SpotSymbol())
+		}
+	}
 }
 
 func (s *Strategy) computeResidualCollateral(task *CloseRoundTask, balance types.Balance, asset string) fixedpoint.Value {

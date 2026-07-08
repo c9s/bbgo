@@ -237,6 +237,18 @@ func (r *ArbitrageRound) StartTime() time.Time {
 	return r.syncState.StartTime
 }
 
+func (r *ArbitrageRound) ClosedTime() time.Time {
+	return r.syncState.ClosedTime
+}
+
+func (r *ArbitrageRound) ReadyTime() time.Time {
+	return r.syncState.ReadyTime
+}
+
+func (r *ArbitrageRound) ClosingTime() time.Time {
+	return r.syncState.ClosingTime
+}
+
 func (r *ArbitrageRound) HasStarted() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -1040,6 +1052,28 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 	r.syncState.ClosingDuration = duration
 }
 
+func (r *ArbitrageRound) SetReady(currentTime time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if !r.syncState.ReadyTime.IsZero() {
+		return
+	}
+	r.syncState.State = RoundReady
+	r.syncState.ReadyTime = currentTime
+}
+
+func (r *ArbitrageRound) SetClosed(currentTime time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if !r.syncState.ClosedTime.IsZero() {
+		return
+	}
+	r.syncState.State = RoundClosed
+	r.syncState.ClosedTime = currentTime
+}
+
 // CollateralAsset returns the asset that this round parks on the futures
 // account (base for Short, quote for Long).
 func (r *ArbitrageRound) CollateralAsset() string {
@@ -1161,7 +1195,7 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 		futuresIsDust := r.futuresWorker.Market().IsDustQuantity(futuresRemaining.Abs(), futuresMidPrice)
 
 		if spotIsDust && futuresIsDust {
-			r.syncState.State = RoundReady
+			r.SetReady(currentTime)
 			return
 		}
 	}
@@ -1176,7 +1210,7 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 		futuresIsDust := r.futuresWorker.Market().IsDustQuantity(futuresFilled.Abs(), futuresMidPrice)
 
 		if spotIsDust && futuresIsDust {
-			r.syncState.State = RoundClosed
+			r.SetClosed(currentTime)
 			r.logger.Infof("arbitrage round transit to closed state at %s: %s", currentTime.Format(time.RFC3339), r.spotWorker.Symbol())
 		}
 		return
