@@ -58,6 +58,14 @@ func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Ti
 			}
 			return
 		}
+		// We set fee average cost after acquiring fee asset and transferring.
+		// Because the fee average cost may change after the fee asset acquisition.
+		if feePosition, ok := s.SpotPositions[s.FeeSymbol]; ok {
+			for _, round := range allRounds {
+				feeAvgCost := feePosition.AverageCost
+				round.SetAvgFeeCost(s.FeeSymbol, feeAvgCost)
+			}
+		}
 	} else {
 		// fee asset is not required, adding all pending rounds to the next step
 		for _, pendingRound := range pendingRounds {

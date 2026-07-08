@@ -45,10 +45,14 @@ func (p *RoundRealizedPnL) NetPnL() fixedpoint.Value {
 		p.FuturesProfitStats.AccumulatedNetProfit,
 	)
 }
-
 func (r *ArbitrageRound) RealizedPnL() *RoundRealizedPnL {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	return r.realizedPnL()
+}
+
+func (r *ArbitrageRound) realizedPnL() *RoundRealizedPnL {
 
 	fundingIncome := r.totalFundingIncome()
 
@@ -101,4 +105,65 @@ func (r *ArbitrageRound) RealizedPnL() *RoundRealizedPnL {
 		FuturesPosition:    futuresPosition,
 	}
 	return &roundPnL
+}
+
+type RoundUnrealizedPnL struct {
+	RoundRealizedPnL
+
+	UnrealizedSpotPnL    fixedpoint.Value
+	UnrealizedFuturesPnL fixedpoint.Value
+}
+
+// UnrealizedPnL calculates the unrealized profit and loss of the round by
+// marking the open spot and futures positions to the current order book prices.
+// Each leg is priced at its close side: a long leg at the best bid, a short leg
+// at the best ask.
+func (r *ArbitrageRound) UnrealizedPnL(spotOrderBook, futuresOrderBook types.OrderBook) *RoundUnrealizedPnL {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	realized := r.realizedPnL()
+
+	result := &RoundUnrealizedPnL{
+		RoundRealizedPnL: *realized,
+	}
+
+	result.UnrealizedSpotPnL = legUnrealizedPnL(spotOrderBook, realized.SpotPosition)
+	result.UnrealizedFuturesPnL = legUnrealizedPnL(futuresOrderBook, realized.FuturesPosition)
+
+	return result
+}
+
+// TotalPnL returns realized net PnL (funding + spot + futures) plus the current
+// unrealized PnL of both open legs.
+func (p *RoundUnrealizedPnL) TotalPnL() fixedpoint.Value {
+	return p.NetPnL().Add(p.UnrealizedSpotPnL).Add(p.UnrealizedFuturesPnL)
+}
+
+// legUnrealizedPnL marks one leg to market. Base is signed, so the PnL is simply
+// (price - averageCost) * base for both long and short. The close-side price is the
+// best bid for a long leg (sell to close) and the best ask for a short leg (buy to
+// close). Returns zero when the position is flat or the relevant book side is empty.
+func legUnrealizedPnL(book types.OrderBook, position *types.Position) fixedpoint.Value {
+	base := position.Base
+	if base.IsZero() {
+		return fixedpoint.Zero
+	}
+
+	var price fixedpoint.Value
+	if base.Sign() > 0 {
+		bid, ok := book.BestBid()
+		if !ok {
+			return fixedpoint.Zero
+		}
+		price = bid.Price
+	} else {
+		ask, ok := book.BestAsk()
+		if !ok {
+			return fixedpoint.Zero
+		}
+		price = ask.Price
+	}
+
+	return price.Sub(position.AverageCost).Mul(base)
 }

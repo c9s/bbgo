@@ -1505,11 +1505,6 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 		}
 	}
 
-	// set fee average cost
-	if executor, ok := s.spotGeneralOrderExecutors[s.FeeSymbol]; ok {
-		feeAvgCost := executor.Position().AverageCost
-		round.SetAvgFeeCost(s.FeeSymbol, feeAvgCost)
-	}
 	// sync funding fee records for the round
 	if err := round.SyncFundingFeeRecords(ctx, tickTime); err != nil {
 		return fmt.Errorf("[handleClosedRound] failed to sync funding fee records for round %s: %w", round, err)
