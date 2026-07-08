@@ -16,6 +16,7 @@ import (
 const createRoundTableSQL = `
 CREATE TABLE xfundingv2_closed_rounds (
 	gid                    INTEGER PRIMARY KEY AUTOINCREMENT,
+	id                     TEXT NOT NULL,
 	strategy_instance_id   TEXT NOT NULL,
 	spot_symbol            TEXT NOT NULL,
 	futures_symbol         TEXT NOT NULL,
@@ -43,7 +44,7 @@ CREATE TABLE xfundingv2_closed_rounds (
 const createFundingFeeTableSQL = `
 CREATE TABLE xfundingv2_funding_fees (
 	gid       INTEGER PRIMARY KEY AUTOINCREMENT,
-	round_gid INTEGER NOT NULL,
+	round_id  TEXT NOT NULL,
 	asset     TEXT NOT NULL,
 	amount    DECIMAL,
 	txn       INTEGER,
@@ -62,7 +63,9 @@ func TestRoundInsertService(t *testing.T) {
 
 	svc := NewRoundInsertService(context.Background(), db, "xfundingv2-test-instance")
 
+	const roundID = "11111111-2222-3333-4444-555555555555"
 	record := ClosedRoundRecord{
+		ID:                   roundID,
 		InstanceID:           svc.instanceID,
 		SpotSymbol:           "BTCUSDT",
 		FuturesSymbol:        "BTCUSDT",
@@ -87,27 +90,27 @@ func TestRoundInsertService(t *testing.T) {
 	}
 
 	fees := []FundingFeeRecord{
-		{Asset: "USDT", Amount: fixedpoint.NewFromFloat(6.25), Txn: 1001, Time: time.Now().Add(-16 * time.Hour)},
-		{Asset: "USDT", Amount: fixedpoint.NewFromFloat(6.25), Txn: 1002, Time: time.Now().Add(-8 * time.Hour)},
+		{RoundID: roundID, Asset: "USDT", Amount: fixedpoint.NewFromFloat(6.25), Txn: 1001, Time: time.Now().Add(-16 * time.Hour)},
+		{RoundID: roundID, Asset: "USDT", Amount: fixedpoint.NewFromFloat(6.25), Txn: 1002, Time: time.Now().Add(-8 * time.Hour)},
 	}
 
-	gid, err := svc.insert(record, fees)
+	err = svc.insert(record, fees)
 	require.NoError(t, err)
-	assert.Greater(t, gid, int64(0))
 
 	var roundCount int
 	require.NoError(t, db.Get(&roundCount, "SELECT COUNT(*) FROM xfundingv2_closed_rounds"))
 	assert.Equal(t, 1, roundCount)
 
 	var feeCount int
-	require.NoError(t, db.Get(&feeCount, "SELECT COUNT(*) FROM xfundingv2_funding_fees WHERE round_gid = ?", gid))
+	require.NoError(t, db.Get(&feeCount, "SELECT COUNT(*) FROM xfundingv2_funding_fees WHERE round_id = ?", roundID))
 	assert.Equal(t, len(fees), feeCount)
 
 	// the round row should carry the values we inserted
-	var gotSymbol, gotDirection string
+	var gotRoundID, gotSymbol, gotDirection string
 	require.NoError(t, db.QueryRow(
-		"SELECT spot_symbol, direction FROM xfundingv2_closed_rounds WHERE gid = ?", gid,
-	).Scan(&gotSymbol, &gotDirection))
+		"SELECT id, spot_symbol, direction FROM xfundingv2_closed_rounds WHERE id = ?", roundID,
+	).Scan(&gotRoundID, &gotSymbol, &gotDirection))
+	assert.Equal(t, roundID, gotRoundID)
 	assert.Equal(t, "BTCUSDT", gotSymbol)
 	assert.Equal(t, "short", gotDirection)
 }
@@ -124,7 +127,8 @@ func TestRoundInsertService_NoFundingFees(t *testing.T) {
 
 	svc := NewRoundInsertService(context.Background(), db, "xfundingv2-test-instance")
 
-	gid, err := svc.insert(ClosedRoundRecord{
+	err = svc.insert(ClosedRoundRecord{
+		ID:              "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		InstanceID:      svc.instanceID,
 		SpotSymbol:      "ETHUSDT",
 		FuturesSymbol:   "ETHUSDT",
@@ -134,7 +138,6 @@ func TestRoundInsertService_NoFundingFees(t *testing.T) {
 		CollateralAsset: "USDT",
 	}, nil)
 	require.NoError(t, err)
-	assert.Greater(t, gid, int64(0))
 
 	var feeCount int
 	require.NoError(t, db.Get(&feeCount, "SELECT COUNT(*) FROM xfundingv2_funding_fees"))

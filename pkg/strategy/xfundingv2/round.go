@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
@@ -81,6 +82,7 @@ func NewArbitrageRound(
 	fundingIntervalEnd := fundingRate.NextFundingTime.Add(-time.Second)
 	return &ArbitrageRound{
 		syncState: ArbitrageRoundSyncState{
+			ID:                          uuid.NewString(),
 			Symbol:                      spotTwap.Symbol(),
 			TriggeredFundingRate:        fundingRate.LastFundingRate,
 			TriggeredSpotTargetPosition: spotTwap.TargetPosition(),
@@ -1006,6 +1008,10 @@ func (r *ArbitrageRound) prepareClosing(
 
 func (r *ArbitrageRound) SetLogger(logger logrus.FieldLogger) {
 	r.logger = logger
+}
+
+func (r *ArbitrageRound) ID() string {
+	return r.syncState.ID
 }
 
 func (r *ArbitrageRound) SpotSymbol() string {

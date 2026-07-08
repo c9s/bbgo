@@ -13,6 +13,9 @@ import (
 
 // ClosedRoundRecord is the summary of a closed arbitrage round persisted to the DB
 type ClosedRoundRecord struct {
+	// ID is the round's own DB-independent identifier (UUID generated at creation)
+	ID string
+
 	InstanceID string
 
 	SpotSymbol    string
@@ -45,11 +48,11 @@ type ClosedRoundRecord struct {
 
 // FundingFeeRecord is an individual funding-fee entry of a round persisted to the DB
 type FundingFeeRecord struct {
-	RoundGID int64
-	Asset    string
-	Amount   fixedpoint.Value
-	Txn      int64
-	Time     time.Time
+	RoundID string
+	Asset   string
+	Amount  fixedpoint.Value
+	Txn     int64
+	Time    time.Time
 }
 
 // RoundInsertService persists round records into the DB
@@ -73,6 +76,7 @@ func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (Closed
 	pnl := round.PnL()
 
 	record := ClosedRoundRecord{
+		ID:         round.ID(),
 		InstanceID: s.instanceID,
 
 		SpotSymbol:    round.SpotSymbol(),
@@ -106,10 +110,11 @@ func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (Closed
 	var fees []FundingFeeRecord
 	for _, fee := range round.syncState.FundingFeeRecords {
 		fees = append(fees, FundingFeeRecord{
-			Asset:  fee.Asset,
-			Amount: fee.Amount,
-			Txn:    fee.Txn,
-			Time:   fee.Time,
+			RoundID: round.ID(),
+			Asset:   fee.Asset,
+			Amount:  fee.Amount,
+			Txn:     fee.Txn,
+			Time:    fee.Time,
 		})
 	}
 
@@ -117,29 +122,30 @@ func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (Closed
 }
 
 // InsertClosedRound persists the closed round summary and its funding-fee records in
-// a single transaction. The funding-fee rows are linked to the round via the
-// auto-incremented gid of the inserted round row.
+// a single transaction. The funding-fee rows are linked to the round via the round's
+// own id (round_id).
 func (s *RoundInsertService) InsertClosedRound(round *ArbitrageRound) error {
 	if round.State() != RoundClosed {
 		return fmt.Errorf("inserted round is not closed: %s", round.State())
 	}
 	record, fees := s.newClosedRoundRecord(round)
 
-	if _, err := s.insert(record, fees); err != nil {
+	if err := s.insert(record, fees); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// insert writes the round record and its funding-fee records in a single
-// transaction and returns the auto-incremented gid of the inserted round row.
+// insert writes the round record and its funding-fee records in a single transaction.
+// The funding-fee rows are linked to the round via the round's own id (round_id), which
+// is known before insertion, so there is no need to read back the auto-incremented gid.
 func (s *RoundInsertService) insert(
 	record ClosedRoundRecord, fees []FundingFeeRecord,
-) (int64, error) {
+) error {
 	tx, err := s.db.Beginx()
 	if err != nil {
-		return 0, fmt.Errorf("failed to begin transaction: %w", err)
+		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
 		// rollback is a no-op if the transaction has already been committed.
@@ -148,6 +154,7 @@ func (s *RoundInsertService) insert(
 
 	roundSQL, roundArgs, err := sq.Insert("xfundingv2_closed_rounds").
 		Columns(
+			"id",
 			"strategy_instance_id",
 			"spot_symbol",
 			"futures_symbol",
@@ -171,6 +178,7 @@ func (s *RoundInsertService) insert(
 			"closed_time",
 		).
 		Values(
+			record.ID,
 			record.InstanceID,
 			record.SpotSymbol,
 			record.FuturesSymbol,
@@ -195,39 +203,33 @@ func (s *RoundInsertService) insert(
 		).
 		ToSql()
 	if err != nil {
-		return 0, fmt.Errorf("failed to build round insert query: %w", err)
+		return fmt.Errorf("failed to build round insert query: %w", err)
 	}
 
-	res, err := tx.ExecContext(s.ctx, roundSQL, roundArgs...)
-	if err != nil {
-		return 0, fmt.Errorf("failed to insert arbitrage round: %w", err)
-	}
-
-	gid, err := res.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get inserted round gid: %w", err)
+	if _, err := tx.ExecContext(s.ctx, roundSQL, roundArgs...); err != nil {
+		return fmt.Errorf("failed to insert arbitrage round: %w", err)
 	}
 
 	if len(fees) > 0 {
 		feeBuilder := sq.Insert("xfundingv2_funding_fees").
-			Columns("round_gid", "asset", "amount", "txn", "time")
+			Columns("round_id", "asset", "amount", "txn", "time")
 		for _, fee := range fees {
-			feeBuilder = feeBuilder.Values(gid, fee.Asset, fee.Amount, fee.Txn, fee.Time)
+			feeBuilder = feeBuilder.Values(fee.RoundID, fee.Asset, fee.Amount, fee.Txn, fee.Time)
 		}
 
 		feeSQL, feeArgs, err := feeBuilder.ToSql()
 		if err != nil {
-			return 0, fmt.Errorf("failed to build funding fee insert query: %w", err)
+			return fmt.Errorf("failed to build funding fee insert query: %w", err)
 		}
 
 		if _, err := tx.ExecContext(s.ctx, feeSQL, feeArgs...); err != nil {
-			return 0, fmt.Errorf("failed to insert round funding fees: %w", err)
+			return fmt.Errorf("failed to insert round funding fees: %w", err)
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("failed to commit round insert transaction: %w", err)
+		return fmt.Errorf("failed to commit round insert transaction: %w", err)
 	}
 
-	return gid, nil
+	return nil
 }
