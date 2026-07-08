@@ -59,8 +59,9 @@ type ArbitrageRound struct {
 	spotSession, futuresSession *bbgo.ExchangeSession
 	retryTransferTickC          chan time.Time
 
-	logger     logrus.FieldLogger
-	slackAlert slackalert.SlackAlert
+	lastTickPrice fixedpoint.Value
+	logger        logrus.FieldLogger
+	slackAlert    slackalert.SlackAlert
 }
 
 func NewArbitrageRound(
@@ -181,6 +182,14 @@ func (r *ArbitrageRound) FuturesFeeAssetAmount() fixedpoint.Value {
 	defer r.mu.Unlock()
 
 	return r.syncState.FuturesFeeAssetAmount
+}
+
+func (r *ArbitrageRound) SetTickPrice(price fixedpoint.Value) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.lastTickPrice = price
+	r.logger.Debugf("setting last tick price to %s: %s", price, r.SpotSymbol())
 }
 
 // RequiredFeeAssetAmount returns the required fee asset amount for the round based on its current state and position.
@@ -1257,28 +1266,52 @@ func (r *ArbitrageRound) rebalance(ctx context.Context) error {
 }
 
 func (r *ArbitrageRound) rebalanceOpening(ctx context.Context) error {
-	// timedCtx, cancel := context.WithTimeout(ctx, time.Second*20)
-	// defer cancel()
+	timedCtx, cancel := context.WithTimeout(ctx, time.Second*20)
+	defer cancel()
 
-	// futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to update futures account: %w", err)
-	// }
-	// spotAccount, err := r.spotSession.UpdateAccount(timedCtx)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to update spot account: %w", err)
-	// }
-
-	// futuresRemaining := r.futuresWorker.RemainingQuantity().Abs()
-	// if futuresRemaining.IsZero() {
-	// 	return nil
-	// }
-	// ticker, err := r.futuresSession.Exchange.QueryTicker(timedCtx, r.FuturesSymbol())
-	// if err != nil {
-	// 	return fmt.Errorf("failed to query ticker for %s: %w", r.FuturesSymbol(), err)
-	// }
-	// requiredMargin := ticker.Last.Mul(futuresRemaining).Div(r)
-	// futuresAccount.FuturesInfo.TotalMarginBalance
+	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
+	if shortFutures {
+		futuresRemaining := r.futuresWorker.RemainingQuantity().Abs()
+		if futuresRemaining.IsZero() {
+			r.logger.Debugf("the remaining quantity for futures is zero, no need for rebalance: %s", r)
+			return nil
+		}
+		if r.lastTickPrice.IsZero() {
+			r.logger.Debugf("last tick price is zero, skipping rebalance: %s", r)
+			return nil
+		}
+		futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
+		if err != nil {
+			return fmt.Errorf("failed to update futures account: %w", err)
+		}
+		spotAccount, err := r.spotSession.UpdateAccount(timedCtx)
+		if err != nil {
+			return fmt.Errorf("failed to update spot account: %w", err)
+		}
+		requiredMargin := r.lastTickPrice.Mul(futuresRemaining).Div(fixedpoint.Value(r.syncState.Leverage))
+		futuresAvailable := futuresAccount.FuturesInfo.AvailableBalance
+		if futuresAvailable.Compare(requiredMargin) < 0 {
+			r.logger.Warnf("detected insufficient available balance on futures account to open %s position: required %s, available %s",
+				r.FuturesSymbol(), requiredMargin, futuresAvailable,
+			)
+			// add 10% buffer
+			transferAmount := requiredMargin.Sub(futuresAvailable).Mul(fixedpoint.NewFromFloat(1.1))
+			market := r.spotWorker.Market()
+			spotAvailable := spotAccount.Balances()[market.QuoteCurrency].Available
+			if spotAvailable.Compare(transferAmount) < 0 {
+				return fmt.Errorf("insufficient %s balance on spot account (%s, need %s) to rebalance round: %s",
+					market.QuoteCurrency, spotAvailable, transferAmount, r.String())
+			}
+			// transfer quote asset from spot to futures
+			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, market.QuoteCurrency, transferAmount, types.TransferIn); err != nil {
+				return fmt.Errorf("failed to transfer %s %s from spot to futures: %w", transferAmount.String(), market.QuoteCurrency, err)
+			}
+			r.logger.Infof("rebalance: transferred %s %s from spot to futures to open position: %s",
+				requiredMargin.String(), market.QuoteCurrency, r.String())
+		}
+	} else {
+		// TODO: rebalance the long futures leg when opening
+	}
 	return nil
 }
 
@@ -1348,7 +1381,7 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		}
 		r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
 	} else {
-		// TODO: rebalance the long futures leg
+		// TODO: rebalance the long futures leg when closing
 	}
 	return nil
 }
