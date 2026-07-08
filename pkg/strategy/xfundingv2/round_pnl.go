@@ -134,6 +134,14 @@ func (r *ArbitrageRound) UnrealizedPnL(spotOrderBook, futuresOrderBook types.Ord
 	return result
 }
 
+func (r *RoundUnrealizedPnL) TotalSpotPnL() fixedpoint.Value {
+	return r.SpotProfitStats.AccumulatedNetProfit.Add(r.UnrealizedSpotPnL)
+}
+
+func (r *RoundUnrealizedPnL) TotalFuturesPnL() fixedpoint.Value {
+	return r.FuturesProfitStats.AccumulatedNetProfit.Add(r.UnrealizedFuturesPnL)
+}
+
 // TotalPnL returns realized net PnL (funding + spot + futures) plus the current
 // unrealized PnL of both open legs.
 func (p *RoundUnrealizedPnL) TotalPnL() fixedpoint.Value {

@@ -748,7 +748,11 @@ func (s *Strategy) CrossRun(
 				continue
 			}
 			round.SetClosing(time.Now(), s.TWAPWorkerConfig.ClosingDuration)
-			bbgo.Notify("⚠️ Round is set to closing state on startup", round.NewNotification())
+			spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+				round.SpotSymbol(),
+				round.FuturesSymbol(),
+			)
+			bbgo.Notify("⚠️ Round is set to closing state on startup", round.NewNotification(spotOrderBook, futuresOrderBook))
 		}
 		s.PendingRounds = make(map[string]*PendingRound)
 		s.mu.Unlock()
@@ -823,21 +827,25 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		round.Tick(ctx, tickTime, spotOrderBook, futuresOrderBook)
 		currentState := round.State()
 		if oriState != currentState {
+			spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+				round.SpotSymbol(),
+				round.FuturesSymbol(),
+			)
 			switch currentState {
 			case RoundReady:
 				bbgo.Notify("🟢 Round entered ready state: %s",
 					round.SpotSymbol(),
-					round.NewNotification(),
+					round.NewNotification(spotOrderBook, futuresOrderBook),
 				)
 			case RoundClosing:
 				bbgo.Notify("🟡 Round is closing: %s",
 					round.SpotSymbol(),
-					round.NewNotification(),
+					round.NewNotification(spotOrderBook, futuresOrderBook),
 				)
 			case RoundClosed:
 				bbgo.Notify("🔴 Round is closed: %s",
 					round.SpotSymbol(),
-					round.NewNotification(),
+					round.NewNotification(spotOrderBook, futuresOrderBook),
 				)
 			}
 		}
@@ -885,11 +893,15 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 					posDeviation.FuturesFilled,
 					posDeviation.DeviatedQuantity,
 				)
+				spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+					round.SpotSymbol(),
+					round.FuturesSymbol(),
+				)
 				bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required: spot filled %s, futures filled %s (deviation: %s)",
 					roundSymbol,
 					posDeviation.SpotFilled, posDeviation.FuturesFilled,
 					posDeviation.DeviatedQuantity,
-					round.NewCriticalNotification(),
+					round.NewCriticalNotification(spotOrderBook, futuresOrderBook),
 				)
 				continue
 			} else if halted && !posDeviation.DeviateTooLong {
@@ -901,10 +913,14 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 					posDeviation.SpotFilled,
 					posDeviation.FuturesFilled,
 				)
+				spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+					round.SpotSymbol(),
+					round.FuturesSymbol(),
+				)
 				bbgo.Notify("✅ Round %s resumed as hedge deviation back to normal. It was halted at %s.",
 					roundSymbol,
 					haltedAt.Format(time.RFC3339),
-					round.NewNotification(),
+					round.NewNotification(spotOrderBook, futuresOrderBook),
 				)
 			}
 
@@ -913,13 +929,17 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				haltedAt := round.HaltedAt()
 				elapsed := tickTime.Sub(haltedAt)
 				limiter, found := s.haltNotificationLimiters[round.SpotSymbol()]
+				spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+					round.SpotSymbol(),
+					round.FuturesSymbol(),
+				)
 				if found && limiter.AllowN(tickTime, 1) {
 					// send notification for rounds that have been halted for a while.
 					bbgo.Notify("💥 Round %s halted for %s (since %s). Manual intervention is required",
 						roundSymbol,
 						elapsed.String(),
 						haltedAt.Format(time.RFC3339),
-						round.NewCriticalNotification(),
+						round.NewCriticalNotification(spotOrderBook, futuresOrderBook),
 					)
 				}
 				continue
@@ -952,9 +972,13 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				// send notification for rounds that failed to pass the cleanup process for 3 times.
 				// the symbol of the round will be blocked for opening new round until the issue is resolved.
 				task.Notified = true
+				spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+					round.SpotSymbol(),
+					round.FuturesSymbol(),
+				)
 				bbgo.Notify("💥 Failed to handle closed round after %d retries. Manual intervention is required.",
 					s.MaxClosedRetryCnt,
-					round.NewCriticalNotification(),
+					round.NewCriticalNotification(spotOrderBook, futuresOrderBook),
 				)
 			}
 			continue
@@ -966,7 +990,11 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			s.logger.WithError(err).Errorf("failed to handle closed round: %s", task.Round)
 		} else {
 			s.closedRoundStats(task.Round, tickTime)
-			bbgo.Notify("✅ Successfully handled closed round: %s", round.String(), round.NewNotification())
+			spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+				round.SpotSymbol(),
+				round.FuturesSymbol(),
+			)
+			bbgo.Notify("✅ Successfully handled closed round: %s", round.String(), round.NewNotification(spotOrderBook, futuresOrderBook))
 			delete(s.ClosedRoundTasks, task.Round.SpotSymbol())
 		}
 	}
@@ -1030,21 +1058,25 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 			round.TriggeredFundingRate(), fundingRate.LastFundingRate, round)
 		rateDiffAbs := fundingRate.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
 		if rateDiffAbs.Compare(s.CriticalErrorConfig.MaxFundingRateFlip) > 0 {
+			spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+				round.SpotSymbol(),
+				round.FuturesSymbol(),
+			)
 			bbgo.Notify("🚨 Round funding rate flip is too large: %s -> %s (threshold %s)",
 				round.TriggeredFundingRate(),
 				fundingRate.LastFundingRate,
 				s.CriticalErrorConfig.MaxFundingRateFlip,
-				round.NewCriticalNotification(),
+				round.NewCriticalNotification(spotOrderBook, futuresOrderBook),
 			)
 		}
-		if round.NumHoldingIntervals(currentTime) >= round.MinHoldingIntervals() {
-			// the min holding time has passed, transit to closing
-			s.logger.Infof(
-				"[transitOpeningOrReadyRound %s] min holding time passed, transit state %s -> closing, current funding rate %s: %s",
-				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round)
-			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
+
+		// the round is still within the min holding time, keep holding
+		if round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals() {
 			return
-		} else if currentTime.Sub(round.StartTime()) >= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
+		}
+
+		// the round is beyond the max holding time, transit to closing
+		if currentTime.Sub(round.StartTime()) >= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound %s] max holding hours reached, transit state %s -> closing, current funding rate %s: %s",
 				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round,
@@ -1052,21 +1084,20 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
 			return
 		}
-		// the funding rate is not favorable anymore, check the exit cost to see if it's worth to transit to closing
-		s.costEstimator.SetTargetPosition(round.TargetPosition())
-		spotOrderBook, spotOk := s.spotOrderBooks[round.SpotSymbol()]
-		futuresOrderBook, futuresOk := s.futuresOrderBooks[round.FuturesSymbol()]
-		if !spotOk || !futuresOk {
+		// the round is already beyond the min holding time and the funding rate has flipped
+		// check if the unrealized PnL is positive
+		spotOrderBook, futuresOrderBook, ok := s.getOrderBooks(
+			round.SpotSymbol(),
+			round.FuturesSymbol(),
+		)
+		if !ok {
 			s.logger.Warnf("[transitOpeningOrReadyRound] order book not found for symbols: %s", round.SpotSymbol())
 			return
 		}
-		cost, err := s.costEstimator.EstimateExitCost(true, spotOrderBook.Copy(), futuresOrderBook.Copy())
-		if err != nil {
-			s.logger.WithError(err).Errorf("[transitOpeningOrReadyRound] failed to estimate exit cost: %s", round.SpotSymbol())
-			return
-		}
-		// the spread PnL is large enough to cover the exit cost, transit to closing
-		if cost.SpreadPnL.Compare(cost.TotalFeeCost()) > 0 {
+		unrealizedPnL := round.UnrealizedPnL(spotOrderBook, futuresOrderBook)
+		// the unrealized PnL is positive, transit to closing
+		unrealizedNetPnL := unrealizedPnL.TotalPnL()
+		if unrealizedNetPnL.Sign() > 0 {
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound %s] transit state %s -> closing, current funding rate %s: %s",
 				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round)
@@ -1497,10 +1528,14 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 		if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
 			return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
 		} else {
+			spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+				round.SpotSymbol(),
+				round.FuturesSymbol(),
+			)
 			bbgo.Notify("⬅️ Transferred %s %s back to spot account",
 				balance.Available,
 				asset,
-				round.NewNotification(),
+				round.NewNotification(spotOrderBook, futuresOrderBook),
 			)
 		}
 	}
@@ -1514,7 +1549,7 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 
 func (s *Strategy) closedRoundStats(round *ArbitrageRound, tickTime time.Time) {
 	pnl := round.RealizedPnL()
-	bbgo.Notify("Round PnL %s", round.SpotSymbol(), pnl)
+	bbgo.Notify("Round Realized PnL %s", round.SpotSymbol(), pnl)
 	if breaker, found := s.CircuitBreakers[round.SpotSymbol()]; found {
 		breaker.RecordProfit(pnl.NetPnL(), tickTime)
 	} else {
@@ -1591,12 +1626,20 @@ func (s *Strategy) newDebugLogger() *logrus.Entry {
 func (s *Strategy) notifyStats() {
 	var activeRoundNotifications []any
 	for _, round := range s.ActiveRounds {
-		activeRoundNotifications = append(activeRoundNotifications, round.NewNotification())
+		spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+			round.SpotSymbol(),
+			round.FuturesSymbol(),
+		)
+		activeRoundNotifications = append(activeRoundNotifications, round.NewNotification(spotOrderBook, futuresOrderBook))
 	}
 
 	var pendingRoundNotifications []any
 	for _, pendingRound := range s.PendingRounds {
-		pendingRoundNotifications = append(pendingRoundNotifications, pendingRound.Round.NewNotification())
+		spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+			pendingRound.Round.SpotSymbol(),
+			pendingRound.Round.FuturesSymbol(),
+		)
+		pendingRoundNotifications = append(pendingRoundNotifications, pendingRound.Round.NewNotification(spotOrderBook, futuresOrderBook))
 	}
 
 	bbgo.Notify("📊 Round stats: %d active rounds, %d pending rounds",
@@ -1695,4 +1738,10 @@ func (s *Strategy) setLeverage(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func (s *Strategy) getOrderBooks(spotSymbol, futuresSymbol string) (types.OrderBook, types.OrderBook, bool) {
+	spotOrderBook, spotOk := s.spotOrderBooks[spotSymbol]
+	futuresOrderBook, futuresOk := s.futuresOrderBooks[futuresSymbol]
+	return spotOrderBook.Copy(), futuresOrderBook.Copy(), spotOk && futuresOk
 }

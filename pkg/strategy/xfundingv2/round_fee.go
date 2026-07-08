@@ -92,7 +92,15 @@ func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Ti
 		// move to active round list
 		s.ActiveRounds[round.SpotSymbol()] = round
 		delete(s.PendingRounds, round.SpotSymbol())
-		bbgo.Notify("🚀 Round started: %s", round.SpotSymbol(), round.NewNotification())
+		spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+			round.SpotSymbol(),
+			round.FuturesSymbol(),
+		)
+		bbgo.Notify("🚀 Round started: %s", round.SpotSymbol(),
+			round.NewNotification(
+				spotOrderBook, futuresOrderBook,
+			),
+		)
 	}
 }
 
