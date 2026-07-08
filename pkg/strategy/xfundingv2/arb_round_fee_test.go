@@ -354,7 +354,7 @@ func TestStrategy_CalculateRoundFeeAsset(t *testing.T) {
 		round := NewArbitrageRound(
 			fundingRate,
 			types.ExchangeBinance, types.ExchangeBinance,
-			3, 8,
+			3, 8, 3,
 			spotWorker, futuresWorker, mockService,
 			types.PositionLong)
 
@@ -472,7 +472,7 @@ func TestStrategy_CalculateRoundFeeAsset(t *testing.T) {
 		round := NewArbitrageRound(
 			fundingRate,
 			types.ExchangeBinance, types.ExchangeBinance,
-			3, 8, spotWorker, futuresWorker, mockService,
+			3, 8, 3, spotWorker, futuresWorker, mockService,
 			types.PositionShort)
 
 		err := s.calculateRoundFeeAsset(round)

@@ -113,7 +113,7 @@ func newTestArbitrageRound(t *testing.T, ctrl *gomock.Controller, fundingInterva
 	round := NewArbitrageRound(
 		fundingRate,
 		types.ExchangeBinance, types.ExchangeBinance,
-		minHoldingIntervals, fundingIntervalHours, spotWorker, futuresWorker, mockService,
+		minHoldingIntervals, fundingIntervalHours, 3, spotWorker, futuresWorker, mockService,
 		types.PositionShort)
 	return round, mockService
 }
@@ -405,7 +405,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	round := NewArbitrageRound(
 		fundingRate,
 		types.ExchangeBinance, types.ExchangeBinance,
-		3, 8, spotWorker, futuresWorker, mockService,
+		3, 8, 3, spotWorker, futuresWorker, mockService,
 		sc.direction)
 	round.SetLogger(logrus.WithField("test", sc.name))
 
