@@ -44,7 +44,7 @@ func (p *RoundPnL) NetPnL() fixedpoint.Value {
 	)
 }
 
-func (r *ArbitrageRound) PnL() RoundPnL {
+func (r *ArbitrageRound) PnL() *RoundPnL {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -91,9 +91,10 @@ func (r *ArbitrageRound) PnL() RoundPnL {
 		}
 	}
 
-	return RoundPnL{
+	roundPnL := RoundPnL{
 		FundingIncome:      fundingIncome,
 		SpotProfitStats:    spotProfitStats,
 		FuturesProfitStats: futuresProfitStats,
 	}
+	return &roundPnL
 }
