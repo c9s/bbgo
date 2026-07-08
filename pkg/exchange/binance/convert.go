@@ -336,7 +336,7 @@ func convertSubscription(s types.Subscription) string {
 	// for trade, it's "<symbol>@trade"
 	// for aggregated trade, it's "<symbol>@aggTrade"
 	switch s.Channel {
-	case types.KLineChannel:
+	case types.KLineChannel, types.IndexPriceKLineChannel:
 		return fmt.Sprintf("%s@%s_%s", strings.ToLower(s.Symbol), s.Channel, s.Options.String())
 	case types.BookChannel:
 		// depth values: 5, 10, 20
