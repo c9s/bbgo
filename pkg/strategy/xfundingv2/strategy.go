@@ -292,8 +292,9 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) CrossRun(
-	ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
+	parent context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
 ) error {
+	ctx, cancelAll := context.WithCancel(parent)
 	// Initialize position maps (may be populated by LoadState if persisted state exists)
 	if s.SpotPositions == nil {
 		s.SpotPositions = make(map[string]*types.Position)
@@ -355,6 +356,8 @@ func (s *Strategy) CrossRun(
 	// the database service is nil when no database is configured (e.g. backtesting).
 	if !bbgo.IsBackTesting && s.Environment != nil && s.Environment.DatabaseService != nil && s.Environment.DatabaseService.DB != nil {
 		s.roundInsertService = NewRoundInsertService(ctx, s.Environment.DatabaseService.DB, s.InstanceID())
+		s.roundInsertService.SetLogger(s.logger)
+		s.roundInsertService.Start()
 	} else {
 		s.logger.Warn("no database service configured, closed round records will not be persisted")
 	}
@@ -767,6 +770,7 @@ func (s *Strategy) CrossRun(
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		s.logger.Infof("shutting down %s", s.InstanceID())
+		cancelAll()
 		for symbol, executor := range s.spotGeneralOrderExecutors {
 			if err := executor.GracefulCancel(ctx); err != nil {
 				s.logger.WithError(err).Errorf("failed to gracefully cancel spot orders: %s", symbol)
@@ -779,6 +783,9 @@ func (s *Strategy) CrossRun(
 		}
 		// persist state
 		bbgo.Sync(ctx, s)
+		if s.roundInsertService != nil {
+			close(s.roundInsertService.C)
+		}
 		s.logger.Infof("state persisted for %s", s.InstanceID())
 	})
 
@@ -806,7 +813,10 @@ func (s *Strategy) defaultBreaker(symbol string) *circuitbreaker.BasicCircuitBre
 	return newBreaker
 }
 
-func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
+func (s *Strategy) tick(parent context.Context, tickTime time.Time) {
+	ctx, cancel := context.WithTimeout(parent, s.TickInterval.Duration()-5*time.Second)
+	defer cancel()
+
 	// lock the strategy to ensure all the updates to the active rounds are seen
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1008,7 +1018,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 
 	// 6. log stats
 	if s.lastStatsTime.IsZero() || tickTime.Sub(s.lastStatsTime) >= s.StatsPeriod.Duration() {
-		s.notifyStats()
+		s.notifyStats(ctx, tickTime)
 		s.lastStatsTime = tickTime
 	}
 }
@@ -1521,7 +1531,7 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 		return fmt.Errorf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round)
 	}
 	// compute the amount to transfer back to spot account
-	residualAmount := s.computeResidualCollateral(task, balance, asset)
+	residualAmount := s.computeResidualCollateral(task, balance)
 
 	// transfer the collateral back to spot account when the available balance is sufficient
 	if residualAmount.Sign() > 0 {
@@ -1566,13 +1576,16 @@ func (s *Strategy) closedRoundStats(round *ArbitrageRound, tickTime time.Time) {
 
 	// insert closed round records into database
 	if s.roundInsertService != nil {
-		if err := s.roundInsertService.InsertClosedRound(round); err != nil {
-			s.logger.WithError(err).Warnf("failed to insert closed round record for %s", round.SpotSymbol())
+		select {
+		case s.roundInsertService.C <- round:
+			s.logger.Debugf("sent closed round to insert service: %s", round)
+		default:
+			s.logger.Warnf("insert service channel is full, skipping closed round insert: %s", round)
 		}
 	}
 }
 
-func (s *Strategy) computeResidualCollateral(task *CloseRoundTask, balance types.Balance, asset string) fixedpoint.Value {
+func (s *Strategy) computeResidualCollateral(task *CloseRoundTask, balance types.Balance) fixedpoint.Value {
 	amount := fixedpoint.Zero
 	var closingSide types.SideType
 	if task.Round.TriggeredTargetPosition().Sign() > 0 {
@@ -1623,13 +1636,16 @@ func (s *Strategy) newDebugLogger() *logrus.Entry {
 	})
 }
 
-func (s *Strategy) notifyStats() {
+func (s *Strategy) notifyStats(ctx context.Context, tickTime time.Time) {
 	var activeRoundNotifications []any
 	for _, round := range s.ActiveRounds {
 		spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
 			round.SpotSymbol(),
 			round.FuturesSymbol(),
 		)
+		if err := round.SyncFundingFeeRecords(ctx, tickTime); err != nil {
+			s.logger.WithError(err).Warnf("failed to sync funding fee records for round: %s", round)
+		}
 		activeRoundNotifications = append(activeRoundNotifications, round.NewNotification(spotOrderBook, futuresOrderBook))
 	}
 

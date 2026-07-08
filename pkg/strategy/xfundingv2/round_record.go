@@ -7,6 +7,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
@@ -57,17 +58,53 @@ type FundingFeeRecord struct {
 
 // RoundInsertService persists round records into the DB
 type RoundInsertService struct {
-	db *sqlx.DB
+	C chan *ArbitrageRound
 
+	db         *sqlx.DB
 	ctx        context.Context
 	instanceID string
+	logger     logrus.FieldLogger
 }
 
 func NewRoundInsertService(ctx context.Context, db *sqlx.DB, instanceID string) *RoundInsertService {
 	return &RoundInsertService{
-		ctx:        ctx,
+		C: make(chan *ArbitrageRound, 100),
+
 		db:         db,
+		ctx:        ctx,
 		instanceID: instanceID,
+	}
+}
+
+func (s *RoundInsertService) SetLogger(logger logrus.FieldLogger) {
+	s.logger = logger.WithField("component", "roundInsertService")
+}
+
+func (s *RoundInsertService) Start() {
+	if s.logger == nil {
+		s.logger = logrus.New()
+	}
+	go s.run()
+}
+
+func (s *RoundInsertService) run() {
+	defer s.logger.Info("round insert service stopped")
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case round, ok := <-s.C:
+			if !ok {
+				return
+			}
+			switch round.State() {
+			case RoundClosed:
+				if err := s.InsertClosedRound(round); err != nil {
+					s.logger.WithError(err).Warnf("failed to insert closed round record: %s", round)
+				}
+			}
+		}
 	}
 }
 
