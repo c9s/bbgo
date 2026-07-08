@@ -20,7 +20,7 @@ func TestArbitrageRound_TradePnL(t *testing.T) {
 	round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
 
 	t.Run("returns zero profit stats when no trades", func(t *testing.T) {
-		pnl := round.PnL()
+		pnl := round.RealizedPnL()
 		assert.Equal(t, fixedpoint.Zero, pnl.SpotProfitStats.AccumulatedPnL)
 		assert.Equal(t, fixedpoint.Zero, pnl.SpotProfitStats.AccumulatedNetProfit)
 		assert.Equal(t, fixedpoint.Zero, pnl.FuturesProfitStats.AccumulatedPnL)
@@ -64,7 +64,7 @@ func TestArbitrageRound_TradePnL(t *testing.T) {
 		})
 
 		// Only opening trades — no realized profit yet
-		pnl := round.PnL()
+		pnl := round.RealizedPnL()
 		assert.Equal(t, fixedpoint.Zero, pnl.SpotProfitStats.AccumulatedPnL)
 		assert.Equal(t, fixedpoint.Zero, pnl.FuturesProfitStats.AccumulatedPnL)
 	})
@@ -104,7 +104,7 @@ func TestArbitrageRound_TradePnL(t *testing.T) {
 			Time:          types.Time(time.Date(2024, 1, 2, 1, 0, 0, 0, time.UTC)),
 		})
 
-		pnl := round.PnL()
+		pnl := round.RealizedPnL()
 
 		// Spot: bought 1 BTC at 40000 with 0.001 BTC fee → effective qty = 0.999
 		// Sold 1 BTC at 41000, fee 10 USDT

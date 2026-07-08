@@ -9,13 +9,15 @@ import (
 	"github.com/slack-go/slack"
 )
 
-type RoundPnL struct {
+type RoundRealizedPnL struct {
 	FundingIncome      fixedpoint.Value
 	SpotProfitStats    *types.ProfitStats
 	FuturesProfitStats *types.ProfitStats
+	SpotPosition       *types.Position
+	FuturesPosition    *types.Position
 }
 
-func (p *RoundPnL) SlackAttachment() slack.Attachment {
+func (p *RoundRealizedPnL) SlackAttachment() slack.Attachment {
 	totalNetPnL := p.FundingIncome.Add(
 		p.SpotProfitStats.AccumulatedNetProfit,
 	).Add(
@@ -36,7 +38,7 @@ func (p *RoundPnL) SlackAttachment() slack.Attachment {
 	}
 }
 
-func (p *RoundPnL) NetPnL() fixedpoint.Value {
+func (p *RoundRealizedPnL) NetPnL() fixedpoint.Value {
 	return p.FundingIncome.Add(
 		p.SpotProfitStats.AccumulatedNetProfit,
 	).Add(
@@ -44,7 +46,7 @@ func (p *RoundPnL) NetPnL() fixedpoint.Value {
 	)
 }
 
-func (r *ArbitrageRound) PnL() *RoundPnL {
+func (r *ArbitrageRound) RealizedPnL() *RoundRealizedPnL {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -91,10 +93,12 @@ func (r *ArbitrageRound) PnL() *RoundPnL {
 		}
 	}
 
-	roundPnL := RoundPnL{
+	roundPnL := RoundRealizedPnL{
 		FundingIncome:      fundingIncome,
 		SpotProfitStats:    spotProfitStats,
 		FuturesProfitStats: futuresProfitStats,
+		SpotPosition:       spotPosition,
+		FuturesPosition:    futuresPosition,
 	}
 	return &roundPnL
 }

@@ -73,7 +73,7 @@ func NewRoundInsertService(ctx context.Context, db *sqlx.DB, instanceID string) 
 
 // newClosedRoundRecord builds the summary record and funding-fee records from a closed round
 func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (ClosedRoundRecord, []FundingFeeRecord) {
-	pnl := round.PnL()
+	pnl := round.RealizedPnL()
 
 	record := ClosedRoundRecord{
 		ID:         round.ID(),

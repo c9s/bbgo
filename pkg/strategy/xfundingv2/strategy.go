@@ -1005,9 +1005,7 @@ func (s *Strategy) transitRound(ctx context.Context, round *ArbitrageRound, curr
 
 	oriState := round.State()
 	switch oriState {
-	case RoundOpening:
-		s.transitOpeningOrReadyRoundToClosing(ctx, round, currentTime)
-	case RoundReady:
+	case RoundOpening, RoundReady:
 		s.transitOpeningOrReadyRoundToClosing(ctx, round, currentTime)
 	case RoundClosing:
 		s.transitClosingRound(ctx, round, currentTime)
@@ -1520,7 +1518,7 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 }
 
 func (s *Strategy) closedRoundStats(round *ArbitrageRound, tickTime time.Time) {
-	pnl := round.PnL()
+	pnl := round.RealizedPnL()
 	bbgo.Notify("Round PnL %s", round.SpotSymbol(), pnl)
 	if breaker, found := s.CircuitBreakers[round.SpotSymbol()]; found {
 		breaker.RecordProfit(pnl.NetPnL(), tickTime)
