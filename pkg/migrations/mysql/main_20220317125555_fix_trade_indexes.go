@@ -1,69 +1,29 @@
 package mysql
 
 import (
-	"context"
-
 	"github.com/c9s/rockhopper/v2"
 )
 
+// This migration was compiled from migrations/mysql/20220317125555_fix_trade_indexes.sql.
+// The SQL statements are registered as data so they can be previewed in the
+// console while the migration runs, exactly like a raw .sql migration.
 func init() {
-	AddMigration("main", up_main_fixTradeIndexes, down_main_fixTradeIndexes)
-}
-
-func up_main_fixTradeIndexes(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
-	// This code is executed when the migration is applied.
-	_, err = tx.ExecContext(ctx, "DROP INDEX trades_symbol ON trades;")
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, "DROP INDEX trades_symbol_fee_currency ON trades;")
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, "DROP INDEX trades_traded_at_symbol ON trades;")
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, "CREATE INDEX trades_traded_at ON trades (traded_at, symbol, exchange, id, fee_currency, fee);")
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, "CREATE INDEX trades_id_traded_at ON trades (id, traded_at);")
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, "CREATE INDEX trades_order_id_traded_at ON trades (order_id, traded_at);")
-	if err != nil {
-		return err
-	}
-	return err
-}
-
-func down_main_fixTradeIndexes(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
-	// This code is executed when the migration is rolled back.
-	_, err = tx.ExecContext(ctx, "DROP INDEX trades_traded_at ON trades;")
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, "DROP INDEX trades_id_traded_at ON trades;")
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, "DROP INDEX trades_order_id_traded_at ON trades;")
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, "CREATE INDEX trades_symbol ON trades (exchange, symbol);")
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, "CREATE INDEX trades_symbol_fee_currency ON trades (exchange, symbol, fee_currency, traded_at);")
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, "CREATE INDEX trades_traded_at_symbol ON trades (exchange, traded_at, symbol);")
-	if err != nil {
-		return err
-	}
-	return err
+	AddStatementMigration("main", 20220317125555, "migrations/mysql/20220317125555_fix_trade_indexes.sql", true,
+		[]rockhopper.Statement{
+			{Direction: rockhopper.DirectionUp, SQL: "DROP INDEX trades_symbol ON trades;"},
+			{Direction: rockhopper.DirectionUp, SQL: "DROP INDEX trades_symbol_fee_currency ON trades;"},
+			{Direction: rockhopper.DirectionUp, SQL: "DROP INDEX trades_traded_at_symbol ON trades;"},
+			{Direction: rockhopper.DirectionUp, SQL: "CREATE INDEX trades_traded_at ON trades (traded_at, symbol, exchange, id, fee_currency, fee);"},
+			{Direction: rockhopper.DirectionUp, SQL: "CREATE INDEX trades_id_traded_at ON trades (id, traded_at);"},
+			{Direction: rockhopper.DirectionUp, SQL: "CREATE INDEX trades_order_id_traded_at ON trades (order_id, traded_at);"},
+		},
+		[]rockhopper.Statement{
+			{Direction: rockhopper.DirectionDown, SQL: "DROP INDEX trades_traded_at ON trades;"},
+			{Direction: rockhopper.DirectionDown, SQL: "DROP INDEX trades_id_traded_at ON trades;"},
+			{Direction: rockhopper.DirectionDown, SQL: "DROP INDEX trades_order_id_traded_at ON trades;"},
+			{Direction: rockhopper.DirectionDown, SQL: "CREATE INDEX trades_symbol ON trades (exchange, symbol);"},
+			{Direction: rockhopper.DirectionDown, SQL: "CREATE INDEX trades_symbol_fee_currency ON trades (exchange, symbol, fee_currency, traded_at);"},
+			{Direction: rockhopper.DirectionDown, SQL: "CREATE INDEX trades_traded_at_symbol ON trades (exchange, traded_at, symbol);"},
+		},
+	)
 }

@@ -1,29 +1,19 @@
 package sqlite3
 
 import (
-	"context"
-
 	"github.com/c9s/rockhopper/v2"
 )
 
+// This migration was compiled from migrations/sqlite3/20251105153420_profits_index_traded_at_symbol.sql.
+// The SQL statements are registered as data so they can be previewed in the
+// console while the migration runs, exactly like a raw .sql migration.
 func init() {
-	AddMigration("main", up_main_profitsIndexTradedAtSymbol, down_main_profitsIndexTradedAtSymbol)
-}
-
-func up_main_profitsIndexTradedAtSymbol(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
-	// This code is executed when the migration is applied.
-	_, err = tx.ExecContext(ctx, "CREATE INDEX idx_profits_traded_at_symbol ON profits (traded_at, symbol);")
-	if err != nil {
-		return err
-	}
-	return err
-}
-
-func down_main_profitsIndexTradedAtSymbol(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
-	// This code is executed when the migration is rolled back.
-	_, err = tx.ExecContext(ctx, "DROP INDEX idx_profits_traded_at_symbol;")
-	if err != nil {
-		return err
-	}
-	return err
+	AddStatementMigration("main", 20251105153420, "migrations/sqlite3/20251105153420_profits_index_traded_at_symbol.sql", true,
+		[]rockhopper.Statement{
+			{Direction: rockhopper.DirectionUp, SQL: "CREATE INDEX idx_profits_traded_at_symbol ON profits (traded_at, symbol);"},
+		},
+		[]rockhopper.Statement{
+			{Direction: rockhopper.DirectionDown, SQL: "DROP INDEX idx_profits_traded_at_symbol;"},
+		},
+	)
 }
