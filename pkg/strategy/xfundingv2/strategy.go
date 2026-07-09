@@ -666,8 +666,8 @@ func (s *Strategy) CrossRun(
 		position.StrategyInstanceID = s.InstanceID()
 	}
 
-	// start round funding income sync worker
-	s.fundingIncomeC = s.fundingIncomeSyncWorker(s.ctx)
+	// start round funding income syncing worker
+	s.runFundingIncomeWorker(s.ctx)
 
 	// setup callbacks
 	s.spotSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.TickSymbol, s.TickInterval, func(kline types.KLine) {
@@ -830,6 +830,16 @@ func (s *Strategy) tick(parent context.Context, tickTime time.Time) {
 	// lock the strategy to ensure all the updates to the active rounds are seen
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// trigger the worker to sync the funding income for all active rounds
+	defer func() {
+		select {
+		case s.fundingIncomeC <- tickTime:
+			s.logger.Debugf("sent funding income sync tick time: %s", tickTime)
+		default:
+			s.logger.Warnf("funding income sync tick time channel is full, skip tick time: %s", tickTime)
+		}
+	}()
 
 	if !s.lastTickTime.IsZero() && (s.lastTickTime.Equal(tickTime) || tickTime.Before(s.lastTickTime)) {
 		return
@@ -1561,6 +1571,7 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 	}
 
 	// sync funding fee records for the round
+	// get the round ready for realized PnL calculation and cleanup
 	if err := round.SyncFundingFeeRecords(ctx, tickTime); err != nil {
 		return fmt.Errorf("[handleClosedRound] failed to sync funding fee records for round %s: %w", round, err)
 	}
@@ -1676,6 +1687,37 @@ func (s *Strategy) notifyStats() {
 		bbgo.Notify("Pending Rounds", pendingRoundNotifications...)
 	}
 
+}
+
+func (s *Strategy) runFundingIncomeWorker(ctx context.Context) {
+	if s.fundingIncomeC != nil {
+		return
+	}
+
+	s.fundingIncomeC = make(chan time.Time, 10)
+	s.logger.Info("starting funding income sync worker")
+	go func() {
+		defer s.logger.Info("funding income sync worker exited")
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case tickTime, ok := <-s.fundingIncomeC:
+				if !ok {
+					return
+				}
+				for _, round := range s.ActiveRounds {
+					if err := round.SyncFundingFeeRecords(ctx, tickTime); err != nil {
+						s.logger.WithError(err).Warnf(
+							"failed to sync funding fee records for round at %s: %s",
+							tickTime.Format(time.RFC3339), round,
+						)
+					}
+				}
+			}
+		}
+	}()
 }
 
 // Fee rate and BNB discount.
