@@ -949,6 +949,7 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresBa
 	}
 }
 
+// Prepare prepares the round to be ready for resume, such as doing neceessary transfers and syncing the positions.
 func (r *ArbitrageRound) Prepare(
 	ctx context.Context,
 	spotSession, futuresSession *bbgo.ExchangeSession,

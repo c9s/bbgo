@@ -654,6 +654,12 @@ func (s *Strategy) CrossRun(
 		if err := s.prepareRounds(s.ctx); err != nil {
 			return err
 		}
+
+		for _, round := range s.ActiveRounds {
+			if err := round.SyncFundingFeeRecords(s.ctx, time.Now()); err != nil {
+				return fmt.Errorf("failed to sync funding fee records for round %s: %w", round.SpotSymbol(), err)
+			}
+		}
 	}
 
 	// setup metrics for positions
@@ -1786,6 +1792,7 @@ func (s *Strategy) checkAndFixMarginMode(ctx context.Context) error {
 	return nil
 }
 
+// prepare active rounds
 func (s *Strategy) prepareRounds(ctx context.Context) error {
 	for symbol, round := range s.ActiveRounds {
 		err := round.Prepare(ctx, s.spotSession, s.futuresSession)
