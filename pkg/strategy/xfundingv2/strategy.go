@@ -65,9 +65,10 @@ type Strategy struct {
 
 	// CandidateSymbols is the list of symbols to consider for selection
 	// IMPORTANT: xfundingv2 is now assuming trading on U-major pairs
-	CandidateSymbols     []string       `json:"candidateSymbols"`
-	OpenPositionInterval types.Duration `json:"openPositionInterval"`
-	TransitRoundInterval types.Duration `json:"transitRoundInterval"`
+	CandidateSymbols       []string       `json:"candidateSymbols"`
+	OpenPositionInterval   types.Duration `json:"openPositionInterval"`
+	TransitRoundInterval   types.Duration `json:"transitRoundInterval"`
+	RoundRebalanceInterval types.Duration `json:"roundRebalanceInterval"`
 
 	// TickSymbol is the symbol used for ticking the strategy, default to the first candidate symbol
 	TickSymbol   string         `json:"tickSymbol"`
@@ -180,6 +181,10 @@ func (s *Strategy) Defaults() error {
 	}
 	if s.TransitRoundInterval.Duration() == 0 {
 		s.TransitRoundInterval = types.Duration(time.Minute * 10)
+	}
+	if s.RoundRebalanceInterval.Duration() == 0 {
+		// default 3x of the tick interval
+		s.RoundRebalanceInterval = types.Duration(s.TickInterval.Duration() * 3)
 	}
 
 	if s.MarketSelectionConfig == nil {
@@ -1243,6 +1248,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 				futuresTwap,
 				s.futuresService,
 				s.MarketSelectionConfig.FuturesDirection,
+				s.RoundRebalanceInterval.Duration(),
 			)
 			round.SetLogger(s.logger)
 			round.SetSpotExchangeFeeRates(

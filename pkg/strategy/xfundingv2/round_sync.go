@@ -65,6 +65,7 @@ func (r *ArbitrageRound) Initialize(ctx context.Context, s *Strategy) error {
 		// the restored round should always have the futures worker restored as well.
 		return errors.New("[ArbitrageRound] futures worker is nil")
 	}
+	r.rebalanceInterval = s.RoundRebalanceInterval.Duration()
 
 	return nil
 }

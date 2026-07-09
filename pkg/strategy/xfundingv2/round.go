@@ -54,6 +54,9 @@ type ArbitrageRound struct {
 	futuresWorker *TWAPWorker
 	haltedAt      time.Time
 
+	lastRebalanceTime time.Time
+	rebalanceInterval time.Duration
+
 	futuresService                                FuturesService
 	spotExchangeFeeRates, futuresExchangeFeeRates map[types.ExchangeName]types.ExchangeFee
 
@@ -73,6 +76,7 @@ func NewArbitrageRound(
 	spotTwap, futuresTwap *TWAPWorker,
 	futuresService FuturesService,
 	direction types.PositionType,
+	rebalanceInterval time.Duration,
 ) *ArbitrageRound {
 	policy, err := newDirectionPolicy(direction, spotTwap.Market())
 	if err != nil {
@@ -104,6 +108,7 @@ func NewArbitrageRound(
 
 		spotWorker:         spotTwap,
 		futuresWorker:      futuresTwap,
+		rebalanceInterval:  rebalanceInterval,
 		futuresService:     futuresService,
 		retryTransferTickC: make(chan time.Time, 100),
 	}
@@ -1260,7 +1265,7 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 			)
 	}
 
-	if err := r.rebalance(ctx); err != nil {
+	if err := r.rebalance(ctx, currentTime); err != nil {
 		r.logger.WithError(err).Errorf("failed to rebalance round: %s", r.String())
 	}
 
@@ -1371,7 +1376,11 @@ func (r *ArbitrageRound) syncSpotPosition(futuresTrade types.Trade) {
 	r.spotWorker.SetTargetPosition(spotTarget)
 }
 
-func (r *ArbitrageRound) rebalance(ctx context.Context) error {
+func (r *ArbitrageRound) rebalance(ctx context.Context, currentTime time.Time) error {
+	if !r.lastRebalanceTime.IsZero() && currentTime.Sub(r.lastRebalanceTime) < r.rebalanceInterval {
+		return nil
+	}
+	r.lastRebalanceTime = currentTime
 	switch r.syncState.State {
 	case RoundOpening:
 		return r.rebalanceOpening(ctx)
