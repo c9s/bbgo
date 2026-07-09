@@ -46,6 +46,8 @@ const (
 	// @group RiskDataStream
 	EventTypeMarginLevelStatusChange EventType = "MARGIN_LEVEL_STATUS_CHANGE"
 	EventTypeUserLiabilityChange     EventType = "USER_LIABILITY_CHANGE"
+
+	EventServerShutdown EventType = "serverShutdown"
 )
 
 type EventBase struct {
@@ -449,6 +451,10 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		var event ForceOrderEvent
 		err = json.Unmarshal(message, &event)
 		return &event, err
+	case EventServerShutdown:
+		var event ServerShutdownEvent
+		err = json.Unmarshal(message, &event)
+		return &event, err
 	}
 
 	// events for futures
@@ -513,6 +519,16 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 	}
 
 	return nil, fmt.Errorf("unsupported binance websocket message: %s", message)
+}
+
+//	{
+//	  "event": {
+//	    "e": "serverShutdown", // Event Type
+//	    "E": 1770123456789     // Event Time
+//	  }
+//	}
+type ServerShutdownEvent struct {
+	EventBase
 }
 
 // isBookTicker document ref :https://binance-docs.github.io/apidocs/spot/en/#individual-symbol-book-ticker-streams
