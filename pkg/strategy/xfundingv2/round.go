@@ -420,34 +420,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			realizedPnL := n.RealizedPnL()
 			spotAvgCost = realizedPnL.SpotPosition.AverageCost
 			futuresAvgCost = realizedPnL.FuturesPosition.AverageCost
-			fields = append(fields,
-				slack.AttachmentField{
-					Title: "Funding Income",
-					Value: realizedPnL.FundingIncome.String(),
-					Short: true,
-				},
-				slack.AttachmentField{
-					Title: "Spot PnL",
-					Value: fmt.Sprintf(
-						"%s (Net %s)",
-						realizedPnL.SpotProfitStats.AccumulatedPnL.String(),
-						realizedPnL.SpotProfitStats.AccumulatedNetProfit.String(),
-					),
-					Short: true,
-				},
-				slack.AttachmentField{
-					Title: "Futures PnL",
-					Value: fmt.Sprintf("%s (Net %s)",
-						realizedPnL.FuturesProfitStats.AccumulatedPnL.String(),
-						realizedPnL.FuturesProfitStats.AccumulatedNetProfit.String()),
-					Short: true,
-				},
-				slack.AttachmentField{
-					Title: "Total Net PnL",
-					Value: realizedPnL.NetPnL().String(),
-					Short: false,
-				},
-			)
+			fields = append(fields, realizedPnLFields(realizedPnL)...)
 		} else {
 			unrealizedPnL := n.UnrealizedPnL(
 				n.spotOrderBook,
@@ -455,23 +428,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			)
 			spotAvgCost = unrealizedPnL.SpotPosition.AverageCost
 			futuresAvgCost = unrealizedPnL.FuturesPosition.AverageCost
-			fields = append(fields,
-				slack.AttachmentField{
-					Title: "Unrealized Total Spot PnL",
-					Value: unrealizedPnL.TotalSpotPnL().String(),
-					Short: true,
-				},
-				slack.AttachmentField{
-					Title: "Unrealized Total Futures PnL",
-					Value: unrealizedPnL.TotalFuturesPnL().String(),
-					Short: true,
-				},
-				slack.AttachmentField{
-					Title: "Unrealized Total PnL",
-					Value: unrealizedPnL.TotalPnL().String(),
-					Short: false,
-				},
-			)
+			fields = append(fields, unrealizedPnLFields(unrealizedPnL)...)
 		}
 	}
 	spotActiveOrder := n.spotWorker.activeOrder
@@ -529,6 +486,57 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 		Text:   text,
 		Color:  n.stateColor(),
 		Fields: fields,
+	}
+}
+
+func realizedPnLFields(realizedPnL *RoundRealizedPnL) []slack.AttachmentField {
+	return []slack.AttachmentField{
+		{
+			Title: "Funding Income",
+			Value: realizedPnL.FundingIncome.String(),
+			Short: true,
+		},
+		{
+			Title: "Spot PnL",
+			Value: fmt.Sprintf(
+				"%s (Net %s)",
+				realizedPnL.SpotProfitStats.AccumulatedPnL.String(),
+				realizedPnL.SpotProfitStats.AccumulatedNetProfit.String(),
+			),
+			Short: true,
+		},
+		{
+			Title: "Futures PnL",
+			Value: fmt.Sprintf("%s (Net %s)",
+				realizedPnL.FuturesProfitStats.AccumulatedPnL.String(),
+				realizedPnL.FuturesProfitStats.AccumulatedNetProfit.String()),
+			Short: true,
+		},
+		{
+			Title: "Total Net PnL",
+			Value: realizedPnL.NetPnL().String(),
+			Short: false,
+		},
+	}
+}
+
+func unrealizedPnLFields(unrealizedPnL *RoundUnrealizedPnL) []slack.AttachmentField {
+	return []slack.AttachmentField{
+		{
+			Title: "Unrealized Total Spot PnL",
+			Value: unrealizedPnL.TotalSpotPnL().String(),
+			Short: true,
+		},
+		{
+			Title: "Unrealized Total Futures PnL",
+			Value: unrealizedPnL.TotalFuturesPnL().String(),
+			Short: true,
+		},
+		{
+			Title: "Unrealized Total PnL",
+			Value: unrealizedPnL.TotalPnL().String(),
+			Short: false,
+		},
 	}
 }
 
