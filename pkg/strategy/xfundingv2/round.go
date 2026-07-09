@@ -1387,6 +1387,8 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context) error {
 
 	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
 	if shortFutures {
+		// rebalance the short futures leg when opening
+		// check if there is sufficient margin on the futures account to open the position, if not, transfer from spot account
 		futuresRemaining := r.futuresWorker.RemainingQuantity().Abs()
 		if activeOrder := r.futuresWorker.ActiveOrder(); activeOrder != nil {
 			// deduct the active order remaining quantity from the futures remaining quantity
@@ -1450,21 +1452,26 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 
 	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
 	if shortFutures {
-		// rebalance the short futures leg
-		// 1. check the quote currency balance should be non-negative
-		// negative quote balance on futures account will decrease the collateral available for transfer back to spot
-		// this will cause the spot leg to be unable to close its position
+		// rebalance the short futures leg for negative unrealized PnL
+		// negative unrealized PnL will lock available collateral on futures account and prevent us to transfer out the asset back to spot account.
+		// Overtime, it may cause an unexpected position risk on overall positions, both spot and futures.
+		risks, err := r.futuresService.QueryPositionRisk(ctx, r.FuturesSymbol())
+		if err != nil || len(risks) == 0 {
+			return fmt.Errorf("failed to query position risk: %w", err)
+		}
+		risk := risks[0]
 		futuresMarket := r.futuresWorker.Market()
 		spotMarket := r.spotWorker.Market()
-		baseAsset := futuresMarket.BaseCurrency
-		quoteAsset := futuresMarket.QuoteCurrency
-		netFuturesQuote := futuresAccount.Balances()[quoteAsset].Net()
-		baseAssetBalance := futuresAccount.Balances()[baseAsset]
-		if netFuturesQuote.Sign() < 0 {
-			// double the transfer amount to set a buffer for the quote balance
-			transferAmount := netFuturesQuote.Abs().Mul(fixedpoint.NewFromFloat(1.1))
+		baseAsset := r.syncState.DirectionPolicy.CollateralAsset()
+		quoteAsset := futuresMarket.BaseCurrency
+		// rebalance the short futures leg for negative unrealized PnL
+		r.logger.Debugf("round %s unrealized PnL: %s", r.SpotSymbol(), risk.UnrealizedPnL)
+		if risk.UnrealizedPnL.Sign() < 0 {
+			// transfer 110% of the unrealized PnL from spot to futures to cover the loss
+			transferAmount := risk.UnrealizedPnL.Abs().Mul(fixedpoint.NewFromFloat(1.1))
 			transferAmount = spotMarket.TruncateQuantity(transferAmount)
-			spotAvailable := spotAccount.Balances()[quoteAsset].Available
+			spotBalance := spotAccount.Balances()[futuresMarket.BaseCurrency]
+			spotAvailable := spotBalance.Available
 			if transferAmount.Compare(spotAvailable) > 0 {
 				return fmt.Errorf("insufficient %s balance on spot account (%s) to rebalance round: %s", quoteAsset, spotAvailable, r.String())
 			}
@@ -1487,7 +1494,8 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 			expectedTransferOut = expectedTransferOut.Add(amount)
 		}
 		transferDiff := expectedTransferOut.Sub(accTransferOut)
-		maxWithdraw := baseAssetBalance.MaxWithdrawAmount
+		futuresBalance := futuresAccount.Balances()[baseAsset]
+		maxWithdraw := futuresBalance.MaxWithdrawAmount
 		if maxWithdraw != nil && maxWithdraw.Sign() > 0 {
 			transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
 		}

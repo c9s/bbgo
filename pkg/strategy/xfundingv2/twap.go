@@ -80,8 +80,9 @@ type TWAPWorker struct {
 	syncState   TWAPWorkerSyncState
 	activeOrder *types.Order
 
-	ctx    context.Context
-	logger logrus.FieldLogger
+	account *types.Account
+	ctx     context.Context
+	logger  logrus.FieldLogger
 }
 
 func NewTWAPWorker(
@@ -108,6 +109,7 @@ func NewTWAPWorker(
 		},
 	}
 	w.ctx = ctx
+	w.account = session.Account
 	w.syncState.TWAPExecutor = NewTWAPExecutor(
 		w.ctx,
 		service,
@@ -552,6 +554,27 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 	// cap at remaining
 	if sliceQty.Compare(remaining) > 0 {
 		sliceQty = remaining
+	}
+	// cap at available balance for spot orders
+	if !w.Executor().IsFutures() {
+		switch orderSide(remaining) {
+		case types.SideTypeSell:
+			// check available base for sell
+			base := w.Market().BaseCurrency
+			if baseBalance, ok := w.account.Balance(base); ok {
+				w.logger.Debugf("available balance on spot: %s %s", baseBalance.Available, base)
+				sliceQty = fixedpoint.Min(sliceQty, baseBalance.Available)
+			}
+		case types.SideTypeBuy:
+			// check available quote for buy
+			quote := w.Market().QuoteCurrency
+			if quoteBalance, ok := w.account.Balance(quote); !price.IsZero() && ok {
+				w.logger.Debugf("available balance on spot: %s %s", quoteBalance.Available, quote)
+				// calculate the max quantity we can buy with the available quote balance
+				maxBuyQty := quoteBalance.Available.Div(price)
+				sliceQty = fixedpoint.Min(sliceQty, maxBuyQty)
+			}
+		}
 	}
 	w.logger.Debugf("sliceQty: %s@%s", sliceQty, price)
 	return sliceQty
