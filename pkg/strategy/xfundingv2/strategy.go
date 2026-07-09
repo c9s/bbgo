@@ -15,6 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
@@ -829,10 +830,14 @@ func (s *Strategy) defaultBreaker(symbol string) *circuitbreaker.BasicCircuitBre
 	return newBreaker
 }
 
-func (s *Strategy) tick(parent context.Context, tickTime time.Time) {
-	ctx, cancel := context.WithTimeout(parent, s.TickInterval.Duration()-5*time.Second)
-	defer cancel()
-
+func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
+	if !bbgo.IsBackTesting {
+		profiler := timeprofile.Start()
+		defer func() {
+			duration := profiler.Stop()
+			s.logger.Debugf("tick duration: %s", duration)
+		}()
+	}
 	// lock the strategy to ensure all the updates to the active rounds are seen
 	s.mu.Lock()
 	defer s.mu.Unlock()

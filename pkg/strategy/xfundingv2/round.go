@@ -1388,6 +1388,23 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context) error {
 	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
 	if shortFutures {
 		// rebalance the short futures leg when opening
+		// check if there is any remaining quantity on the spot account to be transferred to futures account
+		spotAccount, err := r.spotSession.UpdateAccount(timedCtx)
+		if err != nil {
+			return fmt.Errorf("failed to update spot account: %w", err)
+		}
+		baseAsset := r.CollateralAsset()
+		baseAvailable := spotAccount.Balances()[baseAsset].Available
+		if baseAvailable.Sign() > 0 {
+			// transfer the available collateral asset from spot to futures
+			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, baseAvailable, types.TransferIn); err != nil {
+				return fmt.Errorf("failed to transfer %s %s from spot to futures: %w", baseAvailable.String(), baseAsset, err)
+			}
+			bbgo.Notify("➡️ Transfered %s %s from spot to futures to rebalance",
+				baseAvailable.String(),
+				baseAsset,
+			)
+		}
 		// check if there is sufficient margin on the futures account to open the position, if not, transfer from spot account
 		futuresRemaining := r.futuresWorker.RemainingQuantity().Abs()
 		if activeOrder := r.futuresWorker.ActiveOrder(); activeOrder != nil {
@@ -1405,10 +1422,6 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context) error {
 		futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
 		if err != nil {
 			return fmt.Errorf("failed to update futures account: %w", err)
-		}
-		spotAccount, err := r.spotSession.UpdateAccount(timedCtx)
-		if err != nil {
-			return fmt.Errorf("failed to update spot account: %w", err)
 		}
 		requiredMargin := r.lastTickPrice.Mul(futuresRemaining).Div(r.syncState.Leverage)
 		futuresAvailable := futuresAccount.FuturesInfo.AvailableBalance
