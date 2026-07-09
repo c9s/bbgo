@@ -1,3 +1,4 @@
+-- @package xfundingv2
 -- +up
 -- +begin
 CREATE TABLE `xfundingv2_closed_rounds`
