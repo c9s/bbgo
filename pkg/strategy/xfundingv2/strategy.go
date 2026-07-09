@@ -835,7 +835,12 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		profiler := timeprofile.Start()
 		defer func() {
 			duration := profiler.Stop()
+			// tick duration
+			// ideally the tick duration should not exceed the tick interval
 			s.logger.Debugf("tick duration: %s", duration)
+			tickDurationMetrics.With(prometheus.Labels{
+				"strategy_id": s.InstanceID(),
+			}).Set(duration.Seconds())
 		}()
 	}
 	// lock the strategy to ensure all the updates to the active rounds are seen
