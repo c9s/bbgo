@@ -70,6 +70,8 @@ func (r *ArbitrageRound) Initialize(ctx context.Context, s *Strategy) error {
 }
 
 type ArbitrageRoundSyncState struct {
+	ID string `json:"id"`
+
 	TriggeredFundingRate        fixedpoint.Value     `json:"triggeredFundingRate"`
 	TriggeredSpotTargetPosition fixedpoint.Value     `json:"triggeredSpotTargetPosition"`
 	TransferInAmount            fixedpoint.Value     `json:"transferInAmount"`
@@ -105,6 +107,12 @@ type ArbitrageRoundSyncState struct {
 	ClosingDuration types.Duration `json:"closingDuration"`
 	// LastUpdateTime is the last time when the round is updated
 	LastUpdateTime time.Time `json:"lastUpdateTime"`
+
+	// ReadyTime is the time when the round enters ready state
+	ReadyTime time.Time `json:"readyTime"`
+
+	// ClosedTime is the time when the round is closed
+	ClosedTime time.Time `json:"closedTime"`
 
 	LargeDeviationStartTime time.Time `json:"largeDeviationStartTime"`
 }

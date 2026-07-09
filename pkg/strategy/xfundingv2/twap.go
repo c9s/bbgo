@@ -132,6 +132,7 @@ func (w *TWAPWorker) SetLogger(logger logrus.FieldLogger) {
 	w.logger = logger.WithFields(logrus.Fields{
 		"component":   "TWAPWorker",
 		"accountType": accountType,
+		"symbol":      w.syncState.Symbol,
 	})
 }
 
@@ -374,6 +375,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 				w.logger.WithError(err).Warn("[TWAP tick] failed to cancel active order when deadline exceeded")
 				return nil
 			}
+			w.logger.Debug("deadline exceeded, reseting active order")
 			w.syncAndResetActiveOrder()
 		}
 		// the remaining quantity is dust, do nothing
@@ -464,6 +466,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 		return nil
 	}
 
+	w.logger.Debugf("current interval ended, placing next slice order: %s > %s", currentTime, w.syncState.CurrentIntervalEnd)
 	// currentTime is after current interval end, time to place the next slice order
 	if oldActiveOrder := w.syncAndResetActiveOrder(); oldActiveOrder != nil && !oldActiveOrder.GetRemainingQuantity().IsZero() {
 		// cancel the old active order before placing the next slice order
@@ -488,6 +491,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 	if err != nil || createdOrder == nil {
 		return fmt.Errorf("failed to place order for the next slice: %w", err)
 	}
+	w.logger.Infof("[TWAP tick] new active order created for next slice: %s", createdOrder)
 	w.activeOrder = createdOrder
 
 	return nil

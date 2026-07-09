@@ -1,29 +1,19 @@
 package sqlite3
 
 import (
-	"context"
-
 	"github.com/c9s/rockhopper/v2"
 )
 
+// This migration was compiled from migrations/sqlite3/20220512170330_fix_profit_symbol_length.sql.
+// The SQL statements are registered as data so they can be previewed in the
+// console while the migration runs, exactly like a raw .sql migration.
 func init() {
-	AddMigration("main", up_main_fixProfitSymbolLength, down_main_fixProfitSymbolLength)
-}
-
-func up_main_fixProfitSymbolLength(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
-	// This code is executed when the migration is applied.
-	_, err = tx.ExecContext(ctx, "SELECT 1;")
-	if err != nil {
-		return err
-	}
-	return err
-}
-
-func down_main_fixProfitSymbolLength(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
-	// This code is executed when the migration is rolled back.
-	_, err = tx.ExecContext(ctx, "SELECT 1;")
-	if err != nil {
-		return err
-	}
-	return err
+	AddStatementMigration("main", 20220512170330, "migrations/sqlite3/20220512170330_fix_profit_symbol_length.sql", true,
+		[]rockhopper.Statement{
+			{Direction: rockhopper.DirectionUp, SQL: "SELECT 1;"},
+		},
+		[]rockhopper.Statement{
+			{Direction: rockhopper.DirectionDown, SQL: "SELECT 1;"},
+		},
+	)
 }

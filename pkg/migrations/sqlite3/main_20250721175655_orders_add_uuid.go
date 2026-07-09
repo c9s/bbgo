@@ -1,29 +1,19 @@
 package sqlite3
 
 import (
-	"context"
-
 	"github.com/c9s/rockhopper/v2"
 )
 
+// This migration was compiled from migrations/sqlite3/20250721175655_orders_add_uuid.sql.
+// The SQL statements are registered as data so they can be previewed in the
+// console while the migration runs, exactly like a raw .sql migration.
 func init() {
-	AddMigration("main", up_main_ordersAddUuid, down_main_ordersAddUuid)
-}
-
-func up_main_ordersAddUuid(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
-	// This code is executed when the migration is applied.
-	_, err = tx.ExecContext(ctx, "ALTER TABLE trades ADD COLUMN order_uuid TEXT NOT NULL DEFAULT '';")
-	if err != nil {
-		return err
-	}
-	return err
-}
-
-func down_main_ordersAddUuid(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
-	// This code is executed when the migration is rolled back.
-	_, err = tx.ExecContext(ctx, "ALTER TABLE trades DROP COLUMN order_uuid;")
-	if err != nil {
-		return err
-	}
-	return err
+	AddStatementMigration("main", 20250721175655, "migrations/sqlite3/20250721175655_orders_add_uuid.sql", true,
+		[]rockhopper.Statement{
+			{Direction: rockhopper.DirectionUp, SQL: "ALTER TABLE trades ADD COLUMN order_uuid TEXT NOT NULL DEFAULT '';"},
+		},
+		[]rockhopper.Statement{
+			{Direction: rockhopper.DirectionDown, SQL: "ALTER TABLE trades DROP COLUMN order_uuid;"},
+		},
+	)
 }

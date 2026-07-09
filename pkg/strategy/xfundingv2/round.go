@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
@@ -81,6 +82,7 @@ func NewArbitrageRound(
 	fundingIntervalEnd := fundingRate.NextFundingTime.Add(-time.Second)
 	return &ArbitrageRound{
 		syncState: ArbitrageRoundSyncState{
+			ID:                          uuid.NewString(),
 			Symbol:                      spotTwap.Symbol(),
 			TriggeredFundingRate:        fundingRate.LastFundingRate,
 			TriggeredSpotTargetPosition: spotTwap.TargetPosition(),
@@ -237,6 +239,18 @@ func (r *ArbitrageRound) StartTime() time.Time {
 	return r.syncState.StartTime
 }
 
+func (r *ArbitrageRound) ClosedTime() time.Time {
+	return r.syncState.ClosedTime
+}
+
+func (r *ArbitrageRound) ReadyTime() time.Time {
+	return r.syncState.ReadyTime
+}
+
+func (r *ArbitrageRound) ClosingTime() time.Time {
+	return r.syncState.ClosingTime
+}
+
 func (r *ArbitrageRound) HasStarted() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -310,23 +324,31 @@ func (r *ArbitrageRound) SetSlackAlert(alert slackalert.SlackAlert) {
 	r.slackAlert = alert
 }
 
-func (r *ArbitrageRound) NewCriticalNotification() *roundNotification {
+func (r *ArbitrageRound) NewCriticalNotification(spotOrderBook, futuresOrderBook types.OrderBook) *roundNotification {
 	return &roundNotification{
 		ArbitrageRound: r,
 		IsCritical:     true,
+
+		spotOrderBook:    spotOrderBook,
+		futuresOrderBook: futuresOrderBook,
 	}
 }
 
-func (r *ArbitrageRound) NewNotification() *roundNotification {
+func (r *ArbitrageRound) NewNotification(spotOrderBook, futuresOrderBook types.OrderBook) *roundNotification {
 	return &roundNotification{
 		ArbitrageRound: r,
 		IsCritical:     false,
+
+		spotOrderBook:    spotOrderBook,
+		futuresOrderBook: futuresOrderBook,
 	}
 }
 
 type roundNotification struct {
 	*ArbitrageRound
 	IsCritical bool
+
+	spotOrderBook, futuresOrderBook types.OrderBook
 }
 
 func (n *roundNotification) SlackAttachment() slack.Attachment {
@@ -352,8 +374,14 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			Value: n.AnnualizedRate().Percentage(),
 			Short: true,
 		},
+		{
+			Title: "Start Time",
+			Value: n.syncState.StartTime.Format(time.RFC3339),
+			Short: true,
+		},
 	}
-	if n.State() == RoundClosing {
+	switch n.State() {
+	case RoundClosing:
 		fields = append(fields,
 			slack.AttachmentField{
 				Title: "Closing Time",
@@ -363,24 +391,15 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			slack.AttachmentField{
 				Title: "Expected Close Time",
 				Value: n.syncState.ClosingTime.Add(n.syncState.ClosingDuration.Duration()).Format(time.RFC3339),
-				Short: true,
+				Short: false,
 			})
-	} else if n.HasStarted() {
+	case RoundOpening, RoundReady:
 		minHoldingHours := n.syncState.MinHoldingIntervals * n.syncState.FundingIntervalHours
 		expectedClosingTime := n.syncState.FundingIntervalStart.Add(time.Duration(minHoldingHours) * time.Hour)
 		fields = append(fields,
 			slack.AttachmentField{
-				Title: "Start Time",
-				Value: n.syncState.StartTime.Format(time.RFC3339),
-				Short: true,
-			},
-			slack.AttachmentField{
 				Title: "Expected Closing Time",
 				Value: expectedClosingTime.Format(time.RFC3339),
-			},
-			slack.AttachmentField{
-				Title: "Min Holding Intervals",
-				Value: fmt.Sprintf("%d", n.syncState.MinHoldingIntervals),
 				Short: true,
 			},
 			slack.AttachmentField{
@@ -388,9 +407,30 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				Value: n.syncState.FundingIntervalStart.Format(time.RFC3339),
 				Short: true,
 			},
+			slack.AttachmentField{
+				Title: "Min Holding Intervals",
+				Value: fmt.Sprintf("%d", n.syncState.MinHoldingIntervals),
+				Short: true,
+			},
 		)
 	}
-
+	var spotAvgCost, futuresAvgCost fixedpoint.Value
+	if n.hasStarted() {
+		if n.State() == RoundClosed {
+			realizedPnL := n.RealizedPnL()
+			spotAvgCost = realizedPnL.SpotPosition.AverageCost
+			futuresAvgCost = realizedPnL.FuturesPosition.AverageCost
+			fields = append(fields, realizedPnLFields(realizedPnL)...)
+		} else {
+			unrealizedPnL := n.UnrealizedPnL(
+				n.spotOrderBook,
+				n.futuresOrderBook,
+			)
+			spotAvgCost = unrealizedPnL.SpotPosition.AverageCost
+			futuresAvgCost = unrealizedPnL.FuturesPosition.AverageCost
+			fields = append(fields, unrealizedPnLFields(unrealizedPnL)...)
+		}
+	}
 	spotActiveOrder := n.spotWorker.activeOrder
 	spotOrderField := slack.AttachmentField{
 		Title: "Spot Active Order",
@@ -399,10 +439,10 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 	}
 	if spotActiveOrder != nil {
 		spotOrderField.Value = fmt.Sprintf(
-			"%s %s(executed: %s)@%s",
+			"%s %s/%s@%s",
 			spotActiveOrder.Side,
-			spotActiveOrder.Quantity,
 			spotActiveOrder.ExecutedQuantity,
+			spotActiveOrder.Quantity,
 			spotActiveOrder.Price,
 		)
 	}
@@ -414,10 +454,10 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 	}
 	if futuresActiveOrder != nil {
 		futuresOrderField.Value = fmt.Sprintf(
-			"%s %s(executed: %s)@%s",
+			"%s %s/%s@%s",
 			futuresActiveOrder.Side,
-			futuresActiveOrder.Quantity,
 			futuresActiveOrder.ExecutedQuantity,
+			futuresActiveOrder.Quantity,
 			futuresActiveOrder.Price,
 		)
 	}
@@ -425,12 +465,12 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 	fields = append(fields,
 		slack.AttachmentField{
 			Title: "Spot Filled Position",
-			Value: n.spotWorker.FilledPosition().String(),
+			Value: fmt.Sprintf("%s@%s", n.spotWorker.FilledPosition().String(), spotAvgCost.String()),
 			Short: true,
 		},
 		slack.AttachmentField{
 			Title: "Futures Filled Position",
-			Value: n.futuresWorker.FilledPosition().String(),
+			Value: fmt.Sprintf("%s@%s", n.futuresWorker.FilledPosition().String(), futuresAvgCost.String()),
 			Short: true,
 		},
 		spotOrderField,
@@ -446,6 +486,57 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 		Text:   text,
 		Color:  n.stateColor(),
 		Fields: fields,
+	}
+}
+
+func realizedPnLFields(realizedPnL *RoundRealizedPnL) []slack.AttachmentField {
+	return []slack.AttachmentField{
+		{
+			Title: "Funding Income",
+			Value: realizedPnL.FundingIncome.String(),
+			Short: true,
+		},
+		{
+			Title: "Spot PnL",
+			Value: fmt.Sprintf(
+				"%s (Net %s)",
+				realizedPnL.SpotProfitStats.AccumulatedPnL.String(),
+				realizedPnL.SpotProfitStats.AccumulatedNetProfit.String(),
+			),
+			Short: true,
+		},
+		{
+			Title: "Futures PnL",
+			Value: fmt.Sprintf("%s (Net %s)",
+				realizedPnL.FuturesProfitStats.AccumulatedPnL.String(),
+				realizedPnL.FuturesProfitStats.AccumulatedNetProfit.String()),
+			Short: true,
+		},
+		{
+			Title: "Total Net PnL",
+			Value: realizedPnL.NetPnL().String(),
+			Short: false,
+		},
+	}
+}
+
+func unrealizedPnLFields(unrealizedPnL *RoundUnrealizedPnL) []slack.AttachmentField {
+	return []slack.AttachmentField{
+		{
+			Title: "Unrealized Total Spot PnL",
+			Value: unrealizedPnL.TotalSpotPnL().String(),
+			Short: true,
+		},
+		{
+			Title: "Unrealized Total Futures PnL",
+			Value: unrealizedPnL.TotalFuturesPnL().String(),
+			Short: true,
+		},
+		{
+			Title: "Unrealized Total PnL",
+			Value: unrealizedPnL.TotalPnL().String(),
+			Short: false,
+		},
 	}
 }
 
@@ -866,6 +957,7 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresBa
 	}
 }
 
+// Prepare prepares the round to be ready for resume, such as doing neceessary transfers and syncing the positions.
 func (r *ArbitrageRound) Prepare(
 	ctx context.Context,
 	spotSession, futuresSession *bbgo.ExchangeSession,
@@ -996,6 +1088,10 @@ func (r *ArbitrageRound) SetLogger(logger logrus.FieldLogger) {
 	r.logger = logger
 }
 
+func (r *ArbitrageRound) ID() string {
+	return r.syncState.ID
+}
+
 func (r *ArbitrageRound) SpotSymbol() string {
 	return r.spotWorker.Symbol()
 }
@@ -1038,6 +1134,26 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 	r.syncState.State = RoundClosing
 	r.syncState.ClosingTime = currentTime
 	r.syncState.ClosingDuration = duration
+}
+
+// setReady updates the round state to ready without locking. The caller must
+// already hold r.mu.
+func (r *ArbitrageRound) setReady(currentTime time.Time) {
+	if !r.syncState.ReadyTime.IsZero() {
+		return
+	}
+	r.syncState.State = RoundReady
+	r.syncState.ReadyTime = currentTime
+}
+
+// setClosed updates the round state to closed without locking. The caller must
+// already hold r.mu.
+func (r *ArbitrageRound) setClosed(currentTime time.Time) {
+	if !r.syncState.ClosedTime.IsZero() {
+		return
+	}
+	r.syncState.State = RoundClosed
+	r.syncState.ClosedTime = currentTime
 }
 
 // CollateralAsset returns the asset that this round parks on the futures
@@ -1161,7 +1277,7 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 		futuresIsDust := r.futuresWorker.Market().IsDustQuantity(futuresRemaining.Abs(), futuresMidPrice)
 
 		if spotIsDust && futuresIsDust {
-			r.syncState.State = RoundReady
+			r.setReady(currentTime)
 			return
 		}
 	}
@@ -1176,7 +1292,7 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 		futuresIsDust := r.futuresWorker.Market().IsDustQuantity(futuresFilled.Abs(), futuresMidPrice)
 
 		if spotIsDust && futuresIsDust {
-			r.syncState.State = RoundClosed
+			r.setClosed(currentTime)
 			r.logger.Infof("arbitrage round transit to closed state at %s: %s", currentTime.Format(time.RFC3339), r.spotWorker.Symbol())
 		}
 		return
