@@ -114,7 +114,7 @@ func newTestArbitrageRound(t *testing.T, ctrl *gomock.Controller, fundingInterva
 		fundingRate,
 		types.ExchangeBinance, types.ExchangeBinance,
 		minHoldingIntervals, fundingIntervalHours, Number(3), spotWorker, futuresWorker, mockService,
-		types.PositionShort)
+		types.PositionShort, time.Minute)
 	return round, mockService
 }
 
@@ -406,7 +406,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 		fundingRate,
 		types.ExchangeBinance, types.ExchangeBinance,
 		3, 8, Number(3), spotWorker, futuresWorker, mockService,
-		sc.direction)
+		sc.direction, time.Minute)
 	round.SetLogger(logrus.WithField("test", sc.name))
 
 	assert.Equal(t, sc.collateral, round.CollateralAsset())

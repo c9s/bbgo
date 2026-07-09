@@ -48,6 +48,9 @@ func newTestTWAPWorker(
 	session.SetMarkets(map[string]types.Market{
 		"BTCUSDT": market,
 	})
+	// Attach a non-nil account so TWAPWorker.calculateSliceQuantity can query
+	// balances without panicking (mirrors production where session.Account is set).
+	session.Account = types.NewAccount()
 
 	generalExecutor := bbgo.NewGeneralOrderExecutor(session, "BTCUSDT", "test", "test-instance", position)
 
