@@ -391,7 +391,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			slack.AttachmentField{
 				Title: "Expected Close Time",
 				Value: n.syncState.ClosingTime.Add(n.syncState.ClosingDuration.Duration()).Format(time.RFC3339),
-				Short: true,
+				Short: false,
 			})
 	case RoundOpening, RoundReady:
 		minHoldingHours := n.syncState.MinHoldingIntervals * n.syncState.FundingIntervalHours
@@ -403,20 +403,23 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 			slack.AttachmentField{
-				Title: "Min Holding Intervals",
-				Value: fmt.Sprintf("%d", n.syncState.MinHoldingIntervals),
-				Short: true,
-			},
-			slack.AttachmentField{
 				Title: "Funding Interval Start",
 				Value: n.syncState.FundingIntervalStart.Format(time.RFC3339),
 				Short: true,
 			},
+			slack.AttachmentField{
+				Title: "Min Holding Intervals",
+				Value: fmt.Sprintf("%d", n.syncState.MinHoldingIntervals),
+				Short: true,
+			},
 		)
 	}
+	var spotAvgCost, futuresAvgCost fixedpoint.Value
 	if n.hasStarted() {
 		if n.State() == RoundClosed {
 			realizedPnL := n.RealizedPnL()
+			spotAvgCost = realizedPnL.SpotPosition.AverageCost
+			futuresAvgCost = realizedPnL.FuturesPosition.AverageCost
 			fields = append(fields,
 				slack.AttachmentField{
 					Title: "Funding Income",
@@ -442,7 +445,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				slack.AttachmentField{
 					Title: "Total Net PnL",
 					Value: realizedPnL.NetPnL().String(),
-					Short: true,
+					Short: false,
 				},
 			)
 		} else {
@@ -450,6 +453,8 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				n.spotOrderBook,
 				n.futuresOrderBook,
 			)
+			spotAvgCost = unrealizedPnL.SpotPosition.AverageCost
+			futuresAvgCost = unrealizedPnL.FuturesPosition.AverageCost
 			fields = append(fields,
 				slack.AttachmentField{
 					Title: "Unrealized Total Spot PnL",
@@ -477,10 +482,10 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 	}
 	if spotActiveOrder != nil {
 		spotOrderField.Value = fmt.Sprintf(
-			"%s %s(executed: %s)@%s",
+			"%s %s/%s@%s",
 			spotActiveOrder.Side,
-			spotActiveOrder.Quantity,
 			spotActiveOrder.ExecutedQuantity,
+			spotActiveOrder.Quantity,
 			spotActiveOrder.Price,
 		)
 	}
@@ -492,10 +497,10 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 	}
 	if futuresActiveOrder != nil {
 		futuresOrderField.Value = fmt.Sprintf(
-			"%s %s(executed: %s)@%s",
+			"%s %s/%s@%s",
 			futuresActiveOrder.Side,
-			futuresActiveOrder.Quantity,
 			futuresActiveOrder.ExecutedQuantity,
+			futuresActiveOrder.Quantity,
 			futuresActiveOrder.Price,
 		)
 	}
@@ -503,12 +508,12 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 	fields = append(fields,
 		slack.AttachmentField{
 			Title: "Spot Filled Position",
-			Value: n.spotWorker.FilledPosition().String(),
+			Value: fmt.Sprintf("%s@%s", n.spotWorker.FilledPosition().String(), spotAvgCost.String()),
 			Short: true,
 		},
 		slack.AttachmentField{
 			Title: "Futures Filled Position",
-			Value: n.futuresWorker.FilledPosition().String(),
+			Value: fmt.Sprintf("%s@%s", n.futuresWorker.FilledPosition().String(), futuresAvgCost.String()),
 			Short: true,
 		},
 		spotOrderField,
