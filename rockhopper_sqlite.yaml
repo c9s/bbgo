@@ -4,4 +4,6 @@ dialect: sqlite3
 dsn: "bbgo.sqlite3"
 # package: bbgo
 package: main
-migrationsDir: migrations/sqlite3
+migrationsDirs:
+- migrations/sqlite3
+- pkg/strategy/xfundingv2/migrations/sqlite3

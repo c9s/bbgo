@@ -13,4 +13,6 @@ dsn: "root:root@tcp(localhost:3306)/bbgo?parseTime=true"
 
 # tcp connection to mysql without password
 # dsn: "root@tcp(localhost:3306)/bbgo_dev?parseTime=true"
-migrationsDir: migrations/mysql
+migrationsDirs:
+- migrations/mysql
+- pkg/strategy/xfundingv2/migrations/mysql
