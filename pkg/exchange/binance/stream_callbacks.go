@@ -2,7 +2,9 @@
 
 package binance
 
-import "github.com/c9s/bbgo/pkg/types"
+import (
+	"github.com/c9s/bbgo/pkg/types"
+)
 
 func (s *Stream) OnDepthEvent(cb func(e *DepthEvent)) {
 	s.depthEventCallbacks = append(s.depthEventCallbacks, cb)
@@ -224,22 +226,32 @@ func (s *Stream) EmitListenKeyExpired(e *ListenKeyExpired) {
 	}
 }
 
-func (s *Stream) OnError(cb func(e *ErrorEvent)) {
-	s.errorCallbacks = append(s.errorCallbacks, cb)
-}
-
-func (s *Stream) EmitError(e *ErrorEvent) {
-	for _, cb := range s.errorCallbacks {
-		cb(e)
-	}
-}
-
 func (s *Stream) OnAlgoOrderUpdateEvent(cb func(e *AlgoOrderUpdateEvent)) {
 	s.algoOrderUpdateEventCallbacks = append(s.algoOrderUpdateEventCallbacks, cb)
 }
 
 func (s *Stream) EmitAlgoOrderUpdateEvent(e *AlgoOrderUpdateEvent) {
 	for _, cb := range s.algoOrderUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnServerShutdownEvent(cb func(e *ServerShutdownEvent)) {
+	s.serverShutdownEventCallbacks = append(s.serverShutdownEventCallbacks, cb)
+}
+
+func (s *Stream) EmitServerShutdownEvent(e *ServerShutdownEvent) {
+	for _, cb := range s.serverShutdownEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnError(cb func(e *ErrorEvent)) {
+	s.errorCallbacks = append(s.errorCallbacks, cb)
+}
+
+func (s *Stream) EmitError(e *ErrorEvent) {
+	for _, cb := range s.errorCallbacks {
 		cb(e)
 	}
 }
@@ -288,6 +300,10 @@ type StreamEventHub interface {
 	OnMarginCallEvent(cb func(e *MarginCallEvent))
 
 	OnListenKeyExpired(cb func(e *ListenKeyExpired))
+
+	OnAlgoOrderUpdateEvent(cb func(e *AlgoOrderUpdateEvent))
+
+	OnServerShutdownEvent(cb func(e *ServerShutdownEvent))
 
 	OnError(cb func(e *ErrorEvent))
 }

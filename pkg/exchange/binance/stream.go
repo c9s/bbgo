@@ -106,6 +106,7 @@ type Stream struct {
 	marginCallEventCallbacks          []func(e *MarginCallEvent)
 	listenKeyExpiredCallbacks         []func(e *ListenKeyExpired)
 	algoOrderUpdateEventCallbacks     []func(e *AlgoOrderUpdateEvent)
+	serverShutdownEventCallbacks      []func(e *ServerShutdownEvent)
 
 	errorCallbacks []func(e *ErrorEvent)
 
@@ -214,6 +215,10 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.SetBeforeConnect(stream.handleBeforeConnect)
 	stream.OnListenKeyExpired(func(e *ListenKeyExpired) {
 		log.Warnf("listen key expired, triggering reconnect: %+v", e)
+		stream.Reconnect()
+	})
+	stream.OnServerShutdownEvent(func(e *ServerShutdownEvent) {
+		log.Warnf("the server is about to shutdown soon, triggering reconnect: %+v", e)
 		stream.Reconnect()
 	})
 	return stream
@@ -616,6 +621,8 @@ func (s *Stream) dispatchEvent(e interface{}) {
 		s.EmitForceOrderEvent(e)
 	case *AlgoOrderUpdateEvent:
 		s.EmitAlgoOrderUpdateEvent(e)
+	case *ServerShutdownEvent:
+		s.EmitServerShutdownEvent(e)
 
 	case *MarginCallEvent:
 	}
