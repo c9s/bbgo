@@ -87,6 +87,10 @@ func (s *RoundInsertService) Start() {
 	go s.run()
 }
 
+func (s *RoundInsertService) Stop() {
+	close(s.C)
+}
+
 func (s *RoundInsertService) run() {
 	defer s.logger.Info("round insert service stopped")
 
