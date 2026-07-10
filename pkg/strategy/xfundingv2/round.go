@@ -1129,7 +1129,7 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// During close, futures is the leader: drive its target to zero so it
+	// While closing, futures is the leader: drive its target to zero so it
 	// starts reducing the position. The spot target stays where it is and is
 	// re-synced after each futures fill in handleFuturesTradeForClose, so spot
 	// only trades once the collateral has been transferred back from futures.
@@ -1140,6 +1140,8 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 	r.syncState.State = RoundClosing
 	r.syncState.ClosingTime = currentTime
 	r.syncState.ClosingDuration = duration
+	// empty the retry transfer tasks to avoid retrying old opening trades when closing
+	r.syncState.RetryTransfers = make(map[uint64]*transferRetry)
 }
 
 // setReady updates the round state to ready without locking. The caller must
