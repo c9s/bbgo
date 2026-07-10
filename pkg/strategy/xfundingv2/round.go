@@ -360,6 +360,11 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 	title := fmt.Sprintf("Arbitrage Round %s (%s)", n.SpotSymbol(), n.syncState.State)
 	fields := []slack.AttachmentField{
 		{
+			Title: "Round ID",
+			Value: n.syncState.ID,
+			Short: false,
+		},
+		{
 			Title: "Triggered Spot Position",
 			Value: n.syncState.TriggeredSpotTargetPosition.String(),
 			Short: true,
@@ -538,9 +543,14 @@ func unrealizedPnLFields(unrealizedPnL *RoundUnrealizedPnL) []slack.AttachmentFi
 			Short: true,
 		},
 		{
+			Title: "Total Funding Income",
+			Value: unrealizedPnL.FundingIncome.String(),
+			Short: true,
+		},
+		{
 			Title: "Unrealized Total PnL",
 			Value: unrealizedPnL.TotalPnL().String(),
-			Short: false,
+			Short: true,
 		},
 	}
 }

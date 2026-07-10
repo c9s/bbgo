@@ -791,7 +791,7 @@ func (s *Strategy) CrossRun(
 	// Register shutdown handler to persist state
 	bbgo.OnShutdown(s.ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-		s.logger.Infof("shutting down %s", s.InstanceID())
+		bbgo.Notify("⚠️ shutting down %s", s.InstanceID())
 		s.cancel()
 		for symbol, executor := range s.spotGeneralOrderExecutors {
 			if err := executor.GracefulCancel(ctx); err != nil {
