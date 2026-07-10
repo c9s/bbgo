@@ -1109,12 +1109,14 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 		)
 		rateDiffAbs := fundingRate.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
 		if rateDiffAbs.Compare(s.CriticalErrorConfig.MaxFundingRateFlip) > 0 {
-			bbgo.Notify("🚨 Round funding rate flip is too large: %s -> %s (threshold %s)",
+			bbgo.Notify("🚨 Round funding rate flip is too large: %s -> %s (threshold %s), closing round",
 				round.TriggeredFundingRate(),
 				fundingRate.LastFundingRate,
 				s.CriticalErrorConfig.MaxFundingRateFlip,
 				round.NewCriticalNotification(spotOrderBook, futuresOrderBook),
 			)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
+			return
 		}
 
 		// the round is still within the min holding time, keep holding
