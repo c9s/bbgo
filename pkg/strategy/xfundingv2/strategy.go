@@ -367,7 +367,7 @@ func (s *Strategy) CrossRun(
 
 	// setup the round insert service for persisting closed round records.
 	// the database service is nil when no database is configured (e.g. backtesting).
-	if !bbgo.IsBackTesting && s.Environment != nil && s.Environment.DatabaseService != nil && s.Environment.DatabaseService.DB != nil {
+	if s.Environment != nil && s.Environment.DatabaseService != nil && s.Environment.DatabaseService.DB != nil {
 		s.roundInsertService = NewRoundInsertService(s.ctx, s.Environment.DatabaseService.DB, s.InstanceID())
 		s.roundInsertService.SetLogger(s.logger)
 		s.roundInsertService.Start()
