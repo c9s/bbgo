@@ -65,10 +65,11 @@ type Strategy struct {
 
 	// CandidateSymbols is the list of symbols to consider for selection
 	// IMPORTANT: xfundingv2 is now assuming trading on U-major pairs
-	CandidateSymbols       []string       `json:"candidateSymbols"`
-	OpenPositionInterval   types.Duration `json:"openPositionInterval"`
-	TransitRoundInterval   types.Duration `json:"transitRoundInterval"`
-	RoundRebalanceInterval types.Duration `json:"roundRebalanceInterval"`
+	CandidateSymbols       []string         `json:"candidateSymbols"`
+	OpenPositionInterval   types.Duration   `json:"openPositionInterval"`
+	TransitRoundInterval   types.Duration   `json:"transitRoundInterval"`
+	RoundRebalanceInterval types.Duration   `json:"roundRebalanceInterval"`
+	MaxClosingLossRatio    fixedpoint.Value `json:"maxClosingLossRatio"`
 
 	// TickSymbol is the symbol used for ticking the strategy, default to the first candidate symbol
 	TickSymbol   string         `json:"tickSymbol"`
@@ -186,6 +187,9 @@ func (s *Strategy) Defaults() error {
 		// default 3x of the tick interval
 		s.RoundRebalanceInterval = types.Duration(s.TickInterval.Duration() * 3)
 	}
+	if s.MaxClosingLossRatio.IsZero() {
+		s.MaxClosingLossRatio = fixedpoint.NewFromFloat(-0.03) // -3%
+	}
 
 	if s.MarketSelectionConfig == nil {
 		s.MarketSelectionConfig = &MarketSelectionConfig{}
@@ -279,6 +283,9 @@ func (s *Strategy) Validate() error {
 		if rate.Sign() < 0 || rate.Compare(fixedpoint.One) > 0 {
 			return fmt.Errorf("feeDiscountRate[%s] should be between 0 and 1: %s", feeType, rate)
 		}
+	}
+	if s.MaxClosingLossRatio.Sign() > 0 {
+		return fmt.Errorf("maxClosingLossRatio should be negative: %s", s.MaxClosingLossRatio)
 	}
 	return nil
 }
@@ -1147,10 +1154,18 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 			s.logger.Warnf("[transitOpeningOrReadyRound] order book not found for symbols: %s", round.SpotSymbol())
 			return
 		}
+
+		midPrice := getMidPrice(futuresOrderBook)
+		futuresPosition := round.FuturesWorker().FilledPosition()
+		futuresPositionValue := futuresPosition.Mul(midPrice)
+		nextFundingIncome := fundingRate.LastFundingRate.Mul(futuresPosition)
 		unrealizedPnL := round.UnrealizedPnL(spotOrderBook, futuresOrderBook)
-		// the unrealized PnL is positive, transit to closing
-		unrealizedNetPnL := unrealizedPnL.TotalPnL()
-		if unrealizedNetPnL.Sign() > 0 {
+		// unrealizedNetPnL = unrealizedPnL + the funding income for holding the position till the current interval ends
+		unrealizedNetPnL := unrealizedPnL.TotalPnL().Add(nextFundingIncome)
+		// the unrealized PnL is positive or the unrealized net PnL is below the max closing loss ratio, transit to closing
+		// That is, we will close the round either when there is profit or the estimated loss is too large
+		// NOTE: MaxClosingLossRatio is negative
+		if unrealizedNetPnL.Sign() > 0 || unrealizedNetPnL.Div(futuresPositionValue).Compare(s.MaxClosingLossRatio) < 0 {
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound %s] transit state %s -> closing, current funding rate %s: %s",
 				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round)
