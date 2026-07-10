@@ -63,9 +63,8 @@ type ArbitrageRound struct {
 	spotSession, futuresSession *bbgo.ExchangeSession
 	retryTransferTickC          chan time.Time
 
-	lastTickPrice fixedpoint.Value
-	logger        logrus.FieldLogger
-	slackAlert    slackalert.SlackAlert
+	logger     logrus.FieldLogger
+	slackAlert slackalert.SlackAlert
 }
 
 func NewArbitrageRound(
@@ -189,14 +188,6 @@ func (r *ArbitrageRound) FuturesFeeAssetAmount() fixedpoint.Value {
 	defer r.mu.Unlock()
 
 	return r.syncState.FuturesFeeAssetAmount
-}
-
-func (r *ArbitrageRound) SetTickPrice(price fixedpoint.Value) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.lastTickPrice = price
-	r.logger.Debugf("setting last tick price to %s: %s", price, r.SpotSymbol())
 }
 
 // RequiredFeeAssetAmount returns the required fee asset amount for the round based on its current state and position.
@@ -1275,7 +1266,7 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 			)
 	}
 
-	if err := r.rebalance(ctx, currentTime); err != nil {
+	if err := r.rebalance(ctx, currentTime, futuresOrderBook); err != nil {
 		r.logger.WithError(err).Errorf("failed to rebalance round: %s", r.String())
 	}
 
@@ -1386,21 +1377,21 @@ func (r *ArbitrageRound) syncSpotPosition(futuresTrade types.Trade) {
 	r.spotWorker.SetTargetPosition(spotTarget)
 }
 
-func (r *ArbitrageRound) rebalance(ctx context.Context, currentTime time.Time) error {
+func (r *ArbitrageRound) rebalance(ctx context.Context, currentTime time.Time, futuresOrderBook types.OrderBook) error {
 	if !r.lastRebalanceTime.IsZero() && currentTime.Sub(r.lastRebalanceTime) < r.rebalanceInterval {
 		return nil
 	}
 	r.lastRebalanceTime = currentTime
 	switch r.syncState.State {
 	case RoundOpening:
-		return r.rebalanceOpening(ctx)
+		return r.rebalanceOpening(ctx, futuresOrderBook)
 	case RoundClosing:
 		return r.rebalanceClosing(ctx)
 	}
 	return nil
 }
 
-func (r *ArbitrageRound) rebalanceOpening(ctx context.Context) error {
+func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook types.OrderBook) error {
 	timedCtx, cancel := context.WithTimeout(ctx, time.Second*20)
 	defer cancel()
 
@@ -1434,15 +1425,18 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context) error {
 			r.logger.Debugf("non-positive remaining quantity for futures, no need for rebalance: %s", r)
 			return nil
 		}
-		if r.lastTickPrice.IsZero() {
-			r.logger.Debugf("last tick price is zero, skipping rebalance: %s", r)
+		// short futures -> sell order on futures, use the best bid price
+		bestBid, ok := futuresOrderBook.BestBid()
+		if !ok {
+			r.logger.Debugf("cannot get the best bid, skipping rebalance: %s", r)
 			return nil
 		}
+		price := bestBid.Price
 		futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
 		if err != nil {
 			return fmt.Errorf("failed to update futures account: %w", err)
 		}
-		requiredMargin := r.lastTickPrice.Mul(futuresRemaining).Div(r.syncState.Leverage)
+		requiredMargin := price.Mul(futuresRemaining).Div(r.syncState.Leverage)
 		futuresAvailable := futuresAccount.FuturesInfo.AvailableBalance
 		if futuresAvailable.Compare(requiredMargin) < 0 {
 			r.logger.Warnf("detected insufficient available balance on futures account to open %s position: required %s, available %s",

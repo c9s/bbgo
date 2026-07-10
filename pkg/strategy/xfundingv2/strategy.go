@@ -756,12 +756,6 @@ func (s *Strategy) CrossRun(
 		round.HandleFuturesOrderUpdate(update)
 		bbgo.Notify("📝 Round futures order update: %s", round.String(), update)
 	})
-	// market stream callbacks
-	s.futuresSession.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if round, found := s.ActiveRounds[kline.Symbol]; found {
-			round.SetTickPrice(kline.Close)
-		}
-	})
 
 	// strategy is ready for running
 	if !bbgo.IsBackTesting && s.ClosingAllOnStartup {
