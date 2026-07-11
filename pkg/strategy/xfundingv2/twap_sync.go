@@ -34,8 +34,8 @@ type TWAPWorkerSyncState struct {
 	// TargetPosition: positive = buy/long, negative = sell/short
 	TargetPosition       fixedpoint.Value `json:"targetPosition"`
 	State                TWAPWorkerState  `json:"state"`
-	StartTime            time.Time        `json:"startTime"`
-	EndTime              time.Time        `json:"endTime"`
+	StartAt              time.Time        `json:"startAt"`
+	EndAt                time.Time        `json:"endAt"`
 	CurrentIntervalStart time.Time        `json:"currentIntervalStart"`
 	CurrentIntervalEnd   time.Time        `json:"currentIntervalEnd"`
 	LastCheckTime        time.Time        `json:"lastCheckTime"`

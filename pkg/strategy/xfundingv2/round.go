@@ -232,19 +232,19 @@ func (r *ArbitrageRound) RequiredFeeAssetAmounts() (fixedpoint.Value, fixedpoint
 }
 
 func (r *ArbitrageRound) StartAt() time.Time {
-	return r.syncState.StartTime
+	return r.syncState.StartAt
 }
 
 func (r *ArbitrageRound) ClosedAt() time.Time {
-	return r.syncState.ClosedTime
+	return r.syncState.ClosedAt
 }
 
 func (r *ArbitrageRound) ReadyAt() time.Time {
-	return r.syncState.ReadyTime
+	return r.syncState.ReadyAt
 }
 
-func (r *ArbitrageRound) ClosingTime() time.Time {
-	return r.syncState.ClosingTime
+func (r *ArbitrageRound) ClosingAt() time.Time {
+	return r.syncState.ClosingAt
 }
 
 func (r *ArbitrageRound) HasStarted() bool {
@@ -255,7 +255,7 @@ func (r *ArbitrageRound) HasStarted() bool {
 }
 
 func (r *ArbitrageRound) hasStarted() bool {
-	return !r.syncState.StartTime.IsZero()
+	return !r.syncState.StartAt.IsZero()
 }
 
 func (r *ArbitrageRound) TriggeredFundingRate() fixedpoint.Value {
@@ -267,7 +267,7 @@ func (r *ArbitrageRound) TriggeredTargetPosition() fixedpoint.Value {
 }
 
 func (r *ArbitrageRound) NumHoldingIntervals(currentTime time.Time) int {
-	if r.syncState.StartTime.IsZero() {
+	if r.syncState.StartAt.IsZero() {
 		return 0
 	}
 	intervalDuration := time.Duration(r.syncState.FundingIntervalHours) * time.Hour
@@ -302,7 +302,7 @@ func (r *ArbitrageRound) String() string {
 			r.syncState.State,
 			r.spotWorker.FilledPosition(),
 			r.futuresWorker.FilledPosition(),
-			r.syncState.StartTime.Format(time.RFC3339),
+			r.syncState.StartAt.Format(time.RFC3339),
 		)
 	}
 	return fmt.Sprintf(
@@ -311,8 +311,8 @@ func (r *ArbitrageRound) String() string {
 		r.syncState.State,
 		r.spotWorker.FilledPosition(),
 		r.futuresWorker.FilledPosition(),
-		r.syncState.ClosingTime.Format(time.RFC3339),
-		r.syncState.ClosingTime.Add(r.syncState.ClosingDuration.Duration()).Format(time.RFC3339),
+		r.syncState.ClosingAt.Format(time.RFC3339),
+		r.syncState.ClosingAt.Add(r.syncState.ClosingDuration.Duration()).Format(time.RFC3339),
 	)
 }
 
@@ -377,7 +377,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 		},
 		{
 			Title: "Start Time",
-			Value: n.syncState.StartTime.Format(time.RFC3339),
+			Value: n.syncState.StartAt.Format(time.RFC3339),
 			Short: true,
 		},
 	}
@@ -386,12 +386,12 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 		fields = append(fields,
 			slack.AttachmentField{
 				Title: "Closing Time",
-				Value: n.syncState.ClosingTime.Format(time.RFC3339),
+				Value: n.syncState.ClosingAt.Format(time.RFC3339),
 				Short: true,
 			},
 			slack.AttachmentField{
 				Title: "Expected Close Time",
-				Value: n.syncState.ClosingTime.Add(n.syncState.ClosingDuration.Duration()).Format(time.RFC3339),
+				Value: n.syncState.ClosingAt.Add(n.syncState.ClosingDuration.Duration()).Format(time.RFC3339),
 				Short: false,
 			})
 	case RoundOpening, RoundReady:
@@ -569,7 +569,7 @@ func (r *ArbitrageRound) TotalFundingIncome() fixedpoint.Value {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.syncState.StartTime.IsZero() {
+	if r.syncState.StartAt.IsZero() {
 		return fixedpoint.Zero
 	}
 	return r.totalFundingIncome()
@@ -629,9 +629,9 @@ func (r *ArbitrageRound) hasOrder(orderID uint64) bool {
 }
 
 func (r *ArbitrageRound) syncFundingFeeRecords(ctx context.Context, currentTime time.Time) error {
-	if r.syncState.StartTime.IsZero() || r.syncState.StartTime.After(currentTime) {
+	if r.syncState.StartAt.IsZero() || r.syncState.StartAt.After(currentTime) {
 		return fmt.Errorf("query time is before the round start time: current %s v.s start %s",
-			currentTime.Format(time.RFC3339), r.syncState.StartTime.Format(time.RFC3339),
+			currentTime.Format(time.RFC3339), r.syncState.StartAt.Format(time.RFC3339),
 		)
 	}
 
@@ -639,7 +639,7 @@ func (r *ArbitrageRound) syncFundingFeeRecords(ctx context.Context, currentTime 
 		BinanceFuturesIncomeHistoryService: r.futuresService,
 	}
 	symbol := r.futuresWorker.Symbol()
-	dataC, errC := q.Query(ctx, symbol, binanceapi.FuturesIncomeFundingFee, r.syncState.StartTime, currentTime)
+	dataC, errC := q.Query(ctx, symbol, binanceapi.FuturesIncomeFundingFee, r.syncState.StartAt, currentTime)
 	for {
 		select {
 		case <-ctx.Done():
@@ -674,7 +674,7 @@ func (r *ArbitrageRound) Start(ctx context.Context,
 	spotSession, futuresSession *bbgo.ExchangeSession,
 	currentTime time.Time,
 ) error {
-	if r.syncState.StartTime.IsZero() {
+	if r.syncState.StartAt.IsZero() {
 		if currentTime.After(r.syncState.FundingIntervalEnd) {
 			// the round is triggered after the funding interval -> error
 			return fmt.Errorf(
@@ -695,7 +695,7 @@ func (r *ArbitrageRound) Start(ctx context.Context,
 
 		go r.retryTransferWorker(ctx, r.retryTransferTickC)
 
-		r.syncState.StartTime = currentTime
+		r.syncState.StartAt = currentTime
 		r.syncState.State = RoundOpening
 	}
 	return nil
@@ -1138,7 +1138,7 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 	r.futuresWorker.ResetTime(currentTime, duration)
 
 	r.syncState.State = RoundClosing
-	r.syncState.ClosingTime = currentTime
+	r.syncState.ClosingAt = currentTime
 	r.syncState.ClosingDuration = duration
 	// empty the retry transfer tasks to avoid retrying old opening trades when closing
 	r.syncState.RetryTransfers = make(map[uint64]*transferRetry)
@@ -1147,21 +1147,21 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 // setReady updates the round state to ready without locking. The caller must
 // already hold r.mu.
 func (r *ArbitrageRound) setReady(currentTime time.Time) {
-	if !r.syncState.ReadyTime.IsZero() {
+	if !r.syncState.ReadyAt.IsZero() {
 		return
 	}
 	r.syncState.State = RoundReady
-	r.syncState.ReadyTime = currentTime
+	r.syncState.ReadyAt = currentTime
 }
 
 // setClosed updates the round state to closed without locking. The caller must
 // already hold r.mu.
 func (r *ArbitrageRound) setClosed(currentTime time.Time) {
-	if !r.syncState.ClosedTime.IsZero() {
+	if !r.syncState.ClosedAt.IsZero() {
 		return
 	}
 	r.syncState.State = RoundClosed
-	r.syncState.ClosedTime = currentTime
+	r.syncState.ClosedAt = currentTime
 }
 
 // CollateralAsset returns the asset that this round parks on the futures

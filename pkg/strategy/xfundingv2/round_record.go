@@ -148,7 +148,7 @@ func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (Closed
 
 		StartAt:   round.StartAt(),
 		ReadyAt:   readyTime,
-		ClosingAt: round.ClosingTime(),
+		ClosingAt: round.ClosingAt(),
 		ClosedAt:  round.ClosedAt(),
 	}
 

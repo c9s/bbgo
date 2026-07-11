@@ -235,10 +235,10 @@ func (w *TWAPWorker) Start(ctx context.Context, currentTime time.Time) error {
 }
 
 func (w *TWAPWorker) RemainingDuration(currentTime time.Time) time.Duration {
-	if currentTime.After(w.syncState.EndTime) {
+	if currentTime.After(w.syncState.EndAt) {
 		return 0
 	}
-	return w.syncState.EndTime.Sub(currentTime)
+	return w.syncState.EndAt.Sub(currentTime)
 }
 
 // ResetTime resets the start and end time of the TWAP execution.
@@ -246,9 +246,9 @@ func (w *TWAPWorker) RemainingDuration(currentTime time.Time) time.Duration {
 // ex: TWAP worker is opening a position and then switch to closing the position, we can reset the time for the closing.
 func (w *TWAPWorker) ResetTime(currentTime time.Time, duration types.Duration) {
 	w.syncState.State = TWAPWorkerStateRunning
-	w.syncState.StartTime = currentTime
+	w.syncState.StartAt = currentTime
 	w.syncState.Config.Duration = duration
-	w.syncState.EndTime = currentTime.Add(w.syncState.Config.Duration.Duration())
+	w.syncState.EndAt = currentTime.Add(w.syncState.Config.Duration.Duration())
 
 	numSlices := w.syncState.Config.NumSlices
 	if numSlices <= 0 {
@@ -258,8 +258,8 @@ func (w *TWAPWorker) ResetTime(currentTime time.Time, duration types.Duration) {
 	w.syncState.PlaceOrderInterval = w.syncState.Config.Duration.Duration() / time.Duration(numSlices)
 	w.syncState.CurrentIntervalStart = currentTime
 	w.syncState.CurrentIntervalEnd = w.syncState.CurrentIntervalStart.Add(w.syncState.PlaceOrderInterval)
-	if w.syncState.CurrentIntervalEnd.After(w.syncState.EndTime) {
-		w.syncState.CurrentIntervalEnd = w.syncState.EndTime
+	if w.syncState.CurrentIntervalEnd.After(w.syncState.EndAt) {
+		w.syncState.CurrentIntervalEnd = w.syncState.EndAt
 	}
 
 	w.syncAndResetActiveOrder()
@@ -316,14 +316,14 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 		if currentTime.After(w.syncState.CurrentIntervalEnd) {
 			w.syncState.CurrentIntervalStart = w.syncState.CurrentIntervalEnd
 			w.syncState.CurrentIntervalEnd = w.syncState.CurrentIntervalStart.Add(w.syncState.PlaceOrderInterval)
-			if w.syncState.CurrentIntervalStart.After(w.syncState.EndTime) {
-				w.syncState.CurrentIntervalStart = w.syncState.EndTime
+			if w.syncState.CurrentIntervalStart.After(w.syncState.EndAt) {
+				w.syncState.CurrentIntervalStart = w.syncState.EndAt
 			}
-			if w.syncState.CurrentIntervalEnd.After(w.syncState.EndTime) {
-				w.syncState.CurrentIntervalEnd = w.syncState.EndTime
+			if w.syncState.CurrentIntervalEnd.After(w.syncState.EndAt) {
+				w.syncState.CurrentIntervalEnd = w.syncState.EndAt
 			}
 		}
-		if currentTime.After(w.syncState.EndTime) {
+		if currentTime.After(w.syncState.EndAt) {
 			w.syncState.State = TWAPWorkerStateDone
 		}
 	}()
@@ -364,7 +364,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 	midPrice := getMidPrice(orderBook)
 
 	// check if deadline exceeded
-	deadlineExceeded := !currentTime.Before(w.syncState.EndTime)
+	deadlineExceeded := !currentTime.Before(w.syncState.EndAt)
 	orderOptions := TWAPExecuteOrderOptions{
 		DeadlineExceeded: deadlineExceeded,
 		// use reduce-only if we are closing the position
@@ -513,7 +513,7 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 	}
 
 	// dynamic slice: remaining / remaining_slices
-	timeLeft := w.syncState.EndTime.Sub(currentTime)
+	timeLeft := w.syncState.EndAt.Sub(currentTime)
 	w.logger.Debugf("time left: %s", timeLeft)
 	if timeLeft <= 0 {
 		return remaining
