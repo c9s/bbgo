@@ -2,68 +2,75 @@ package xfundingv2
 
 import (
 	"context"
+	"database/sql"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	// register the DB drivers that DB_DRIVER may select.
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
-const createRoundTableSQL = `
-CREATE TABLE xfundingv2_closed_rounds (
-	gid                    INTEGER PRIMARY KEY AUTOINCREMENT,
-	id                     TEXT NOT NULL,
-	strategy_instance_id   TEXT NOT NULL,
-	spot_symbol            TEXT NOT NULL,
-	futures_symbol         TEXT NOT NULL,
-	spot_exchange          TEXT NOT NULL,
-	futures_exchange       TEXT NOT NULL,
-	direction              TEXT NOT NULL,
-	collateral_asset       TEXT NOT NULL,
-	leverage               DECIMAL,
-	triggered_funding_rate DECIMAL,
-	annualized_rate        DECIMAL,
-	funding_income         DECIMAL,
-	spot_pnl               DECIMAL,
-	spot_net_pnl           DECIMAL,
-	futures_pnl            DECIMAL,
-	futures_net_pnl        DECIMAL,
-	net_pnl                DECIMAL,
-	num_holding_intervals  INTEGER,
-	start_time             DATETIME,
-	ready_time             DATETIME,
-	closing_time           DATETIME,
-	closed_time            DATETIME,
-	inserted_at            DEFAULT CURRENT_TIMESTAMP NOT NULL
-);`
+// newTestInsertDB connects to the database configured via the DB_DRIVER and DB_DSN
+// environment variables. The migrations are assumed to be already applied, so the
+// test only exercises the insert service. When either variable is missing the test
+// is skipped so that CI without a database stays green.
+func newTestInsertDB(t *testing.T) *sqlx.DB {
+	t.Helper()
 
-const createFundingFeeTableSQL = `
-CREATE TABLE xfundingv2_funding_fees (
-	gid       INTEGER PRIMARY KEY AUTOINCREMENT,
-	round_id  TEXT NOT NULL,
-	asset     TEXT NOT NULL,
-	amount    DECIMAL,
-	txn       INTEGER,
-	time      DATETIME
-);`
+	driver, ok := os.LookupEnv("DB_DRIVER")
+	if !ok || driver == "" {
+		t.Skip("DB_DRIVER is not set, skipping round insert service DB test")
+	}
+
+	dsn, ok := os.LookupEnv("DB_DSN")
+	if !ok || dsn == "" {
+		t.Skip("DB_DSN is not set, skipping round insert service DB test")
+	}
+
+	db, err := sqlx.Connect(driver, dsn)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	return db
+}
+
+// cleanupRound removes the round record and its funding-fee records that were
+// created during a test, keyed by the round's own id. Both sqlite3 and mysql use
+// the `?` placeholder so the same statements work for either driver.
+func cleanupRound(t *testing.T, db *sqlx.DB, roundID string) {
+	t.Cleanup(func() {
+		if _, err := db.Exec("DELETE FROM xfundingv2_funding_fees WHERE round_id = ?", roundID); err != nil {
+			t.Logf("cleanup: failed to delete funding fees for round %s: %v", roundID, err)
+		}
+		if _, err := db.Exec("DELETE FROM xfundingv2_closed_rounds WHERE id = ?", roundID); err != nil {
+			t.Logf("cleanup: failed to delete closed round %s: %v", roundID, err)
+		}
+	})
+}
 
 func TestRoundInsertService(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:")
-	require.NoError(t, err)
-	defer db.Close()
-
-	_, err = db.Exec(createRoundTableSQL)
-	require.NoError(t, err)
-	_, err = db.Exec(createFundingFeeTableSQL)
-	require.NoError(t, err)
+	db := newTestInsertDB(t)
 
 	svc := NewRoundInsertService(context.Background(), db, "xfundingv2-test-instance")
 
-	const roundID = "11111111-2222-3333-4444-555555555555"
+	// use a fresh id per run so the assertions and cleanup never collide with
+	// leftover rows from earlier runs or other data in a shared database.
+	roundID := uuid.NewString()
+	cleanupRound(t, db, roundID)
+
+	readyTime := time.Now().Add(-23 * time.Hour)
 	record := ClosedRoundRecord{
 		ID:                   roundID,
 		InstanceID:           svc.instanceID,
@@ -83,10 +90,10 @@ func TestRoundInsertService(t *testing.T) {
 		FuturesNetPnL:        fixedpoint.NewFromFloat(0.5),
 		NetPnL:               fixedpoint.NewFromFloat(11.5),
 		NumHoldingIntervals:  3,
-		StartTime:            time.Now().Add(-24 * time.Hour),
-		ReadyTime:            time.Now().Add(-23 * time.Hour),
-		ClosingTime:          time.Now().Add(-2 * time.Hour),
-		ClosedTime:           time.Now().Add(-time.Hour),
+		StartAt:              time.Now().Add(-24 * time.Hour),
+		ReadyAt:              &readyTime,
+		ClosingAt:            time.Now().Add(-2 * time.Hour),
+		ClosedAt:             time.Now().Add(-time.Hour),
 	}
 
 	fees := []FundingFeeRecord{
@@ -94,11 +101,11 @@ func TestRoundInsertService(t *testing.T) {
 		{RoundID: roundID, Asset: "USDT", Amount: fixedpoint.NewFromFloat(6.25), Txn: 1002, Time: time.Now().Add(-8 * time.Hour)},
 	}
 
-	err = svc.insertClosedRound(record, fees)
+	err := svc.insertClosedRound(record, fees)
 	require.NoError(t, err)
 
 	var roundCount int
-	require.NoError(t, db.Get(&roundCount, "SELECT COUNT(*) FROM xfundingv2_closed_rounds"))
+	require.NoError(t, db.Get(&roundCount, "SELECT COUNT(*) FROM xfundingv2_closed_rounds WHERE id = ?", roundID))
 	assert.Equal(t, 1, roundCount)
 
 	var feeCount int
@@ -116,19 +123,17 @@ func TestRoundInsertService(t *testing.T) {
 }
 
 func TestRoundInsertService_NoFundingFees(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:")
-	require.NoError(t, err)
-	defer db.Close()
-
-	_, err = db.Exec(createRoundTableSQL)
-	require.NoError(t, err)
-	_, err = db.Exec(createFundingFeeTableSQL)
-	require.NoError(t, err)
+	db := newTestInsertDB(t)
 
 	svc := NewRoundInsertService(context.Background(), db, "xfundingv2-test-instance")
 
-	err = svc.insertClosedRound(ClosedRoundRecord{
-		ID:              "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+	roundID := uuid.NewString()
+	cleanupRound(t, db, roundID)
+
+	// a closed round always has start/closing/closed times; ready_time is left unset
+	// to exercise the nullable-ready_time path (a round closed before it became ready).
+	err := svc.insertClosedRound(ClosedRoundRecord{
+		ID:              roundID,
 		InstanceID:      svc.instanceID,
 		SpotSymbol:      "ETHUSDT",
 		FuturesSymbol:   "ETHUSDT",
@@ -136,10 +141,24 @@ func TestRoundInsertService_NoFundingFees(t *testing.T) {
 		FuturesExchange: "binance",
 		Direction:       "long",
 		CollateralAsset: "USDT",
+		StartAt:         time.Now().Add(-24 * time.Hour),
+		ClosingAt:       time.Now().Add(-2 * time.Hour),
+		ClosedAt:        time.Now().Add(-time.Hour),
 	}, nil)
 	require.NoError(t, err)
 
+	var roundCount int
+	require.NoError(t, db.Get(&roundCount, "SELECT COUNT(*) FROM xfundingv2_closed_rounds WHERE id = ?", roundID))
+	assert.Equal(t, 1, roundCount)
+
 	var feeCount int
-	require.NoError(t, db.Get(&feeCount, "SELECT COUNT(*) FROM xfundingv2_funding_fees"))
+	require.NoError(t, db.Get(&feeCount, "SELECT COUNT(*) FROM xfundingv2_funding_fees WHERE round_id = ?", roundID))
 	assert.Equal(t, 0, feeCount)
+
+	// ready_time must be persisted as NULL when the round never became ready
+	var readyAt sql.NullTime
+	require.NoError(t, db.QueryRow(
+		"SELECT ready_at FROM xfundingv2_closed_rounds WHERE id = ?", roundID,
+	).Scan(&readyAt))
+	assert.False(t, readyAt.Valid, "ready_time should be NULL when unset")
 }
