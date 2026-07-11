@@ -231,15 +231,15 @@ func (r *ArbitrageRound) RequiredFeeAssetAmounts() (fixedpoint.Value, fixedpoint
 	return fixedpoint.Zero, fixedpoint.Zero
 }
 
-func (r *ArbitrageRound) StartTime() time.Time {
+func (r *ArbitrageRound) StartAt() time.Time {
 	return r.syncState.StartTime
 }
 
-func (r *ArbitrageRound) ClosedTime() time.Time {
+func (r *ArbitrageRound) ClosedAt() time.Time {
 	return r.syncState.ClosedTime
 }
 
-func (r *ArbitrageRound) ReadyTime() time.Time {
+func (r *ArbitrageRound) ReadyAt() time.Time {
 	return r.syncState.ReadyTime
 }
 

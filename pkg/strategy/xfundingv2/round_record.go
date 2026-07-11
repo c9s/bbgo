@@ -41,10 +41,10 @@ type ClosedRoundRecord struct {
 
 	NumHoldingIntervals int
 
-	StartTime   time.Time
-	ReadyTime   time.Time
-	ClosingTime time.Time
-	ClosedTime  time.Time
+	StartAt   time.Time
+	ReadyAt   *time.Time
+	ClosingAt time.Time
+	ClosedAt  time.Time
 }
 
 // FundingFeeRecord is an individual funding-fee entry of a round persisted to the DB
@@ -105,7 +105,7 @@ func (s *RoundInsertService) run() {
 			switch round.State() {
 			case RoundClosed:
 				if err := s.InsertClosedRound(round); err != nil {
-					s.logger.WithError(err).Warnf("failed to insert closed round record: %s", round)
+					s.logger.WithError(err).Errorf("failed to insert closed round record: %s", round)
 				}
 			}
 		}
@@ -116,6 +116,10 @@ func (s *RoundInsertService) run() {
 func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (ClosedRoundRecord, []FundingFeeRecord) {
 	pnl := round.RealizedPnL()
 
+	var readyTime *time.Time
+	if ts := round.ReadyAt(); !ts.IsZero() {
+		readyTime = &ts
+	}
 	record := ClosedRoundRecord{
 		ID:         round.ID(),
 		InstanceID: s.instanceID,
@@ -142,10 +146,10 @@ func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (Closed
 
 		NumHoldingIntervals: round.NumHoldingIntervals(round.LastUpdateTime()),
 
-		StartTime:   round.StartTime(),
-		ReadyTime:   round.ReadyTime(),
-		ClosingTime: round.ClosingTime(),
-		ClosedTime:  round.ClosedTime(),
+		StartAt:   round.StartAt(),
+		ReadyAt:   readyTime,
+		ClosingAt: round.ClosingTime(),
+		ClosedAt:  round.ClosedAt(),
 	}
 
 	var fees []FundingFeeRecord
@@ -213,10 +217,10 @@ func (s *RoundInsertService) insertClosedRound(
 			"futures_net_pnl",
 			"net_pnl",
 			"num_holding_intervals",
-			"start_time",
-			"ready_time",
-			"closing_time",
-			"closed_time",
+			"start_at",
+			"ready_at",
+			"closing_at",
+			"closed_at",
 		).
 		Values(
 			record.ID,
@@ -237,10 +241,10 @@ func (s *RoundInsertService) insertClosedRound(
 			record.FuturesNetPnL,
 			record.NetPnL,
 			record.NumHoldingIntervals,
-			record.StartTime,
-			record.ReadyTime,
-			record.ClosingTime,
-			record.ClosedTime,
+			record.StartAt,
+			record.ReadyAt,
+			record.ClosingAt,
+			record.ClosedAt,
 		).
 		ToSql()
 	if err != nil {
