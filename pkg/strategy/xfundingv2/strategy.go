@@ -15,6 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
@@ -64,9 +65,10 @@ type Strategy struct {
 
 	// CandidateSymbols is the list of symbols to consider for selection
 	// IMPORTANT: xfundingv2 is now assuming trading on U-major pairs
-	CandidateSymbols     []string       `json:"candidateSymbols"`
-	OpenPositionInterval types.Duration `json:"openPositionInterval"`
-	TransitRoundInterval types.Duration `json:"transitRoundInterval"`
+	CandidateSymbols       []string       `json:"candidateSymbols"`
+	OpenPositionInterval   types.Duration `json:"openPositionInterval"`
+	TransitRoundInterval   types.Duration `json:"transitRoundInterval"`
+	RoundRebalanceInterval types.Duration `json:"roundRebalanceInterval"`
 
 	// TickSymbol is the symbol used for ticking the strategy, default to the first candidate symbol
 	TickSymbol   string         `json:"tickSymbol"`
@@ -179,6 +181,10 @@ func (s *Strategy) Defaults() error {
 	}
 	if s.TransitRoundInterval.Duration() == 0 {
 		s.TransitRoundInterval = types.Duration(time.Minute * 10)
+	}
+	if s.RoundRebalanceInterval.Duration() == 0 {
+		// default 3x of the tick interval
+		s.RoundRebalanceInterval = types.Duration(s.TickInterval.Duration() * 3)
 	}
 
 	if s.MarketSelectionConfig == nil {
@@ -361,7 +367,7 @@ func (s *Strategy) CrossRun(
 
 	// setup the round insert service for persisting closed round records.
 	// the database service is nil when no database is configured (e.g. backtesting).
-	if !bbgo.IsBackTesting && s.Environment != nil && s.Environment.DatabaseService != nil && s.Environment.DatabaseService.DB != nil {
+	if s.Environment != nil && s.Environment.DatabaseService != nil && s.Environment.DatabaseService.DB != nil {
 		s.roundInsertService = NewRoundInsertService(s.ctx, s.Environment.DatabaseService.DB, s.InstanceID())
 		s.roundInsertService.SetLogger(s.logger)
 		s.roundInsertService.Start()
@@ -750,12 +756,6 @@ func (s *Strategy) CrossRun(
 		round.HandleFuturesOrderUpdate(update)
 		bbgo.Notify("📝 Round futures order update: %s", round.String(), update)
 	})
-	// market stream callbacks
-	s.futuresSession.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if round, found := s.ActiveRounds[kline.Symbol]; found {
-			round.SetTickPrice(kline.Close)
-		}
-	})
 
 	// strategy is ready for running
 	if !bbgo.IsBackTesting && s.ClosingAllOnStartup {
@@ -785,7 +785,7 @@ func (s *Strategy) CrossRun(
 	// Register shutdown handler to persist state
 	bbgo.OnShutdown(s.ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-		s.logger.Infof("shutting down %s", s.InstanceID())
+		bbgo.Notify("⚠️ shutting down %s", s.InstanceID())
 		s.cancel()
 		for symbol, executor := range s.spotGeneralOrderExecutors {
 			if err := executor.GracefulCancel(ctx); err != nil {
@@ -829,10 +829,19 @@ func (s *Strategy) defaultBreaker(symbol string) *circuitbreaker.BasicCircuitBre
 	return newBreaker
 }
 
-func (s *Strategy) tick(parent context.Context, tickTime time.Time) {
-	ctx, cancel := context.WithTimeout(parent, s.TickInterval.Duration()-5*time.Second)
-	defer cancel()
-
+func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
+	if !bbgo.IsBackTesting {
+		profiler := timeprofile.Start()
+		defer func() {
+			duration := profiler.Stop()
+			// tick duration
+			// ideally the tick duration should not exceed the tick interval
+			s.logger.Debugf("tick duration: %s", duration)
+			tickDurationMetrics.With(prometheus.Labels{
+				"strategy_id": s.InstanceID(),
+			}).Set(duration.Seconds())
+		}()
+	}
 	// lock the strategy to ensure all the updates to the active rounds are seen
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -853,42 +862,17 @@ func (s *Strategy) tick(parent context.Context, tickTime time.Time) {
 	s.lastTickTime = tickTime
 
 	// start processing
-	// 1. tick existing active rounds
+	// 1. process existing active rounds
 	// We need to tick the active rounds first since we need to proceed the underlying workers to update the positions.
 	// So that the following checks can accurately reflect the current status of the rounds.
 	for _, round := range s.ActiveRounds {
+		// 1.1 tick existing active rounds
 		spotOrderBook := s.spotOrderBooks[round.SpotSymbol()].Copy()
 		futuresOrderBook := s.futuresOrderBooks[round.FuturesSymbol()].Copy()
 		oriState := round.State()
 		round.Tick(ctx, tickTime, spotOrderBook, futuresOrderBook)
-		currentState := round.State()
-		if oriState != currentState {
-			spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
-				round.SpotSymbol(),
-				round.FuturesSymbol(),
-			)
-			switch currentState {
-			case RoundReady:
-				bbgo.Notify("🟢 Round entered ready state: %s",
-					round.SpotSymbol(),
-					round.NewNotification(spotOrderBook, futuresOrderBook),
-				)
-			case RoundClosing:
-				bbgo.Notify("🟡 Round is closing: %s",
-					round.SpotSymbol(),
-					round.NewNotification(spotOrderBook, futuresOrderBook),
-				)
-			case RoundClosed:
-				bbgo.Notify("🔴 Round is closed: %s",
-					round.SpotSymbol(),
-					round.NewNotification(spotOrderBook, futuresOrderBook),
-				)
-			}
-		}
 
-	}
-	// 2. transit active rounds
-	for _, round := range s.ActiveRounds {
+		// 1.2 transit active rounds
 		posDeviation := round.CheckPositionDeviation(
 			tickTime,
 			s.CriticalErrorConfig.MaxMoqDeviation,
@@ -983,6 +967,31 @@ func (s *Strategy) tick(parent context.Context, tickTime time.Time) {
 		}
 
 		s.transitRound(ctx, round, tickTime)
+		// all transitions are done, check if the state has changed
+		currentState := round.State()
+		if oriState != currentState {
+			spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+				round.SpotSymbol(),
+				round.FuturesSymbol(),
+			)
+			switch currentState {
+			case RoundReady:
+				bbgo.Notify("🟢 Round entered ready state: %s",
+					round.SpotSymbol(),
+					round.NewNotification(spotOrderBook, futuresOrderBook),
+				)
+			case RoundClosing:
+				bbgo.Notify("🟡 Round is closing: %s",
+					round.SpotSymbol(),
+					round.NewNotification(spotOrderBook, futuresOrderBook),
+				)
+			case RoundClosed:
+				bbgo.Notify("🔴 Round is closed: %s",
+					round.SpotSymbol(),
+					round.NewNotification(spotOrderBook, futuresOrderBook),
+				)
+			}
+		}
 
 		// enque closed active rounds
 		if round.State() == RoundClosed {
@@ -999,7 +1008,7 @@ func (s *Strategy) tick(parent context.Context, tickTime time.Time) {
 		}
 	}
 
-	// 3. process closed round tasks
+	// 2. process closed round tasks
 	closeRoundCtx, cancelCloseRound := context.WithTimeout(ctx, 15*time.Second)
 	for _, task := range s.ClosedRoundTasks {
 		round := task.Round
@@ -1036,13 +1045,13 @@ func (s *Strategy) tick(parent context.Context, tickTime time.Time) {
 	}
 	cancelCloseRound()
 
-	// 4. check if new round can be opened or existing round needs to be adjusted
+	// 3. check if new round can be opened or existing round needs to be adjusted
 	s.checkOpenNewRound(ctx, tickTime)
 
-	// 5. process pending rounds that are waiting for fee asset preparation
+	// 4. process pending rounds that are waiting for fee asset preparation
 	s.processPendingRounds(ctx, tickTime)
 
-	// 6. log stats
+	// 5. log stats
 	if s.lastStatsTime.IsZero() || tickTime.Sub(s.lastStatsTime) >= s.StatsPeriod.Duration() {
 		s.notifyStats()
 		s.lastStatsTime = tickTime
@@ -1090,29 +1099,37 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 
 	// the funding rate has flipped
 	if round.TriggeredFundingRate().Sign()*fundingRate.LastFundingRate.Sign() <= 0 {
-		s.logger.Debugf("[transitOpeningOrReadyRound] funding rate flipped %s -> %s: %s",
-			round.TriggeredFundingRate(), fundingRate.LastFundingRate, round)
+		spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+			round.SpotSymbol(),
+			round.FuturesSymbol(),
+		)
+		bbgo.Notify("⚠️ Round funding rate flipped %s -> %s (%s)",
+			round.TriggeredFundingRate(), fundingRate.LastFundingRate, round.SpotSymbol(),
+			round.NewNotification(spotOrderBook, futuresOrderBook),
+		)
 		rateDiffAbs := fundingRate.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
 		if rateDiffAbs.Compare(s.CriticalErrorConfig.MaxFundingRateFlip) > 0 {
-			spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
-				round.SpotSymbol(),
-				round.FuturesSymbol(),
-			)
-			bbgo.Notify("🚨 Round funding rate flip is too large: %s -> %s (threshold %s)",
+			bbgo.Notify("🚨 Round funding rate flip is too large: %s -> %s (threshold %s), closing round",
 				round.TriggeredFundingRate(),
 				fundingRate.LastFundingRate,
 				s.CriticalErrorConfig.MaxFundingRateFlip,
 				round.NewCriticalNotification(spotOrderBook, futuresOrderBook),
 			)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
+			return
 		}
 
 		// the round is still within the min holding time, keep holding
 		if round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals() {
+			s.logger.Infof(
+				"[transitOpeningOrReadyRound] still within min holding hours, keep holding, current funding rate %s: %s",
+				fundingRate.LastFundingRate, round,
+			)
 			return
 		}
 
 		// the round is beyond the max holding time, transit to closing
-		if currentTime.Sub(round.StartTime()) >= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
+		if currentTime.Sub(round.StartAt()) >= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound %s] max holding hours reached, transit state %s -> closing, current funding rate %s: %s",
 				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round,
@@ -1161,7 +1178,7 @@ func (s *Strategy) transitClosingRound(ctx context.Context, round *ArbitrageRoun
 func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time) {
 	var lastOpenTime time.Time
 	for _, round := range s.ActiveRounds {
-		startTime := round.StartTime()
+		startTime := round.StartAt()
 		if lastOpenTime.IsZero() {
 			lastOpenTime = startTime
 			continue
@@ -1233,6 +1250,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 				futuresTwap,
 				s.futuresService,
 				s.MarketSelectionConfig.FuturesDirection,
+				s.RoundRebalanceInterval.Duration(),
 			)
 			round.SetLogger(s.logger)
 			round.SetSpotExchangeFeeRates(

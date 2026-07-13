@@ -65,6 +65,7 @@ func (r *ArbitrageRound) Initialize(ctx context.Context, s *Strategy) error {
 		// the restored round should always have the futures worker restored as well.
 		return errors.New("[ArbitrageRound] futures worker is nil")
 	}
+	r.rebalanceInterval = s.RoundRebalanceInterval.Duration()
 
 	return nil
 }
@@ -100,19 +101,19 @@ type ArbitrageRoundSyncState struct {
 
 	State RoundState `json:"state"`
 
-	// StartTime is the time when the round is started
-	StartTime time.Time `json:"startTime"`
-	// ClosingTime is the time when the round is entered closing state
-	ClosingTime     time.Time      `json:"closingTime"`
+	// StartAt is the time when the round is started
+	StartAt time.Time `json:"startAt"`
+	// ClosingAt is the time when the round is entered closing state
+	ClosingAt       time.Time      `json:"closingAt"`
 	ClosingDuration types.Duration `json:"closingDuration"`
 	// LastUpdateTime is the last time when the round is updated
 	LastUpdateTime time.Time `json:"lastUpdateTime"`
 
-	// ReadyTime is the time when the round enters ready state
-	ReadyTime time.Time `json:"readyTime"`
+	// ReadyAt is the time when the round enters ready state
+	ReadyAt time.Time `json:"readyAt"`
 
-	// ClosedTime is the time when the round is closed
-	ClosedTime time.Time `json:"closedTime"`
+	// ClosedAt is the time when the round is closed
+	ClosedAt time.Time `json:"closedAt"`
 
 	LargeDeviationStartTime time.Time `json:"largeDeviationStartTime"`
 }

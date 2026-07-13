@@ -71,3 +71,11 @@ var roundQuantityDeviationMetrics = promauto.NewGaugeVec(
 	},
 	[]string{"strategy_id", "symbol"},
 )
+
+var tickDurationMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_tick_duration",
+		Help: "Duration of the tick in seconds",
+	},
+	[]string{"strategy_id"},
+)

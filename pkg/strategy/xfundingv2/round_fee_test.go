@@ -356,7 +356,7 @@ func TestStrategy_CalculateRoundFeeAsset(t *testing.T) {
 			types.ExchangeBinance, types.ExchangeBinance,
 			3, 8, Number(3),
 			spotWorker, futuresWorker, mockService,
-			types.PositionLong)
+			types.PositionLong, time.Minute)
 
 		err := s.calculateRoundFeeAsset(round)
 		assert.EqualError(t, err, "order book data is not ready yet")
@@ -473,7 +473,7 @@ func TestStrategy_CalculateRoundFeeAsset(t *testing.T) {
 			fundingRate,
 			types.ExchangeBinance, types.ExchangeBinance,
 			3, 8, Number(3), spotWorker, futuresWorker, mockService,
-			types.PositionShort)
+			types.PositionShort, time.Minute)
 
 		err := s.calculateRoundFeeAsset(round)
 		assert.NoError(t, err)
