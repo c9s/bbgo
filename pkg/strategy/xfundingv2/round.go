@@ -1469,6 +1469,8 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 	timedCtx, cancel := context.WithTimeout(ctx, time.Second*20)
 	defer cancel()
 
+	r.logger.Debugf("rebalance closing round: %s", r.SpotSymbol())
+
 	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
 	if shortFutures {
 		spotAccount, err := r.spotSession.UpdateAccount(timedCtx)
@@ -1487,6 +1489,7 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		spotMarket := r.spotWorker.Market()
 		baseAsset := r.CollateralAsset()
 		quoteAsset := futuresMarket.QuoteCurrency
+		r.logger.Debugf("base asset: %s, quote asset: %s", baseAsset, quoteAsset)
 		// rebalance the short futures leg for negative unrealized PnL
 		r.logger.Debugf("round %s unrealized PnL: %s", r.SpotSymbol(), risk.UnrealizedPnL)
 		if risk.UnrealizedPnL.Sign() < 0 {
@@ -1515,20 +1518,25 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		accTransferOut := r.syncState.TransferOutAmount
 		expectedTransferOut := fixedpoint.Zero
 		for _, trade := range r.futuresWorker.Executor().AllTrades() {
-			if trade.Side != types.SideTypeSell {
+			// consider only the closing trades, which are buy trades for short futures leg
+			if trade.Side != types.SideTypeBuy {
 				continue
 			}
 			amount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
 			expectedTransferOut = expectedTransferOut.Add(amount)
 		}
 		transferDiff := expectedTransferOut.Sub(accTransferOut)
+		r.logger.Debugf("rebalance closing: expected transfer out amount: %s, actual transfer out amount: %s, diff: %s",
+			expectedTransferOut,
+			accTransferOut,
+			transferDiff,
+		)
 		futuresBalance := futuresAccount.Balances()[baseAsset]
 		maxWithdraw := futuresBalance.MaxWithdrawAmount
 		if maxWithdraw != nil && maxWithdraw.Sign() > 0 {
 			transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
 		}
 		if transferDiff.Sign() <= 0 {
-			r.logger.Debugf("transferDiff: %s", transferDiff)
 			return nil
 		}
 		// 3. transfer the base asset from futures to spot
