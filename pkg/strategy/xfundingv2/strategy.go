@@ -1746,6 +1746,7 @@ func (s *Strategy) runFundingIncomeWorker(ctx context.Context) {
 				if !ok {
 					return
 				}
+				s.mu.Lock()
 				for _, round := range s.ActiveRounds {
 					if err := round.SyncFundingFeeRecords(ctx, tickTime); err != nil {
 						s.logger.WithError(err).Warnf(
@@ -1754,6 +1755,7 @@ func (s *Strategy) runFundingIncomeWorker(ctx context.Context) {
 						)
 					}
 				}
+				s.mu.Unlock()
 			}
 		}
 	}()
