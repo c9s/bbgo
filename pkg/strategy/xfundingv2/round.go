@@ -1497,32 +1497,25 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		// rebalance the short futures leg for negative unrealized PnL
 		// negative unrealized PnL will lock available collateral on futures account and prevent us to transfer out the asset back to spot account.
 		// Overtime, it may cause an unexpected position risk on overall positions, both spot and futures.
-		risks, err := r.futuresService.QueryPositionRisk(ctx, r.FuturesSymbol())
-		if err != nil {
-			return fmt.Errorf("failed to query position risk: %w", err)
-		}
+		// We check the net balance of the quote asset on futures account and transfer from spot account to futures account if it's negative.
 		baseAsset := r.CollateralAsset()
 		futuresMarket := r.futuresWorker.Market()
 		quoteAsset := futuresMarket.QuoteCurrency
 		r.logger.Debugf("base asset: %s, quote asset: %s", baseAsset, quoteAsset)
-		if b, ok := futuresAccount.Balance(quoteAsset); ok && b.Net().Sign() < 0 && len(risks) > 0 {
-			// rebalance the short futures leg for negative unrealized PnL
-			risk := risks[0]
-			r.logger.Debugf("round %s unrealized PnL: %s, quote balance on futures account: %s", r.SpotSymbol(), risk.UnrealizedPnL, b)
+		if b, ok := futuresAccount.Balance(quoteAsset); ok && b.Net().Sign() < 0 {
+			// rebalance the short futures leg for negative net quote asset balance
 			spotMarket := r.spotWorker.Market()
-			if risk.UnrealizedPnL.Sign() < 0 {
-				// transfer 105% of the unrealized PnL from spot to futures to cover the loss
-				transferAmount := risk.UnrealizedPnL.Abs().Mul(fixedpoint.NewFromFloat(1.05))
-				transferAmount = spotMarket.TruncateQuantity(transferAmount)
-				spotBalance := spotAccount.Balances()[quoteAsset]
-				spotAvailable := spotBalance.Available
-				if transferAmount.Compare(spotAvailable) > 0 {
-					return fmt.Errorf("insufficient %s balance on spot account (%s) to rebalance round: %s", quoteAsset, spotAvailable, r.String())
-				}
-				// transfer quote asset from spot to futures
-				if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, quoteAsset, transferAmount, types.TransferIn); err != nil {
-					return fmt.Errorf("failed to transfer %s %s from spot to futures: %w", transferAmount.String(), quoteAsset, err)
-				}
+			// transfer 105% of the unrealized PnL from spot to futures to cover the loss
+			transferAmount := b.Net().Abs().Mul(fixedpoint.NewFromFloat(1.05))
+			transferAmount = spotMarket.TruncateQuantity(transferAmount)
+			spotBalance := spotAccount.Balances()[quoteAsset]
+			spotAvailable := spotBalance.Available
+			if transferAmount.Compare(spotAvailable) > 0 {
+				return fmt.Errorf("insufficient %s balance on spot account (%s) to rebalance round: %s", quoteAsset, spotAvailable, r.String())
+			}
+			// transfer quote asset from spot to futures
+			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, quoteAsset, transferAmount, types.TransferIn); err != nil {
+				return fmt.Errorf("failed to transfer %s %s from spot to futures: %w", transferAmount.String(), quoteAsset, err)
 			}
 		}
 		// 2. transfer the base asset from futures to spot
