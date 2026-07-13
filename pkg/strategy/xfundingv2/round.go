@@ -57,6 +57,8 @@ type ArbitrageRound struct {
 	lastRebalanceTime time.Time
 	rebalanceInterval time.Duration
 
+	lastFundingIncomeSyncTime time.Time
+
 	futuresService                                FuturesService
 	spotExchangeFeeRates, futuresExchangeFeeRates map[types.ExchangeName]types.ExchangeFee
 
@@ -635,6 +637,11 @@ func (r *ArbitrageRound) syncFundingFeeRecords(ctx context.Context, currentTime 
 		)
 	}
 
+	syncDuration := time.Duration(r.syncState.FundingIntervalHours/2) * time.Hour
+	if !r.lastFundingIncomeSyncTime.IsZero() && currentTime.Sub(r.lastFundingIncomeSyncTime) <= syncDuration {
+		return nil
+	}
+	r.lastFundingIncomeSyncTime = currentTime
 	q := batch.BinanceFuturesIncomeBatchQuery{
 		BinanceFuturesIncomeHistoryService: r.futuresService,
 	}
@@ -1176,10 +1183,12 @@ func (r *ArbitrageRound) Cleanup(ctx context.Context, orderBook types.OrderBook)
 	}
 	w := r.futuresWorker
 	remaining := w.RemainingQuantity()
+	r.logger.Debugf("[Cleanup] remaining futures quantity: %s", remaining)
 	if remaining.IsZero() {
 		return nil
 	}
 
+	r.logger.Infof("[Cleanup] closing remaining futures position: %s", remaining)
 	midPrice := getMidPrice(orderBook)
 	market := w.Market()
 	if market.IsDustQuantity(remaining.Abs(), midPrice) {
@@ -1209,8 +1218,12 @@ func (r *ArbitrageRound) Cleanup(ctx context.Context, orderBook types.OrderBook)
 		return fmt.Errorf("[CloseFuturesPosition] failed to wait for closing order trades: %w", err)
 	}
 	risks, err := r.futuresService.QueryPositionRisk(timedCtx, r.FuturesSymbol())
-	if err != nil || len(risks) == 0 {
+	if err != nil {
 		return fmt.Errorf("[CloseFuturesPosition] failed to query position risk after closing order filled: %w", err)
+	}
+	if len(risks) == 0 {
+		// no position
+		return nil
 	}
 	risk := risks[0]
 	if !risk.PositionAmount.IsZero() {
@@ -1477,33 +1490,39 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to update spot account: %w", err)
 		}
+		futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
+		if err != nil {
+			return fmt.Errorf("failed to update futures account: %w", err)
+		}
 		// rebalance the short futures leg for negative unrealized PnL
 		// negative unrealized PnL will lock available collateral on futures account and prevent us to transfer out the asset back to spot account.
 		// Overtime, it may cause an unexpected position risk on overall positions, both spot and futures.
 		risks, err := r.futuresService.QueryPositionRisk(ctx, r.FuturesSymbol())
-		if err != nil || len(risks) == 0 {
+		if err != nil {
 			return fmt.Errorf("failed to query position risk: %w", err)
 		}
-		risk := risks[0]
-		futuresMarket := r.futuresWorker.Market()
-		spotMarket := r.spotWorker.Market()
 		baseAsset := r.CollateralAsset()
+		futuresMarket := r.futuresWorker.Market()
 		quoteAsset := futuresMarket.QuoteCurrency
 		r.logger.Debugf("base asset: %s, quote asset: %s", baseAsset, quoteAsset)
-		// rebalance the short futures leg for negative unrealized PnL
-		r.logger.Debugf("round %s unrealized PnL: %s", r.SpotSymbol(), risk.UnrealizedPnL)
-		if risk.UnrealizedPnL.Sign() < 0 {
-			// transfer 105% of the unrealized PnL from spot to futures to cover the loss
-			transferAmount := risk.UnrealizedPnL.Abs().Mul(fixedpoint.NewFromFloat(1.05))
-			transferAmount = spotMarket.TruncateQuantity(transferAmount)
-			spotBalance := spotAccount.Balances()[quoteAsset]
-			spotAvailable := spotBalance.Available
-			if transferAmount.Compare(spotAvailable) > 0 {
-				return fmt.Errorf("insufficient %s balance on spot account (%s) to rebalance round: %s", quoteAsset, spotAvailable, r.String())
-			}
-			// transfer quote asset from spot to futures
-			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, quoteAsset, transferAmount, types.TransferIn); err != nil {
-				return fmt.Errorf("failed to transfer %s %s from spot to futures: %w", transferAmount.String(), quoteAsset, err)
+		if b, ok := futuresAccount.Balance(quoteAsset); ok && b.Net().Sign() < 0 && len(risks) > 0 {
+			// rebalance the short futures leg for negative unrealized PnL
+			risk := risks[0]
+			r.logger.Debugf("round %s unrealized PnL: %s, quote balance on futures account: %s", r.SpotSymbol(), risk.UnrealizedPnL, b)
+			spotMarket := r.spotWorker.Market()
+			if risk.UnrealizedPnL.Sign() < 0 {
+				// transfer 105% of the unrealized PnL from spot to futures to cover the loss
+				transferAmount := risk.UnrealizedPnL.Abs().Mul(fixedpoint.NewFromFloat(1.05))
+				transferAmount = spotMarket.TruncateQuantity(transferAmount)
+				spotBalance := spotAccount.Balances()[quoteAsset]
+				spotAvailable := spotBalance.Available
+				if transferAmount.Compare(spotAvailable) > 0 {
+					return fmt.Errorf("insufficient %s balance on spot account (%s) to rebalance round: %s", quoteAsset, spotAvailable, r.String())
+				}
+				// transfer quote asset from spot to futures
+				if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, quoteAsset, transferAmount, types.TransferIn); err != nil {
+					return fmt.Errorf("failed to transfer %s %s from spot to futures: %w", transferAmount.String(), quoteAsset, err)
+				}
 			}
 		}
 		// 2. transfer the base asset from futures to spot
@@ -1511,10 +1530,6 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		// if the expected transfer amount is larger than the accumulated one, transfer the difference back to spot
 		// NOTE: need to check the max withdraw
 		// update futures account info for the latest max withdraw amount
-		futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
-		if err != nil {
-			return fmt.Errorf("failed to update futures account: %w", err)
-		}
 		accTransferOut := r.syncState.TransferOutAmount
 		expectedTransferOut := fixedpoint.Zero
 		for _, trade := range r.futuresWorker.Executor().AllTrades() {
