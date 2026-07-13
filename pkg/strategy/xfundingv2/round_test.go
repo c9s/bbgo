@@ -282,7 +282,10 @@ func TestArbitrageRound_TotalFundingIncome(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		currentTime := time.Date(2024, 1, 2, 8, 0, 0, 0, time.UTC)
+		// Advance past the sync-throttle window (FundingIntervalHours/2 = 4h after
+		// the previous subtest's sync at Jan 2 08:00) so the query actually runs
+		// and its error can propagate.
+		currentTime := time.Date(2024, 1, 2, 13, 0, 0, 0, time.UTC)
 		err := round.SyncFundingFeeRecords(ctx, currentTime)
 		assert.Error(t, err)
 	})
