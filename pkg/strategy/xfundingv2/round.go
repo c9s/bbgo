@@ -811,9 +811,14 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotBalance t
 	}
 
 	if transferAmount.Sign() <= 0 {
-		// nothing left to transfer (e.g. fees ate the entire fill)
+		// nothing left to transfer (may have been transferred by rebalancing)
 		r.logger.Warnf("no collateral asset available to transfer to futures: %s (available: %s %s)", trade.Symbol, available, asset)
+		// consider the transfer succeeded -> delete the retry task and sync the futures position
 		delete(r.syncState.RetryTransfers, trade.ID)
+		if _, found := r.syncState.SyncedSpotTrades[trade.ID]; !found {
+			r.syncFuturesPosition(trade)
+			r.syncState.SyncedSpotTrades[trade.ID] = struct{}{}
+		}
 		return
 	}
 
@@ -925,6 +930,11 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresBa
 		// remove from retry list if exists
 		r.logger.Warnf("no collateral asset available to transfer back to spot: %s", asset)
 		delete(r.syncState.RetryTransfers, trade.ID)
+		// consider the transfer succeeded and sync the spot position
+		if _, found := r.syncState.SyncedFuturesTrades[trade.ID]; !found {
+			r.syncSpotPosition(trade)
+			r.syncState.SyncedFuturesTrades[trade.ID] = struct{}{}
+		}
 		return
 	}
 
