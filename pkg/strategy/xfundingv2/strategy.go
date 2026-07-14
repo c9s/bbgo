@@ -1697,11 +1697,19 @@ func (s *Strategy) newDebugLogger() *logrus.Entry {
 func (s *Strategy) notifyStats() {
 	var activeRoundNotifications []any
 	for _, round := range s.ActiveRounds {
-		spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+		spotOrderBook, futuresOrderBook, ok := s.getOrderBooks(
 			round.SpotSymbol(),
 			round.FuturesSymbol(),
 		)
+		if !ok {
+			continue
+		}
 		activeRoundNotifications = append(activeRoundNotifications, round.NewNotification(spotOrderBook, futuresOrderBook))
+		if s.roundInsertService != nil {
+			if err := s.roundInsertService.InsertActiveRound(round, spotOrderBook, futuresOrderBook); err != nil {
+				s.logger.WithError(err).Warnf("failed to insert active round to database: %s", round)
+			}
+		}
 	}
 
 	var pendingRoundNotifications []any
