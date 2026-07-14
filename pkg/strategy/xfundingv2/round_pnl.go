@@ -39,9 +39,7 @@ func (p *RoundRealizedPnL) SlackAttachment() slack.Attachment {
 }
 
 func (p *RoundRealizedPnL) NetPnL() fixedpoint.Value {
-	return p.FundingIncome.Add(
-		p.SpotProfitStats.AccumulatedNetProfit,
-	).Add(
+	return p.SpotProfitStats.AccumulatedNetProfit.Add(
 		p.FuturesProfitStats.AccumulatedNetProfit,
 	)
 }
@@ -110,6 +108,10 @@ func (r *ArbitrageRound) realizedPnL() *RoundRealizedPnL {
 type RoundUnrealizedPnL struct {
 	RoundRealizedPnL
 
+	// prices used to calculate the unrealized PnL
+	SpotPrice    fixedpoint.Value
+	FuturesPrice fixedpoint.Value
+	// unrealized PnL of the open positions
 	UnrealizedSpotPnL    fixedpoint.Value
 	UnrealizedFuturesPnL fixedpoint.Value
 }
@@ -128,8 +130,12 @@ func (r *ArbitrageRound) UnrealizedPnL(spotOrderBook, futuresOrderBook types.Ord
 		RoundRealizedPnL: *realized,
 	}
 
-	result.UnrealizedSpotPnL = legUnrealizedPnL(spotOrderBook, realized.SpotPosition)
-	result.UnrealizedFuturesPnL = legUnrealizedPnL(futuresOrderBook, realized.FuturesPosition)
+	spotPrice, spotUnrealizedPnL := legUnrealizedPnL(spotOrderBook, realized.SpotPosition)
+	result.SpotPrice = spotPrice
+	result.UnrealizedSpotPnL = spotUnrealizedPnL
+	futuresPrice, futuresUnrealizedPnL := legUnrealizedPnL(futuresOrderBook, realized.FuturesPosition)
+	result.FuturesPrice = futuresPrice
+	result.UnrealizedFuturesPnL = futuresUnrealizedPnL
 
 	return result
 }
@@ -142,7 +148,7 @@ func (r *RoundUnrealizedPnL) TotalFuturesPnL() fixedpoint.Value {
 	return r.FuturesProfitStats.AccumulatedNetProfit.Add(r.UnrealizedFuturesPnL)
 }
 
-// TotalPnL returns realized net PnL (funding + spot + futures) plus the current
+// TotalPnL returns realized net PnL (spot + futures) plus the current
 // unrealized PnL of both open legs.
 func (p *RoundUnrealizedPnL) TotalPnL() fixedpoint.Value {
 	return p.NetPnL().Add(p.UnrealizedSpotPnL).Add(p.UnrealizedFuturesPnL)
@@ -152,26 +158,26 @@ func (p *RoundUnrealizedPnL) TotalPnL() fixedpoint.Value {
 // (price - averageCost) * base for both long and short. The close-side price is the
 // best bid for a long leg (sell to close) and the best ask for a short leg (buy to
 // close). Returns zero when the position is flat or the relevant book side is empty.
-func legUnrealizedPnL(book types.OrderBook, position *types.Position) fixedpoint.Value {
+func legUnrealizedPnL(book types.OrderBook, position *types.Position) (fixedpoint.Value, fixedpoint.Value) {
 	base := position.Base
 	if base.IsZero() {
-		return fixedpoint.Zero
+		return fixedpoint.Zero, fixedpoint.Zero
 	}
 
 	var price fixedpoint.Value
 	if base.Sign() > 0 {
 		bid, ok := book.BestBid()
 		if !ok {
-			return fixedpoint.Zero
+			return fixedpoint.Zero, fixedpoint.Zero
 		}
 		price = bid.Price
 	} else {
 		ask, ok := book.BestAsk()
 		if !ok {
-			return fixedpoint.Zero
+			return fixedpoint.Zero, fixedpoint.Zero
 		}
 		price = ask.Price
 	}
 
-	return price.Sub(position.AverageCost).Mul(base)
+	return price, price.Sub(position.AverageCost).Mul(base)
 }
