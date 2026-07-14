@@ -1035,6 +1035,7 @@ func (r *ArbitrageRound) prepareOpening(
 		if err := r.futuresService.TransferFuturesAccountAsset(ctx, asset, transferDiff, types.TransferIn); err != nil {
 			return fmt.Errorf("failed to transfer in %s %s: %w", transferDiff.String(), asset, err)
 		}
+		r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(transferDiff)
 	}
 	// transfer succeeded, need to sync the futures position to keep delta-neutral
 	targetPosition := r.spotWorker.FilledPosition().Neg()
@@ -1079,20 +1080,21 @@ func (r *ArbitrageRound) prepareClosing(
 	transferDiff := expectedTransferOut.Sub(r.syncState.TransferOutAmount)
 	asset := r.syncState.DirectionPolicy.CollateralAsset()
 	balance := futuresSession.GetAccount().Balances()[asset]
+	maxWithdraw := balance.MaxWithdrawAmount
+	if maxWithdraw != nil {
+		transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
+	}
 	if transferDiff.Sign() > 0 {
-		maxWithdraw := balance.MaxWithdrawAmount
 		r.logger.Infof("expected transfer out amount: %s, actual transfer out amount: %s, diff: %s, max withdraw: %s",
 			expectedTransferOut,
 			r.syncState.TransferOutAmount,
 			transferDiff,
 			maxWithdraw,
 		)
-		if maxWithdraw != nil {
-			transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
-		}
 		if err := r.futuresService.TransferFuturesAccountAsset(ctx, asset, transferDiff, types.TransferOut); err != nil {
 			return fmt.Errorf("failed to transfer out %s %s: %w", transferDiff.String(), asset, err)
 		}
+		r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
 	}
 	// transfer succeeded, need to sync the spot position to keep delta-neutral
 	targetPosition := r.futuresWorker.FilledPosition().Neg()
@@ -1439,6 +1441,7 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, baseAvailable, types.TransferIn); err != nil {
 				return fmt.Errorf("failed to transfer %s %s from spot to futures: %w", baseAvailable.String(), baseAsset, err)
 			}
+			r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(baseAvailable)
 			bbgo.Notify("➡️ Transfered %s %s from spot to futures to rebalance",
 				baseAvailable.String(),
 				baseAsset,
