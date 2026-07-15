@@ -672,6 +672,7 @@ func (s *Strategy) CrossRun(
 			if err := round.SyncFundingFeeRecords(s.ctx, time.Now()); err != nil {
 				return fmt.Errorf("failed to sync funding fee records for round %s: %w", round.SpotSymbol(), err)
 			}
+			s.logger.Debugf("funding fee records synced for round %s", round)
 		}
 	}
 

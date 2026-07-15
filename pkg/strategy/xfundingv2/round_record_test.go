@@ -107,7 +107,7 @@ func TestRoundInsertService_ClosedRound(t *testing.T) {
 			ClosedAt:             time.Now().Add(-time.Hour),
 		}
 
-		fees := []FundingFeeRecord{
+		fees := []FundingFee{
 			{RoundID: roundID, Asset: "USDT", Amount: fixedpoint.NewFromFloat(6.25), Txn: 1001, Time: time.Now().Add(-16 * time.Hour)},
 			{RoundID: roundID, Asset: "USDT", Amount: fixedpoint.NewFromFloat(6.25), Txn: 1002, Time: time.Now().Add(-8 * time.Hour)},
 		}
@@ -212,7 +212,7 @@ func TestRoundInsertService_ActiveRoundSnapshot(t *testing.T) {
 		TotalNetPnL:          fixedpoint.NewFromFloat(1103.5),
 	}
 
-	fees := []FundingFeeRecord{
+	fees := []FundingFee{
 		{RoundID: roundID, Asset: "USDT", Amount: fixedpoint.NewFromFloat(2.1), Txn: 2001, Time: time.Now().Add(-16 * time.Hour)},
 		{RoundID: roundID, Asset: "USDT", Amount: fixedpoint.NewFromFloat(2.1), Txn: 2002, Time: time.Now().Add(-8 * time.Hour)},
 	}

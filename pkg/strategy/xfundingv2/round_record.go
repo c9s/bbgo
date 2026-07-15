@@ -52,15 +52,6 @@ type ClosedRoundRecord struct {
 	ClosedAt  time.Time  `db:"closed_at"`
 }
 
-// FundingFeeRecord is an individual funding-fee entry of a round persisted to the DB
-type FundingFeeRecord struct {
-	RoundID string           `db:"round_id"`
-	Asset   string           `db:"asset"`
-	Amount  fixedpoint.Value `db:"amount"`
-	Txn     int64            `db:"txn"`
-	Time    time.Time        `db:"time"`
-}
-
 // RoundInsertService persists round records into the DB
 type RoundInsertService struct {
 	C chan *ArbitrageRound
@@ -118,7 +109,7 @@ func (s *RoundInsertService) run() {
 }
 
 // newClosedRoundRecord builds the summary record and funding-fee records from a closed round
-func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (ClosedRoundRecord, []FundingFeeRecord) {
+func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (ClosedRoundRecord, []FundingFee) {
 	pnl := round.RealizedPnL()
 
 	var readyTime *time.Time
@@ -163,16 +154,10 @@ func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (Closed
 // newFundingFeeRecords builds the funding-fee records of a round from its synced
 // funding-fee entries. The records are linked to the round via the round's own id
 // (round_id) and are shared by both the closed-round and active-round snapshot paths.
-func newFundingFeeRecords(round *ArbitrageRound) []FundingFeeRecord {
-	var fees []FundingFeeRecord
+func newFundingFeeRecords(round *ArbitrageRound) []FundingFee {
+	var fees []FundingFee
 	for _, fee := range round.syncState.FundingFeeRecords {
-		fees = append(fees, FundingFeeRecord{
-			RoundID: round.ID(),
-			Asset:   fee.Asset,
-			Amount:  fee.Amount,
-			Txn:     fee.Txn,
-			Time:    fee.Time,
-		})
+		fees = append(fees, fee)
 	}
 
 	return fees
@@ -198,7 +183,7 @@ func (s *RoundInsertService) InsertClosedRound(round *ArbitrageRound) error {
 // The funding-fee rows are linked to the round via the round's own id (round_id), which
 // is known before insertion, so there is no need to read back the auto-incremented gid.
 func (s *RoundInsertService) insertClosedRound(
-	record ClosedRoundRecord, fees []FundingFeeRecord,
+	record ClosedRoundRecord, fees []FundingFee,
 ) error {
 	tx, err := s.db.Beginx()
 	if err != nil {
@@ -290,7 +275,7 @@ type ActiveRoundRecord struct {
 func (s *RoundInsertService) newActiveRoundRecord(
 	round *ArbitrageRound,
 	spotOrderBook, futuresOrderBook types.OrderBook,
-) (ActiveRoundRecord, []FundingFeeRecord) {
+) (ActiveRoundRecord, []FundingFee) {
 	pnl := round.UnrealizedPnL(spotOrderBook, futuresOrderBook)
 
 	record := ActiveRoundRecord{
@@ -361,7 +346,7 @@ func (s *RoundInsertService) InsertActiveRound(
 // the snapshots table), so an existing snapshot is updated in place, keeping exactly
 // one live snapshot per active round. Funding fees are upserted on (round_id, txn).
 func (s *RoundInsertService) insertActiveRound(
-	record ActiveRoundRecord, fees []FundingFeeRecord,
+	record ActiveRoundRecord, fees []FundingFee,
 ) error {
 	tx, err := s.db.Beginx()
 	if err != nil {
@@ -401,13 +386,13 @@ func (s *RoundInsertService) insertActiveRound(
 // row is updated in place, so the same fees can be persisted both while the round is
 // an active snapshot and again when it is closed. It is a no-op when fees is empty.
 func upsertFundingFees(
-	ctx context.Context, tx *sqlx.Tx, driverName string, fees []FundingFeeRecord,
+	ctx context.Context, tx *sqlx.Tx, driverName string, fees []FundingFee,
 ) error {
 	if len(fees) == 0 {
 		return nil
 	}
 
-	colNames, _ := extractDBColumns(FundingFeeRecord{})
+	colNames, _ := extractDBColumns(FundingFee{})
 	feeBuilder := sq.Insert("xfundingv2_funding_fees").Columns(colNames...)
 	for _, fee := range fees {
 		_, values := extractDBColumns(fee)

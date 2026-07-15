@@ -677,10 +677,11 @@ func (r *ArbitrageRound) syncFundingFeeRecords(ctx context.Context, currentTime 
 			switch income.IncomeType {
 			case binanceapi.FuturesIncomeFundingFee:
 				record := FundingFee{
-					Asset:  income.Asset,
-					Amount: income.Income,
-					Txn:    income.TranId,
-					Time:   income.Time.Time(),
+					RoundID: r.syncState.ID,
+					Asset:   income.Asset,
+					Amount:  income.Income,
+					Txn:     income.TranId,
+					Time:    income.Time.Time(),
 				}
 				r.syncState.FundingFeeRecords[income.TranId] = record
 			}
@@ -1190,6 +1191,13 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 func (r *ArbitrageRound) setReady(currentTime time.Time) {
 	if !r.syncState.ReadyAt.IsZero() {
 		return
+	}
+
+	if oriOrder := r.spotWorker.syncAndResetActiveOrder(); oriOrder != nil {
+		r.logger.Debugf("[setReady] reseting spot order: %s", oriOrder)
+	}
+	if oriOrder := r.futuresWorker.syncAndResetActiveOrder(); oriOrder != nil {
+		r.logger.Debugf("[setReady] reseting futures order: %s", oriOrder)
 	}
 	r.syncState.State = RoundReady
 	r.syncState.ReadyAt = currentTime
