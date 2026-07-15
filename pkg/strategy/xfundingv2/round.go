@@ -57,6 +57,8 @@ type ArbitrageRound struct {
 	lastRebalanceTime time.Time
 	rebalanceInterval time.Duration
 
+	lastFundingIncomeSyncTime time.Time
+
 	futuresService                                FuturesService
 	spotExchangeFeeRates, futuresExchangeFeeRates map[types.ExchangeName]types.ExchangeFee
 
@@ -635,6 +637,11 @@ func (r *ArbitrageRound) syncFundingFeeRecords(ctx context.Context, currentTime 
 		)
 	}
 
+	syncDuration := time.Duration(r.syncState.FundingIntervalHours/2) * time.Hour
+	if !r.lastFundingIncomeSyncTime.IsZero() && currentTime.Sub(r.lastFundingIncomeSyncTime) <= syncDuration {
+		return nil
+	}
+	r.lastFundingIncomeSyncTime = currentTime
 	q := batch.BinanceFuturesIncomeBatchQuery{
 		BinanceFuturesIncomeHistoryService: r.futuresService,
 	}
@@ -744,12 +751,10 @@ func (r *ArbitrageRound) doRetryTransfers(currentTime time.Time) {
 		switch transfer.Direction {
 		case types.TransferOut:
 			// the round should be in closing state
-			futuresBalance := r.futuresSession.Account.Balances()
-			r.handleFuturesTradeForClose(transfer.Trade, futuresBalance, currentTime)
+			r.handleFuturesTradeForClose(transfer.Trade, r.futuresSession.Account, currentTime)
 		case types.TransferIn:
 			// the round should be in opening state
-			spotBalance := r.spotSession.Account.Balances()
-			r.handleSpotTradeForOpen(transfer.Trade, spotBalance, currentTime)
+			r.handleSpotTradeForOpen(transfer.Trade, r.spotSession.Account, currentTime)
 		default:
 			r.logger.Warnf("unknown transfer direction for retry: %s", transfer.Direction)
 		}
@@ -761,7 +766,7 @@ func (r *ArbitrageRound) SetRetryDuration(d time.Duration) {
 }
 
 // HandleSpotTrade handles a spot trade, including update filled position, transfer collateral and sync futures position if the round is opening.
-func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, spotBalance types.BalanceMap, currentTime time.Time) {
+func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, spotAccount *types.Account, currentTime time.Time) {
 	// lock the round to ensure the state is updated correctly when receiving trade updates from spot worker
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -774,7 +779,7 @@ func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, spotBalance types.Ba
 
 	if r.syncState.State == RoundOpening {
 		r.logger.Infof("handling spot trade (open): %s", trade)
-		r.handleSpotTradeForOpen(trade, spotBalance, currentTime)
+		r.handleSpotTradeForOpen(trade, spotAccount, currentTime)
 	} else {
 		// the round is ready or closing, just log the spot trade
 		r.logger.Infof("received spot trade: %s", trade)
@@ -784,7 +789,7 @@ func (r *ArbitrageRound) HandleSpotTrade(trade types.Trade, spotBalance types.Ba
 // handleSpotTradeForOpen is the mirror of handleFuturesTradeForClose: during opening, spot is the leader.
 // After each spot fill, the futures position is synced to keep delta-neutral and the collateral asset is
 // transferred to futures so the futures leg can use it as collateral for its offsetting trade.
-func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotBalance types.BalanceMap, currentTime time.Time) {
+func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotAccount *types.Account, currentTime time.Time) {
 	// move the collateral asset received from the spot fill onto the futures
 	// account so the futures leg can use it as margin.
 	transferAmount := r.syncState.DirectionPolicy.TransferAmountFromSpotTrade(trade)
@@ -798,15 +803,20 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotBalance t
 	if trade.FeeCurrency == asset {
 		transferAmount = transferAmount.Sub(trade.Fee)
 	}
-	available := spotBalance[asset].Available
+	available := spotAccount.Balances()[asset].Available
 	if !available.IsZero() {
 		transferAmount = fixedpoint.Min(transferAmount, available)
 	}
 
 	if transferAmount.Sign() <= 0 {
-		// nothing left to transfer (e.g. fees ate the entire fill)
+		// nothing left to transfer (may have been transferred by rebalancing)
 		r.logger.Warnf("no collateral asset available to transfer to futures: %s (available: %s %s)", trade.Symbol, available, asset)
+		// consider the transfer succeeded -> delete the retry task and sync the futures position
 		delete(r.syncState.RetryTransfers, trade.ID)
+		if _, found := r.syncState.SyncedSpotTrades[trade.ID]; !found {
+			r.syncFuturesPosition(trade)
+			r.syncState.SyncedSpotTrades[trade.ID] = struct{}{}
+		}
 		return
 	}
 
@@ -848,7 +858,7 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotBalance t
 }
 
 // HandleFuturesTrade handles a futures trade, including update filled position, transfer collateral and sync spot position if the round is closing.
-func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, futuresBalance types.BalanceMap, currentTime time.Time) {
+func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, futuresAccount *types.Account, currentTime time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -859,7 +869,7 @@ func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, futuresBalance ty
 
 	if r.syncState.State == RoundClosing {
 		r.logger.Infof("handling future trade (closing): %s", trade)
-		r.handleFuturesTradeForClose(trade, futuresBalance, currentTime)
+		r.handleFuturesTradeForClose(trade, futuresAccount, currentTime)
 	} else {
 		// the round is opening or ready, just log the futures trade
 		r.logger.Infof("received futures trade: %s", trade)
@@ -900,7 +910,12 @@ func handleOrderUpdate(twapWorker *TWAPWorker, update types.Order) {
 // closing, futures is the leader. After each futures fill reduces the position,
 // the freed collateral asset is transferred back to spot and the spot worker's
 // target is advanced so it can execute its offsetting trade with that asset.
-func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresBalance types.BalanceMap, currentTime time.Time) {
+func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresAccount *types.Account, currentTime time.Time) {
+	if !bbgo.IsBackTesting {
+		// simple hack: wait for 5 seconds to let the futures account update its balance if it's not a backtesting environment.
+		// this would make the available withdraw amount to reflect the trade fill
+		time.Sleep(5 * time.Second)
+	}
 	// transfer the freed collateral asset back to spot so the spot leg can use it to close its position.
 	transferAmount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
 	asset := r.syncState.DirectionPolicy.CollateralAsset()
@@ -908,7 +923,8 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresBa
 	if asset == trade.FeeCurrency {
 		transferAmount = transferAmount.Sub(trade.Fee)
 	}
-	if w := futuresBalance[asset].MaxWithdrawAmount; w != nil {
+	// read the balance after the delay above so the max withdraw amount reflects the trade fill.
+	if w := futuresAccount.Balances()[asset].MaxWithdrawAmount; w != nil {
 		r.logger.Debugf("max withdraw amount on futures account: %s %s", w.String(), asset)
 		transferAmount = fixedpoint.Min(transferAmount, *w)
 	}
@@ -918,6 +934,11 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresBa
 		// remove from retry list if exists
 		r.logger.Warnf("no collateral asset available to transfer back to spot: %s", asset)
 		delete(r.syncState.RetryTransfers, trade.ID)
+		// consider the transfer succeeded and sync the spot position
+		if _, found := r.syncState.SyncedFuturesTrades[trade.ID]; !found {
+			r.syncSpotPosition(trade)
+			r.syncState.SyncedFuturesTrades[trade.ID] = struct{}{}
+		}
 		return
 	}
 
@@ -1176,10 +1197,12 @@ func (r *ArbitrageRound) Cleanup(ctx context.Context, orderBook types.OrderBook)
 	}
 	w := r.futuresWorker
 	remaining := w.RemainingQuantity()
+	r.logger.Debugf("[Cleanup] remaining futures quantity: %s", remaining)
 	if remaining.IsZero() {
 		return nil
 	}
 
+	r.logger.Infof("[Cleanup] closing remaining futures position: %s", remaining)
 	midPrice := getMidPrice(orderBook)
 	market := w.Market()
 	if market.IsDustQuantity(remaining.Abs(), midPrice) {
@@ -1209,8 +1232,12 @@ func (r *ArbitrageRound) Cleanup(ctx context.Context, orderBook types.OrderBook)
 		return fmt.Errorf("[CloseFuturesPosition] failed to wait for closing order trades: %w", err)
 	}
 	risks, err := r.futuresService.QueryPositionRisk(timedCtx, r.FuturesSymbol())
-	if err != nil || len(risks) == 0 {
+	if err != nil {
 		return fmt.Errorf("[CloseFuturesPosition] failed to query position risk after closing order filled: %w", err)
+	}
+	if len(risks) == 0 {
+		// no position
+		return nil
 	}
 	risk := risks[0]
 	if !risk.PositionAmount.IsZero() {
@@ -1469,29 +1496,31 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 	timedCtx, cancel := context.WithTimeout(ctx, time.Second*20)
 	defer cancel()
 
+	r.logger.Debugf("rebalance closing round: %s", r.SpotSymbol())
+
 	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
 	if shortFutures {
 		spotAccount, err := r.spotSession.UpdateAccount(timedCtx)
 		if err != nil {
 			return fmt.Errorf("failed to update spot account: %w", err)
 		}
+		futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
+		if err != nil {
+			return fmt.Errorf("failed to update futures account: %w", err)
+		}
 		// rebalance the short futures leg for negative unrealized PnL
 		// negative unrealized PnL will lock available collateral on futures account and prevent us to transfer out the asset back to spot account.
 		// Overtime, it may cause an unexpected position risk on overall positions, both spot and futures.
-		risks, err := r.futuresService.QueryPositionRisk(ctx, r.FuturesSymbol())
-		if err != nil || len(risks) == 0 {
-			return fmt.Errorf("failed to query position risk: %w", err)
-		}
-		risk := risks[0]
-		futuresMarket := r.futuresWorker.Market()
-		spotMarket := r.spotWorker.Market()
+		// We check the net balance of the quote asset on futures account and transfer from spot account to futures account if it's negative.
 		baseAsset := r.CollateralAsset()
+		futuresMarket := r.futuresWorker.Market()
 		quoteAsset := futuresMarket.QuoteCurrency
-		// rebalance the short futures leg for negative unrealized PnL
-		r.logger.Debugf("round %s unrealized PnL: %s", r.SpotSymbol(), risk.UnrealizedPnL)
-		if risk.UnrealizedPnL.Sign() < 0 {
+		r.logger.Debugf("base asset: %s, quote asset: %s", baseAsset, quoteAsset)
+		if b, ok := futuresAccount.Balance(quoteAsset); ok && b.Net().Sign() < 0 {
+			// rebalance the short futures leg for negative net quote asset balance
+			spotMarket := r.spotWorker.Market()
 			// transfer 105% of the unrealized PnL from spot to futures to cover the loss
-			transferAmount := risk.UnrealizedPnL.Abs().Mul(fixedpoint.NewFromFloat(1.05))
+			transferAmount := b.Net().Abs().Mul(fixedpoint.NewFromFloat(1.05))
 			transferAmount = spotMarket.TruncateQuantity(transferAmount)
 			spotBalance := spotAccount.Balances()[quoteAsset]
 			spotAvailable := spotBalance.Available
@@ -1508,27 +1537,28 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		// if the expected transfer amount is larger than the accumulated one, transfer the difference back to spot
 		// NOTE: need to check the max withdraw
 		// update futures account info for the latest max withdraw amount
-		futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
-		if err != nil {
-			return fmt.Errorf("failed to update futures account: %w", err)
-		}
 		accTransferOut := r.syncState.TransferOutAmount
 		expectedTransferOut := fixedpoint.Zero
 		for _, trade := range r.futuresWorker.Executor().AllTrades() {
-			if trade.Side != types.SideTypeSell {
+			// consider only the closing trades, which are buy trades for short futures leg
+			if trade.Side != types.SideTypeBuy {
 				continue
 			}
 			amount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
 			expectedTransferOut = expectedTransferOut.Add(amount)
 		}
 		transferDiff := expectedTransferOut.Sub(accTransferOut)
+		r.logger.Debugf("rebalance closing: expected transfer out amount: %s, actual transfer out amount: %s, diff: %s",
+			expectedTransferOut,
+			accTransferOut,
+			transferDiff,
+		)
 		futuresBalance := futuresAccount.Balances()[baseAsset]
 		maxWithdraw := futuresBalance.MaxWithdrawAmount
 		if maxWithdraw != nil && maxWithdraw.Sign() > 0 {
 			transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
 		}
 		if transferDiff.Sign() <= 0 {
-			r.logger.Debugf("transferDiff: %s", transferDiff)
 			return nil
 		}
 		// 3. transfer the base asset from futures to spot
