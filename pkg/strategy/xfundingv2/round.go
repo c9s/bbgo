@@ -416,6 +416,14 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 		)
+	case RoundClosed:
+		fields = append(fields,
+			slack.AttachmentField{
+				Title: "Closed Time",
+				Value: n.syncState.ClosedAt.Format(time.RFC3339),
+				Short: true,
+			},
+		)
 	}
 	var spotAvgCost, futuresAvgCost fixedpoint.Value
 	if n.hasStarted() {
@@ -495,11 +503,6 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 func realizedPnLFields(realizedPnL *RoundRealizedPnL) []slack.AttachmentField {
 	return []slack.AttachmentField{
 		{
-			Title: "Funding Income",
-			Value: realizedPnL.FundingIncome.String(),
-			Short: true,
-		},
-		{
 			Title: "Spot PnL",
 			Value: fmt.Sprintf(
 				"%s (Net %s)",
@@ -516,9 +519,14 @@ func realizedPnLFields(realizedPnL *RoundRealizedPnL) []slack.AttachmentField {
 			Short: true,
 		},
 		{
+			Title: "Funding Income",
+			Value: realizedPnL.FundingIncome.String(),
+			Short: true,
+		},
+		{
 			Title: "Total Net PnL",
 			Value: realizedPnL.NetPnL().String(),
-			Short: false,
+			Short: true,
 		},
 	}
 }
@@ -526,13 +534,23 @@ func realizedPnLFields(realizedPnL *RoundRealizedPnL) []slack.AttachmentField {
 func unrealizedPnLFields(unrealizedPnL *RoundUnrealizedPnL) []slack.AttachmentField {
 	return []slack.AttachmentField{
 		{
-			Title: "Unrealized Total Spot PnL",
-			Value: unrealizedPnL.TotalSpotPnL().String(),
+			Title: "Unrealized Spot PnL",
+			Value: unrealizedPnL.UnrealizedSpotPnL.String(),
 			Short: true,
 		},
 		{
-			Title: "Unrealized Total Futures PnL",
-			Value: unrealizedPnL.TotalFuturesPnL().String(),
+			Title: "Realized Spot Net PnL",
+			Value: unrealizedPnL.SpotProfitStats.AccumulatedNetProfit.String(),
+			Short: true,
+		},
+		{
+			Title: "Unrealized Futures PnL",
+			Value: unrealizedPnL.UnrealizedFuturesPnL.String(),
+			Short: true,
+		},
+		{
+			Title: "Realized Futures Net PnL",
+			Value: unrealizedPnL.FuturesProfitStats.AccumulatedNetProfit.String(),
 			Short: true,
 		},
 		{
@@ -541,7 +559,7 @@ func unrealizedPnLFields(unrealizedPnL *RoundUnrealizedPnL) []slack.AttachmentFi
 			Short: true,
 		},
 		{
-			Title: "Unrealized Total PnL",
+			Title: "Total PnL",
 			Value: unrealizedPnL.TotalPnL().String(),
 			Short: true,
 		},
