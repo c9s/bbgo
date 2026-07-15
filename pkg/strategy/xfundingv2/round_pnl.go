@@ -19,9 +19,7 @@ type RoundRealizedPnL struct {
 
 func (p *RoundRealizedPnL) SlackAttachment() slack.Attachment {
 	totalNetPnL := p.FundingIncome.Add(
-		p.SpotProfitStats.AccumulatedNetProfit,
-	).Add(
-		p.FuturesProfitStats.AccumulatedNetProfit,
+		p.NetPnL(),
 	)
 	color := style.PnLColor(totalNetPnL)
 	return slack.Attachment{
