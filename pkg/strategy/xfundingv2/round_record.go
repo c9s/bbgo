@@ -149,7 +149,7 @@ func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (Closed
 		FuturesNetPnL: pnl.FuturesProfitStats.AccumulatedNetProfit,
 		NetPnL:        pnl.NetPnL(),
 
-		NumHoldingIntervals: round.NumHoldingIntervals(round.LastUpdateTime()),
+		NumHoldingIntervals: round.NumHoldingIntervals(round.ClosedAt()),
 
 		StartAt:   round.StartAt(),
 		ReadyAt:   readyTime,
