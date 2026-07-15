@@ -665,14 +665,16 @@ func (r *ArbitrageRound) syncFundingFeeRecords(ctx context.Context, currentTime 
 	}
 	symbol := r.futuresWorker.Symbol()
 	dataC, errC := q.Query(ctx, symbol, binanceapi.FuturesIncomeFundingFee, r.syncState.StartAt, currentTime)
-	for {
+	shouldContinue := true
+	for shouldContinue {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 
 		case income, ok := <-dataC:
 			if !ok {
-				return nil
+				shouldContinue = false
+				continue
 			}
 			switch income.IncomeType {
 			case binanceapi.FuturesIncomeFundingFee:
@@ -687,13 +689,16 @@ func (r *ArbitrageRound) syncFundingFeeRecords(ctx context.Context, currentTime 
 			}
 		case err, ok := <-errC:
 			if !ok {
-				return nil
+				shouldContinue = false
+				continue
 			}
 
 			return err
 
 		}
 	}
+	r.logger.Debugf("synced funding fee records: %+v", r.syncState.FundingFeeRecords)
+	return nil
 }
 
 func (r *ArbitrageRound) Start(ctx context.Context,
