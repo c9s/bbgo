@@ -913,6 +913,11 @@ func handleOrderUpdate(twapWorker *TWAPWorker, update types.Order) {
 // the freed collateral asset is transferred back to spot and the spot worker's
 // target is advanced so it can execute its offsetting trade with that asset.
 func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresBalance types.BalanceMap, currentTime time.Time) {
+	if !bbgo.IsBackTesting {
+		// simple hack: wait for 5 seconds to let the futures account update its balance if it's not a backtesting environment.
+		// this would make the available withdraw amount to reflect the trade fill
+		time.Sleep(5 * time.Second)
+	}
 	// transfer the freed collateral asset back to spot so the spot leg can use it to close its position.
 	transferAmount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
 	asset := r.syncState.DirectionPolicy.CollateralAsset()
