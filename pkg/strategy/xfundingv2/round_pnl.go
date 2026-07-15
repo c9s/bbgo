@@ -41,6 +41,13 @@ func (p *RoundRealizedPnL) NetPnL() fixedpoint.Value {
 		p.FuturesProfitStats.AccumulatedNetProfit,
 	)
 }
+
+func (p *RoundRealizedPnL) TotalPnL() fixedpoint.Value {
+	return p.FundingIncome.Add(
+		p.NetPnL(),
+	)
+}
+
 func (r *ArbitrageRound) RealizedPnL() *RoundRealizedPnL {
 	r.mu.Lock()
 	defer r.mu.Unlock()

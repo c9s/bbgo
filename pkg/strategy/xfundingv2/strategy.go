@@ -1619,7 +1619,7 @@ func (s *Strategy) closedRoundStats(round *ArbitrageRound, tickTime time.Time) {
 	pnl := round.RealizedPnL()
 	bbgo.Notify("Round Realized PnL %s", round.SpotSymbol(), pnl)
 	if breaker, found := s.CircuitBreakers[round.SpotSymbol()]; found {
-		breaker.RecordProfit(pnl.NetPnL(), tickTime)
+		breaker.RecordProfit(pnl.TotalPnL(), tickTime)
 	} else {
 		s.logger.Warnf("circuit breaker not found for symbol %s when recording profit: %s", round.SpotSymbol(), pnl)
 	}
