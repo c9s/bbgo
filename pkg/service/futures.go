@@ -8,9 +8,15 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/jmoiron/sqlx"
 )
+
+type ExchangeFuturesService interface {
+	types.ExchangeRiskService
+	types.ExchangeFundingFeeService
+}
 
 type FuturesService struct {
 	DB                         *sqlx.DB
@@ -27,7 +33,7 @@ func NewFuturesService(db *sqlx.DB) *FuturesService {
 }
 
 func (s *FuturesService) QueryPositionsAndInsert(
-	ctx context.Context, exchange types.ExchangeRiskService, currentTime time.Time, symbol ...string) error {
+	ctx context.Context, exchange ExchangeFuturesService, currentTime time.Time, symbol ...string) error {
 	symbolStr := "*"
 	if len(symbol) > 0 {
 		// sort to ensure the symbolStr is the same for the same set of symbols
@@ -59,7 +65,7 @@ func (s *FuturesService) QueryPositionsAndInsert(
 
 	for _, risk := range risks {
 		risk.UpdateTime = types.MillisecondTimestamp(time.Now())
-		if err := s.Insert(risk); err != nil {
+		if err := s.InsertPositionRisk(risk); err != nil {
 			return fmt.Errorf("failed to insert position risk (%+v): %w", risk, err)
 		}
 	}
@@ -73,7 +79,7 @@ type QueryFuturesPositionRiskOptions struct {
 }
 
 func (s *FuturesService) Sync(
-	ctx context.Context, service types.ExchangeRiskService, symbol string,
+	ctx context.Context, service ExchangeFuturesService, symbol string, startTime, endTime time.Time,
 ) error {
 	// TODO: sync the position history of the given time range
 	// we only sync the lastest position risk record for now.
@@ -82,19 +88,47 @@ func (s *FuturesService) Sync(
 	if err != nil {
 		return fmt.Errorf("failed to query position risk: %w", err)
 	}
-	if len(risks) == 0 {
-		return nil
+	if len(risks) > 0 {
+		risk := risks[0]
+		risk.UpdateTime = types.MillisecondTimestamp(time.Now())
+		if err := s.InsertPositionRisk(risk); err != nil {
+			return fmt.Errorf("failed to insert position risk (%+v): %w", risk, err)
+		}
 	}
 
-	risk := risks[0]
-	risk.UpdateTime = types.MillisecondTimestamp(time.Now())
-	if err := s.Insert(risk); err != nil {
-		return fmt.Errorf("failed to insert position risk (%+v): %w", risk, err)
+	// sync the funding fee history
+	query := batch.FuturesFundingFeeBatchQuery{
+		ExchangeFundingFeeService: service,
+	}
+	feeC, errC := query.Query(ctx, symbol, startTime, endTime)
+	keepRunning := true
+	for keepRunning {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case fee, ok := <-feeC:
+			if !ok {
+				keepRunning = false
+				continue
+			}
+
+			if err := s.InsertFundingFee(fee); err != nil {
+				return fmt.Errorf("failed to insert funding fee (%+v): %w", fee, err)
+			}
+		case err, ok := <-errC:
+			if !ok {
+				keepRunning = false
+				continue
+			}
+			if err != nil {
+				return fmt.Errorf("failed to query funding fee: %w", err)
+			}
+		}
 	}
 	return nil
 }
 
-func (s *FuturesService) Query(options QueryFuturesPositionRiskOptions) ([]types.PositionRisk, error) {
+func (s *FuturesService) QueryPositionRisks(options QueryFuturesPositionRiskOptions) ([]types.PositionRisk, error) {
 	builder := sq.
 		Select("*").
 		From("futures_position_risks").
@@ -123,7 +157,7 @@ func (s *FuturesService) Query(options QueryFuturesPositionRiskOptions) ([]types
 	return risks, nil
 }
 
-func (s *FuturesService) Insert(risk types.PositionRisk) (err error) {
+func (s *FuturesService) InsertPositionRisk(risk types.PositionRisk) (err error) {
 	sql := `
 	INSERT INTO futures_position_risks (
 		exchange, symbol, position_side, entry_price, leverage, liquidation_price,
@@ -145,5 +179,69 @@ func (s *FuturesService) Insert(risk types.PositionRisk) (err error) {
 	}
 
 	_, err = s.DB.NamedExec(sql, risk)
+	return err
+}
+
+type QueryFundingFeeOptions struct {
+	Exchange  string
+	Symbol    string
+	StartTime *time.Time
+	EndTime   *time.Time
+}
+
+func (s *FuturesService) QueryFundingFeeHistory(
+	ctx context.Context, options QueryFundingFeeOptions,
+) ([]types.FundingFee, error) {
+	builder := sq.
+		Select("*").
+		From("funding_fees").
+		Where(sq.Eq{"exchange": options.Exchange, "symbol": options.Symbol}).
+		OrderBy("time DESC")
+
+	if options.StartTime != nil {
+		builder = builder.Where(sq.GtOrEq{"time": *options.StartTime})
+	}
+	if options.EndTime != nil {
+		builder = builder.Where(sq.LtOrEq{"time": *options.EndTime})
+	}
+
+	sql, args, err := builder.ToSql()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.DB.NamedQuery(sql, args)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var fees []types.FundingFee
+	for rows.Next() {
+		var fee types.FundingFee
+		if err := rows.StructScan(&fee); err != nil {
+			return nil, err
+		}
+
+		fees = append(fees, fee)
+	}
+
+	return fees, nil
+}
+
+func (s *FuturesService) InsertFundingFee(fee types.FundingFee) error {
+	sql := `
+	INSERT INTO funding_fees (
+		exchange, symbol, asset, amount, txn, time
+	) VALUES (
+		:exchange, :symbol, :asset, :amount, :txn, :time
+	)`
+
+	if s.DB.DriverName() == "mysql" {
+		sql = fmt.Sprintf(`%s
+		ON DUPLICATE KEY UPDATE exchange=:exchange, symbol=:symbol, txn=:txn`,
+			sql)
+	}
+
+	_, err := s.DB.NamedExec(sql, fee)
 	return err
 }

@@ -207,6 +207,10 @@ type ExchangeRiskService interface {
 	QueryPositionRisk(ctx context.Context, symbol ...string) ([]PositionRisk, error)
 }
 
+type ExchangeFundingFeeService interface {
+	QueryFundingFeeHistory(ctx context.Context, symbol string, startTime, endTime *time.Time) ([]FundingFee, error)
+}
+
 // TradeQueryOptions defines the parameters for querying historical trades from exchanges.
 //
 // Time Range Requirements:

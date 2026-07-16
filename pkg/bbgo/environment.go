@@ -428,7 +428,7 @@ func (environ *Environment) BindSync(config *SyncConfig) {
 		}
 	}
 
-	futuresPositionWriterCreator := func(ex types.ExchangeRiskService) func(types.Trade) {
+	futuresPositionWriterCreator := func(ex service.ExchangeFuturesService) func(types.Trade) {
 		return func(trade types.Trade) {
 			if !(trade.IsFutures || trade.IsIsolated) {
 				return
@@ -477,7 +477,7 @@ func (environ *Environment) BindSync(config *SyncConfig) {
 				)
 				continue
 			}
-			if ex, ok := session.Exchange.(types.ExchangeRiskService); ok {
+			if ex, ok := session.Exchange.(service.ExchangeFuturesService); ok {
 				futuresPositionWriter := futuresPositionWriterCreator(ex)
 				session.UserDataStream.OnTradeUpdate(futuresPositionWriter)
 			}
