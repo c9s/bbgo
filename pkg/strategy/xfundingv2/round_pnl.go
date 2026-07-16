@@ -153,10 +153,10 @@ func (r *RoundUnrealizedPnL) TotalFuturesPnL() fixedpoint.Value {
 	return r.FuturesProfitStats.AccumulatedNetProfit.Add(r.UnrealizedFuturesPnL)
 }
 
-// TotalPnL returns realized net PnL (spot + futures) plus the current
+// TotalPnL returns realized net PnL (spot + futures + realized funding income) plus the current
 // unrealized PnL of both open legs.
 func (p *RoundUnrealizedPnL) TotalPnL() fixedpoint.Value {
-	return p.NetPnL().Add(p.UnrealizedSpotPnL).Add(p.UnrealizedFuturesPnL)
+	return p.RoundRealizedPnL.TotalPnL().Add(p.UnrealizedSpotPnL).Add(p.UnrealizedFuturesPnL)
 }
 
 // legUnrealizedPnL marks one leg to market. Base is signed, so the PnL is simply
