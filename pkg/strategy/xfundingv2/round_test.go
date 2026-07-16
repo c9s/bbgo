@@ -115,6 +115,7 @@ func newTestArbitrageRound(t *testing.T, ctrl *gomock.Controller, fundingInterva
 		types.ExchangeBinance, types.ExchangeBinance,
 		minHoldingIntervals, fundingIntervalHours, Number(3), spotWorker, futuresWorker, mockService,
 		types.PositionShort, time.Minute)
+	round.SetLogger(logrus.WithField("test", "round_test"))
 	return round, mockService
 }
 
