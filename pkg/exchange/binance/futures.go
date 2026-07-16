@@ -568,6 +568,31 @@ func (e *Exchange) QueryFuturesIncomeHistory(
 	return resp, err
 }
 
+func (e *Exchange) QueryFundingFeeHistory(
+	ctx context.Context, symbol string, startTime, endTime *time.Time,
+) ([]types.FundingFee, error) {
+	resp, err := e.QueryFuturesIncomeHistory(
+		ctx, symbol, binanceapi.FuturesIncomeFundingFee, startTime, endTime,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var fundingFees []types.FundingFee
+	for _, income := range resp {
+		fundingFees = append(fundingFees, types.FundingFee{
+			Exchange: e.Name(),
+			Symbol:   income.Symbol,
+			Asset:    income.Asset,
+			Amount:   income.Income,
+			Txn:      income.TranId,
+			Time:     income.Time.Time(),
+		})
+	}
+
+	return fundingFees, nil
+}
+
 func (e *Exchange) SetLeverage(ctx context.Context, symbol string, leverage int) error {
 	if e.IsFutures {
 		_, err := e.futuresClient2.NewFuturesChangeInitialLeverageRequest().
