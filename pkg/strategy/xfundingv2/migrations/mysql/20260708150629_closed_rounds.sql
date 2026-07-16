@@ -32,7 +32,8 @@ CREATE TABLE `xfundingv2_closed_rounds`
     `ready_at`              DATETIME(3)        NULL,
     `closing_at`            DATETIME(3)        NOT NULL,
     `closed_at`             DATETIME(3)        NOT NULL,
-    `inserted_at`             DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+
+    `inserted_at`           DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) NOT NULL,
 
     PRIMARY KEY (`gid`),
     KEY `idx_xfundingv2_closed_rounds_instance` (`strategy_instance_id`),
@@ -50,7 +51,8 @@ CREATE TABLE `xfundingv2_funding_fees`
     `amount`     DECIMAL(20, 8)     NOT NULL DEFAULT 0,
     `txn`        BIGINT             NOT NULL DEFAULT 0,
     `time`       DATETIME(3)        NOT NULL,
-    `inserted_at`             DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+
+    `inserted_at` DATETIME(3)       DEFAULT CURRENT_TIMESTAMP(3) NOT NULL,
 
     PRIMARY KEY (`gid`),
     KEY `idx_xfundingv2_funding_fees_round_id` (`round_id`)

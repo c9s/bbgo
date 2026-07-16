@@ -44,7 +44,7 @@ CREATE TABLE `xfundingv2_round_snapshots`
     `total_futures_net_pnl`   DECIMAL(20, 8)  NOT NULL DEFAULT 0,
     `total_net_pnl`           DECIMAL(20, 8)  NOT NULL DEFAULT 0,
 
-    `inserted_at`             DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    `inserted_at`             DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) NOT NULL,
 
     PRIMARY KEY (`gid`),
     KEY `idx_xfundingv2_round_snapshots_instance` (`strategy_instance_id`)

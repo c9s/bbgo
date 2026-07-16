@@ -44,7 +44,7 @@ CREATE TABLE `xfundingv2_round_snapshots`
     `total_futures_net_pnl`   REAL     NOT NULL DEFAULT 0,
     `total_net_pnl`           REAL     NOT NULL DEFAULT 0,
 
-    `inserted_at`             DATETIME   DEFAULT CURRENT_TIMESTAMP NOT NULL
+    `inserted_at`             DATETIME(3)   DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 -- +end
 
