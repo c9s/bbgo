@@ -1156,15 +1156,22 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 
 		midPrice := getMidPrice(futuresOrderBook)
 		futuresPosition := round.FuturesWorker().FilledPosition()
-		futuresPositionValue := futuresPosition.Mul(midPrice)
-		nextFundingIncome := fundingRate.LastFundingRate.Mul(futuresPosition)
+		futuresPositionNotional := futuresPosition.Abs().Mul(midPrice)
+		// short position -> last funding rate is negative due to the flipped rate
+		// long position -> last funding rate is positive due to the flipped rate
+		// the product of the flipped rate and the position is positive
+		// we need to negate the product to get the next funding income, which should be negative -> expected loss
+		nextFundingIncome := fundingRate.LastFundingRate.Mul(futuresPosition).Neg()
 		unrealizedPnL := round.UnrealizedPnL(spotOrderBook, futuresOrderBook)
-		// unrealizedNetPnL = unrealizedPnL + the funding income for holding the position till the current interval ends
-		unrealizedNetPnL := unrealizedPnL.TotalPnL().Add(nextFundingIncome)
-		// the unrealized PnL is positive or the unrealized net PnL is below the max closing loss ratio, transit to closing
+		unrealizedTotalPnL := unrealizedPnL.TotalPnL()
+		// the unrealized PnL is positive or the expected unrealized net PnL is below the max closing loss ratio, transit to closing
 		// That is, we will close the round either when there is profit or the estimated loss is too large
 		// NOTE: MaxClosingLossRatio is negative
-		if unrealizedNetPnL.Sign() > 0 || unrealizedNetPnL.Div(futuresPositionValue).Compare(s.MaxClosingLossRatio) < 0 {
+		if unrealizedTotalPnL.Sign() > 0 || unrealizedTotalPnL.Add(nextFundingIncome).Div(futuresPositionNotional).Compare(s.MaxClosingLossRatio) < 0 {
+			s.logger.Debugf(
+				"[transitOpeningOrReadyRound %s] unrealized total PnL: %s, next funding income: %s, futures position notional: %s, max closing loss ratio: %s",
+				unrealizedTotalPnL, nextFundingIncome, futuresPositionNotional, s.MaxClosingLossRatio,
+			)
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound %s] transit state %s -> closing, current funding rate %s: %s",
 				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round)
