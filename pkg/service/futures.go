@@ -129,16 +129,17 @@ func (s *FuturesService) Sync(
 }
 
 func (s *FuturesService) QueryPositionRisks(options QueryFuturesPositionRiskOptions) ([]types.PositionRisk, error) {
+	columns := fieldsNamesOf(types.PositionRisk{})
 	builder := sq.
-		Select("*").
+		Select(columns...).
 		From("futures_position_risks").
 		Where(sq.Eq{"exchange": options.Exchange, "symbol": options.Symbol}).
-		OrderBy("update_time DESC")
+		OrderBy("updated_at DESC")
 	sql, args, err := builder.ToSql()
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.DB.NamedQuery(sql, args)
+	rows, err := s.DB.Queryx(sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -189,11 +190,10 @@ type QueryFundingFeeOptions struct {
 	EndTime   *time.Time
 }
 
-func (s *FuturesService) QueryFundingFeeHistory(
-	ctx context.Context, options QueryFundingFeeOptions,
-) ([]types.FundingFee, error) {
+func (s *FuturesService) QueryFundingFeeHistory(options QueryFundingFeeOptions) ([]types.FundingFee, error) {
+	columns := fieldsNamesOf(types.FundingFee{})
 	builder := sq.
-		Select("*").
+		Select(columns...).
 		From("funding_fees").
 		Where(sq.Eq{"exchange": options.Exchange, "symbol": options.Symbol}).
 		OrderBy("time DESC")
@@ -209,7 +209,7 @@ func (s *FuturesService) QueryFundingFeeHistory(
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.DB.NamedQuery(sql, args)
+	rows, err := s.DB.Queryx(sql, args...)
 	if err != nil {
 		return nil, err
 	}
