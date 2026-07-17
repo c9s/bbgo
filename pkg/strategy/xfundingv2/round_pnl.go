@@ -56,14 +56,15 @@ func (r *ArbitrageRound) RealizedPnL() *RoundRealizedPnL {
 }
 
 func (r *ArbitrageRound) realizedPnL() *RoundRealizedPnL {
-
 	fundingIncome := r.totalFundingIncome()
 
 	spotMarket := r.spotWorker.Market()
 	futuresMarket := r.futuresWorker.Market()
 
 	spotPosition := types.NewPositionFromMarket(spotMarket)
+	spotPosition.UseExcludeFeeFromCostMode()
 	futuresPosition := types.NewPositionFromMarket(futuresMarket)
+	futuresPosition.UseExcludeFeeFromCostMode()
 	if r.spotExchangeFeeRates != nil {
 		spotPosition.ExchangeFeeRates = r.spotExchangeFeeRates
 	}
