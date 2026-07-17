@@ -266,6 +266,8 @@ type ActiveRoundRecord struct {
 	TotalNetPnL        fixedpoint.Value `db:"total_net_pnl"`
 	TotalSpotNetPnL    fixedpoint.Value `db:"total_spot_net_pnl"`
 	TotalFuturesNetPnL fixedpoint.Value `db:"total_futures_net_pnl"`
+
+	StartAt time.Time `db:"start_at"`
 }
 
 // newActiveRoundRecord builds a point-in-time snapshot of an active (non-closed)
@@ -317,6 +319,8 @@ func (s *RoundInsertService) newActiveRoundRecord(
 		TotalNetPnL:        pnl.TotalPnL(),
 		TotalSpotNetPnL:    pnl.TotalSpotNetPnL(),
 		TotalFuturesNetPnL: pnl.TotalFuturesNetPnL(),
+
+		StartAt: round.StartAt(),
 	}
 
 	return record, newFundingFeeRecords(round)
