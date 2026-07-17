@@ -524,8 +524,8 @@ func realizedPnLFields(realizedPnL *RoundRealizedPnL) []slack.AttachmentField {
 			Short: true,
 		},
 		{
-			Title: "Total Net PnL",
-			Value: realizedPnL.NetPnL().String(),
+			Title: "Total PnL",
+			Value: realizedPnL.TotalPnL().String(),
 			Short: true,
 		},
 	}
