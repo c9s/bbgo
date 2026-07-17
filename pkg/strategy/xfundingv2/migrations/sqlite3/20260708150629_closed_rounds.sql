@@ -27,11 +27,12 @@ CREATE TABLE `xfundingv2_closed_rounds`
 
     `num_holding_intervals`   INTEGER    NOT NULL DEFAULT 0,
 
-    `start_at`              DATETIME   NOT NULL,
-    `ready_at`              DATETIME   NULL,
-    `closing_at`            DATETIME   NOT NULL,
-    `closed_at`             DATETIME   NOT NULL,
-    `inserted_at`             DATETIME   DEFAULT CURRENT_TIMESTAMP NOT NULL
+    `start_at`              DATETIME(3)   NOT NULL,
+    `ready_at`              DATETIME(3)   NULL,
+    `closing_at`            DATETIME(3)   NOT NULL,
+    `closed_at`             DATETIME(3)   NOT NULL,
+
+    `inserted_at`           DATETIME(3)   DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 -- +end
 

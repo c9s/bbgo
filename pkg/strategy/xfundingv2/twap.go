@@ -296,6 +296,7 @@ func (w *TWAPWorker) syncAndResetActiveOrder() *types.Order {
 	if w.activeOrder == nil {
 		return nil
 	}
+	w.logger.Debugf("[TWAPWorker syncAndResetActiveOrder] sync and reset active order: %s", w.activeOrder)
 
 	if err := w.syncState.TWAPExecutor.SyncOrder(*w.activeOrder); err != nil {
 		w.logger.WithError(err).Warnf("[TWAP syncAndResetActiveOrder] fail to sync active order, resetting: %s", w.activeOrder.String())
@@ -504,6 +505,7 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 	w.logger.Debugf("remaining quantity: %s@%s", remaining, price)
 
 	if deadlineExceeded {
+		w.logger.Debugf("deadline exceeded, placing final order: %s@%s", remaining, price)
 		return remaining
 	}
 

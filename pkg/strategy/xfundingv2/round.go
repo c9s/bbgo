@@ -416,6 +416,14 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 		)
+	case RoundClosed:
+		fields = append(fields,
+			slack.AttachmentField{
+				Title: "Closed Time",
+				Value: n.syncState.ClosedAt.Format(time.RFC3339),
+				Short: true,
+			},
+		)
 	}
 	var spotAvgCost, futuresAvgCost fixedpoint.Value
 	if n.hasStarted() {
@@ -495,11 +503,6 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 func realizedPnLFields(realizedPnL *RoundRealizedPnL) []slack.AttachmentField {
 	return []slack.AttachmentField{
 		{
-			Title: "Funding Income",
-			Value: realizedPnL.FundingIncome.String(),
-			Short: true,
-		},
-		{
 			Title: "Spot PnL",
 			Value: fmt.Sprintf(
 				"%s (Net %s)",
@@ -516,9 +519,14 @@ func realizedPnLFields(realizedPnL *RoundRealizedPnL) []slack.AttachmentField {
 			Short: true,
 		},
 		{
+			Title: "Funding Income",
+			Value: realizedPnL.FundingIncome.String(),
+			Short: true,
+		},
+		{
 			Title: "Total Net PnL",
 			Value: realizedPnL.NetPnL().String(),
-			Short: false,
+			Short: true,
 		},
 	}
 }
@@ -526,13 +534,23 @@ func realizedPnLFields(realizedPnL *RoundRealizedPnL) []slack.AttachmentField {
 func unrealizedPnLFields(unrealizedPnL *RoundUnrealizedPnL) []slack.AttachmentField {
 	return []slack.AttachmentField{
 		{
-			Title: "Unrealized Total Spot PnL",
-			Value: unrealizedPnL.TotalSpotPnL().String(),
+			Title: "Unrealized Spot PnL",
+			Value: unrealizedPnL.UnrealizedSpotPnL.String(),
 			Short: true,
 		},
 		{
-			Title: "Unrealized Total Futures PnL",
-			Value: unrealizedPnL.TotalFuturesPnL().String(),
+			Title: "Realized Spot Net PnL",
+			Value: unrealizedPnL.SpotProfitStats.AccumulatedNetProfit.String(),
+			Short: true,
+		},
+		{
+			Title: "Unrealized Futures PnL",
+			Value: unrealizedPnL.UnrealizedFuturesPnL.String(),
+			Short: true,
+		},
+		{
+			Title: "Realized Futures Net PnL",
+			Value: unrealizedPnL.FuturesProfitStats.AccumulatedNetProfit.String(),
 			Short: true,
 		},
 		{
@@ -541,7 +559,7 @@ func unrealizedPnLFields(unrealizedPnL *RoundUnrealizedPnL) []slack.AttachmentFi
 			Short: true,
 		},
 		{
-			Title: "Unrealized Total PnL",
+			Title: "Total PnL",
 			Value: unrealizedPnL.TotalPnL().String(),
 			Short: true,
 		},
@@ -647,34 +665,40 @@ func (r *ArbitrageRound) syncFundingFeeRecords(ctx context.Context, currentTime 
 	}
 	symbol := r.futuresWorker.Symbol()
 	dataC, errC := q.Query(ctx, symbol, binanceapi.FuturesIncomeFundingFee, r.syncState.StartAt, currentTime)
-	for {
+	shouldContinue := true
+	for shouldContinue {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 
 		case income, ok := <-dataC:
 			if !ok {
-				return nil
+				shouldContinue = false
+				continue
 			}
 			switch income.IncomeType {
 			case binanceapi.FuturesIncomeFundingFee:
 				record := FundingFee{
-					Asset:  income.Asset,
-					Amount: income.Income,
-					Txn:    income.TranId,
-					Time:   income.Time.Time(),
+					RoundID: r.syncState.ID,
+					Asset:   income.Asset,
+					Amount:  income.Income,
+					Txn:     income.TranId,
+					Time:    income.Time.Time(),
 				}
 				r.syncState.FundingFeeRecords[income.TranId] = record
 			}
 		case err, ok := <-errC:
 			if !ok {
-				return nil
+				shouldContinue = false
+				continue
 			}
 
 			return err
 
 		}
 	}
+	r.logger.Debugf("synced funding fee records: %+v", r.syncState.FundingFeeRecords)
+	return nil
 }
 
 func (r *ArbitrageRound) Start(ctx context.Context,
@@ -1035,6 +1059,7 @@ func (r *ArbitrageRound) prepareOpening(
 		if err := r.futuresService.TransferFuturesAccountAsset(ctx, asset, transferDiff, types.TransferIn); err != nil {
 			return fmt.Errorf("failed to transfer in %s %s: %w", transferDiff.String(), asset, err)
 		}
+		r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(transferDiff)
 	}
 	// transfer succeeded, need to sync the futures position to keep delta-neutral
 	targetPosition := r.spotWorker.FilledPosition().Neg()
@@ -1079,20 +1104,21 @@ func (r *ArbitrageRound) prepareClosing(
 	transferDiff := expectedTransferOut.Sub(r.syncState.TransferOutAmount)
 	asset := r.syncState.DirectionPolicy.CollateralAsset()
 	balance := futuresSession.GetAccount().Balances()[asset]
+	maxWithdraw := balance.MaxWithdrawAmount
+	if maxWithdraw != nil {
+		transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
+	}
 	if transferDiff.Sign() > 0 {
-		maxWithdraw := balance.MaxWithdrawAmount
 		r.logger.Infof("expected transfer out amount: %s, actual transfer out amount: %s, diff: %s, max withdraw: %s",
 			expectedTransferOut,
 			r.syncState.TransferOutAmount,
 			transferDiff,
 			maxWithdraw,
 		)
-		if maxWithdraw != nil {
-			transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
-		}
 		if err := r.futuresService.TransferFuturesAccountAsset(ctx, asset, transferDiff, types.TransferOut); err != nil {
 			return fmt.Errorf("failed to transfer out %s %s: %w", transferDiff.String(), asset, err)
 		}
+		r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
 	}
 	// transfer succeeded, need to sync the spot position to keep delta-neutral
 	targetPosition := r.futuresWorker.FilledPosition().Neg()
@@ -1170,6 +1196,13 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 func (r *ArbitrageRound) setReady(currentTime time.Time) {
 	if !r.syncState.ReadyAt.IsZero() {
 		return
+	}
+
+	if oriOrder := r.spotWorker.syncAndResetActiveOrder(); oriOrder != nil {
+		r.logger.Debugf("[setReady] reseting spot order: %s", oriOrder)
+	}
+	if oriOrder := r.futuresWorker.syncAndResetActiveOrder(); oriOrder != nil {
+		r.logger.Debugf("[setReady] reseting futures order: %s", oriOrder)
 	}
 	r.syncState.State = RoundReady
 	r.syncState.ReadyAt = currentTime
@@ -1439,6 +1472,7 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, baseAvailable, types.TransferIn); err != nil {
 				return fmt.Errorf("failed to transfer %s %s from spot to futures: %w", baseAvailable.String(), baseAsset, err)
 			}
+			r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(baseAvailable)
 			bbgo.Notify("➡️ Transfered %s %s from spot to futures to rebalance",
 				baseAvailable.String(),
 				baseAsset,
