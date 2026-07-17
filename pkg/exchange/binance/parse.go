@@ -144,7 +144,7 @@ type ExecutionReportEvent struct {
 	SelfTradePreventionMode *string `json:"V"`
 }
 
-func (e *ExecutionReportEvent) Order() (*types.Order, error) {
+func (e *ExecutionReportEvent) Order(isMargin, isIsolated bool) (*types.Order, error) {
 	switch e.CurrentExecutionType {
 	case "NEW", "CANCELED", "REJECTED", "EXPIRED":
 	case "REPLACED":
@@ -174,10 +174,12 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 		ExecutedQuantity: e.CumulativeFilledQuantity,
 		CreationTime:     types.Time(orderCreationTime),
 		UpdateTime:       types.Time(orderCreationTime),
+		IsMargin:         isMargin,
+		IsIsolated:       isIsolated,
 	}, nil
 }
 
-func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
+func (e *ExecutionReportEvent) Trade(isMargin, isIsolated bool) (*types.Trade, error) {
 	if e.CurrentExecutionType != "TRADE" {
 		return nil, errors.New("execution report is not a trade")
 	}
@@ -197,6 +199,8 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 		Time:          types.Time(tt),
 		Fee:           e.CommissionAmount,
 		FeeCurrency:   e.CommissionAsset,
+		IsMargin:      isMargin,
+		IsIsolated:    isIsolated,
 	}, nil
 }
 
@@ -1099,7 +1103,7 @@ type OrderTradeUpdateEvent struct {
 
 //   }
 
-func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
+func (e *OrderTradeUpdateEvent) OrderFutures(isIsolated bool) (*types.Order, error) {
 
 	switch e.OrderTrade.CurrentExecutionType {
 	case "NEW", "CANCELED", "EXPIRED":
@@ -1126,10 +1130,12 @@ func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
 		ExecutedQuantity: e.OrderTrade.OrderFilledAccumulatedQuantity,
 		CreationTime:     types.Time(e.OrderTrade.OrderTradeTime.Time()), // FIXME: find the correct field for creation time
 		UpdateTime:       types.Time(e.OrderTrade.OrderTradeTime.Time()),
+		IsFutures:        true,
+		IsIsolated:       isIsolated,
 	}, nil
 }
 
-func (e *OrderTradeUpdateEvent) TradeFutures() (*types.Trade, error) {
+func (e *OrderTradeUpdateEvent) TradeFutures(isIsolated bool) (*types.Trade, error) {
 	if e.OrderTrade.CurrentExecutionType != "TRADE" {
 		return nil, errors.New("execution report is not a futures trade")
 	}
@@ -1148,6 +1154,8 @@ func (e *OrderTradeUpdateEvent) TradeFutures() (*types.Trade, error) {
 		Time:          types.Time(e.OrderTrade.OrderTradeTime.Time()),
 		Fee:           e.OrderTrade.CommissionAmount,
 		FeeCurrency:   e.OrderTrade.CommissionAsset,
+		IsFutures:     true,
+		IsIsolated:    isIsolated,
 	}, nil
 }
 
@@ -1397,7 +1405,7 @@ type AlgoOrder struct {
 	FailedReason     string           `json:"rm"`
 }
 
-func (e *AlgoOrderUpdateEvent) OrderFutures() (*types.Order, error) {
+func (e *AlgoOrderUpdateEvent) OrderFutures(isFutures, isMargin, isIsolated bool) (*types.Order, error) {
 	switch e.AlgoOrder.Status {
 	case "NEW", "CANCELED", "EXPIRED", "REJECTED", "TRIGGERING", "TRIGGERED", "FINISHED":
 	default:
@@ -1426,5 +1434,8 @@ func (e *AlgoOrderUpdateEvent) OrderFutures() (*types.Order, error) {
 		Status:           toGlobalFuturesOrderStatus(futures.OrderStatusType(e.AlgoOrder.Status)),
 		ExecutedQuantity: e.AlgoOrder.ExecutedQuantity,
 		UpdateTime:       types.Time(e.TransactionTime.Time()),
+		IsFutures:        isFutures,
+		IsMargin:         isMargin,
+		IsIsolated:       isIsolated,
 	}, nil
 }

@@ -329,7 +329,7 @@ func (s *Stream) handleExecutionReportEvent(e *ExecutionReportEvent) {
 	switch e.CurrentExecutionType {
 
 	case "NEW", "CANCELED", "REJECTED", "EXPIRED", "REPLACED":
-		order, err := e.Order()
+		order, err := e.Order(s.exchange.IsMargin, s.exchange.IsIsolatedMargin)
 		if err != nil {
 			log.WithError(err).Errorf("order convert error: %+v", e)
 			return
@@ -338,7 +338,10 @@ func (s *Stream) handleExecutionReportEvent(e *ExecutionReportEvent) {
 		s.EmitOrderUpdate(*order)
 
 	case "TRADE":
-		trade, err := e.Trade()
+		trade, err := e.Trade(
+			s.exchange.IsMargin,
+			s.exchange.IsIsolatedMargin,
+		)
 		if err != nil {
 			log.WithError(err).Errorf("trade convert error: %+v", e)
 			return
@@ -346,7 +349,10 @@ func (s *Stream) handleExecutionReportEvent(e *ExecutionReportEvent) {
 
 		s.EmitTradeUpdate(*trade)
 
-		order, err := e.Order()
+		order, err := e.Order(
+			s.exchange.IsMargin,
+			s.exchange.IsIsolatedMargin,
+		)
 		if err != nil {
 			log.WithError(err).Errorf("order convert error: %+v", e)
 			return
@@ -426,7 +432,7 @@ func (s *Stream) handleOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
 		log.Warnf("ExecutionReport %s: %+v", e.OrderTrade.CurrentExecutionType, e)
 
 	case "NEW", "CANCELED", "EXPIRED":
-		order, err := e.OrderFutures()
+		order, err := e.OrderFutures(s.exchange.IsIsolatedFutures)
 		if err != nil {
 			log.WithError(err).Error("futures order convert error")
 			return
@@ -435,7 +441,7 @@ func (s *Stream) handleOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
 		s.EmitOrderUpdate(*order)
 
 	case "TRADE":
-		trade, err := e.TradeFutures()
+		trade, err := e.TradeFutures(s.exchange.IsIsolatedFutures)
 		if err != nil {
 			log.WithError(err).Error("futures trade convert error")
 			return
@@ -443,7 +449,7 @@ func (s *Stream) handleOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
 
 		s.EmitTradeUpdate(*trade)
 
-		order, err := e.OrderFutures()
+		order, err := e.OrderFutures(s.exchange.IsIsolatedFutures)
 		if err != nil {
 			log.WithError(err).Error("futures order convert error")
 			return
@@ -839,7 +845,11 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 }
 
 func (s *Stream) handleAlgoOrderUpdateEvent(e *AlgoOrderUpdateEvent) {
-	order, err := e.OrderFutures()
+	order, err := e.OrderFutures(
+		s.exchange.IsFutures,
+		s.exchange.IsMargin,
+		s.exchange.IsIsolatedFutures || s.exchange.IsIsolatedMargin,
+	)
 	if err != nil {
 		log.WithError(err).Error("algo order convert error")
 		return
