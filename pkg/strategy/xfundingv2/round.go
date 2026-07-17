@@ -233,7 +233,7 @@ func (r *ArbitrageRound) RequiredFeeAssetAmounts() (fixedpoint.Value, fixedpoint
 	return fixedpoint.Zero, fixedpoint.Zero
 }
 
-func (r *ArbitrageRound) StartAt() time.Time {
+func (r *ArbitrageRound) StartedAt() time.Time {
 	return r.syncState.StartAt
 }
 
@@ -524,8 +524,8 @@ func realizedPnLFields(realizedPnL *RoundRealizedPnL) []slack.AttachmentField {
 			Short: true,
 		},
 		{
-			Title: "Total Net PnL",
-			Value: realizedPnL.NetPnL().String(),
+			Title: "Total PnL",
+			Value: realizedPnL.TotalPnL().String(),
 			Short: true,
 		},
 	}
