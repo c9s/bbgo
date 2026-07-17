@@ -212,7 +212,7 @@ func TestParseOrderUpdate(t *testing.T) {
 	assert.Equal(t, executionReport.CumulativeQuoteAssetTransactedQuantity, fixedpoint.MustNewFromString("0.1"))
 	assert.Equal(t, executionReport.LastQuoteAssetTransactedQuantity, fixedpoint.MustNewFromString("0.00000000"))
 
-	orderUpdate, err := executionReport.Order()
+	orderUpdate, err := executionReport.Order(false, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, orderUpdate)
 }
@@ -451,7 +451,7 @@ func TestParseOrderFuturesUpdate(t *testing.T) {
 	assert.Equal(t, int64(38541728873), orderTradeEvent.OrderTrade.OrderId)
 	assert.Equal(t, int64(1741505949), orderTradeEvent.OrderTrade.TradeId)
 
-	orderUpdate, err := orderTradeEvent.OrderFutures()
+	orderUpdate, err := orderTradeEvent.OrderFutures(false)
 	assert.NoError(t, err)
 	assert.NotNil(t, orderUpdate)
 }
@@ -491,7 +491,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, types.ExchangeBinance, order.Exchange)
@@ -527,7 +527,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, types.OrderStatusCanceled, order.Status)
@@ -551,7 +551,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, types.OrderStatusExpired, order.Status)
@@ -576,7 +576,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, types.OrderStatusRejected, order.Status)
@@ -600,7 +600,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, uint64(456789), order.OrderID)
@@ -627,7 +627,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, fixedpoint.MustNewFromString("5000.0"), order.ExecutedQuantity)
@@ -654,7 +654,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, fixedpoint.MustNewFromString("500.0"), order.ExecutedQuantity)
@@ -673,7 +673,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.Error(t, err)
 		assert.Nil(t, order)
 		assert.Contains(t, err.Error(), "algo update event type is not for futures order")
@@ -700,7 +700,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, fixedpoint.MustNewFromString("1.5"), order.ExecutedQuantity)
@@ -738,7 +738,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 					},
 				}
 
-				order, err := event.OrderFutures()
+				order, err := event.OrderFutures(false, false, false)
 				assert.NoError(t, err)
 				assert.NotNil(t, order)
 				assert.Equal(t, tc.expected, order.Type)
@@ -775,7 +775,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 					},
 				}
 
-				order, err := event.OrderFutures()
+				order, err := event.OrderFutures(false, false, false)
 				assert.NoError(t, err)
 				assert.NotNil(t, order)
 				assert.Equal(t, tc.expected, order.Side)
@@ -802,7 +802,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, uint64(987654321), order.ActualOrderId)
@@ -827,7 +827,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Zero(t, order.ActualOrderId)

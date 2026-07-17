@@ -483,7 +483,7 @@ func (e *Exchange) queryFuturesTrades(
 		return nil, err
 	}
 	for _, t := range remoteTrades {
-		localTrade, err := toGlobalFuturesTrade(*t)
+		localTrade, err := toGlobalFuturesTrade(*t, e.IsIsolatedFutures)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert binance futures trade: %+v", t)
 			continue

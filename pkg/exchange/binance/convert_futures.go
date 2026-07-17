@@ -273,7 +273,7 @@ func toGlobalFuturesOrder[T FuturesOrderConstraint](orderSource T, isIsolated bo
 	}, nil
 }
 
-func toGlobalFuturesTrade(t futures.AccountTrade) (*types.Trade, error) {
+func toGlobalFuturesTrade(t futures.AccountTrade, isIsolated bool) (*types.Trade, error) {
 	// skip trade ID that is the same. however this should not happen
 	var side types.SideType
 	if t.Buyer {
@@ -322,6 +322,7 @@ func toGlobalFuturesTrade(t futures.AccountTrade) (*types.Trade, error) {
 		FeeCurrency:   t.CommissionAsset,
 		Time:          types.Time(millisecondTime(t.Time)),
 		IsFutures:     true,
+		IsIsolated:    isIsolated,
 	}, nil
 }
 
