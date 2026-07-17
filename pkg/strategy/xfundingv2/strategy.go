@@ -1135,7 +1135,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 		}
 
 		// the round is beyond the max holding time, transit to closing
-		if currentTime.Sub(round.StartAt()) >= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
+		if currentTime.Sub(round.StartedAt()) >= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound %s] max holding hours reached, transit state %s -> closing, current funding rate %s: %s",
 				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round,
@@ -1199,7 +1199,7 @@ func (s *Strategy) transitClosingRound(ctx context.Context, round *ArbitrageRoun
 func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time) {
 	var lastOpenTime time.Time
 	for _, round := range s.ActiveRounds {
-		startTime := round.StartAt()
+		startTime := round.StartedAt()
 		if lastOpenTime.IsZero() {
 			lastOpenTime = startTime
 			continue

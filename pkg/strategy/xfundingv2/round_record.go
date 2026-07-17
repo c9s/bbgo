@@ -46,7 +46,7 @@ type ClosedRoundRecord struct {
 
 	NumHoldingIntervals int `db:"num_holding_intervals"`
 
-	StartAt   time.Time  `db:"start_at"`
+	StartAt   time.Time  `db:"started_at"`
 	ReadyAt   *time.Time `db:"ready_at"`
 	ClosingAt time.Time  `db:"closing_at"`
 	ClosedAt  time.Time  `db:"closed_at"`
@@ -142,7 +142,7 @@ func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (Closed
 
 		NumHoldingIntervals: round.NumHoldingIntervals(round.ClosedAt()),
 
-		StartAt:   round.StartAt(),
+		StartAt:   round.StartedAt(),
 		ReadyAt:   readyTime,
 		ClosingAt: round.ClosingAt(),
 		ClosedAt:  round.ClosedAt(),
@@ -267,7 +267,7 @@ type ActiveRoundRecord struct {
 	TotalSpotNetPnL    fixedpoint.Value `db:"total_spot_net_pnl"`
 	TotalFuturesNetPnL fixedpoint.Value `db:"total_futures_net_pnl"`
 
-	StartAt time.Time `db:"start_at"`
+	StartedAt time.Time `db:"started_at"`
 }
 
 // newActiveRoundRecord builds a point-in-time snapshot of an active (non-closed)
@@ -320,7 +320,7 @@ func (s *RoundInsertService) newActiveRoundRecord(
 		TotalSpotNetPnL:    pnl.TotalSpotNetPnL(),
 		TotalFuturesNetPnL: pnl.TotalFuturesNetPnL(),
 
-		StartAt: round.StartAt(),
+		StartedAt: round.StartedAt(),
 	}
 
 	return record, newFundingFeeRecords(round)
