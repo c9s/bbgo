@@ -315,8 +315,8 @@ func (s *RoundInsertService) newActiveRoundRecord(
 		UnrealizedFuturesPnL: pnl.UnrealizedFuturesPnL,
 
 		TotalNetPnL:        pnl.TotalPnL(),
-		TotalSpotNetPnL:    pnl.TotalSpotPnL(),
-		TotalFuturesNetPnL: pnl.TotalFuturesPnL(),
+		TotalSpotNetPnL:    pnl.TotalSpotNetPnL(),
+		TotalFuturesNetPnL: pnl.TotalFuturesNetPnL(),
 	}
 
 	return record, newFundingFeeRecords(round)

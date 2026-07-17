@@ -145,11 +145,11 @@ func (r *ArbitrageRound) UnrealizedPnL(spotOrderBook, futuresOrderBook types.Ord
 	return result
 }
 
-func (r *RoundUnrealizedPnL) TotalSpotPnL() fixedpoint.Value {
+func (r *RoundUnrealizedPnL) TotalSpotNetPnL() fixedpoint.Value {
 	return r.SpotProfitStats.AccumulatedNetProfit.Add(r.UnrealizedSpotPnL)
 }
 
-func (r *RoundUnrealizedPnL) TotalFuturesPnL() fixedpoint.Value {
+func (r *RoundUnrealizedPnL) TotalFuturesNetPnL() fixedpoint.Value {
 	return r.FuturesProfitStats.AccumulatedNetProfit.Add(r.UnrealizedFuturesPnL)
 }
 
