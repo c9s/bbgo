@@ -622,6 +622,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	price := td.Price
 	quantity := td.Quantity
 	quoteQuantity := td.QuoteQuantity
+	quoteCashQuantity := quoteQuantity
 	fee := td.Fee
 
 	if quantity.IsZero() {
@@ -641,8 +642,13 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 		}
 
 	case p.QuoteCurrency:
+		feeInQuote = fee
 		if !td.IsFutures {
-			quoteQuantity = quoteQuantity.Sub(fee)
+			if td.Side == SideTypeBuy {
+				quoteCashQuantity = quoteQuantity.Add(fee)
+			} else {
+				quoteCashQuantity = quoteQuantity.Sub(fee)
+			}
 		}
 
 	default:
@@ -675,7 +681,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 				profit = p.AverageCost.Sub(price).Mul(p.Base.Neg())
 				netProfit = p.AverageCost.Sub(price).Mul(p.Base.Neg()).Sub(feeInQuote)
 				p.Base = p.Base.Add(quantity)
-				p.Quote = p.Quote.Sub(quoteQuantity)
+				p.Quote = p.Quote.Sub(quoteCashQuantity)
 				p.AverageCost = price
 				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
 				p.OpenedAt = td.Time.Time()
@@ -683,7 +689,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 			} else {
 				// after adding quantity it's still short position
 				p.Base = p.Base.Add(quantity)
-				p.Quote = p.Quote.Sub(quoteQuantity)
+				p.Quote = p.Quote.Sub(quoteCashQuantity)
 				profit = p.AverageCost.Sub(price).Mul(quantity)
 				netProfit = p.AverageCost.Sub(price).Mul(quantity).Sub(feeInQuote)
 				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
@@ -706,7 +712,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 			Div(divisor)
 
 		p.Base = p.Base.Add(quantity)
-		p.Quote = p.Quote.Sub(quoteQuantity)
+		p.Quote = p.Quote.Sub(quoteCashQuantity)
 		return fixedpoint.Zero, fixedpoint.Zero, false
 
 	case SideTypeSell:
@@ -717,14 +723,14 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 				profit = price.Sub(p.AverageCost).Mul(p.Base)
 				netProfit = price.Sub(p.AverageCost).Mul(p.Base).Sub(feeInQuote)
 				p.Base = p.Base.Sub(quantity)
-				p.Quote = p.Quote.Add(quoteQuantity)
+				p.Quote = p.Quote.Add(quoteCashQuantity)
 				p.AverageCost = price
 				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
 				p.OpenedAt = td.Time.Time()
 				return profit, netProfit, true
 			} else {
 				p.Base = p.Base.Sub(quantity)
-				p.Quote = p.Quote.Add(quoteQuantity)
+				p.Quote = p.Quote.Add(quoteCashQuantity)
 				profit = price.Sub(p.AverageCost).Mul(quantity)
 				netProfit = price.Sub(p.AverageCost).Mul(quantity).Sub(feeInQuote)
 				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
@@ -746,7 +752,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 			Sub(feeInQuote).
 			Div(divisor)
 		p.Base = p.Base.Sub(quantity)
-		p.Quote = p.Quote.Add(quoteQuantity)
+		p.Quote = p.Quote.Add(quoteCashQuantity)
 
 		return fixedpoint.Zero, fixedpoint.Zero, false
 	}
