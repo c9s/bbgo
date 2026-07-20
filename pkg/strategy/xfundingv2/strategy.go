@@ -691,7 +691,8 @@ func (s *Strategy) CrossRun(
 
 	// setup callbacks
 	s.spotSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.TickSymbol, s.TickInterval, func(kline types.KLine) {
-		s.tick(s.ctx, kline.EndTime.Time())
+		// end time of the kline is hh:mm:ss.999 -> add 1ms to round it up
+		s.tick(s.ctx, kline.EndTime.Time().Add(time.Millisecond))
 	}))
 
 	// trade update callbacks
@@ -1058,9 +1059,16 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	s.processPendingRounds(ctx, tickTime)
 
 	// 5. log stats
-	if s.lastStatsTime.IsZero() || tickTime.Sub(s.lastStatsTime) >= s.StatsPeriod.Duration() {
+	var notifyStats bool
+	period := s.StatsPeriod.Duration()
+	if s.lastStatsTime.IsZero() {
+		notifyStats = true
+	} else {
+		notifyStats = tickTime.Sub(s.lastStatsTime) >= period
+	}
+	if notifyStats {
 		s.notifyStats()
-		s.lastStatsTime = tickTime
+		s.lastStatsTime = tickTime.Truncate(period)
 	}
 }
 
