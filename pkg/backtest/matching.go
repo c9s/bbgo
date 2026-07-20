@@ -68,6 +68,8 @@ type SimplePriceMatching struct {
 
 	feeModeFunction FeeModeFunction
 
+	pessimisticMakerFill bool
+
 	account *types.Account
 
 	tradeUpdateCallbacks   []func(trade types.Trade)
@@ -214,9 +216,9 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 			// we assume it will be traded as a maker trade, and is traded at its original price
 			// TODO: if it is treated as a maker trade, fee should be specially handled
 			// otherwise, set NextKLine.Close(i.e., m.LastPrice) to be the taker traded price
-			if m.nextKLine != nil && m.nextKLine.High.Compare(order.Price) > 0 && order.Side == types.SideTypeBuy {
+			if !m.pessimisticMakerFill && m.nextKLine != nil && m.nextKLine.High.Compare(order.Price) > 0 && order.Side == types.SideTypeBuy {
 				order.AveragePrice = order.Price
-			} else if m.nextKLine != nil && m.nextKLine.Low.Compare(order.Price) < 0 && order.Side == types.SideTypeSell {
+			} else if !m.pessimisticMakerFill && m.nextKLine != nil && m.nextKLine.Low.Compare(order.Price) < 0 && order.Side == types.SideTypeSell {
 				order.AveragePrice = order.Price
 			} else {
 				order.AveragePrice = m.Market.TruncatePrice(m.lastPrice)
@@ -472,7 +474,7 @@ func (m *SimplePriceMatching) buyToPrice(price fixedpoint.Value) (closedOrders [
 			}
 
 		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
-			if price.Compare(o.Price) >= 0 {
+			if m.shouldFillRestingSell(o, price) {
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -601,7 +603,7 @@ func (m *SimplePriceMatching) sellToPrice(price fixedpoint.Value) (closedOrders 
 			}
 
 		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
-			if price.Compare(o.Price) <= 0 {
+			if m.shouldFillRestingBuy(o, price) {
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -703,6 +705,22 @@ func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 	}
 
 	m.lastKLine = kline
+}
+
+func (m *SimplePriceMatching) shouldFillRestingBuy(o types.Order, price fixedpoint.Value) bool {
+	if !m.pessimisticMakerFill {
+		return price.Compare(o.Price) <= 0
+	}
+
+	return price.Compare(o.Price.Sub(m.Market.TickSize)) <= 0
+}
+
+func (m *SimplePriceMatching) shouldFillRestingSell(o types.Order, price fixedpoint.Value) bool {
+	if !m.pessimisticMakerFill {
+		return price.Compare(o.Price) >= 0
+	}
+
+	return price.Compare(o.Price.Add(m.Market.TickSize)) >= 0
 }
 
 func (m *SimplePriceMatching) newOrder(o types.SubmitOrder, orderID uint64) types.Order {
