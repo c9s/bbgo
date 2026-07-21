@@ -481,12 +481,14 @@ func (s *Strategy) CrossRun(
 			spotPosition = types.NewPositionFromMarket(spotMarket)
 			s.SpotPositions[symbol] = spotPosition
 		}
+		spotPosition.UseExcludeFeeFromCostMode()
 		if p, found := s.FuturesPositions[symbol]; found {
 			futuresPosition = p
 		} else {
 			futuresPosition = types.NewPositionFromMarket(futuresMarket)
 			s.FuturesPositions[symbol] = futuresPosition
 		}
+		futuresPosition.UseExcludeFeeFromCostMode()
 		spotExecutor := bbgo.NewGeneralOrderExecutor(
 			s.spotSession,
 			symbol,
@@ -550,6 +552,7 @@ func (s *Strategy) CrossRun(
 			s.InstanceID(),
 			spotPosition,
 		)
+		spotExecutor.OrderStore().AddOrderUpdate = true
 		spotExecutor.DisableNotify()
 		spotExecutor.Bind()
 		s.spotGeneralOrderExecutors[s.FeeSymbol] = spotExecutor
