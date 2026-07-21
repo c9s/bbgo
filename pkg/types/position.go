@@ -49,6 +49,14 @@ type PositionRisk struct {
 	UpdateTime             MillisecondTimestamp `json:"updateTime,omitempty" db:"updated_at"`
 }
 
+//go:generate stringer -type PnLMode -trimprefix PnLMode
+type PnLMode int
+
+const (
+	PnLModeClassic PnLMode = iota
+	PnLModeExcludeFeeFromCost
+)
+
 // Position stores the position data
 type Position struct {
 	Symbol        string `json:"symbol" db:"symbol"`
@@ -90,6 +98,7 @@ type Position struct {
 	// ttl is the ttl to keep in persistence
 	ttl time.Duration
 
+	PnLMode      PnLMode `json:"pnlMode"`
 	tradeHandler func(Trade) (fixedpoint.Value, fixedpoint.Value, bool)
 }
 
@@ -383,6 +392,7 @@ func NewPosition(symbol, base, quote string) *Position {
 		TotalFee:         make(map[string]fixedpoint.Value),
 		FeeAverageCosts:  make(map[string]fixedpoint.Value),
 		ExchangeFeeRates: make(map[ExchangeName]ExchangeFee),
+		PnLMode:          PnLModeClassic,
 	}
 }
 
@@ -624,10 +634,20 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	// fallback to classic handler if the tradeHandler is not set for backward compatibility
 	p.Lock()
 	if p.tradeHandler == nil {
-		p.tradeHandler = p.addTradeClassic
+		p.tradeHandler = p.getTradeHandler()
 	}
 	p.Unlock()
 	return p.tradeHandler(td)
+}
+
+func (p *Position) getTradeHandler() func(td Trade) (fixedpoint.Value, fixedpoint.Value, bool) {
+	switch p.PnLMode {
+	case PnLModeClassic:
+		return p.addTradeClassic
+	case PnLModeExcludeFeeFromCost:
+		return p.addTradeExcludeFeeFromCost
+	}
+	return p.addTradeClassic
 }
 
 func (p *Position) addTradeClassic(td Trade) (profit fixedpoint.Value, netProfit fixedpoint.Value, madeProfit bool) {
@@ -859,7 +879,7 @@ func (p *Position) UseExcludeFeeFromCostMode() {
 	p.Lock()
 	defer p.Unlock()
 
-	p.tradeHandler = p.addTradeExcludeFeeFromCost
+	p.PnLMode = PnLModeExcludeFeeFromCost
 }
 
 func (p *Position) UpdateMetrics(price *fixedpoint.Value) {
