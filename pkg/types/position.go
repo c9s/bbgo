@@ -49,6 +49,14 @@ type PositionRisk struct {
 	UpdateTime             MillisecondTimestamp `json:"updateTime,omitempty" db:"updated_at"`
 }
 
+//go:generate stringer -type PnLMode -trimprefix PnLMode
+type PnLMode int
+
+const (
+	PnLModeClassic PnLMode = iota
+	PnLModeExcludeFeeFromCost
+)
+
 // Position stores the position data
 type Position struct {
 	Symbol        string `json:"symbol" db:"symbol"`
@@ -89,6 +97,9 @@ type Position struct {
 
 	// ttl is the ttl to keep in persistence
 	ttl time.Duration
+
+	PnLMode      PnLMode `json:"pnlMode"`
+	tradeHandler func(Trade) (fixedpoint.Value, fixedpoint.Value, bool)
 }
 
 type PositionKey struct {
@@ -381,6 +392,7 @@ func NewPosition(symbol, base, quote string) *Position {
 		TotalFee:         make(map[string]fixedpoint.Value),
 		FeeAverageCosts:  make(map[string]fixedpoint.Value),
 		ExchangeFeeRates: make(map[ExchangeName]ExchangeFee),
+		PnLMode:          PnLModeClassic,
 	}
 }
 
@@ -619,6 +631,26 @@ func (p *Position) calculateFeeInQuote(td Trade) fixedpoint.Value {
 }
 
 func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedpoint.Value, madeProfit bool) {
+	// fallback to classic handler if the tradeHandler is not set for backward compatibility
+	p.Lock()
+	if p.tradeHandler == nil {
+		p.tradeHandler = p.getTradeHandler()
+	}
+	p.Unlock()
+	return p.tradeHandler(td)
+}
+
+func (p *Position) getTradeHandler() func(td Trade) (fixedpoint.Value, fixedpoint.Value, bool) {
+	switch p.PnLMode {
+	case PnLModeClassic:
+		return p.addTradeClassic
+	case PnLModeExcludeFeeFromCost:
+		return p.addTradeExcludeFeeFromCost
+	}
+	return p.addTradeClassic
+}
+
+func (p *Position) addTradeClassic(td Trade) (profit fixedpoint.Value, netProfit fixedpoint.Value, madeProfit bool) {
 	price := td.Price
 	quantity := td.Quantity
 	quoteQuantity := td.QuoteQuantity
@@ -752,6 +784,102 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	}
 
 	return fixedpoint.Zero, fixedpoint.Zero, false
+}
+
+func (p *Position) addTradeExcludeFeeFromCost(td Trade) (pnL fixedpoint.Value, netPnL fixedpoint.Value, madeProfit bool) {
+	price := td.Price
+	quantity := td.Quantity
+	quoteQuantity := td.QuoteQuantity
+	fee := td.Fee
+
+	if quantity.IsZero() {
+		return fixedpoint.Zero, fixedpoint.Zero, false
+	}
+
+	// calculate fee in quote
+	var feeInQuote = fixedpoint.Zero
+	switch td.FeeCurrency {
+	case p.BaseCurrency:
+		feeInQuote = fee.Mul(price)
+	case p.QuoteCurrency:
+		feeInQuote = fee
+	default:
+		if !td.Fee.IsZero() {
+			feeInQuote = p.calculateFeeInQuote(td)
+		}
+	}
+
+	p.Lock()
+	defer p.Unlock()
+
+	defer p.updateMetrics(&price)
+
+	defer func() {
+		p.ChangedAt = td.Time.Time()
+	}()
+
+	p.addTradeFee(td)
+
+	// pnL is the profit/loss without the fee
+	pnL = fixedpoint.Zero
+	// netPnL is the profit/loss with the fee
+	// feeInQuote is considered as realized loss in the audit mode
+	netPnL = feeInQuote.Neg()
+
+	switch td.Side {
+	case SideTypeBuy:
+		// was short position, now trade buy should cover the position
+		if p.Base.Sign() < 0 {
+			// convert short position to long position
+			if p.Base.Add(quantity).Sign() > 0 {
+				pnL = p.AverageCost.Sub(price).Mul(p.Base.Neg())
+				netPnL = netPnL.Add(pnL)
+				p.AverageCost = price
+				p.OpenedAt = td.Time.Time()
+			} else {
+				// after adding quantity it's still short position
+				pnL = p.AverageCost.Sub(price).Mul(quantity)
+				netPnL = netPnL.Add(p.AverageCost.Sub(price).Mul(quantity))
+			}
+			p.AccumulatedProfit = p.AccumulatedProfit.Add(pnL)
+		} else {
+			divisor := p.Base.Add(quantity)
+			p.AverageCost = p.AverageCost.Mul(p.Base).Add(quoteQuantity).Div(divisor)
+		}
+		p.Base = p.Base.Add(quantity)
+		p.Quote = p.Quote.Sub(quoteQuantity)
+	case SideTypeSell:
+		// was long position, the sell trade should reduce the base amount
+		if p.Base.Sign() > 0 {
+			// convert long position to short position
+			if p.Base.Compare(quantity) < 0 {
+				pnL = price.Sub(p.AverageCost).Mul(p.Base)
+				netPnL = netPnL.Add(price.Sub(p.AverageCost).Mul(p.Base))
+				p.AverageCost = price
+				p.OpenedAt = td.Time.Time()
+			} else {
+				pnL = price.Sub(p.AverageCost).Mul(quantity)
+				netPnL = netPnL.Add(price.Sub(p.AverageCost).Mul(quantity))
+			}
+			p.AccumulatedProfit = p.AccumulatedProfit.Add(pnL)
+		} else {
+			divisor := quantity.Sub(p.Base)
+			p.AverageCost = p.AverageCost.Mul(p.Base.Neg()).Add(quoteQuantity).Div(divisor)
+		}
+		p.Base = p.Base.Sub(quantity)
+		p.Quote = p.Quote.Add(quoteQuantity)
+	}
+	if p.IsDust(td.Price) {
+		p.OpenedAt = td.Time.Time()
+	}
+	return pnL, netPnL, !pnL.IsZero() || !netPnL.IsZero()
+}
+
+func (p *Position) UseExcludeFeeFromCostMode() {
+	p.Lock()
+	defer p.Unlock()
+
+	p.PnLMode = PnLModeExcludeFeeFromCost
 }
 
 func (p *Position) UpdateMetrics(price *fixedpoint.Value) {

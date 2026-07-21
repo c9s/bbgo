@@ -149,6 +149,39 @@ func Test_storePersistenceFields(t *testing.T) {
 		})
 	}
 
+	a.Position.UseExcludeFeeFromCostMode()
+	for _, ps := range pss {
+		psName := reflect.TypeOf(ps).Elem().String()
+		t.Run("all-exclude-fee-from-cost/"+psName, func(t *testing.T) {
+			id := dynamic.CallID(a)
+			err := storePersistenceFields(a, id, ps)
+			assert.NoError(t, err)
+
+			var i int64
+			store := ps.NewStore("state", "test-struct", "integer")
+			err = store.Load(&i)
+			assert.NoError(t, err)
+			assert.Equal(t, int64(1), i)
+
+			var p *types.Position
+			store = ps.NewStore("state", "test-struct", "position")
+			err = store.Load(&p)
+			assert.NoError(t, err)
+			assert.Equal(t, fixedpoint.NewFromFloat(10.0), p.Base)
+			assert.Equal(t, fixedpoint.NewFromFloat(3343.0), p.AverageCost)
+			assert.Equal(t, types.PnLModeExcludeFeeFromCost, p.PnLMode)
+
+			var b = &TestStruct{}
+			err = loadPersistenceFields(b, id, ps)
+			assert.NoError(t, err)
+			assert.Equal(t, a.Integer, b.Integer)
+			assert.Equal(t, a.Integer2, b.Integer2)
+			assert.Equal(t, a.Float, b.Float)
+			assert.Equal(t, a.String, b.String)
+			assert.Equal(t, a.Position, b.Position)
+		})
+	}
+
 }
 
 func Test_persistenceMapWithPointers(t *testing.T) {

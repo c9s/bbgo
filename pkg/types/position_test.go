@@ -379,3 +379,189 @@ func TestPosition_GetBaseAndAverageCost(t *testing.T) {
 	assert.Equal(t, pos.Base, base)
 	assert.Equal(t, pos.AverageCost, avgCost)
 }
+
+func TestPosition_ExcludeFeeFromCostMode(t *testing.T) {
+	// unit tests for the PnL calculation when the PnLMode is set to ExcludeFeeFromCost
+	newPosition := func() *Position {
+		pos := NewPosition("BTCUSDT", "BTC", "USDT")
+		pos.Strategy = "test-position"
+		pos.StrategyInstanceID = "test-position:BTCUSDT"
+		pos.UseExcludeFeeFromCostMode()
+		return pos
+	}
+
+	t.Run("open long, quote fee excluded from average cost", func(t *testing.T) {
+		pos := newPosition()
+
+		// buy 0.01 BTC @ 1000 with a 0.01 USDT (quote) fee
+		profit, netProfit, madeProfit := pos.AddTrade(Trade{
+			Side:          SideTypeBuy,
+			Price:         fixedpoint.NewFromInt(1000),
+			Quantity:      fixedpoint.NewFromFloat(0.01),
+			QuoteQuantity: fixedpoint.NewFromFloat(10.0),
+			Fee:           fixedpoint.NewFromFloat(0.01),
+			FeeCurrency:   "USDT",
+		})
+
+		// opening a position realizes no gross PnL, but the fee is booked as a net loss
+		assert.True(t, madeProfit)
+		assert.InDelta(t, 0.0, profit.Float64(), Delta, "profit")
+		assert.InDelta(t, -0.01, netProfit.Float64(), Delta, "netProfit")
+
+		// average cost must NOT include the fee (1000, not 1001)
+		assert.InDelta(t, 1000.0, pos.AverageCost.Float64(), Delta, "averageCost")
+		assert.InDelta(t, 0.01, pos.Base.Float64(), Delta, "base")
+		assert.InDelta(t, -10.0, pos.Quote.Float64(), Delta, "quote")
+	})
+
+	t.Run("open long, base fee does not reduce base quantity", func(t *testing.T) {
+		pos := newPosition()
+
+		// buy 0.01 BTC @ 1000 with a 0.00001 BTC (base) fee => 0.01 USDT
+		profit, netProfit, madeProfit := pos.AddTrade(Trade{
+			Side:          SideTypeBuy,
+			Price:         fixedpoint.NewFromInt(1000),
+			Quantity:      fixedpoint.NewFromFloat(0.01),
+			QuoteQuantity: fixedpoint.NewFromFloat(10.0),
+			Fee:           fixedpoint.NewFromFloat(0.00001),
+			FeeCurrency:   "BTC",
+		})
+
+		assert.True(t, madeProfit)
+		assert.InDelta(t, 0.0, profit.Float64(), Delta, "profit")
+		assert.InDelta(t, -0.01, netProfit.Float64(), Delta, "netProfit")
+
+		// unlike the classic mode, the base fee is not subtracted from the acquired base
+		assert.InDelta(t, 0.01, pos.Base.Float64(), Delta, "base")
+		// and the average cost stays exactly the trade price
+		assert.InDelta(t, 1000.0, pos.AverageCost.Float64(), Delta, "averageCost")
+	})
+
+	t.Run("long then close with profit", func(t *testing.T) {
+		pos := newPosition()
+
+		pos.AddTrade(Trade{
+			Side:          SideTypeBuy,
+			Price:         fixedpoint.NewFromInt(1000),
+			Quantity:      fixedpoint.NewFromFloat(0.01),
+			QuoteQuantity: fixedpoint.NewFromFloat(10.0),
+			Fee:           fixedpoint.NewFromFloat(0.01),
+			FeeCurrency:   "USDT",
+		})
+
+		// sell 0.01 BTC @ 1100 with 0.011 USDT fee => close the long
+		profit, netProfit, madeProfit := pos.AddTrade(Trade{
+			Side:          SideTypeSell,
+			Price:         fixedpoint.NewFromInt(1100),
+			Quantity:      fixedpoint.NewFromFloat(0.01),
+			QuoteQuantity: fixedpoint.NewFromFloat(11.0),
+			Fee:           fixedpoint.NewFromFloat(0.011),
+			FeeCurrency:   "USDT",
+		})
+
+		assert.True(t, madeProfit)
+		// gross realized PnL = (1100 - 1000) * 0.01 = 1.0
+		assert.InDelta(t, 1.0, profit.Float64(), Delta, "profit")
+		// net realized PnL = 1.0 - 0.011 (sell fee only, cost carries no fee) = 0.989
+		assert.InDelta(t, 0.989, netProfit.Float64(), Delta, "netProfit")
+
+		assert.InDelta(t, 0.0, pos.Base.Float64(), Delta, "base")
+		assert.InDelta(t, 1.0, pos.AccumulatedProfit.Float64(), Delta, "accumulatedProfit")
+	})
+
+	t.Run("short then cover with profit", func(t *testing.T) {
+		pos := newPosition()
+
+		// open short: sell 0.01 BTC @ 2000
+		pos.AddTrade(Trade{
+			Side:          SideTypeSell,
+			Price:         fixedpoint.NewFromInt(2000),
+			Quantity:      fixedpoint.NewFromFloat(0.01),
+			QuoteQuantity: fixedpoint.NewFromFloat(20.0),
+			Fee:           fixedpoint.NewFromFloat(0.02),
+			FeeCurrency:   "USDT",
+		})
+		assert.InDelta(t, 2000.0, pos.AverageCost.Float64(), Delta, "averageCost after open short")
+		assert.InDelta(t, -0.01, pos.Base.Float64(), Delta, "base after open short")
+
+		// cover: buy 0.01 BTC @ 1800
+		profit, netProfit, madeProfit := pos.AddTrade(Trade{
+			Side:          SideTypeBuy,
+			Price:         fixedpoint.NewFromInt(1800),
+			Quantity:      fixedpoint.NewFromFloat(0.01),
+			QuoteQuantity: fixedpoint.NewFromFloat(18.0),
+			Fee:           fixedpoint.NewFromFloat(0.018),
+			FeeCurrency:   "USDT",
+		})
+
+		assert.True(t, madeProfit)
+		// gross realized PnL = (2000 - 1800) * 0.01 = 2.0
+		assert.InDelta(t, 2.0, profit.Float64(), Delta, "profit")
+		// net realized PnL = 2.0 - 0.018 = 1.982
+		assert.InDelta(t, 1.982, netProfit.Float64(), 1e-8, "netProfit")
+
+		assert.InDelta(t, 0.0, pos.Base.Float64(), Delta, "base")
+		assert.InDelta(t, 2.0, pos.AccumulatedProfit.Float64(), Delta, "accumulatedProfit")
+	})
+
+	t.Run("long flips to short and realizes profit on the closed portion", func(t *testing.T) {
+		pos := newPosition()
+
+		// open long: buy 0.02 BTC @ 1000
+		pos.AddTrade(Trade{
+			Side:          SideTypeBuy,
+			Price:         fixedpoint.NewFromInt(1000),
+			Quantity:      fixedpoint.NewFromFloat(0.02),
+			QuoteQuantity: fixedpoint.NewFromFloat(20.0),
+			Fee:           fixedpoint.NewFromFloat(0.02),
+			FeeCurrency:   "USDT",
+		})
+
+		// sell 0.03 BTC @ 1200 => close 0.02 long and open 0.01 short
+		profit, netProfit, madeProfit := pos.AddTrade(Trade{
+			Side:          SideTypeSell,
+			Price:         fixedpoint.NewFromInt(1200),
+			Quantity:      fixedpoint.NewFromFloat(0.03),
+			QuoteQuantity: fixedpoint.NewFromFloat(36.0),
+			Fee:           fixedpoint.NewFromFloat(0.036),
+			FeeCurrency:   "USDT",
+		})
+
+		assert.True(t, madeProfit)
+		// only the closed long portion realizes PnL: (1200 - 1000) * 0.02 = 4.0
+		assert.InDelta(t, 4.0, profit.Float64(), Delta, "profit")
+		// net realized PnL = 4.0 - 0.036 = 3.964
+		assert.InDelta(t, 3.964, netProfit.Float64(), 1e-8, "netProfit")
+
+		// the remaining short is re-based at the flip price
+		assert.InDelta(t, 1200.0, pos.AverageCost.Float64(), Delta, "averageCost")
+		assert.InDelta(t, -0.01, pos.Base.Float64(), Delta, "base")
+		assert.InDelta(t, 4.0, pos.AccumulatedProfit.Float64(), Delta, "accumulatedProfit")
+	})
+
+	t.Run("scaling into a long averages cost without folding in fees", func(t *testing.T) {
+		pos := newPosition()
+
+		pos.AddTrade(Trade{
+			Side:          SideTypeBuy,
+			Price:         fixedpoint.NewFromInt(1000),
+			Quantity:      fixedpoint.NewFromFloat(0.01),
+			QuoteQuantity: fixedpoint.NewFromFloat(10.0),
+			Fee:           fixedpoint.NewFromFloat(0.01),
+			FeeCurrency:   "USDT",
+		})
+		pos.AddTrade(Trade{
+			Side:          SideTypeBuy,
+			Price:         fixedpoint.NewFromInt(2000),
+			Quantity:      fixedpoint.NewFromFloat(0.03),
+			QuoteQuantity: fixedpoint.NewFromFloat(60.0),
+			Fee:           fixedpoint.NewFromFloat(0.06),
+			FeeCurrency:   "USDT",
+		})
+
+		// average cost = (10 + 60) / 0.04 = 1750, fees excluded entirely
+		assert.InDelta(t, 1750.0, pos.AverageCost.Float64(), Delta, "averageCost")
+		assert.InDelta(t, 0.04, pos.Base.Float64(), Delta, "base")
+		assert.InDelta(t, -70.0, pos.Quote.Float64(), Delta, "quote")
+	})
+}
