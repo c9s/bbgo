@@ -15,10 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// ClosedRoundRecord is the summary of a closed arbitrage round persisted to the DB.
-// The `db` tags name the xfundingv2_closed_rounds columns and are the single source
-// of truth for the insert column list and values (see dbColumnsOf / dbValuesOf).
-type ClosedRoundRecord struct {
+type RoundRecordBase struct {
 	// ID is the round's own DB-independent identifier (UUID generated at creation)
 	ID string `db:"id"`
 
@@ -38,15 +35,24 @@ type ClosedRoundRecord struct {
 	AnnualizedRate       fixedpoint.Value `db:"annualized_rate"`
 	FundingIncome        fixedpoint.Value `db:"funding_income"`
 
+	// realized PnLs
 	SpotPnL       fixedpoint.Value `db:"spot_pnl"`
 	SpotNetPnL    fixedpoint.Value `db:"spot_net_pnl"`
 	FuturesPnL    fixedpoint.Value `db:"futures_pnl"`
 	FuturesNetPnL fixedpoint.Value `db:"futures_net_pnl"`
 	NetPnL        fixedpoint.Value `db:"net_pnl"`
 
+	StartedAt time.Time `db:"started_at"`
+}
+
+// ClosedRoundRecord is the summary of a closed arbitrage round persisted to the DB.
+// The `db` tags name the xfundingv2_closed_rounds columns and are the single source
+// of truth for the insert column list and values (see dbColumnsOf / dbValuesOf).
+type ClosedRoundRecord struct {
+	RoundRecordBase
+
 	NumHoldingIntervals int `db:"num_holding_intervals"`
 
-	StartAt   time.Time  `db:"started_at"`
 	ReadyAt   *time.Time `db:"ready_at"`
 	ClosingAt time.Time  `db:"closing_at"`
 	ClosedAt  time.Time  `db:"closed_at"`
@@ -117,32 +123,35 @@ func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (Closed
 		readyTime = &ts
 	}
 	record := ClosedRoundRecord{
-		ID:         round.ID(),
-		InstanceID: s.instanceID,
+		RoundRecordBase: RoundRecordBase{
+			ID:         round.ID(),
+			InstanceID: s.instanceID,
 
-		SpotSymbol:    round.SpotSymbol(),
-		FuturesSymbol: round.FuturesSymbol(),
+			SpotSymbol:    round.SpotSymbol(),
+			FuturesSymbol: round.FuturesSymbol(),
 
-		SpotExchange:    round.syncState.SpotExchangeName.String(),
-		FuturesExchange: round.syncState.FuturesExchangeName.String(),
+			SpotExchange:    round.syncState.SpotExchangeName.String(),
+			FuturesExchange: round.syncState.FuturesExchangeName.String(),
 
-		Direction:       string(round.syncState.DirectionPolicy.Direction),
-		CollateralAsset: round.CollateralAsset(),
+			Direction:       string(round.syncState.DirectionPolicy.Direction),
+			CollateralAsset: round.CollateralAsset(),
 
-		Leverage:             round.syncState.Leverage,
-		TriggeredFundingRate: round.TriggeredFundingRate(),
-		AnnualizedRate:       round.AnnualizedRate(),
-		FundingIncome:        pnl.FundingIncome,
+			Leverage:             round.syncState.Leverage,
+			TriggeredFundingRate: round.TriggeredFundingRate(),
+			AnnualizedRate:       round.AnnualizedRate(),
+			FundingIncome:        pnl.FundingIncome,
 
-		SpotPnL:       pnl.SpotProfitStats.AccumulatedPnL,
-		SpotNetPnL:    pnl.SpotProfitStats.AccumulatedNetProfit,
-		FuturesPnL:    pnl.FuturesProfitStats.AccumulatedPnL,
-		FuturesNetPnL: pnl.FuturesProfitStats.AccumulatedNetProfit,
-		NetPnL:        pnl.NetPnL(),
+			SpotPnL:       pnl.SpotProfitStats.AccumulatedPnL,
+			SpotNetPnL:    pnl.SpotProfitStats.AccumulatedNetProfit,
+			FuturesPnL:    pnl.FuturesProfitStats.AccumulatedPnL,
+			FuturesNetPnL: pnl.FuturesProfitStats.AccumulatedNetProfit,
+			NetPnL:        pnl.NetPnL(),
+
+			StartedAt: round.StartedAt(),
+		},
 
 		NumHoldingIntervals: round.NumHoldingIntervals(round.ClosedAt()),
 
-		StartAt:   round.StartedAt(),
 		ReadyAt:   readyTime,
 		ClosingAt: round.ClosingAt(),
 		ClosedAt:  round.ClosedAt(),
@@ -222,23 +231,7 @@ func (s *RoundInsertService) insertClosedRound(
 // persisted to the DB. The `db` tags name the xfundingv2_round_snapshots columns and
 // are the single source of truth for the insert column list and values.
 type ActiveRoundRecord struct {
-	ID string `db:"id"`
-
-	InstanceID string `db:"strategy_instance_id"`
-
-	SpotSymbol    string `db:"spot_symbol"`
-	FuturesSymbol string `db:"futures_symbol"`
-
-	SpotExchange    string `db:"spot_exchange"`
-	FuturesExchange string `db:"futures_exchange"`
-
-	Direction       string `db:"direction"`
-	CollateralAsset string `db:"collateral_asset"`
-
-	Leverage             fixedpoint.Value `db:"leverage"`
-	TriggeredFundingRate fixedpoint.Value `db:"triggered_funding_rate"`
-	AnnualizedRate       fixedpoint.Value `db:"annualized_rate"`
-	FundingIncome        fixedpoint.Value `db:"funding_income"`
+	RoundRecordBase
 
 	SpotPosition    fixedpoint.Value `db:"spot_position"`
 	FuturesPosition fixedpoint.Value `db:"futures_position"`
@@ -252,13 +245,6 @@ type ActiveRoundRecord struct {
 	SpotAverageCost    fixedpoint.Value `db:"spot_average_cost"`
 	FuturesAverageCost fixedpoint.Value `db:"futures_average_cost"`
 
-	// realized PnLs
-	SpotPnL       fixedpoint.Value `db:"spot_pnl"`
-	SpotNetPnL    fixedpoint.Value `db:"spot_net_pnl"`
-	FuturesPnL    fixedpoint.Value `db:"futures_pnl"`
-	FuturesNetPnL fixedpoint.Value `db:"futures_net_pnl"`
-	NetPnL        fixedpoint.Value `db:"net_pnl"`
-
 	// unrealized PnLs
 	UnrealizedSpotPnL    fixedpoint.Value `db:"unrealized_spot_pnl"`
 	UnrealizedFuturesPnL fixedpoint.Value `db:"unrealized_futures_pnl"`
@@ -266,8 +252,6 @@ type ActiveRoundRecord struct {
 	TotalNetPnL        fixedpoint.Value `db:"total_net_pnl"`
 	TotalSpotNetPnL    fixedpoint.Value `db:"total_spot_net_pnl"`
 	TotalFuturesNetPnL fixedpoint.Value `db:"total_futures_net_pnl"`
-
-	StartedAt time.Time `db:"started_at"`
 }
 
 // newActiveRoundRecord builds a point-in-time snapshot of an active (non-closed)
@@ -281,22 +265,32 @@ func (s *RoundInsertService) newActiveRoundRecord(
 	pnl := round.UnrealizedPnL(spotOrderBook, futuresOrderBook)
 
 	record := ActiveRoundRecord{
-		ID:         round.ID(),
-		InstanceID: s.instanceID,
+		RoundRecordBase: RoundRecordBase{
+			ID:         round.ID(),
+			InstanceID: s.instanceID,
 
-		SpotSymbol:    round.SpotSymbol(),
-		FuturesSymbol: round.FuturesSymbol(),
+			SpotSymbol:    round.SpotSymbol(),
+			FuturesSymbol: round.FuturesSymbol(),
 
-		SpotExchange:    round.syncState.SpotExchangeName.String(),
-		FuturesExchange: round.syncState.FuturesExchangeName.String(),
+			SpotExchange:    round.syncState.SpotExchangeName.String(),
+			FuturesExchange: round.syncState.FuturesExchangeName.String(),
 
-		Direction:       string(round.syncState.DirectionPolicy.Direction),
-		CollateralAsset: round.CollateralAsset(),
+			Direction:       string(round.syncState.DirectionPolicy.Direction),
+			CollateralAsset: round.CollateralAsset(),
 
-		Leverage:             round.syncState.Leverage,
-		TriggeredFundingRate: round.TriggeredFundingRate(),
-		AnnualizedRate:       round.AnnualizedRate(),
-		FundingIncome:        pnl.FundingIncome,
+			Leverage:             round.syncState.Leverage,
+			TriggeredFundingRate: round.TriggeredFundingRate(),
+			AnnualizedRate:       round.AnnualizedRate(),
+			FundingIncome:        pnl.FundingIncome,
+
+			SpotPnL:       pnl.SpotProfitStats.AccumulatedPnL,
+			SpotNetPnL:    pnl.SpotProfitStats.AccumulatedNetProfit,
+			FuturesPnL:    pnl.FuturesProfitStats.AccumulatedPnL,
+			FuturesNetPnL: pnl.FuturesProfitStats.AccumulatedNetProfit,
+			NetPnL:        pnl.NetPnL(),
+
+			StartedAt: round.StartedAt(),
+		},
 
 		SpotPosition:    pnl.SpotPosition.Base,
 		FuturesPosition: pnl.FuturesPosition.Base,
@@ -307,20 +301,12 @@ func (s *RoundInsertService) newActiveRoundRecord(
 		SpotAverageCost:    pnl.SpotPosition.AverageCost,
 		FuturesAverageCost: pnl.FuturesPosition.AverageCost,
 
-		SpotPnL:       pnl.SpotProfitStats.AccumulatedPnL,
-		SpotNetPnL:    pnl.SpotProfitStats.AccumulatedNetProfit,
-		FuturesPnL:    pnl.FuturesProfitStats.AccumulatedPnL,
-		FuturesNetPnL: pnl.FuturesProfitStats.AccumulatedNetProfit,
-		NetPnL:        pnl.NetPnL(),
-
 		UnrealizedSpotPnL:    pnl.UnrealizedSpotPnL,
 		UnrealizedFuturesPnL: pnl.UnrealizedFuturesPnL,
 
 		TotalNetPnL:        pnl.TotalPnL(),
 		TotalSpotNetPnL:    pnl.TotalSpotNetPnL(),
 		TotalFuturesNetPnL: pnl.TotalFuturesNetPnL(),
-
-		StartedAt: round.StartedAt(),
 	}
 
 	return record, newFundingFeeRecords(round)
@@ -462,8 +448,33 @@ func extractDBColumns(record any) ([]string, []any) {
 	colnames := make([]string, 0, rt.NumField())
 	values := make([]any, 0, rt.NumField())
 	for i := 0; i < rt.NumField(); i++ {
-		if col, ok := dbColumnName(rt.Field(i)); ok {
-			value := rv.Field(i).Interface()
+		field := rt.Field(i)
+		fieldValue := rv.Field(i)
+
+		// Recurse into embedded (anonymous) structs that carry no db tag of their
+		// own, so their db-tagged fields are promoted as columns of the parent.
+		if field.Anonymous {
+			ft := field.Type
+			fv := fieldValue
+			for ft.Kind() == reflect.Ptr {
+				if fv.IsNil() {
+					break
+				}
+				ft = ft.Elem()
+				fv = fv.Elem()
+			}
+			if ft.Kind() == reflect.Struct {
+				if _, tagged := field.Tag.Lookup("db"); !tagged {
+					embeddedCols, embeddedVals := extractDBColumns(fv.Interface())
+					colnames = append(colnames, embeddedCols...)
+					values = append(values, embeddedVals...)
+					continue
+				}
+			}
+		}
+
+		if col, ok := dbColumnName(field); ok {
+			value := fieldValue.Interface()
 			colnames = append(colnames, col)
 			values = append(values, value)
 		}
