@@ -18,20 +18,14 @@ func (r *ArbitrageRound) Initialize(ctx context.Context, s *Strategy) error {
 			r.syncState.FuturesExchangeName, s.futuresSession.Exchange.Name())
 	}
 	r.SetFuturesExchangeFeeRates(
-		types.ExchangeFee{
-			MakerFeeRate: s.futuresSession.MakerFeeRate,
-			TakerFeeRate: s.futuresSession.TakerFeeRate,
-		},
+		s.costEstimator.GetSpotFeeRate(),
 	)
 	if s.spotSession.Exchange.Name() != r.syncState.SpotExchangeName {
 		return fmt.Errorf("[ArbitrageRound] spot exchange name mismatch: expected %s, got %s",
 			r.syncState.SpotExchangeName, s.spotSession.Exchange.Name())
 	}
 	r.SetSpotExchangeFeeRates(
-		types.ExchangeFee{
-			MakerFeeRate: s.spotSession.MakerFeeRate,
-			TakerFeeRate: s.spotSession.TakerFeeRate,
-		},
+		s.costEstimator.GetFuturesFeeRate(),
 	)
 	r.retryTransferTickC = make(chan time.Time, 100)
 	if r.hasStarted() {

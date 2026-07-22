@@ -133,12 +133,22 @@ func (r *ArbitrageRound) UnrealizedPnL(spotPrice, futuresPrice fixedpoint.Value)
 		RoundRealizedPnL: *realized,
 	}
 
+	// calculate estimated fees based on the current prices and base position sizes
+	spotFeeRate := r.spotExchangeFeeRates[r.syncState.SpotExchangeName].TakerFeeRate
+	futuresFeeRate := r.futuresExchangeFeeRates[r.syncState.FuturesExchangeName].TakerFeeRate
+	estimatedSpotFee := spotPrice.Mul(
+		realized.SpotPosition.Base.Abs(),
+	).Mul(spotFeeRate)
+	estimatedFuturesFee := futuresPrice.Mul(
+		realized.FuturesPosition.Base.Abs(),
+	).Mul(futuresFeeRate)
+
 	spotUnrealizedPnL := realized.SpotPosition.UnrealizedProfit(spotPrice)
 	result.SpotPrice = spotPrice
-	result.UnrealizedSpotPnL = spotUnrealizedPnL
+	result.UnrealizedSpotPnL = spotUnrealizedPnL.Sub(estimatedSpotFee)
 	futuresUnrealizedPnL := realized.FuturesPosition.UnrealizedProfit(futuresPrice)
 	result.FuturesPrice = futuresPrice
-	result.UnrealizedFuturesPnL = futuresUnrealizedPnL
+	result.UnrealizedFuturesPnL = futuresUnrealizedPnL.Sub(estimatedFuturesFee)
 
 	return result
 }
