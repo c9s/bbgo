@@ -12,7 +12,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 type RoundRecordBase struct {
@@ -267,9 +266,9 @@ type ActiveRoundRecord struct {
 // so the snapshot path persists the same funding-fee rows as the closed-round path.
 func (s *RoundInsertService) newActiveRoundRecord(
 	round *ArbitrageRound,
-	spotOrderBook, futuresOrderBook types.OrderBook,
+	spotPrice, futuresPrice fixedpoint.Value,
 ) (ActiveRoundRecord, []FundingFee) {
-	pnl := round.UnrealizedPnL(spotOrderBook, futuresOrderBook)
+	pnl := round.UnrealizedPnL(spotPrice, futuresPrice)
 
 	record := ActiveRoundRecord{
 		RoundRecordBase: RoundRecordBase{
@@ -330,13 +329,13 @@ func (s *RoundInsertService) newActiveRoundRecord(
 // round_id, txn) so they can be re-persisted when the round is later closed.
 func (s *RoundInsertService) InsertActiveRound(
 	round *ArbitrageRound,
-	spotOrderBook, futuresOrderBook types.OrderBook,
+	spotPrice, futuresPrice fixedpoint.Value,
 ) error {
 	if round.State() == RoundClosed {
 		return fmt.Errorf("given round is not active but closed: %s", round)
 	}
 
-	record, fees := s.newActiveRoundRecord(round, spotOrderBook, futuresOrderBook)
+	record, fees := s.newActiveRoundRecord(round, spotPrice, futuresPrice)
 
 	return s.insertActiveRound(record, fees)
 }

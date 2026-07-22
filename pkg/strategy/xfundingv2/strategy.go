@@ -103,6 +103,9 @@ type Strategy struct {
 	// stream order books to keep track of the latest order book for the candidate symbols
 	futuresOrderBooks, spotOrderBooks map[string]*types.StreamOrderBook
 
+	updateLastPriceC                  chan time.Time
+	futuresMarkPrices, spotLastPrices map[string]fixedpoint.Value
+
 	candidateSymbols          []string
 	costEstimator             *CostEstimator
 	preliminaryMarketSelector *MarketSelector
@@ -267,6 +270,10 @@ func (s *Strategy) Initialize() error {
 		s.CircuitBreakers = make(map[string]*circuitbreaker.BasicCircuitBreaker)
 	}
 	s.haltNotificationLimiters = make(map[string]*rate.Limiter)
+
+	s.futuresMarkPrices = make(map[string]fixedpoint.Value)
+	s.spotLastPrices = make(map[string]fixedpoint.Value)
+
 	return nil
 }
 
@@ -692,6 +699,13 @@ func (s *Strategy) CrossRun(
 	// start round funding income syncing worker
 	s.runFundingIncomeWorker(s.ctx)
 
+	// update the last prices for the first time
+	if err := s.updateLastPrices(s.ctx); err != nil {
+		s.logger.WithError(err).Error("failed to update last prices at startup")
+	}
+	// start the last price updater worker
+	s.runLastPriceWorker(s.ctx)
+
 	// setup callbacks
 	s.spotSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.TickSymbol, s.TickInterval, func(kline types.KLine) {
 		// end time of the kline is hh:mm:ss.999 -> add 1ms to round it up
@@ -777,11 +791,11 @@ func (s *Strategy) CrossRun(
 				continue
 			}
 			round.SetClosing(time.Now(), s.TWAPWorkerConfig.ClosingDuration)
-			spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+			spotPrice, futuresPrice, _ := s.getLastPrices(
 				round.SpotSymbol(),
 				round.FuturesSymbol(),
 			)
-			bbgo.Notify("⚠️ Round is set to closing state on startup", round.NewNotification(spotOrderBook, futuresOrderBook))
+			bbgo.Notify("⚠️ Round is set to closing state on startup", round.NewNotification(spotPrice, futuresPrice))
 		}
 		s.PendingRounds = make(map[string]*PendingRound)
 		s.mu.Unlock()
@@ -866,6 +880,14 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		}
 	}()
 
+	// trigger the worker to update the last prices
+	select {
+	case s.updateLastPriceC <- tickTime:
+		s.logger.Debugf("sent last price update tick time: %s", tickTime)
+	default:
+		s.logger.Warnf("last price update tick time channel is full, skip tick time: %s", tickTime)
+	}
+
 	if !s.lastTickTime.IsZero() && (s.lastTickTime.Equal(tickTime) || tickTime.Before(s.lastTickTime)) {
 		return
 	}
@@ -923,7 +945,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 					posDeviation.FuturesFilled,
 					posDeviation.DeviatedQuantity,
 				)
-				spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+				spotPrice, futuresPrice, _ := s.getLastPrices(
 					round.SpotSymbol(),
 					round.FuturesSymbol(),
 				)
@@ -931,7 +953,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 					roundSymbol,
 					posDeviation.SpotFilled, posDeviation.FuturesFilled,
 					posDeviation.DeviatedQuantity,
-					round.NewCriticalNotification(spotOrderBook, futuresOrderBook),
+					round.NewCriticalNotification(spotPrice, futuresPrice),
 				)
 				continue
 			} else if halted && !posDeviation.DeviateTooLong {
@@ -943,14 +965,14 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 					posDeviation.SpotFilled,
 					posDeviation.FuturesFilled,
 				)
-				spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+				spotPrice, futuresPrice, _ := s.getLastPrices(
 					round.SpotSymbol(),
 					round.FuturesSymbol(),
 				)
 				bbgo.Notify("✅ Round %s resumed as hedge deviation back to normal. It was halted at %s.",
 					roundSymbol,
 					haltedAt.Format(time.RFC3339),
-					round.NewNotification(spotOrderBook, futuresOrderBook),
+					round.NewNotification(spotPrice, futuresPrice),
 				)
 			}
 
@@ -959,7 +981,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				haltedAt := round.HaltedAt()
 				elapsed := tickTime.Sub(haltedAt)
 				limiter, found := s.haltNotificationLimiters[round.SpotSymbol()]
-				spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+				spotPrice, futuresPrice, _ := s.getLastPrices(
 					round.SpotSymbol(),
 					round.FuturesSymbol(),
 				)
@@ -969,7 +991,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 						roundSymbol,
 						elapsed.String(),
 						haltedAt.Format(time.RFC3339),
-						round.NewCriticalNotification(spotOrderBook, futuresOrderBook),
+						round.NewCriticalNotification(spotPrice, futuresPrice),
 					)
 				}
 				continue
@@ -980,25 +1002,26 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		// all transitions are done, check if the state has changed
 		currentState := round.State()
 		if oriState != currentState {
-			spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+			spotPrice, futuresPrice, _ := s.getLastPrices(
 				round.SpotSymbol(),
 				round.FuturesSymbol(),
 			)
+			notification := round.NewNotification(spotPrice, futuresPrice)
 			switch currentState {
 			case RoundReady:
 				bbgo.Notify("🟢 Round entered ready state: %s",
 					round.SpotSymbol(),
-					round.NewNotification(spotOrderBook, futuresOrderBook),
+					notification,
 				)
 			case RoundClosing:
 				bbgo.Notify("🟡 Round is closing: %s",
 					round.SpotSymbol(),
-					round.NewNotification(spotOrderBook, futuresOrderBook),
+					notification,
 				)
 			case RoundClosed:
 				bbgo.Notify("🔴 Round is closed: %s",
 					round.SpotSymbol(),
-					round.NewNotification(spotOrderBook, futuresOrderBook),
+					notification,
 				)
 			}
 		}
@@ -1027,13 +1050,13 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				// send notification for rounds that failed to pass the cleanup process for 3 times.
 				// the symbol of the round will be blocked for opening new round until the issue is resolved.
 				task.Notified = true
-				spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+				spotPrice, futuresPrice, _ := s.getLastPrices(
 					round.SpotSymbol(),
 					round.FuturesSymbol(),
 				)
 				bbgo.Notify("💥 Failed to handle closed round after %d retries. Manual intervention is required.",
 					s.MaxClosedRetryCnt,
-					round.NewCriticalNotification(spotOrderBook, futuresOrderBook),
+					round.NewCriticalNotification(spotPrice, futuresPrice),
 				)
 			}
 			continue
@@ -1045,11 +1068,11 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			s.logger.WithError(err).Errorf("failed to handle closed round: %s", task.Round)
 		} else {
 			s.closedRoundStats(task.Round, tickTime)
-			spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+			spotPrice, futuresPrice, _ := s.getLastPrices(
 				round.SpotSymbol(),
 				round.FuturesSymbol(),
 			)
-			bbgo.Notify("✅ Successfully handled closed round: %s", round.String(), round.NewNotification(spotOrderBook, futuresOrderBook))
+			bbgo.Notify("✅ Successfully handled closed round: %s", round.String(), round.NewNotification(spotPrice, futuresPrice))
 			delete(s.ClosedRoundTasks, task.Round.SpotSymbol())
 		}
 	}
@@ -1116,13 +1139,9 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 
 	// the funding rate has flipped
 	if round.TriggeredFundingRate().Sign()*fundingRate.LastFundingRate.Sign() <= 0 {
-		spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+		spotPrice, futuresPrice, _ := s.getLastPrices(
 			round.SpotSymbol(),
 			round.FuturesSymbol(),
-		)
-		bbgo.Notify("⚠️ Round funding rate flipped %s -> %s (%s)",
-			round.TriggeredFundingRate(), fundingRate.LastFundingRate, round.SpotSymbol(),
-			round.NewNotification(spotOrderBook, futuresOrderBook),
 		)
 		rateDiffAbs := fundingRate.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
 		if rateDiffAbs.Compare(s.CriticalErrorConfig.MaxFundingRateFlip) > 0 {
@@ -1130,10 +1149,15 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 				round.TriggeredFundingRate(),
 				fundingRate.LastFundingRate,
 				s.CriticalErrorConfig.MaxFundingRateFlip,
-				round.NewCriticalNotification(spotOrderBook, futuresOrderBook),
+				round.NewCriticalNotification(spotPrice, futuresPrice),
 			)
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
 			return
+		} else {
+			bbgo.Notify("⚠️ Round funding rate flipped %s -> %s (%s)",
+				round.TriggeredFundingRate(), fundingRate.LastFundingRate, round.SpotSymbol(),
+				round.NewNotification(spotPrice, futuresPrice),
+			)
 		}
 
 		// the round is still within the min holding time, keep holding
@@ -1156,24 +1180,20 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 		}
 		// the round is already beyond the min holding time and the funding rate has flipped
 		// check if the unrealized PnL is positive
-		spotOrderBook, futuresOrderBook, ok := s.getOrderBooks(
-			round.SpotSymbol(),
-			round.FuturesSymbol(),
-		)
+		spotPrice, futuresPrice, ok := s.getLastPrices(round.SpotSymbol(), round.FuturesSymbol())
 		if !ok {
 			s.logger.Warnf("[transitOpeningOrReadyRound] order book not found for symbols: %s", round.SpotSymbol())
 			return
 		}
 
-		midPrice := getMidPrice(futuresOrderBook)
 		futuresPosition := round.FuturesWorker().FilledPosition()
-		futuresPositionNotional := futuresPosition.Abs().Mul(midPrice)
+		futuresPositionNotional := futuresPosition.Abs().Mul(futuresPrice)
 		// short position -> last funding rate is negative due to the flipped rate
 		// long position -> last funding rate is positive due to the flipped rate
 		// the product of the flipped rate and the position is positive
 		// we need to negate the product to get the next funding income, which should be negative -> expected loss
 		nextFundingIncome := fundingRate.LastFundingRate.Mul(futuresPosition).Neg()
-		unrealizedPnL := round.UnrealizedPnL(spotOrderBook, futuresOrderBook)
+		unrealizedPnL := round.UnrealizedPnL(spotPrice, futuresPrice)
 		unrealizedTotalPnL := unrealizedPnL.TotalPnL()
 		// the unrealized PnL is positive or the expected unrealized net PnL is below the max closing loss ratio, transit to closing
 		// That is, we will close the round either when there is profit or the estimated loss is too large
@@ -1614,14 +1634,14 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 		if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
 			return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
 		} else {
-			spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+			spotPrice, futuresPrice, _ := s.getLastPrices(
 				round.SpotSymbol(),
 				round.FuturesSymbol(),
 			)
 			bbgo.Notify("⬅️ Transferred %s %s back to spot account",
 				balance.Available,
 				asset,
-				round.NewNotification(spotOrderBook, futuresOrderBook),
+				round.NewNotification(spotPrice, futuresPrice),
 			)
 		}
 	}
@@ -1716,16 +1736,16 @@ func (s *Strategy) newDebugLogger() *logrus.Entry {
 func (s *Strategy) notifyStats() {
 	var activeRoundNotifications []any
 	for _, round := range s.ActiveRounds {
-		spotOrderBook, futuresOrderBook, ok := s.getOrderBooks(
+		spotPrice, futuresPrice, ok := s.getLastPrices(
 			round.SpotSymbol(),
 			round.FuturesSymbol(),
 		)
 		if !ok {
 			continue
 		}
-		activeRoundNotifications = append(activeRoundNotifications, round.NewNotification(spotOrderBook, futuresOrderBook))
+		activeRoundNotifications = append(activeRoundNotifications, round.NewNotification(spotPrice, futuresPrice))
 		if s.roundInsertService != nil {
-			if err := s.roundInsertService.InsertActiveRound(round, spotOrderBook, futuresOrderBook); err != nil {
+			if err := s.roundInsertService.InsertActiveRound(round, spotPrice, futuresPrice); err != nil {
 				s.logger.WithError(err).Warnf("failed to insert active round to database: %s", round)
 			}
 		}
@@ -1733,11 +1753,11 @@ func (s *Strategy) notifyStats() {
 
 	var pendingRoundNotifications []any
 	for _, pendingRound := range s.PendingRounds {
-		spotOrderBook, futuresOrderBook, _ := s.getOrderBooks(
+		spotPrice, futuresPrice, _ := s.getLastPrices(
 			pendingRound.Round.SpotSymbol(),
 			pendingRound.Round.FuturesSymbol(),
 		)
-		pendingRoundNotifications = append(pendingRoundNotifications, pendingRound.Round.NewNotification(spotOrderBook, futuresOrderBook))
+		pendingRoundNotifications = append(pendingRoundNotifications, pendingRound.Round.NewNotification(spotPrice, futuresPrice))
 	}
 
 	bbgo.Notify("📊 Round stats: %d active rounds, %d pending rounds",
@@ -1872,8 +1892,56 @@ func (s *Strategy) setLeverage(ctx context.Context) error {
 	return nil
 }
 
-func (s *Strategy) getOrderBooks(spotSymbol, futuresSymbol string) (types.OrderBook, types.OrderBook, bool) {
-	spotOrderBook, spotOk := s.spotOrderBooks[spotSymbol]
-	futuresOrderBook, futuresOk := s.futuresOrderBooks[futuresSymbol]
-	return spotOrderBook.Copy(), futuresOrderBook.Copy(), spotOk && futuresOk
+func (s *Strategy) getLastPrices(spotSymbol, futuresSybol string) (spotPrice, futuresPrice fixedpoint.Value, ok bool) {
+	spotPrice, spotOk := s.spotLastPrices[spotSymbol]
+	futuresPrice, futuresOk := s.futuresMarkPrices[futuresSybol]
+
+	return spotPrice, futuresPrice, spotOk && futuresOk
+}
+
+func (s *Strategy) runLastPriceWorker(ctx context.Context) {
+	if s.updateLastPriceC != nil {
+		return
+	}
+
+	s.updateLastPriceC = make(chan time.Time, 5)
+	s.logger.Info("starting last price worker")
+	go func() {
+		defer s.logger.Info("last price worker exited")
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case tickTime, ok := <-s.updateLastPriceC:
+				if !ok {
+					return
+				}
+				if err := s.updateLastPrices(ctx); err != nil {
+					s.logger.WithError(err).Errorf("failed to update last price at %s", tickTime.Format(time.RFC3339))
+				}
+			}
+		}
+	}()
+}
+
+func (s *Strategy) updateLastPrices(ctx context.Context) error {
+	timedCtx, cancel := context.WithTimeout(ctx, 40*time.Second)
+	defer cancel()
+
+	for _, symbol := range s.candidateSymbols {
+		// update spot price
+		if ticker, err := s.spotSession.Exchange.QueryTicker(timedCtx, symbol); err != nil {
+			return err
+		} else {
+			s.spotLastPrices[symbol] = ticker.Last
+		}
+
+		// update futures price
+		if index, err := s.futuresService.QueryPremiumIndex(timedCtx, symbol); err != nil {
+			return err
+		} else {
+			s.futuresMarkPrices[symbol] = index.MarkPrice
+		}
+	}
+	return nil
 }
