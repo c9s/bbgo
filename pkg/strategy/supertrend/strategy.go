@@ -129,7 +129,14 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LinearRegression.Interval})
+	// LinearRegression is optional: setupIndicators() nils it for window==0 or
+	// empty-interval configs, and session.Subscribe panics on an empty kline
+	// interval — guard both panic paths here. Degenerate configs (window==0
+	// with an interval set) keep their historical unused subscription so
+	// existing backtest replay inputs are unchanged.
+	if s.LinearRegression != nil && s.LinearRegression.Interval != "" {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LinearRegression.Interval})
+	}
 
 	s.ExitMethods.SetAndSubscribe(session, s)
 
