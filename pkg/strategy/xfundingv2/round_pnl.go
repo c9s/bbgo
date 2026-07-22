@@ -56,14 +56,15 @@ func (r *ArbitrageRound) RealizedPnL() *RoundRealizedPnL {
 }
 
 func (r *ArbitrageRound) realizedPnL() *RoundRealizedPnL {
-
 	fundingIncome := r.totalFundingIncome()
 
 	spotMarket := r.spotWorker.Market()
 	futuresMarket := r.futuresWorker.Market()
 
 	spotPosition := types.NewPositionFromMarket(spotMarket)
+	spotPosition.UseExcludeFeeFromCostMode()
 	futuresPosition := types.NewPositionFromMarket(futuresMarket)
+	futuresPosition.UseExcludeFeeFromCostMode()
 	if r.spotExchangeFeeRates != nil {
 		spotPosition.ExchangeFeeRates = r.spotExchangeFeeRates
 	}
@@ -159,18 +160,15 @@ func (p *RoundUnrealizedPnL) TotalPnL() fixedpoint.Value {
 	return p.RoundRealizedPnL.TotalPnL().Add(p.UnrealizedSpotPnL).Add(p.UnrealizedFuturesPnL)
 }
 
-// legUnrealizedPnL marks one leg to market. Base is signed, so the PnL is simply
-// (price - averageCost) * base for both long and short. The close-side price is the
-// best bid for a long leg (sell to close) and the best ask for a short leg (buy to
-// close). Returns zero when the position is flat or the relevant book side is empty.
+// legUnrealizedPnL marks one leg to market.
+// If the position is long, it uses the best bid price; Otherwise, it uses the best ask price.
 func legUnrealizedPnL(book types.OrderBook, position *types.Position) (fixedpoint.Value, fixedpoint.Value) {
-	base := position.Base
-	if base.IsZero() {
+	if position.IsClosed() {
 		return fixedpoint.Zero, fixedpoint.Zero
 	}
 
 	var price fixedpoint.Value
-	if base.Sign() > 0 {
+	if position.IsLong() {
 		bid, ok := book.BestBid()
 		if !ok {
 			return fixedpoint.Zero, fixedpoint.Zero
@@ -184,5 +182,5 @@ func legUnrealizedPnL(book types.OrderBook, position *types.Position) (fixedpoin
 		price = ask.Price
 	}
 
-	return price, price.Sub(position.AverageCost).Mul(base)
+	return price, position.UnrealizedProfit(price)
 }
