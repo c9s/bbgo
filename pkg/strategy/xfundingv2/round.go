@@ -322,23 +322,23 @@ func (r *ArbitrageRound) SetSlackAlert(alert slackalert.SlackAlert) {
 	r.slackAlert = alert
 }
 
-func (r *ArbitrageRound) NewCriticalNotification(spotOrderBook, futuresOrderBook types.OrderBook) *roundNotification {
+func (r *ArbitrageRound) NewCriticalNotification(spotPrice, futuresPrice fixedpoint.Value) *roundNotification {
 	return &roundNotification{
 		ArbitrageRound: r,
 		IsCritical:     true,
 
-		spotOrderBook:    spotOrderBook,
-		futuresOrderBook: futuresOrderBook,
+		spotPrice:    spotPrice,
+		futuresPrice: futuresPrice,
 	}
 }
 
-func (r *ArbitrageRound) NewNotification(spotOrderBook, futuresOrderBook types.OrderBook) *roundNotification {
+func (r *ArbitrageRound) NewNotification(spotPrice, futuresPrice fixedpoint.Value) *roundNotification {
 	return &roundNotification{
 		ArbitrageRound: r,
 		IsCritical:     false,
 
-		spotOrderBook:    spotOrderBook,
-		futuresOrderBook: futuresOrderBook,
+		spotPrice:    spotPrice,
+		futuresPrice: futuresPrice,
 	}
 }
 
@@ -346,7 +346,7 @@ type roundNotification struct {
 	*ArbitrageRound
 	IsCritical bool
 
-	spotOrderBook, futuresOrderBook types.OrderBook
+	spotPrice, futuresPrice fixedpoint.Value
 }
 
 func (n *roundNotification) SlackAttachment() slack.Attachment {
@@ -434,8 +434,8 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			fields = append(fields, realizedPnLFields(realizedPnL)...)
 		} else {
 			unrealizedPnL := n.UnrealizedPnL(
-				n.spotOrderBook,
-				n.futuresOrderBook,
+				n.spotPrice,
+				n.futuresPrice,
 			)
 			spotAvgCost = unrealizedPnL.SpotPosition.AverageCost
 			futuresAvgCost = unrealizedPnL.FuturesPosition.AverageCost

@@ -122,11 +122,8 @@ type RoundUnrealizedPnL struct {
 	UnrealizedFuturesPnL fixedpoint.Value
 }
 
-// UnrealizedPnL calculates the unrealized profit and loss of the round by
-// marking the open spot and futures positions to the current order book prices.
-// Each leg is priced at its close side: a long leg at the best bid, a short leg
-// at the best ask.
-func (r *ArbitrageRound) UnrealizedPnL(spotOrderBook, futuresOrderBook types.OrderBook) *RoundUnrealizedPnL {
+// UnrealizedPnL calculates the unrealized profit and loss of the round by the given mark prices
+func (r *ArbitrageRound) UnrealizedPnL(spotPrice, futuresPrice fixedpoint.Value) *RoundUnrealizedPnL {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -136,10 +133,10 @@ func (r *ArbitrageRound) UnrealizedPnL(spotOrderBook, futuresOrderBook types.Ord
 		RoundRealizedPnL: *realized,
 	}
 
-	spotPrice, spotUnrealizedPnL := legUnrealizedPnL(spotOrderBook, realized.SpotPosition)
+	spotUnrealizedPnL := realized.SpotPosition.UnrealizedProfit(spotPrice)
 	result.SpotPrice = spotPrice
 	result.UnrealizedSpotPnL = spotUnrealizedPnL
-	futuresPrice, futuresUnrealizedPnL := legUnrealizedPnL(futuresOrderBook, realized.FuturesPosition)
+	futuresUnrealizedPnL := realized.FuturesPosition.UnrealizedProfit(futuresPrice)
 	result.FuturesPrice = futuresPrice
 	result.UnrealizedFuturesPnL = futuresUnrealizedPnL
 
@@ -158,29 +155,4 @@ func (r *RoundUnrealizedPnL) TotalFuturesNetPnL() fixedpoint.Value {
 // unrealized PnL of both open legs.
 func (p *RoundUnrealizedPnL) TotalPnL() fixedpoint.Value {
 	return p.RoundRealizedPnL.TotalPnL().Add(p.UnrealizedSpotPnL).Add(p.UnrealizedFuturesPnL)
-}
-
-// legUnrealizedPnL marks one leg to market.
-// If the position is long, it uses the best bid price; Otherwise, it uses the best ask price.
-func legUnrealizedPnL(book types.OrderBook, position *types.Position) (fixedpoint.Value, fixedpoint.Value) {
-	if position.IsClosed() {
-		return fixedpoint.Zero, fixedpoint.Zero
-	}
-
-	var price fixedpoint.Value
-	if position.IsLong() {
-		bid, ok := book.BestBid()
-		if !ok {
-			return fixedpoint.Zero, fixedpoint.Zero
-		}
-		price = bid.Price
-	} else {
-		ask, ok := book.BestAsk()
-		if !ok {
-			return fixedpoint.Zero, fixedpoint.Zero
-		}
-		price = ask.Price
-	}
-
-	return price, position.UnrealizedProfit(price)
 }
