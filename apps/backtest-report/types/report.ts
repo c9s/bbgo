@@ -31,6 +31,8 @@ export interface ReportSummary {
   intervals: string[];
   initialTotalBalances: BalanceMap;
   finalTotalBalances: BalanceMap;
+  totalProfit?: number;
+  totalNetProfit?: number;
   symbolReports: SymbolReport[];
   manifests: Manifest[];
 }

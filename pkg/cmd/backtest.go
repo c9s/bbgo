@@ -577,7 +577,8 @@ var BacktestCmd = &cobra.Command{
 
 				summaryReport.Symbols = append(summaryReport.Symbols, symbol)
 				summaryReport.SymbolReports = append(summaryReport.SymbolReports, *symbolReport)
-				summaryReport.TotalProfit = symbolReport.PnL.Profit
+				summaryReport.TotalProfit = summaryReport.TotalProfit.Add(symbolReport.PnL.Profit)
+				summaryReport.TotalNetProfit = summaryReport.TotalNetProfit.Add(symbolReport.PnL.NetProfit)
 				summaryReport.TotalUnrealizedProfit = symbolReport.PnL.UnrealizedProfit
 				summaryReport.InitialEquityValue = summaryReport.InitialEquityValue.Add(symbolReport.InitialEquityValue())
 				summaryReport.FinalEquityValue = summaryReport.FinalEquityValue.Add(symbolReport.FinalEquityValue())

@@ -41,8 +41,11 @@ type SummaryReport struct {
 	InitialEquityValue fixedpoint.Value `json:"initialEquityValue"`
 	FinalEquityValue   fixedpoint.Value `json:"finalEquityValue"`
 
-	// TotalProfit is the profit aggregated from the symbol reports
-	TotalProfit           fixedpoint.Value `json:"totalProfit,omitempty"`
+	// TotalProfit is the gross profit aggregated from the symbol reports.
+	TotalProfit fixedpoint.Value `json:"totalProfit,omitempty"`
+	// TotalNetProfit is the realized profit after fees aggregated from the
+	// symbol reports.
+	TotalNetProfit        fixedpoint.Value `json:"totalNetProfit,omitempty"`
 	TotalUnrealizedProfit fixedpoint.Value `json:"totalUnrealizedProfit,omitempty"`
 
 	TotalGrossProfit fixedpoint.Value `json:"totalGrossProfit,omitempty"`
