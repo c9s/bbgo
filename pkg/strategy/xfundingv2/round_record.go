@@ -35,6 +35,10 @@ type RoundRecordBase struct {
 	AnnualizedRate       fixedpoint.Value `db:"annualized_rate"`
 	FundingIncome        fixedpoint.Value `db:"funding_income"`
 
+	// fee
+	FeeSymbol  string           `db:"fee_symbol"`
+	FeeAvgCost fixedpoint.Value `db:"fee_avg_cost"`
+
 	// realized PnLs
 	SpotPnL       fixedpoint.Value `db:"spot_pnl"`
 	SpotNetPnL    fixedpoint.Value `db:"spot_net_pnl"`
@@ -146,6 +150,9 @@ func (s *RoundInsertService) newClosedRoundRecord(round *ArbitrageRound) (Closed
 			FuturesPnL:    pnl.FuturesProfitStats.AccumulatedPnL,
 			FuturesNetPnL: pnl.FuturesProfitStats.AccumulatedNetProfit,
 			NetPnL:        pnl.NetPnL(),
+
+			FeeSymbol:  round.syncState.FeeSymbol,
+			FeeAvgCost: round.syncState.AvgFeeCost,
 
 			StartedAt: round.StartedAt(),
 		},
@@ -282,6 +289,9 @@ func (s *RoundInsertService) newActiveRoundRecord(
 			TriggeredFundingRate: round.TriggeredFundingRate(),
 			AnnualizedRate:       round.AnnualizedRate(),
 			FundingIncome:        pnl.FundingIncome,
+
+			FeeSymbol:  round.syncState.FeeSymbol,
+			FeeAvgCost: round.syncState.AvgFeeCost,
 
 			SpotPnL:       pnl.SpotProfitStats.AccumulatedPnL,
 			SpotNetPnL:    pnl.SpotProfitStats.AccumulatedNetProfit,
