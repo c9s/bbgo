@@ -131,19 +131,6 @@ func TestArbitrageRound_TradePnL(t *testing.T) {
 	})
 }
 
-// newTestOrderBook builds an order book with the given bid/ask price-volume text.
-// Either side may be empty to simulate a one-sided book.
-func newTestOrderBook(symbol, bidsText, asksText string) types.OrderBook {
-	book := &types.SliceOrderBook{Symbol: symbol}
-	if bidsText != "" {
-		book.Bids = PriceVolumeSliceFromText(bidsText)
-	}
-	if asksText != "" {
-		book.Asks = PriceVolumeSliceFromText(asksText)
-	}
-	return book
-}
-
 func TestArbitrageRound_UnrealizedPnL(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -153,10 +140,8 @@ func TestArbitrageRound_UnrealizedPnL(t *testing.T) {
 	t.Run("returns zero unrealized PnL when there are no trades", func(t *testing.T) {
 		round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
 
-		spotBook := newTestOrderBook("BTCUSDT", "41000, 10", "41010, 10")
-		futuresBook := newTestOrderBook("BTCUSDT", "40990, 10", "41000, 10")
-
-		pnl := round.UnrealizedPnL(spotBook, futuresBook)
+		// no open positions → marking to any price yields zero unrealized PnL
+		pnl := round.UnrealizedPnL(Number(41000), Number(40000))
 		assert.Equal(t, fixedpoint.Zero, pnl.UnrealizedSpotPnL)
 		assert.Equal(t, fixedpoint.Zero, pnl.UnrealizedFuturesPnL)
 		// with no realized profit and no unrealized profit, total is zero
@@ -194,52 +179,30 @@ func TestArbitrageRound_UnrealizedPnL(t *testing.T) {
 			Time:          types.Time(time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC)),
 		})
 
-		// Spot long closes at the bid (41000 > 40000 avg cost → profit).
-		// Futures short closes at the ask (40000 < 40100 avg cost → profit).
-		spotBook := newTestOrderBook("BTCUSDT", "41000, 10", "41010, 10")
-		futuresBook := newTestOrderBook("BTCUSDT", "39990, 10", "40000, 10")
+		// Mark to the current prices: spot at 41000 (> 40000 avg cost → profit),
+		// futures at 40000 (< 40100 avg cost → profit for the short leg).
+		spotPrice := Number(41000)
+		futuresPrice := Number(40000)
 
-		pnl := round.UnrealizedPnL(spotBook, futuresBook)
+		pnl := round.UnrealizedPnL(spotPrice, futuresPrice)
 
 		// realized positions are populated on the embedded struct
 		assert.True(t, pnl.SpotPosition.IsLong(), "spot position should be long")
 		assert.True(t, pnl.FuturesPosition.IsShort(), "futures position should be short")
 
+		// prices are recorded on the result
+		assert.Equal(t, spotPrice, pnl.SpotPrice)
+		assert.Equal(t, futuresPrice, pnl.FuturesPrice)
+
 		// spot: (41000 - 40000) * 1 = 1000
 		assert.Equal(t, Number(1000), pnl.UnrealizedSpotPnL,
 			"unrealized spot PnL should be 1000, got: %s", pnl.UnrealizedSpotPnL)
-		// futures: (40000 - 40100) * -1 = 100
+		// futures: (40100 - 40000) * 1 = 100
 		assert.Equal(t, Number(100), pnl.UnrealizedFuturesPnL,
 			"unrealized futures PnL should be 100, got: %s", pnl.UnrealizedFuturesPnL)
 
 		// total = realized net + both unrealized legs
 		expectedTotal := pnl.NetPnL().Add(Number(1000)).Add(Number(100))
 		assert.Equal(t, expectedTotal, pnl.TotalPnL())
-	})
-
-	t.Run("returns zero for a leg when its close-side book is empty", func(t *testing.T) {
-		round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
-
-		// long spot position → needs a bid to mark to market
-		spotExecutor := round.spotWorker.Executor()
-		spotExecutor.syncState.Orders[1] = types.OrderQuery{OrderID: "1"}
-		spotExecutor.AddTrade(types.Trade{
-			ID:            100,
-			OrderID:       1,
-			Symbol:        "BTCUSDT",
-			Side:          types.SideTypeBuy,
-			Price:         Number(40000),
-			Quantity:      Number(1),
-			QuoteQuantity: Number(40000),
-			Time:          types.Time(time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC)),
-		})
-
-		// spot book has asks only (no bid) → long leg cannot be priced → zero
-		spotBook := newTestOrderBook("BTCUSDT", "", "41010, 10")
-		futuresBook := newTestOrderBook("BTCUSDT", "39990, 10", "40000, 10")
-
-		pnl := round.UnrealizedPnL(spotBook, futuresBook)
-		assert.Equal(t, fixedpoint.Zero, pnl.UnrealizedSpotPnL,
-			"unrealized spot PnL should be zero when the bid side is empty")
 	})
 }
