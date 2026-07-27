@@ -1368,13 +1368,15 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 }
 
 type PositionDeviation struct {
-	SpotFilled       fixedpoint.Value
-	FuturesFilled    fixedpoint.Value
-	DeviatedQuantity fixedpoint.Value
-	DeviateTooLong   bool
+	SpotFilled            fixedpoint.Value
+	FuturesFilled         fixedpoint.Value
+	DeviatedQuantity      fixedpoint.Value
+	DeviatedQuoteQuantity fixedpoint.Value
+	LastPrice             fixedpoint.Value
+	DeviateTooLong        bool
 }
 
-func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxMoqDeviation fixedpoint.Value, duration time.Duration) PositionDeviation {
+func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxMoqDeviation, maxQuoteDeviation, lastPrice fixedpoint.Value, duration time.Duration) PositionDeviation {
 	// MOQ: minimum order quantity
 	spotMOQ := r.spotWorker.Market().MinQuantity
 	futuresMOQ := r.futuresWorker.Market().MinQuantity
@@ -1386,7 +1388,8 @@ func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxMoqDev
 	spotFilled := r.SpotWorker().FilledPosition()
 	futuresFilled := r.FuturesWorker().FilledPosition()
 	deviation := spotFilled.Add(futuresFilled).Abs()
-	deviationTooLarge := deviation.Compare(thresholdQuantity) >= 0
+	deviationQuote := deviation.Mul(lastPrice)
+	deviationTooLarge := deviation.Compare(thresholdQuantity) >= 0 || deviationQuote.Compare(maxQuoteDeviation) >= 0
 	if deviationTooLarge {
 		if r.syncState.LargeDeviationStartTime.IsZero() {
 			r.syncState.LargeDeviationStartTime = currentTime
@@ -1399,10 +1402,12 @@ func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxMoqDev
 		deviateTooLong = true
 	}
 	return PositionDeviation{
-		SpotFilled:       spotFilled,
-		FuturesFilled:    futuresFilled,
-		DeviatedQuantity: deviation,
-		DeviateTooLong:   deviateTooLong,
+		SpotFilled:            spotFilled,
+		FuturesFilled:         futuresFilled,
+		DeviatedQuantity:      deviation,
+		DeviatedQuoteQuantity: deviationQuote,
+		LastPrice:             lastPrice,
+		DeviateTooLong:        deviateTooLong,
 	}
 }
 
