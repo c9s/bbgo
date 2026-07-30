@@ -130,6 +130,10 @@ type Strategy struct {
 	HedgeInterval       types.Duration `json:"hedgeInterval"`
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
 
+	// AdaptiveQuoteInterval adjusts the quote (place/cancel) interval based on
+	// market volatility (ATR). When disabled, the fixed UpdateInterval is used.
+	AdaptiveQuoteInterval *AdaptiveQuoteInterval `json:"adaptiveQuoteInterval,omitempty"`
+
 	EnableSignalMargin bool `json:"enableSignalMargin"`
 
 	// Direction-divergence (D2) control — optional risk widener driven by signal direction conflicts
@@ -321,6 +325,8 @@ type Strategy struct {
 	openOrderBidExposureInUsdMetrics   prometheus.Gauge
 	openOrderAskExposureInUsdMetrics   prometheus.Gauge
 
+	adaptiveQuoteIntervalMetrics prometheus.Observer
+
 	d2Metrics            prometheus.Gauge
 	directionMeanMetrics prometheus.Gauge
 	alignedWeightMetrics prometheus.Gauge
@@ -351,6 +357,14 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	}
 
 	sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol, types.SubscribeOptions{Interval: "1m"})
+
+	// subscribe the kline interval used by the adaptive quote interval (ATR),
+	// if it differs from the 1m interval already subscribed above.
+	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled &&
+		s.AdaptiveQuoteInterval.Interval != "" && s.AdaptiveQuoteInterval.Interval != types.Interval1m {
+		sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol,
+			types.SubscribeOptions{Interval: s.AdaptiveQuoteInterval.Interval})
+	}
 
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
@@ -474,6 +488,8 @@ func (s *Strategy) Initialize() error {
 	s.makerOrderPlacementDurationMetrics = makerOrderPlacementDurationMetrics.With(s.metricsLabels)
 	s.openOrderBidExposureInUsdMetrics = openOrderBidExposureInUsdMetrics.With(s.metricsLabels)
 	s.openOrderAskExposureInUsdMetrics = openOrderAskExposureInUsdMetrics.With(s.metricsLabels)
+
+	s.adaptiveQuoteIntervalMetrics = adaptiveQuoteIntervalSecondsMetrics.With(s.metricsLabels)
 
 	s.d2Metrics = divergenceD2.With(s.metricsLabels)
 	s.directionMeanMetrics = directionMean.With(s.metricsLabels)
@@ -2289,6 +2305,12 @@ func (s *Strategy) Defaults() error {
 		s.UpdateInterval = types.Duration(time.Second)
 	}
 
+	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
+		if err := s.AdaptiveQuoteInterval.Defaults(); err != nil {
+			return err
+		}
+	}
+
 	if s.HedgeInterval == 0 {
 		s.HedgeInterval = types.Duration(10 * time.Second)
 	}
@@ -2446,6 +2468,12 @@ func (s *Strategy) Validate() error {
 		return errors.New("hedge session is required")
 	}
 
+	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
+		if err := s.AdaptiveQuoteInterval.Validate(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -2490,6 +2518,15 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 				if !errors.Is(err, context.Canceled) {
 					s.logger.WithError(err).Errorf("unable to place maker orders")
 				}
+			}
+
+			// adapt the next quote interval to market volatility (ATR).
+			// this only reschedules the ticker; the fast-cancel path above
+			// (marketTradeC) is driven by market-trade events and is unaffected.
+			if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
+				next := s.AdaptiveQuoteInterval.NextInterval(s.UpdateInterval.Duration())
+				s.adaptiveQuoteIntervalMetrics.Observe(next.Seconds())
+				ticker.Reset(timejitter.Milliseconds(next, 200))
 			}
 
 		}
@@ -2701,6 +2738,13 @@ func (s *Strategy) CrossRun(
 
 	indicators := s.hedgeSession.Indicators(s.SourceSymbol)
 	_ = indicators
+
+	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
+		s.AdaptiveQuoteInterval.Bind(s.hedgeSession, s.SourceSymbol, s.logger)
+		s.logger.Infof("adaptive quote interval enabled: ATR(%s, %d), interval range [%s, %s]",
+			s.AdaptiveQuoteInterval.Interval, s.AdaptiveQuoteInterval.Window,
+			s.AdaptiveQuoteInterval.MinInterval.Duration(), s.AdaptiveQuoteInterval.MaxInterval.Duration())
+	}
 
 	// restore state
 	s.groupID = util.FNV32(instanceID)
