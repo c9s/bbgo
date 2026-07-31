@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -53,6 +54,9 @@ type AdaptiveQuoteInterval struct {
 	atrp   *indicatorv2.ATRPStream
 	scale  *bbgo.LinearScale
 	logger logrus.FieldLogger
+
+	volatilityMetric      prometheus.Gauge    // set from adaptiveQuoteIntervalVolatilityMetrics
+	intervalSecondsMetric prometheus.Observer // set from adaptiveQuoteIntervalSecondsMetrics
 }
 
 func (a *AdaptiveQuoteInterval) Defaults() error {
@@ -106,11 +110,17 @@ func (a *AdaptiveQuoteInterval) Validate() error {
 }
 
 // Bind sets up the ATRP indicator on the given session/symbol and builds the
-// inverse linear scale that maps the volatility ratio to a quote interval.
-func (a *AdaptiveQuoteInterval) Bind(session *bbgo.ExchangeSession, symbol string, logger logrus.FieldLogger) {
+// inverse linear scale that maps the volatility ratio to a quote interval. It
+// also wires the Prometheus metric observers from the given labels.
+func (a *AdaptiveQuoteInterval) Bind(
+	session *bbgo.ExchangeSession, symbol string, logger logrus.FieldLogger, metricsLabels prometheus.Labels,
+) {
 	a.logger = logger.WithField("feature", "adaptiveQuoteInterval")
 	a.atrp = session.Indicators(symbol).ATRP(a.Interval, a.Window)
 	a.scale = a.buildScale()
+
+	a.volatilityMetric = adaptiveQuoteIntervalVolatilityMetrics.With(metricsLabels)
+	a.intervalSecondsMetric = adaptiveQuoteIntervalSecondsMetrics.With(metricsLabels)
 }
 
 // buildScale constructs the clamped inverse linear scale:
@@ -156,6 +166,17 @@ func (a *AdaptiveQuoteInterval) intervalForVolatility(atrp float64, fallback tim
 func (a *AdaptiveQuoteInterval) NextInterval(fallback time.Duration) time.Duration {
 	atrp := a.atrp.Last(0)
 	interval := a.intervalForVolatility(atrp, fallback)
+
+	// emit the raw volatility reading and the resulting interval together, so the
+	// two are always recorded from the same decision. Guard against nil observers
+	// because unit tests call NextInterval without Bind().
+	if a.volatilityMetric != nil {
+		a.volatilityMetric.Set(atrp)
+	}
+
+	if a.intervalSecondsMetric != nil {
+		a.intervalSecondsMetric.Observe(interval.Seconds())
+	}
 
 	if a.logger != nil {
 		a.logger.Debugf("adaptive quote interval: atrp=%f -> %s", atrp, interval)

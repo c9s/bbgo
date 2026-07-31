@@ -330,8 +330,6 @@ type Strategy struct {
 	openOrderBidExposureInUsdMetrics   prometheus.Gauge
 	openOrderAskExposureInUsdMetrics   prometheus.Gauge
 
-	adaptiveQuoteIntervalMetrics prometheus.Observer
-
 	d2Metrics            prometheus.Gauge
 	directionMeanMetrics prometheus.Gauge
 	alignedWeightMetrics prometheus.Gauge
@@ -495,8 +493,6 @@ func (s *Strategy) Initialize() error {
 	s.makerOrderPlacementDurationMetrics = makerOrderPlacementDurationMetrics.With(s.metricsLabels)
 	s.openOrderBidExposureInUsdMetrics = openOrderBidExposureInUsdMetrics.With(s.metricsLabels)
 	s.openOrderAskExposureInUsdMetrics = openOrderAskExposureInUsdMetrics.With(s.metricsLabels)
-
-	s.adaptiveQuoteIntervalMetrics = adaptiveQuoteIntervalSecondsMetrics.With(s.metricsLabels)
 
 	s.d2Metrics = divergenceD2.With(s.metricsLabels)
 	s.directionMeanMetrics = directionMean.With(s.metricsLabels)
@@ -2564,7 +2560,6 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 			// (marketTradeC) is driven by market-trade events and is unaffected.
 			if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
 				next := s.AdaptiveQuoteInterval.NextInterval(s.UpdateInterval.Duration())
-				s.adaptiveQuoteIntervalMetrics.Observe(next.Seconds())
 				ticker.Reset(timejitter.Milliseconds(next, 200))
 			}
 
@@ -2783,7 +2778,7 @@ func (s *Strategy) CrossRun(
 	_ = indicators
 
 	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
-		s.AdaptiveQuoteInterval.Bind(s.hedgeSession, s.SourceSymbol, s.logger)
+		s.AdaptiveQuoteInterval.Bind(s.hedgeSession, s.SourceSymbol, s.logger, s.metricsLabels)
 
 		s.logger.Infof("adaptive quote interval enabled: ATR(%s, %d), interval range [%s, %s]",
 			s.AdaptiveQuoteInterval.Interval, s.AdaptiveQuoteInterval.Window,
