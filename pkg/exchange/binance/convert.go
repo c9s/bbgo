@@ -118,6 +118,14 @@ func toGlobalFuturesMarket(symbol futures.Symbol) types.Market {
 		market.TickSize = fixedpoint.MustNewFromString(f.TickSize)
 	}
 
+	if market.MinNotional.IsZero() {
+		log.Warnf("binance futures market %s minNotional is zero", market.Symbol)
+	}
+
+	if market.MinQuantity.IsZero() {
+		log.Warnf("binance futures market %s minQuantity is zero", market.Symbol)
+	}
+
 	return market
 }
 
