@@ -378,8 +378,10 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 
-	for _, sig := range s.SignalConfigList.Signals {
-		sig.Signal.Subscribe(sourceSession, s.SourceSymbol)
+	if s.SignalConfigList != nil {
+		for _, sig := range s.SignalConfigList.Signals {
+			sig.Signal.Subscribe(sourceSession, s.SourceSymbol)
+		}
 	}
 
 	subscribeFeeTokenMarkets(sourceSession)
@@ -541,8 +543,10 @@ func (s *Strategy) Initialize() error {
 	s.positionExposure = bbgo.NewPositionExposure(s.Symbol)
 	s.positionExposure.SetLogger(s.logger)
 	s.positionExposure.SetMetricsLabels(ID, s.InstanceID(), s.MakerExchange, s.Symbol)
-	for _, sig := range s.SignalConfigList.Signals {
-		s.logger.Infof("using signal provider: %s", sig)
+	if s.SignalConfigList != nil {
+		for _, sig := range s.SignalConfigList.Signals {
+			s.logger.Infof("using signal provider: %s", sig)
+		}
 	}
 
 	// initialize connector manager
@@ -788,6 +792,9 @@ func (s *Strategy) collectSignalsAndWeights(ctx context.Context) (signals []floa
 
 // TODO: move this AggregateSignal to the signal package
 func (s *Strategy) AggregateSignal(ctx context.Context) (float64, error) {
+	if s.SignalConfigList == nil {
+		return 0.0, nil
+	}
 	sum := 0.0
 	voters := 0.0
 	for _, signalWrapper := range s.SignalConfigList.Signals {
@@ -2963,28 +2970,30 @@ func (s *Strategy) CrossRun(
 		)
 	}
 
-	for _, signalConfig := range s.SignalConfigList.Signals {
-		sigProvider := signalConfig.Signal
-		if setter, ok := sigProvider.(signal.StreamBookSetter); ok {
-			s.logger.Infof("setting stream book on signal %T", sigProvider)
-			setter.SetStreamBook(s.sourceBook)
-		}
+	if s.SignalConfigList != nil {
+		for _, signalConfig := range s.SignalConfigList.Signals {
+			sigProvider := signalConfig.Signal
+			if setter, ok := sigProvider.(signal.StreamBookSetter); ok {
+				s.logger.Infof("setting stream book on signal %T", sigProvider)
+				setter.SetStreamBook(s.sourceBook)
+			}
 
-		if setter, ok := sigProvider.(signal.MarketTradeStreamSetter); ok {
-			s.logger.Infof("setting market trade stream on signal %T", sigProvider)
-			setter.SetMarketTradeStream(s.marketTradeStream)
-		}
+			if setter, ok := sigProvider.(signal.MarketTradeStreamSetter); ok {
+				s.logger.Infof("setting market trade stream on signal %T", sigProvider)
+				setter.SetMarketTradeStream(s.marketTradeStream)
+			}
 
-		// pass logger to the signal provider
-		if setter, ok := sigProvider.(interface {
-			SetLogger(logger logrus.FieldLogger)
-		}); ok {
-			setter.SetLogger(s.logger.WithField("component", "signal"))
-		}
+			// pass logger to the signal provider
+			if setter, ok := sigProvider.(interface {
+				SetLogger(logger logrus.FieldLogger)
+			}); ok {
+				setter.SetLogger(s.logger.WithField("component", "signal"))
+			}
 
-		s.logger.Infof("binding session on signal %T", sigProvider)
-		if err := sigProvider.Bind(s.tradingCtx, s.hedgeSession, s.SourceSymbol); err != nil {
-			return err
+			s.logger.Infof("binding session on signal %T", sigProvider)
+			if err := sigProvider.Bind(s.tradingCtx, s.hedgeSession, s.SourceSymbol); err != nil {
+				return err
+			}
 		}
 	}
 
