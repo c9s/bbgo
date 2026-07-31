@@ -111,6 +111,11 @@ type Strategy struct {
 
 	Environment *bbgo.Environment
 
+	// DryRun, when true, runs the strategy against live market data but never
+	// submits or cancels real orders on any exchange; intended orders and cancels
+	// are only logged with a [dryRun] prefix.
+	DryRun bool `json:"dryRun"`
+
 	// Symbol is the maker Symbol
 	Symbol      string `json:"symbol"`
 	MakerSymbol string `json:"makerSymbol"`
@@ -1000,10 +1005,14 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	cancelMakerOrdersProfile := timeprofile.Start("cancelMakerOrders")
 
-	if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
-		s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
-		s.activeMakerOrders.Print()
-		return nil
+	// In dry-run mode we never place maker orders, so there is nothing to cancel;
+	// skip the cancel call entirely to avoid touching the exchange.
+	if !s.DryRun {
+		if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
+			s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
+			s.activeMakerOrders.Print()
+			return nil
+		}
 	}
 
 	s.cancelOrderDurationMetrics.Observe(float64(cancelMakerOrdersProfile.Stop().Milliseconds()))
@@ -1690,6 +1699,11 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		return nil
 	}
 
+	if s.DryRun {
+		s.logger.Infof("[dryRun] maker orders: %+v", submitOrders)
+		return nil
+	}
+
 	formattedOrders, err := s.makerSession.FormatOrders(submitOrders)
 	if err != nil {
 		return err
@@ -1825,6 +1839,11 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, disableBid, d
 	}
 
 	if len(iocOrders) == 0 {
+		return false, nil
+	}
+
+	if s.DryRun {
+		s.logger.Infof("[dryRun] arbitrage IOC orders: %+v", iocOrders)
 		return false, nil
 	}
 
@@ -1997,6 +2016,11 @@ func (s *Strategy) spreadMakerHedge(ctx context.Context, sig float64) error {
 		}
 
 		if !hasOrder || !keptOrder {
+			if s.DryRun {
+				s.logger.Infof("[dryRun] spread maker order: %+v", makerOrderForm)
+				return nil
+			}
+
 			spreadMakerCounterMetrics.With(s.metricsLabels).Inc()
 			s.logger.Infof("spreadMaker: placing new spread maker order: %+v...", makerOrderForm)
 
@@ -2177,6 +2201,11 @@ func (s *Strategy) directHedge(
 		bbgo.Notify("Hit hedge error rate limit, waiting...")
 		time.Sleep(s.hedgeErrorRateReservation.Delay())
 		s.hedgeErrorRateReservation = nil
+	}
+
+	if s.DryRun {
+		s.logger.Infof("[dryRun] hedge order: %s %s @ %s", side.String(), quantity.String(), price.String())
+		return nil, nil
 	}
 
 	bbgo.Notify("Submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
@@ -2494,6 +2523,9 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 	defer ticker.Stop()
 
 	defer func() {
+		if s.DryRun {
+			return
+		}
 		if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 			s.logger.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
 		}
@@ -2700,6 +2732,10 @@ func (s *Strategy) CrossRun(
 
 	s.simpleHedgeMode = s.isSimpleHedgeMode()
 
+	if s.DryRun {
+		s.logger.Warnf("xmaker is running in DRY-RUN mode: no real orders will be submitted")
+	}
+
 	if s.UseSandbox {
 		balances := types.BalanceMap{
 			s.hedgeMarket.BaseCurrency:  types.NewBalance(s.hedgeMarket.BaseCurrency, fixedpoint.NewFromFloat(50.0)),
@@ -2775,7 +2811,9 @@ func (s *Strategy) CrossRun(
 		)
 	}
 
-	if err := tradingutil.UniversalCancelAllOrders(ctx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
+	if s.DryRun {
+		s.logger.Infof("[dryRun] skip canceling all %s orders on startup", s.Symbol)
+	} else if err := tradingutil.UniversalCancelAllOrders(ctx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
 		s.logger.WithError(err).Warnf("unable to cancel all orders: %v", err)
 	}
 
@@ -2852,6 +2890,7 @@ func (s *Strategy) CrossRun(
 	}
 
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
+		s.SpreadMaker.dryRun = s.DryRun
 		if err := s.SpreadMaker.Bind(s.tradingCtx, s.makerSession, s.Symbol); err != nil {
 			return err
 		}
@@ -3159,7 +3198,9 @@ func (s *Strategy) gracefulShutDown(shutdownCtx context.Context) {
 	}
 
 	// make sure all orders are cancelled
-	if err := tradingutil.UniversalCancelAllOrders(shutdownCtx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
+	if s.DryRun {
+		s.logger.Infof("[dryRun] skip canceling all %s orders on shutdown", s.Symbol)
+	} else if err := tradingutil.UniversalCancelAllOrders(shutdownCtx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
 		s.logger.WithError(err).Errorf("graceful cancel order error")
 	}
 
