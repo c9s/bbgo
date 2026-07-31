@@ -316,7 +316,7 @@ func (s *TradeStats) Recalculate() {
 
 	s.NumOfProfitTrade = fixedpoint.Count(profitsByOrder, fixedpoint.PositiveTester)
 	s.NumOfLossTrade = fixedpoint.Count(profitsByOrder, fixedpoint.NegativeTester)
-	s.TotalNetProfit = fixedpoint.Reduce(profitsByOrder, fixedpoint.SumReducer)
+	s.TotalNetProfit = fixedpoint.Reduce(netProfitsByOrder, fixedpoint.SumReducer)
 	s.GrossProfit = fixedpoint.Reduce(profitsByOrder, grossProfitReducer)
 	s.GrossLoss = fixedpoint.Reduce(profitsByOrder, grossLossReducer)
 
@@ -393,7 +393,7 @@ func (s *TradeStats) add(profit *Profit) {
 	}
 
 	s.lastOrderID = profit.OrderID
-	s.TotalNetProfit = s.TotalNetProfit.Add(pnl)
+	s.TotalNetProfit = s.TotalNetProfit.Add(profit.NetProfit)
 	s.ProfitFactor = s.GrossProfit.Div(s.GrossLoss.Abs())
 
 	s.updateWinningRatio()

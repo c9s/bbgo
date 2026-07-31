@@ -152,6 +152,45 @@ func TestPosition_ExchangeFeeRate_Long(t *testing.T) {
 	assert.Equal(t, expectedProfit, netProfit)
 }
 
+func TestPosition_QuoteFee_LongRoundTrip(t *testing.T) {
+	pos := &Position{
+		Symbol:             "BTCUSDT",
+		BaseCurrency:       "BTC",
+		QuoteCurrency:      "USDT",
+		StrategyInstanceID: "test-position:BTCUSDT",
+		Strategy:           "test-position",
+	}
+
+	buyFee := fixedpoint.NewFromFloat(1.0)
+	_, _, madeProfit := pos.AddTrade(Trade{
+		Symbol:        "BTCUSDT",
+		Side:          SideTypeBuy,
+		Price:         fixedpoint.NewFromInt(100),
+		Quantity:      fixedpoint.One,
+		QuoteQuantity: fixedpoint.NewFromInt(100),
+		Fee:           buyFee,
+		FeeCurrency:   "USDT",
+	})
+	assert.False(t, madeProfit)
+	assert.Equal(t, fixedpoint.NewFromInt(101), pos.AverageCost)
+	assert.Equal(t, fixedpoint.NewFromInt(-101), pos.Quote)
+
+	sellFee := fixedpoint.NewFromFloat(1.1)
+	profit, netProfit, madeProfit := pos.AddTrade(Trade{
+		Symbol:        "BTCUSDT",
+		Side:          SideTypeSell,
+		Price:         fixedpoint.NewFromInt(110),
+		Quantity:      fixedpoint.One,
+		QuoteQuantity: fixedpoint.NewFromInt(110),
+		Fee:           sellFee,
+		FeeCurrency:   "USDT",
+	})
+	assert.True(t, madeProfit)
+	assert.Equal(t, fixedpoint.NewFromInt(9), profit)
+	assert.Equal(t, fixedpoint.NewFromFloat(7.9), netProfit)
+	assert.Equal(t, fixedpoint.NewFromFloat(7.9), pos.Quote)
+}
+
 func TestPosition(t *testing.T) {
 	var feeRate float64 = 0.05 * 0.01
 	feeRateValue := fixedpoint.NewFromFloat(feeRate)

@@ -177,6 +177,7 @@ const ReportDetails = (props: ReportDetailsProps) => {
   const strategyName = props.runID.split("_")[1]
   const runID = props.runID.split("_").pop()
   const totalProfit = Math.round(reportSummary.symbolReports.map((report) => report.pnl.profit).reduce((prev, cur) => prev + cur) * 100) / 100
+  const totalNetProfit = Math.round((reportSummary.totalNetProfit ?? reportSummary.symbolReports.map((report) => report.pnl.netProfit).reduce((prev, cur) => prev + cur)) * 100) / 100
   const totalUnrealizedProfit = Math.round(reportSummary.symbolReports.map((report) => report.pnl.unrealizedProfit).reduce((prev, cur) => prev + cur) * 100) / 100
   const totalTrades = reportSummary.symbolReports.map((report) => report.pnl.numTrades).reduce((prev, cur) => prev + cur) || 0
 
@@ -200,7 +201,8 @@ const ReportDetails = (props: ReportDetailsProps) => {
         <Badge key={runID} color="gray" size="xs">Run ID: {runID}</Badge>
       </div>
       <StatsGridIcons data={[
-        {title: "Profit", value: "$" + totalProfit.toString(), dir: totalProfit >= 0 ? "up" : "down"},
+        {title: "Gross Profit", value: "$" + totalProfit.toString(), dir: totalProfit >= 0 ? "up" : "down"},
+        {title: "Net Profit", value: "$" + totalNetProfit.toString(), dir: totalNetProfit >= 0 ? "up" : "down"},
         {
           title: "Unr. Profit",
           value: totalUnrealizedProfit.toString() + "$",

@@ -155,10 +155,10 @@ func Test_fixFromTrades(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
-		// Fee is deducted from quoteQuantity, so:
-		// Buy: avgCost = (10000-10)/1 = 9990
-		// Sell: profit = (11000-9990)*1 = 1010
-		assert.Equal(t, fixedpoint.NewFromInt(1010).String(), stats.AccumulatedPnL.String())
+		// Quote-currency buy fees increase the cash cost:
+		// Buy: avgCost = (10000+10)/1 = 10010
+		// Sell: profit = (11000-10010)*1 = 990
+		assert.Equal(t, fixedpoint.NewFromInt(990).String(), stats.AccumulatedPnL.String())
 	})
 
 	t.Run("multiple trades with partial closes", func(t *testing.T) {
@@ -210,11 +210,11 @@ func Test_fixFromTrades(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
-		// Buy: avgCost = (20000-20)/2 = 9990
-		// First sell: profit = (11000-9990)*1 = 1010
-		// Second sell: profit = (12000-9990)*1 = 2010
-		// Total: 1010 + 2010 = 3020
-		assert.Equal(t, fixedpoint.NewFromInt(3020).String(), stats.AccumulatedPnL.String())
+		// Buy: avgCost = (20000+20)/2 = 10010
+		// First sell: profit = (11000-10010)*1 = 990
+		// Second sell: profit = (12000-10010)*1 = 1990
+		// Total: 990 + 1990 = 2980
+		assert.Equal(t, fixedpoint.NewFromInt(2980).String(), stats.AccumulatedPnL.String())
 	})
 
 	t.Run("short position trades", func(t *testing.T) {
@@ -568,10 +568,9 @@ func Test_fixFromTrades(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
-		// Buy: avgCost = (25000 - 25) / 0.5 = 24975 / 0.5 = 49950 per BTC
-		// Sell: profit = (26000 - 49950 * 0.5) = 26000 - 24975 = 1025
-		// Note: The fee is already deducted from quoteQuantity in profit calculation
-		assert.Equal(t, fixedpoint.NewFromInt(1025).String(), stats.AccumulatedPnL.String())
+		// Buy: avgCost = (25000 + 25) / 0.5 = 25025 / 0.5 = 50050 per BTC
+		// Sell: profit = (26000 - 50050 * 0.5) = 26000 - 25025 = 975
+		assert.Equal(t, fixedpoint.NewFromInt(975).String(), stats.AccumulatedPnL.String())
 	})
 
 	t.Run("quote currency fee - multiple buys then sell", func(t *testing.T) {
@@ -623,10 +622,10 @@ func Test_fixFromTrades(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
-		// First buy: avgCost = (25000 - 12.5) / 0.5 = 24987.5 / 0.5 = 49975 per BTC
-		// Second buy: avgCost = ((24987.5 + 25500 - 12.75) / 1 = 50474.75 per BTC
-		// Sell: profit = (53000 - 50474.75 * 1) = 2525.25
-		assert.Equal(t, "2525.25", stats.AccumulatedPnL.String())
+		// First buy: avgCost = (25000 + 12.5) / 0.5 = 25012.5 / 0.5 = 50025 per BTC
+		// Second buy: avgCost = (25012.5 + 25500 + 12.75) / 1 = 50525.25 per BTC
+		// Sell: profit = (53000 - 50525.25 * 1) = 2474.75
+		assert.Equal(t, "2474.75", stats.AccumulatedPnL.String())
 	})
 
 	t.Run("quote currency fee - short position", func(t *testing.T) {
@@ -738,10 +737,9 @@ func Test_fixFromTrades(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.True(t, position.Base.IsZero())
-		// Buy BTCUSDT at 50000 with 50 USDT fee: avgCost = (50000-50)/1 = 49950
+		// Buy BTCUSDT at 50000 with 50 USDT fee: avgCost = (50000+50)/1 = 50050
 		// Sell BTCUSDC converted to BTCUSDT: 55000 * 0.998 = 54890 USDT
-		// Profit = (54890 - 49950) * 1 = 4940 USDT
-		// Note: USDC fee is not converted, so it's ignored in the calculation
-		assert.Equal(t, 4940.0, stats.AccumulatedPnL.Float64())
+		// Profit = (54890 - 50050) * 1 = 4840 USDT
+		assert.Equal(t, 4840.0, stats.AccumulatedPnL.Float64())
 	})
 }
