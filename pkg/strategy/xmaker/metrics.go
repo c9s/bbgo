@@ -33,6 +33,14 @@ var makerOrderPlacementDurationMetrics = prometheus.NewHistogramVec(
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"},
 )
 
+var adaptiveQuoteIntervalSecondsMetrics = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name:    "xmaker_adaptive_quote_interval_seconds",
+		Help:    "the adaptive quote (place/cancel) interval in seconds, driven by ATR volatility",
+		Buckets: prometheus.ExponentialBuckets(1, 2.0, 11),
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"},
+)
+
 var openOrderBidExposureInUsdMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "xmaker_open_order_bid_exposure_in_usd",
@@ -178,6 +186,7 @@ func init() {
 		aggregatedSignalMetrics,
 		cancelOrderDurationMetrics,
 		makerOrderPlacementDurationMetrics,
+		adaptiveQuoteIntervalSecondsMetrics,
 		delayedHedgeCounterMetrics,
 		delayedHedgeMaxDurationMetrics,
 		netProfitMarginHistogram,

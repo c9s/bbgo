@@ -40,6 +40,9 @@ type SpreadMaker struct {
 
 	symbol string
 
+	// dryRun, when true, skips real order submission/cancellation and only logs the intent.
+	dryRun bool
+
 	mu sync.Mutex
 }
 
@@ -158,6 +161,11 @@ func (c *SpreadMaker) getOrder() (o types.Order, ok bool) {
 }
 
 func (c *SpreadMaker) cancelOrder(ctx context.Context) error {
+	if c.dryRun {
+		log.Infof("[dryRun] skip canceling spread maker order")
+		return nil
+	}
+
 	if order, ok := c.getOrder(); ok {
 		return retry.CancelOrdersUntilSuccessful(ctx, c.session.Exchange, order)
 	}
@@ -201,6 +209,11 @@ func (c *SpreadMaker) shouldKeepOrder(o types.Order, now time.Time) bool {
 }
 
 func (c *SpreadMaker) placeOrder(ctx context.Context, submitOrder *types.SubmitOrder) (*types.Order, error) {
+	if c.dryRun {
+		log.Infof("[dryRun] spread maker order: %+v", submitOrder)
+		return nil, nil
+	}
+
 	createdOrder, err := c.session.Exchange.SubmitOrder(ctx, *submitOrder)
 	if err != nil {
 		return nil, err

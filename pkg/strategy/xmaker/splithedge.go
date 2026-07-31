@@ -186,6 +186,7 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 		}
 
 		hedgeMarket.SetLogger(h.logger)
+		hedgeMarket.dryRun = strategy.DryRun
 
 		// ensure the hedge market base currency matches the maker market base currency
 		if h.strategy.makerMarket.BaseCurrency != hedgeMarket.market.BaseCurrency {

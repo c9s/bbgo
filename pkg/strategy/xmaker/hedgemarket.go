@@ -212,6 +212,9 @@ type HedgeMarket struct {
 
 	logger logrus.FieldLogger
 
+	// dryRun, when true, skips real order submission in submitOrder and only logs the intended order.
+	dryRun bool
+
 	mu sync.Mutex
 
 	hedgeExecutor HedgeExecutor
@@ -430,6 +433,11 @@ func (m *HedgeMarket) newMockTrade(
 func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitOrder) (*types.Order, error) {
 	submitOrder.Market = m.market
 	submitOrder.Symbol = m.market.Symbol
+
+	if m.dryRun {
+		m.logger.Infof("[dryRun] hedge order: %+v", submitOrder)
+		return nil, nil
+	}
 
 	submitOrders := []types.SubmitOrder{
 		submitOrder,

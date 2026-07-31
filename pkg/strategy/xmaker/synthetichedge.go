@@ -71,6 +71,7 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 	}
 
 	s.sourceMarket.SetLogger(s.logger)
+	s.sourceMarket.dryRun = strategy.DryRun
 
 	s.fiatMarket, err = InitializeHedgeMarketFromConfig(s.Fiat, sessions)
 	if err != nil {
@@ -78,6 +79,7 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 	}
 
 	s.fiatMarket.SetLogger(s.logger)
+	s.fiatMarket.dryRun = strategy.DryRun
 
 	// update strategy instance ID for the source and fiat markets
 	s.sourceMarket.Position.StrategyInstanceID = strategy.InstanceID()

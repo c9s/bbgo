@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -93,6 +94,52 @@ func TestAdaptiveQuoteInterval_intervalForVolatility(t *testing.T) {
 		low := a.intervalForVolatility(0.001, fallback)
 		high := a.intervalForVolatility(0.004, fallback)
 		assert.Greater(t, low, high)
+	})
+}
+
+// buildKLine constructs a synthetic kline with the given OHLC values.
+func buildKLine(high, low, cloze float64) types.KLine {
+	return types.KLine{
+		High:  fixedpoint.NewFromFloat(high),
+		Low:   fixedpoint.NewFromFloat(low),
+		Open:  fixedpoint.NewFromFloat(cloze),
+		Close: fixedpoint.NewFromFloat(cloze),
+	}
+}
+
+func TestAdaptiveQuoteInterval_backfillWarmup(t *testing.T) {
+	fallback := 3 * time.Second
+
+	// mirror what Bind() wires up, but against a standalone kline stream so we can
+	// drive the ATR indicator directly without a live session.
+	newWarmable := func() (*AdaptiveQuoteInterval, *indicatorv2.KLineStream) {
+		a := newTestAdaptiveQuoteInterval()
+		ks := &indicatorv2.KLineStream{}
+		a.atrp = indicatorv2.ATRP2(ks, a.Window)
+		return a, ks
+	}
+
+	t.Run("cold stream falls back", func(t *testing.T) {
+		a, _ := newWarmable()
+		// no klines fed -> atrp is non-positive -> fallback
+		assert.Equal(t, fallback, a.NextInterval(fallback))
+	})
+
+	t.Run("backfilled klines warm up the indicator", func(t *testing.T) {
+		a, ks := newWarmable()
+
+		// feed enough volatile klines (~1% range around 100) so the ATRP produces a
+		// positive value and NextInterval no longer returns the fallback.
+		var kLines []types.KLine
+		for i := 0; i < a.Window*4; i++ {
+			kLines = append(kLines, buildKLine(100.5, 99.5, 100.0))
+		}
+		ks.BackFill(kLines)
+
+		next := a.NextInterval(fallback)
+		assert.NotEqual(t, fallback, next, "indicator should be warm after backfill")
+		assert.GreaterOrEqual(t, next, a.MinInterval.Duration())
+		assert.LessOrEqual(t, next, a.MaxInterval.Duration())
 	})
 }
 

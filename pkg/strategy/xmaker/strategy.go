@@ -111,6 +111,11 @@ type Strategy struct {
 
 	Environment *bbgo.Environment
 
+	// DryRun, when true, runs the strategy against live market data but never
+	// submits or cancels real orders on any exchange; intended orders and cancels
+	// are only logged with a [dryRun] prefix.
+	DryRun bool `json:"dryRun"`
+
 	// Symbol is the maker Symbol
 	Symbol      string `json:"symbol"`
 	MakerSymbol string `json:"makerSymbol"`
@@ -129,6 +134,10 @@ type Strategy struct {
 	UpdateInterval      types.Duration `json:"updateInterval"`
 	HedgeInterval       types.Duration `json:"hedgeInterval"`
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
+
+	// AdaptiveQuoteInterval adjusts the quote (place/cancel) interval based on
+	// market volatility (ATR). When disabled, the fixed UpdateInterval is used.
+	AdaptiveQuoteInterval *AdaptiveQuoteInterval `json:"adaptiveQuoteInterval,omitempty"`
 
 	EnableSignalMargin bool `json:"enableSignalMargin"`
 
@@ -321,6 +330,8 @@ type Strategy struct {
 	openOrderBidExposureInUsdMetrics   prometheus.Gauge
 	openOrderAskExposureInUsdMetrics   prometheus.Gauge
 
+	adaptiveQuoteIntervalMetrics prometheus.Observer
+
 	d2Metrics            prometheus.Gauge
 	directionMeanMetrics prometheus.Gauge
 	alignedWeightMetrics prometheus.Gauge
@@ -352,6 +363,14 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
 	sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol, types.SubscribeOptions{Interval: "1m"})
 
+	// subscribe the kline interval used by the adaptive quote interval (ATR),
+	// if it differs from the 1m interval already subscribed above.
+	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled &&
+		s.AdaptiveQuoteInterval.Interval != "" && s.AdaptiveQuoteInterval.Interval != types.Interval1m {
+		sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol,
+			types.SubscribeOptions{Interval: s.AdaptiveQuoteInterval.Interval})
+	}
+
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
 		panic(fmt.Errorf("maker session %s is not defined", s.MakerExchange))
@@ -359,8 +378,10 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 
-	for _, sig := range s.SignalConfigList.Signals {
-		sig.Signal.Subscribe(sourceSession, s.SourceSymbol)
+	if s.SignalConfigList != nil {
+		for _, sig := range s.SignalConfigList.Signals {
+			sig.Signal.Subscribe(sourceSession, s.SourceSymbol)
+		}
 	}
 
 	subscribeFeeTokenMarkets(sourceSession)
@@ -475,6 +496,8 @@ func (s *Strategy) Initialize() error {
 	s.openOrderBidExposureInUsdMetrics = openOrderBidExposureInUsdMetrics.With(s.metricsLabels)
 	s.openOrderAskExposureInUsdMetrics = openOrderAskExposureInUsdMetrics.With(s.metricsLabels)
 
+	s.adaptiveQuoteIntervalMetrics = adaptiveQuoteIntervalSecondsMetrics.With(s.metricsLabels)
+
 	s.d2Metrics = divergenceD2.With(s.metricsLabels)
 	s.directionMeanMetrics = directionMean.With(s.metricsLabels)
 	s.alignedWeightMetrics = directionAlignedWeight.With(s.metricsLabels)
@@ -520,8 +543,10 @@ func (s *Strategy) Initialize() error {
 	s.positionExposure = bbgo.NewPositionExposure(s.Symbol)
 	s.positionExposure.SetLogger(s.logger)
 	s.positionExposure.SetMetricsLabels(ID, s.InstanceID(), s.MakerExchange, s.Symbol)
-	for _, sig := range s.SignalConfigList.Signals {
-		s.logger.Infof("using signal provider: %s", sig)
+	if s.SignalConfigList != nil {
+		for _, sig := range s.SignalConfigList.Signals {
+			s.logger.Infof("using signal provider: %s", sig)
+		}
 	}
 
 	// initialize connector manager
@@ -767,6 +792,9 @@ func (s *Strategy) collectSignalsAndWeights(ctx context.Context) (signals []floa
 
 // TODO: move this AggregateSignal to the signal package
 func (s *Strategy) AggregateSignal(ctx context.Context) (float64, error) {
+	if s.SignalConfigList == nil {
+		return 0.0, nil
+	}
 	sum := 0.0
 	voters := 0.0
 	for _, signalWrapper := range s.SignalConfigList.Signals {
@@ -984,10 +1012,14 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	cancelMakerOrdersProfile := timeprofile.Start("cancelMakerOrders")
 
-	if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
-		s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
-		s.activeMakerOrders.Print()
-		return nil
+	// In dry-run mode we never place maker orders, so there is nothing to cancel;
+	// skip the cancel call entirely to avoid touching the exchange.
+	if !s.DryRun {
+		if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
+			s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
+			s.activeMakerOrders.Print()
+			return nil
+		}
 	}
 
 	s.cancelOrderDurationMetrics.Observe(float64(cancelMakerOrdersProfile.Stop().Milliseconds()))
@@ -1674,6 +1706,11 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		return nil
 	}
 
+	if s.DryRun {
+		s.logger.Infof("[dryRun] maker orders: %+v", submitOrders)
+		return nil
+	}
+
 	formattedOrders, err := s.makerSession.FormatOrders(submitOrders)
 	if err != nil {
 		return err
@@ -1809,6 +1846,11 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, disableBid, d
 	}
 
 	if len(iocOrders) == 0 {
+		return false, nil
+	}
+
+	if s.DryRun {
+		s.logger.Infof("[dryRun] arbitrage IOC orders: %+v", iocOrders)
 		return false, nil
 	}
 
@@ -1981,6 +2023,11 @@ func (s *Strategy) spreadMakerHedge(ctx context.Context, sig float64) error {
 		}
 
 		if !hasOrder || !keptOrder {
+			if s.DryRun {
+				s.logger.Infof("[dryRun] spread maker order: %+v", makerOrderForm)
+				return nil
+			}
+
 			spreadMakerCounterMetrics.With(s.metricsLabels).Inc()
 			s.logger.Infof("spreadMaker: placing new spread maker order: %+v...", makerOrderForm)
 
@@ -2163,6 +2210,11 @@ func (s *Strategy) directHedge(
 		s.hedgeErrorRateReservation = nil
 	}
 
+	if s.DryRun {
+		s.logger.Infof("[dryRun] hedge order: %s %s @ %s", side.String(), quantity.String(), price.String())
+		return nil, nil
+	}
+
 	bbgo.Notify("Submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
 
 	submitOrders := []types.SubmitOrder{
@@ -2287,6 +2339,12 @@ func (s *Strategy) Defaults() error {
 	// configure default values
 	if s.UpdateInterval == 0 {
 		s.UpdateInterval = types.Duration(time.Second)
+	}
+
+	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
+		if err := s.AdaptiveQuoteInterval.Defaults(); err != nil {
+			return err
+		}
 	}
 
 	if s.HedgeInterval == 0 {
@@ -2446,6 +2504,12 @@ func (s *Strategy) Validate() error {
 		return errors.New("hedge session is required")
 	}
 
+	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
+		if err := s.AdaptiveQuoteInterval.Validate(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -2466,6 +2530,9 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 	defer ticker.Stop()
 
 	defer func() {
+		if s.DryRun {
+			return
+		}
 		if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 			s.logger.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
 		}
@@ -2490,6 +2557,15 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 				if !errors.Is(err, context.Canceled) {
 					s.logger.WithError(err).Errorf("unable to place maker orders")
 				}
+			}
+
+			// adapt the next quote interval to market volatility (ATR).
+			// this only reschedules the ticker; the fast-cancel path above
+			// (marketTradeC) is driven by market-trade events and is unaffected.
+			if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
+				next := s.AdaptiveQuoteInterval.NextInterval(s.UpdateInterval.Duration())
+				s.adaptiveQuoteIntervalMetrics.Observe(next.Seconds())
+				ticker.Reset(timejitter.Milliseconds(next, 200))
 			}
 
 		}
@@ -2663,6 +2739,10 @@ func (s *Strategy) CrossRun(
 
 	s.simpleHedgeMode = s.isSimpleHedgeMode()
 
+	if s.DryRun {
+		s.logger.Warnf("xmaker is running in DRY-RUN mode: no real orders will be submitted")
+	}
+
 	if s.UseSandbox {
 		balances := types.BalanceMap{
 			s.hedgeMarket.BaseCurrency:  types.NewBalance(s.hedgeMarket.BaseCurrency, fixedpoint.NewFromFloat(50.0)),
@@ -2702,6 +2782,18 @@ func (s *Strategy) CrossRun(
 	indicators := s.hedgeSession.Indicators(s.SourceSymbol)
 	_ = indicators
 
+	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
+		s.AdaptiveQuoteInterval.Bind(s.hedgeSession, s.SourceSymbol, s.logger)
+
+		if err := s.AdaptiveQuoteInterval.Backfill(ctx, s.hedgeSession, s.SourceSymbol); err != nil {
+			s.logger.WithError(err).Warn("failed to backfill adaptive quote interval indicators; will warm up from live klines")
+		}
+
+		s.logger.Infof("adaptive quote interval enabled: ATR(%s, %d), interval range [%s, %s]",
+			s.AdaptiveQuoteInterval.Interval, s.AdaptiveQuoteInterval.Window,
+			s.AdaptiveQuoteInterval.MinInterval.Duration(), s.AdaptiveQuoteInterval.MaxInterval.Duration())
+	}
+
 	// restore state
 	s.groupID = util.FNV32(instanceID)
 	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
@@ -2731,7 +2823,9 @@ func (s *Strategy) CrossRun(
 		)
 	}
 
-	if err := tradingutil.UniversalCancelAllOrders(ctx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
+	if s.DryRun {
+		s.logger.Infof("[dryRun] skip canceling all %s orders on startup", s.Symbol)
+	} else if err := tradingutil.UniversalCancelAllOrders(ctx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
 		s.logger.WithError(err).Warnf("unable to cancel all orders: %v", err)
 	}
 
@@ -2808,6 +2902,7 @@ func (s *Strategy) CrossRun(
 	}
 
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
+		s.SpreadMaker.dryRun = s.DryRun
 		if err := s.SpreadMaker.Bind(s.tradingCtx, s.makerSession, s.Symbol); err != nil {
 			return err
 		}
@@ -2880,28 +2975,30 @@ func (s *Strategy) CrossRun(
 		)
 	}
 
-	for _, signalConfig := range s.SignalConfigList.Signals {
-		sigProvider := signalConfig.Signal
-		if setter, ok := sigProvider.(signal.StreamBookSetter); ok {
-			s.logger.Infof("setting stream book on signal %T", sigProvider)
-			setter.SetStreamBook(s.sourceBook)
-		}
+	if s.SignalConfigList != nil {
+		for _, signalConfig := range s.SignalConfigList.Signals {
+			sigProvider := signalConfig.Signal
+			if setter, ok := sigProvider.(signal.StreamBookSetter); ok {
+				s.logger.Infof("setting stream book on signal %T", sigProvider)
+				setter.SetStreamBook(s.sourceBook)
+			}
 
-		if setter, ok := sigProvider.(signal.MarketTradeStreamSetter); ok {
-			s.logger.Infof("setting market trade stream on signal %T", sigProvider)
-			setter.SetMarketTradeStream(s.marketTradeStream)
-		}
+			if setter, ok := sigProvider.(signal.MarketTradeStreamSetter); ok {
+				s.logger.Infof("setting market trade stream on signal %T", sigProvider)
+				setter.SetMarketTradeStream(s.marketTradeStream)
+			}
 
-		// pass logger to the signal provider
-		if setter, ok := sigProvider.(interface {
-			SetLogger(logger logrus.FieldLogger)
-		}); ok {
-			setter.SetLogger(s.logger.WithField("component", "signal"))
-		}
+			// pass logger to the signal provider
+			if setter, ok := sigProvider.(interface {
+				SetLogger(logger logrus.FieldLogger)
+			}); ok {
+				setter.SetLogger(s.logger.WithField("component", "signal"))
+			}
 
-		s.logger.Infof("binding session on signal %T", sigProvider)
-		if err := sigProvider.Bind(s.tradingCtx, s.hedgeSession, s.SourceSymbol); err != nil {
-			return err
+			s.logger.Infof("binding session on signal %T", sigProvider)
+			if err := sigProvider.Bind(s.tradingCtx, s.hedgeSession, s.SourceSymbol); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -3115,7 +3212,9 @@ func (s *Strategy) gracefulShutDown(shutdownCtx context.Context) {
 	}
 
 	// make sure all orders are cancelled
-	if err := tradingutil.UniversalCancelAllOrders(shutdownCtx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
+	if s.DryRun {
+		s.logger.Infof("[dryRun] skip canceling all %s orders on shutdown", s.Symbol)
+	} else if err := tradingutil.UniversalCancelAllOrders(shutdownCtx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
 		s.logger.WithError(err).Errorf("graceful cancel order error")
 	}
 
