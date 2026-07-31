@@ -769,9 +769,17 @@ func (environ *Environment) ConfigureNotificationSystem(ctx context.Context, use
 	var isolation = GetIsolationFromContext(ctx)
 	var persistence = isolation.persistenceServiceFacade.Get()
 
-	err := environ.setupInteraction(persistence)
-	if err != nil {
-		return err
+	// check if telegram bot token is defined
+	telegramBotToken := viper.GetString("telegram-bot-token")
+
+	// the interaction (OTP / auth) subsystem is only meaningful when there is a
+	// messenger (currently only telegram) that can actually send or receive it.
+	// skip it entirely when telegram is not configured so bbgo does not touch
+	// persistence or attempt any network dial when no notifier is set up at all.
+	if len(telegramBotToken) > 0 {
+		if err := environ.setupInteraction(persistence); err != nil {
+			return err
+		}
 	}
 
 	// setup slack
@@ -780,8 +788,6 @@ func (environ *Environment) ConfigureNotificationSystem(ctx context.Context, use
 		environ.setupSlack(userConfig, slackToken, persistence)
 	}
 
-	// check if telegram bot token is defined
-	telegramBotToken := viper.GetString("telegram-bot-token")
 	if len(telegramBotToken) > 0 {
 		if err := environ.setupTelegram(userConfig, telegramBotToken, persistence); err != nil {
 			return err
