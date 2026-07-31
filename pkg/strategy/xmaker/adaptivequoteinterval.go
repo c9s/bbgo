@@ -1,7 +1,6 @@
 package xmaker
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"time"
@@ -32,8 +31,6 @@ const minBackfillKLines = 100
 type AdaptiveQuoteInterval struct {
 	// Enabled enables the adaptive quote interval feature
 	Enabled bool `json:"enabled"`
-
-	DisableBackfill bool `json:"disableBackfill"`
 
 	// Interval is the kline interval used to compute the ATR, default 1m
 	Interval types.Interval `json:"interval"`
@@ -114,55 +111,6 @@ func (a *AdaptiveQuoteInterval) Bind(session *bbgo.ExchangeSession, symbol strin
 	a.logger = logger.WithField("feature", "adaptiveQuoteInterval")
 	a.atrp = session.Indicators(symbol).ATRP(a.Interval, a.Window)
 	a.scale = a.buildScale()
-}
-
-// Backfill warms up the underlying indicators by feeding it historical klines
-// at startup. It acts as a safety-net for when the framework's history-kline
-// preloader is unavailable (e.g. DisableHistoryKLinePreload is set): in that case
-// the shared kline stream is still empty and the indicators would otherwise start cold,
-// leaving NextInterval stuck at the fallback until enough live klines have closed.
-//
-// It feeds the same shared kline stream the indicators is built on (IndicatorSet.KLines
-// is cached), so the subscriber attached in Bind picks up the emitted updates
-// without any extra live wiring. To avoid double-counting the klines the preloader
-// may have already loaded, it only backfills when that stream is empty.
-func (a *AdaptiveQuoteInterval) Backfill(
-	ctx context.Context, session *bbgo.ExchangeSession, symbol string,
-) error {
-	if a.DisableBackfill {
-		if a.logger != nil {
-			a.logger.Info("adaptive quote interval backfill disabled, skipping")
-		}
-		return nil
-	}
-	klineStream := session.Indicators(symbol).KLines(a.Interval)
-	if n := klineStream.Length(); n > 0 {
-		if a.logger != nil {
-			a.logger.Debugf("ATR kline stream already warmed up with %d klines, skipping backfill", n)
-		}
-		return nil
-	}
-
-	limit := a.Window * 3
-	if limit < minBackfillKLines {
-		limit = minBackfillKLines
-	}
-
-	kLines, err := session.Exchange.QueryKLines(ctx, symbol, a.Interval, types.KLineQueryOptions{
-		Limit: limit,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to query %s %s klines for ATR backfill: %w", symbol, a.Interval, err)
-	}
-
-	klineStream.BackFill(kLines)
-
-	if a.logger != nil {
-		a.logger.Infof("backfilled %d %s klines into the ATR(%s, %d) indicator",
-			len(kLines), a.Interval, a.Interval, a.Window)
-	}
-
-	return nil
 }
 
 // buildScale constructs the clamped inverse linear scale:

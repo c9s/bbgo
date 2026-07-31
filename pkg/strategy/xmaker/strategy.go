@@ -2785,10 +2785,6 @@ func (s *Strategy) CrossRun(
 	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
 		s.AdaptiveQuoteInterval.Bind(s.hedgeSession, s.SourceSymbol, s.logger)
 
-		if err := s.AdaptiveQuoteInterval.Backfill(ctx, s.hedgeSession, s.SourceSymbol); err != nil {
-			s.logger.WithError(err).Warn("failed to backfill adaptive quote interval indicators; will warm up from live klines")
-		}
-
 		s.logger.Infof("adaptive quote interval enabled: ATR(%s, %d), interval range [%s, %s]",
 			s.AdaptiveQuoteInterval.Interval, s.AdaptiveQuoteInterval.Window,
 			s.AdaptiveQuoteInterval.MinInterval.Duration(), s.AdaptiveQuoteInterval.MaxInterval.Duration())
