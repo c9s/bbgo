@@ -24,6 +24,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/gofrs/flock v0.8.1
+	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/pyroscope-go v1.2.0
@@ -44,11 +45,11 @@ require (
 	github.com/robfig/cron/v3 v3.0.0
 	github.com/sajari/regression v1.0.1
 	github.com/sirupsen/logrus v1.9.4
-	github.com/slack-go/slack v0.17.2
+	github.com/slack-go/slack v0.27.0
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.2
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/valyala/fastjson v1.5.1
 	github.com/wcharczuk/go-chart/v2 v2.1.2
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
