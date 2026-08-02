@@ -254,7 +254,7 @@ func (n *Notifier) Upload(upload *types.UploadFile) {
 		return
 	}
 
-	params := slack.UploadFileV2Parameters{
+	params := slack.UploadFileParameters{
 		Filename: upload.FileName,
 		FileSize: upload.Data.Len(),
 		Channel:  n.channel,
@@ -270,7 +270,7 @@ func (n *Notifier) Upload(upload *types.UploadFile) {
 		Reader: upload.Data,
 	}
 
-	file, err := n.client.UploadFileV2Context(n.ctx, params)
+	file, err := n.client.UploadFileContext(n.ctx, params)
 	if err != nil {
 		log.WithError(err).Error("failed to upload file")
 	} else {
