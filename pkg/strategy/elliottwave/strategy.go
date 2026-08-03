@@ -40,7 +40,7 @@ type Strategy struct {
 	bbgo.OpenPositionOptions
 	bbgo.StrategyController
 	bbgo.SourceSelector
-	types.Market
+	Market  types.Market
 	Session *bbgo.ExchangeSession
 
 	Interval           types.Interval   `json:"interval"`
@@ -95,19 +95,27 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
+func (s *Strategy) Validate() error {
+	if s.Symbol == "" {
+		return errors.New("symbol is required")
+	}
+	s.Market.Symbol = s.Symbol
+	return nil
+}
+
 func (s *Strategy) InstanceID() string {
-	return fmt.Sprintf("%s:%s:%v", ID, s.Symbol, bbgo.IsBackTesting)
+	return fmt.Sprintf("%s:%s:%v", ID, s.Market.Symbol, bbgo.IsBackTesting)
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// by default, bbgo only pre-subscribe 1000 klines.
 	// this is not enough if we're subscribing 30m intervals using SerialMarketDataStore
 	if !bbgo.IsBackTesting {
-		session.Subscribe(types.BookTickerChannel, s.Symbol, types.SubscribeOptions{})
-		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
+		session.Subscribe(types.BookTickerChannel, s.Market.Symbol, types.SubscribeOptions{})
+		session.Subscribe(types.MarketTradeChannel, s.Market.Symbol, types.SubscribeOptions{})
 		if s.MinInterval.Milliseconds() >= types.Interval1s.Milliseconds() && s.MinInterval.Milliseconds()%types.Interval1s.Milliseconds() == 0 {
 			bbgo.KLinePreloadLimit = int64(((s.Interval.Milliseconds()/s.MinInterval.Milliseconds())*s.WindowSlow/1000 + 1) + 1000)
-			session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
+			session.Subscribe(types.KLineChannel, s.Market.Symbol, types.SubscribeOptions{
 				Interval: s.MinInterval,
 			})
 		} else {
@@ -115,7 +123,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 		}
 	} else {
 		bbgo.KLinePreloadLimit = int64((s.Interval.Milliseconds()/s.MinInterval.Milliseconds()*s.WindowSlow/1000 + 1) + 1000)
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
+		session.Subscribe(types.KLineChannel, s.Market.Symbol, types.SubscribeOptions{
 			Interval: s.MinInterval,
 		})
 	}
@@ -257,7 +265,7 @@ func (s *Strategy) trailingCheck(price float64, direction string) bool {
 func (s *Strategy) initTickerFunctions() {
 	if s.IsBackTesting() {
 		s.getLastPrice = func() fixedpoint.Value {
-			lastPrice, ok := s.Session.LastPrice(s.Symbol)
+			lastPrice, ok := s.Session.LastPrice(s.Market.Symbol)
 			if !ok {
 				log.Error("cannot get lastprice")
 			}
@@ -284,7 +292,7 @@ func (s *Strategy) initTickerFunctions() {
 			s.lock.RLock()
 			defer s.lock.RUnlock()
 			if s.midPrice.IsZero() {
-				lastPrice, ok = s.Session.LastPrice(s.Symbol)
+				lastPrice, ok = s.Session.LastPrice(s.Market.Symbol)
 				if !ok {
 					log.Error("cannot get lastprice")
 					return lastPrice
@@ -299,6 +307,12 @@ func (s *Strategy) initTickerFunctions() {
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
+	market, ok := session.Market(s.Symbol)
+	if !ok {
+		return fmt.Errorf("market %s not found in session %s", s.Symbol, session.Name)
+	}
+	s.Market = market
+
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
@@ -306,7 +320,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 	if s.TradeStats == nil {
-		s.TradeStats = types.NewTradeStats(s.Symbol)
+		s.TradeStats = types.NewTradeStats(s.Market.Symbol)
 	}
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
@@ -317,7 +331,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		_ = s.GeneralOrderExecutor.GracefulCancel(ctx)
 		_ = s.ClosePosition(ctx, fixedpoint.One)
 	})
-	s.GeneralOrderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.GeneralOrderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Market.Symbol, ID, instanceID, s.Position)
 	s.GeneralOrderExecutor.BindEnvironment(s.Environment)
 	s.GeneralOrderExecutor.BindProfitStats(s.ProfitStats)
 	s.GeneralOrderExecutor.BindTradeStats(s.TradeStats)
@@ -333,7 +347,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		method.Bind(session, s.GeneralOrderExecutor)
 	}
 	profit := floats.Slice{1., 1.}
-	price, _ := s.Session.LastPrice(s.Symbol)
+	price, _ := s.Session.LastPrice(s.Market.Symbol)
 	initAsset := s.CalcAssetValue(price).Float64()
 	cumProfit := floats.Slice{initAsset, initAsset}
 	modify := func(p float64) float64 {
@@ -378,7 +392,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.initOutputCommands()
 
 	// event trigger order: s.Interval => minInterval
-	store, ok := session.SerialMarketDataStore(ctx, s.Symbol, []types.Interval{s.Interval, s.MinInterval}, !bbgo.IsBackTesting)
+	store, ok := session.SerialMarketDataStore(ctx, s.Market.Symbol, []types.Interval{s.Interval, s.MinInterval}, !bbgo.IsBackTesting)
 	if !ok {
 		panic("cannot get " + s.MinInterval + " history")
 	}
