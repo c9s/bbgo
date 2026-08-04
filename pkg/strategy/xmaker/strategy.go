@@ -106,19 +106,14 @@ type AggregatedSignalConfig struct {
 	SmoothingType   indicatorv2.SmoothingType `json:"smoothingType"`
 }
 
-type Strategy struct {
-	common.StrategyProfitFixer
-
-	Environment *bbgo.Environment
-
+// StrategyConfig contains all user-configurable json fields for the xmaker
+// strategy. It is embedded anonymously into Strategy so these settings are
+// promoted and remain accessible as s.<Field>.
+type StrategyConfig struct {
 	// DryRun, when true, runs the strategy against live market data but never
 	// submits or cancels real orders on any exchange; intended orders and cancels
 	// are only logged with a [dryRun] prefix.
 	DryRun bool `json:"dryRun"`
-
-	// Symbol is the maker Symbol
-	Symbol      string `json:"symbol"`
-	MakerSymbol string `json:"makerSymbol"`
 
 	// MakerExchange session name
 	MakerExchange string `json:"makerExchange"`
@@ -239,6 +234,20 @@ type Strategy struct {
 
 	AuthTimeout types.Duration `json:"authTimeout,omitempty"`
 
+	CircuitBreaker *circuitbreaker.BasicCircuitBreaker `json:"circuitBreaker"`
+}
+
+type Strategy struct {
+	common.StrategyProfitFixer
+
+	StrategyConfig
+
+	Environment *bbgo.Environment
+
+	// Symbol is the maker Symbol
+	Symbol      string `json:"symbol"`
+	MakerSymbol string `json:"makerSymbol"`
+
 	// --------------------------------
 	// private field
 
@@ -248,8 +257,7 @@ type Strategy struct {
 
 	state *State
 
-	priceSolver    *pricesolver.SimplePriceSolver
-	CircuitBreaker *circuitbreaker.BasicCircuitBreaker `json:"circuitBreaker"`
+	priceSolver *pricesolver.SimplePriceSolver
 
 	// persistence fields
 	Position    *types.Position `json:"position,omitempty" persistence:"position"`
