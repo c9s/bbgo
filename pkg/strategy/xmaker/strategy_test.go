@@ -3,10 +3,12 @@
 package xmaker
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 )
@@ -78,4 +80,36 @@ func Test_calculateSpread(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func Test_EmbeddedConfigFlatten(t *testing.T) {
+	const blob = `{
+	  "symbol": "BTCUSDT",
+	  "makerSymbol": "BTCUSDT",
+	  "makerExchange": "max",
+	  "sourceExchange": "binance",
+	  "margin": "0.0015",
+	  "quantity": "0.01",
+	  "numLayers": 3,
+	  "circuitBreaker": {}
+	}`
+
+	s := &Strategy{}
+	if err := json.Unmarshal([]byte(blob), s); err != nil {
+		t.Fatal(err)
+	}
+
+	// promoted (embedded StrategyConfig) fields
+	assert.Equal(t, "0.0015", s.Margin.String())
+	assert.Equal(t, "0.01", s.Quantity.String())
+	assert.Equal(t, 3, s.NumLayers)
+	assert.Equal(t, "max", s.MakerExchange)
+	assert.NotNil(t, s.CircuitBreaker)
+
+	// top-level fields
+	assert.Equal(t, "BTCUSDT", s.Symbol)
+	assert.Equal(t, "BTCUSDT", s.MakerSymbol)
+
+	// config metrics still register for promoted fields
+	assert.NoError(t, dynamic.InitializeConfigMetrics(ID, "xmaker:BTCUSDT:temp", s))
 }

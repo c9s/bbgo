@@ -24,7 +24,8 @@ func DefaultWhiteList() []string {
 // @param f: io.Writer used for writing the config dump
 // @param style: pretty print table style. Use NewDefaultTableStyle() to get default one.
 // @param withColor: whether to print with color
-// @param whiteLists: fields to be printed out from embedded struct (1st layer only)
+// @param whiteLists: deprecated no-op. All json-tagged fields of embedded
+// anonymous structs are now printed as if declared on the parent struct.
 func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool, whiteLists ...string) {
 	t := table.NewWriter()
 	var write func(io.Writer, string, ...interface{})
@@ -46,11 +47,6 @@ func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool,
 	}
 	write(f, "---- %s Settings ---\n", CallID(s))
 
-	embeddedWhiteSet := map[string]struct{}{}
-	for _, whiteList := range whiteLists {
-		embeddedWhiteSet[whiteList] = struct{}{}
-	}
-
 	redundantSet := map[string]struct{}{}
 
 	var rows []table.Row
@@ -60,68 +56,71 @@ func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool,
 	if val.Type().Kind() == util.Pointer {
 		val = val.Elem()
 	}
+
 	var values types.JsonArr
+
+	// appendField renders a single struct field into the values slice, honoring
+	// the json / ignore tags and de-duplicating by json name.
+	appendField := func(sf reflect.StructField, fv reflect.Value) {
+		if !sf.IsExported() {
+			return
+		}
+
+		jsonTag := sf.Tag.Get("json")
+		if jsonTag == "" || jsonTag == "-" {
+			return
+		}
+
+		if ig := sf.Tag.Get("ignore"); ig == "true" {
+			return
+		}
+
+		name := strings.Split(jsonTag, ",")[0]
+		if _, ok := redundantSet[name]; ok {
+			return
+		}
+
+		redundantSet[name] = struct{}{}
+
+		value := fv.Interface()
+		if e, err := json.Marshal(value); err == nil {
+			value = string(e)
+		}
+
+		values = append(values, types.JsonStruct{Key: sf.Name, Json: name, Type: sf.Type.String(), Value: value})
+	}
+
 	for i := 0; i < val.Type().NumField(); i++ {
 		t := val.Type().Field(i)
 		if !t.IsExported() {
 			continue
 		}
-		fieldName := t.Name
-		switch jsonTag := t.Tag.Get("json"); jsonTag {
-		case "-":
-		case "":
-			// we only fetch fields from the first layer of the embedded struct
-			if t.Anonymous {
-				var target reflect.Type
-				var field reflect.Value
-				if t.Type.Kind() == util.Pointer {
-					target = t.Type.Elem()
-					field = val.Field(i).Elem()
-				} else {
-					target = t.Type
-					field = val.Field(i)
+
+		// Expand embedded (anonymous) structs so that their promoted json fields
+		// are printed as if they were declared directly on the parent struct.
+		if t.Anonymous && t.Tag.Get("json") == "" {
+			var target reflect.Type
+			var field reflect.Value
+			if t.Type.Kind() == util.Pointer {
+				if val.Field(i).IsNil() {
+					continue
 				}
-				for j := 0; j < target.NumField(); j++ {
-					tt := target.Field(j)
-					if !tt.IsExported() {
-						continue
-					}
-					fieldName := tt.Name
-					if _, ok := embeddedWhiteSet[fieldName]; !ok {
-						continue
-					}
-					if jtag := tt.Tag.Get("json"); jtag != "" && jtag != "-" {
-						if ig := tt.Tag.Get("ignore"); ig == "true" {
-							continue
-						}
-						name := strings.Split(jtag, ",")[0]
-						if _, ok := redundantSet[name]; ok {
-							continue
-						}
-						redundantSet[name] = struct{}{}
-						value := field.Field(j).Interface()
-						if e, err := json.Marshal(value); err == nil {
-							value = string(e)
-						}
-						values = append(values, types.JsonStruct{Key: fieldName, Json: name, Type: tt.Type.String(), Value: value})
-					}
-				}
+
+				target = t.Type.Elem()
+				field = val.Field(i).Elem()
+			} else {
+				target = t.Type
+				field = val.Field(i)
 			}
-		default:
-			name := strings.Split(jsonTag, ",")[0]
-			if ig := t.Tag.Get("ignore"); ig == "true" {
-				continue
+
+			for j := 0; j < target.NumField(); j++ {
+				appendField(target.Field(j), field.Field(j))
 			}
-			if _, ok := redundantSet[name]; ok {
-				continue
-			}
-			redundantSet[name] = struct{}{}
-			value := val.Field(i).Interface()
-			if e, err := json.Marshal(value); err == nil {
-				value = string(e)
-			}
-			values = append(values, types.JsonStruct{Key: fieldName, Json: name, Type: t.Type.String(), Value: value})
+
+			continue
 		}
+
+		appendField(t, val.Field(i))
 	}
 	sort.Sort(values)
 	for _, value := range values {
