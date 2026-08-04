@@ -136,7 +136,8 @@ type Strategy struct {
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
 
 	// AdaptiveQuoteInterval adjusts the quote (place/cancel) interval based on
-	// market volatility (ATR). When disabled, the fixed UpdateInterval is used.
+	// market volatility (realized volatility from trade returns). When disabled,
+	// the fixed UpdateInterval is used.
 	AdaptiveQuoteInterval *AdaptiveQuoteInterval `json:"adaptiveQuoteInterval,omitempty"`
 
 	EnableSignalMargin bool `json:"enableSignalMargin"`
@@ -360,14 +361,6 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	}
 
 	sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol, types.SubscribeOptions{Interval: "1m"})
-
-	// subscribe the kline interval used by the adaptive quote interval (ATR),
-	// if it differs from the 1m interval already subscribed above.
-	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled &&
-		s.AdaptiveQuoteInterval.Interval != "" && s.AdaptiveQuoteInterval.Interval != types.Interval1m {
-		sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol,
-			types.SubscribeOptions{Interval: s.AdaptiveQuoteInterval.Interval})
-	}
 
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
@@ -2777,14 +2770,6 @@ func (s *Strategy) CrossRun(
 	indicators := s.hedgeSession.Indicators(s.SourceSymbol)
 	_ = indicators
 
-	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
-		s.AdaptiveQuoteInterval.Bind(s.hedgeSession, s.SourceSymbol, s.logger, s.metricsLabels)
-
-		s.logger.Infof("adaptive quote interval enabled: ATR(%s, %d), interval range [%s, %s]",
-			s.AdaptiveQuoteInterval.Interval, s.AdaptiveQuoteInterval.Window,
-			s.AdaptiveQuoteInterval.MinInterval.Duration(), s.AdaptiveQuoteInterval.MaxInterval.Duration())
-	}
-
 	// restore state
 	s.groupID = util.FNV32(instanceID)
 	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
@@ -2900,12 +2885,25 @@ func (s *Strategy) CrossRun(
 	}
 
 	// allocate required isolated streams to the connectors
-	if (s.FastCancel != nil && s.FastCancel.Enabled) || (s.EnableSignalMargin && s.SignalConfigList != nil && len(s.SignalConfigList.Signals) > 0) {
+	adaptiveQuoteIntervalEnabled := s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled
+	if (s.FastCancel != nil && s.FastCancel.Enabled) ||
+		(s.EnableSignalMargin && s.SignalConfigList != nil && len(s.SignalConfigList.Signals) > 0) ||
+		adaptiveQuoteIntervalEnabled {
 		s.marketTradeStream = bbgo.NewMarketTradeStream(s.hedgeSession, s.SourceSymbol)
 		s.marketTradeStream.OnMarketTrade(func(trade types.Trade) {
 			s.lastPrice.Set(trade.Price)
 		})
 		s.connectorManager.Add(s.marketTradeStream)
+	}
+
+	// the adaptive quote interval derives its realized volatility from the source
+	// market-trade stream allocated above, so it must be bound after that stream exists.
+	if adaptiveQuoteIntervalEnabled {
+		s.AdaptiveQuoteInterval.Bind(s.marketTradeStream, s.SourceSymbol, s.logger, s.metricsLabels)
+
+		s.logger.Infof("adaptive quote interval enabled: realizedVolatility(lambda=%s, warmup=%d), interval range [%s, %s]",
+			s.AdaptiveQuoteInterval.Lambda.String(), s.AdaptiveQuoteInterval.Warmup,
+			s.AdaptiveQuoteInterval.MinInterval.Duration(), s.AdaptiveQuoteInterval.MaxInterval.Duration())
 	}
 
 	if s.FastCancel != nil && s.FastCancel.Enabled {

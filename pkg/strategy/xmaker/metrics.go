@@ -36,7 +36,7 @@ var makerOrderPlacementDurationMetrics = prometheus.NewHistogramVec(
 var adaptiveQuoteIntervalSecondsMetrics = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Name:    "xmaker_adaptive_quote_interval_seconds",
-		Help:    "the adaptive quote (place/cancel) interval in seconds, driven by ATR volatility",
+		Help:    "the adaptive quote (place/cancel) interval in seconds, driven by realized volatility",
 		Buckets: prometheus.ExponentialBuckets(1, 2.0, 11),
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"},
 )

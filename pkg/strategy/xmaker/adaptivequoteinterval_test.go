@@ -15,6 +15,8 @@ import (
 func newTestAdaptiveQuoteInterval() *AdaptiveQuoteInterval {
 	a := &AdaptiveQuoteInterval{
 		Enabled:        true,
+		Lambda:         fixedpoint.NewFromFloat(0.94),
+		Warmup:         3,
 		LowVolatility:  fixedpoint.NewFromFloat(0.0005),
 		HighVolatility: fixedpoint.NewFromFloat(0.005),
 		MinInterval:    types.Duration(time.Second),
@@ -29,12 +31,12 @@ func TestAdaptiveQuoteInterval_Defaults(t *testing.T) {
 	a := &AdaptiveQuoteInterval{Enabled: true}
 	assert.NoError(t, a.Defaults())
 
-	assert.Equal(t, types.Interval1m, a.Interval)
-	assert.Equal(t, 14, a.Window)
+	assert.InDelta(t, 0.94, a.Lambda.Float64(), 1e-12)
+	assert.Equal(t, 30, a.Warmup)
 	assert.Equal(t, time.Second, a.MinInterval.Duration())
 	assert.Equal(t, time.Minute, a.MaxInterval.Duration())
-	assert.InDelta(t, 0.0005, a.LowVolatility.Float64(), 1e-12)
-	assert.InDelta(t, 0.005, a.HighVolatility.Float64(), 1e-12)
+	assert.InDelta(t, 0.00005, a.LowVolatility.Float64(), 1e-12)
+	assert.InDelta(t, 0.001, a.HighVolatility.Float64(), 1e-12)
 }
 
 func TestAdaptiveQuoteInterval_Validate(t *testing.T) {
@@ -43,9 +45,18 @@ func TestAdaptiveQuoteInterval_Validate(t *testing.T) {
 		assert.NoError(t, a.Validate())
 	})
 
-	t.Run("non-positive window", func(t *testing.T) {
+	t.Run("invalid lambda", func(t *testing.T) {
 		a := newTestAdaptiveQuoteInterval()
-		a.Window = 0
+		a.Lambda = fixedpoint.One
+		assert.Error(t, a.Validate())
+
+		a.Lambda = fixedpoint.Zero
+		assert.Error(t, a.Validate())
+	})
+
+	t.Run("non-positive warmup", func(t *testing.T) {
+		a := newTestAdaptiveQuoteInterval()
+		a.Warmup = 0
 		assert.Error(t, a.Validate())
 	})
 
@@ -97,47 +108,47 @@ func TestAdaptiveQuoteInterval_intervalForVolatility(t *testing.T) {
 	})
 }
 
-// buildKLine constructs a synthetic kline with the given OHLC values.
-func buildKLine(high, low, cloze float64) types.KLine {
-	return types.KLine{
-		High:  fixedpoint.NewFromFloat(high),
-		Low:   fixedpoint.NewFromFloat(low),
-		Open:  fixedpoint.NewFromFloat(cloze),
-		Close: fixedpoint.NewFromFloat(cloze),
-	}
+// buildTrade constructs a synthetic trade at the given price.
+func buildTrade(price float64) types.Trade {
+	return types.Trade{Price: fixedpoint.NewFromFloat(price)}
 }
 
-func TestAdaptiveQuoteInterval_backfillWarmup(t *testing.T) {
+func TestAdaptiveQuoteInterval_tradeWarmup(t *testing.T) {
 	fallback := 3 * time.Second
 
-	// mirror what Bind() wires up, but against a standalone kline stream so we can
-	// drive the ATR indicator directly without a live session.
-	newWarmable := func() (*AdaptiveQuoteInterval, *indicatorv2.KLineStream) {
+	// mirror what Bind() wires up, but against a standalone trade stream so we can
+	// drive the realized-volatility indicator directly without a live session.
+	newWarmable := func() (*AdaptiveQuoteInterval, *indicatorv2.TradeStream) {
 		a := newTestAdaptiveQuoteInterval()
-		ks := &indicatorv2.KLineStream{}
-		a.atrp = indicatorv2.ATRP2(ks, a.Window)
-		return a, ks
+		ts := &indicatorv2.TradeStream{}
+		a.rv = indicatorv2.RealizedVolatility(ts, a.Lambda.Float64(), a.Warmup)
+		return a, ts
 	}
 
 	t.Run("cold stream falls back", func(t *testing.T) {
 		a, _ := newWarmable()
-		// no klines fed -> atrp is non-positive -> fallback
+		// no trades fed -> volatility is non-positive -> fallback
 		assert.Equal(t, fallback, a.NextInterval(fallback))
 	})
 
-	t.Run("backfilled klines warm up the indicator", func(t *testing.T) {
-		a, ks := newWarmable()
+	t.Run("trades warm up the indicator", func(t *testing.T) {
+		a, ts := newWarmable()
 
-		// feed enough volatile klines (~1% range around 100) so the ATRP produces a
-		// positive value and NextInterval no longer returns the fallback.
-		var kLines []types.KLine
-		for i := 0; i < a.Window*4; i++ {
-			kLines = append(kLines, buildKLine(100.5, 99.5, 100.0))
+		// feed enough volatile trades (alternating ~1% around 100) so the realized
+		// volatility produces a positive value and NextInterval no longer returns
+		// the fallback.
+		var trades []types.Trade
+		for i := 0; i < a.Warmup*4; i++ {
+			price := 99.0
+			if i%2 == 0 {
+				price = 101.0
+			}
+			trades = append(trades, buildTrade(price))
 		}
-		ks.BackFill(kLines)
+		ts.BackFill(trades)
 
 		next := a.NextInterval(fallback)
-		assert.NotEqual(t, fallback, next, "indicator should be warm after backfill")
+		assert.NotEqual(t, fallback, next, "indicator should be warm after trades")
 		assert.GreaterOrEqual(t, next, a.MinInterval.Duration())
 		assert.LessOrEqual(t, next, a.MaxInterval.Duration())
 	})
@@ -146,23 +157,23 @@ func TestAdaptiveQuoteInterval_backfillWarmup(t *testing.T) {
 func TestAdaptiveQuoteInterval_ConfigParse(t *testing.T) {
 	const payload = `{
 		"enabled": true,
-		"interval": "5m",
-		"window": 20,
+		"lambda": 0.9,
+		"warmup": 50,
 		"minInterval": "1s",
 		"maxInterval": "1m",
-		"lowVolatility": 0.0008,
-		"highVolatility": 0.006
+		"lowVolatility": 0.0001,
+		"highVolatility": 0.002
 	}`
 
 	var a AdaptiveQuoteInterval
 	assert.NoError(t, json.Unmarshal([]byte(payload), &a))
 
 	assert.True(t, a.Enabled)
-	assert.Equal(t, types.Interval5m, a.Interval)
-	assert.Equal(t, 20, a.Window)
+	assert.InDelta(t, 0.9, a.Lambda.Float64(), 1e-12)
+	assert.Equal(t, 50, a.Warmup)
 	assert.Equal(t, time.Second, a.MinInterval.Duration())
 	assert.Equal(t, time.Minute, a.MaxInterval.Duration())
-	assert.InDelta(t, 0.0008, a.LowVolatility.Float64(), 1e-12)
-	assert.InDelta(t, 0.006, a.HighVolatility.Float64(), 1e-12)
+	assert.InDelta(t, 0.0001, a.LowVolatility.Float64(), 1e-12)
+	assert.InDelta(t, 0.002, a.HighVolatility.Float64(), 1e-12)
 	assert.NoError(t, a.Validate())
 }
