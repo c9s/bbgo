@@ -57,7 +57,7 @@ func Sync(ctx context.Context, obj interface{}) {
 	}
 }
 
-func loadPersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
+func LoadPersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
 	return dynamic.IterateFieldsByTag(obj, "persistence", true, func(
 		tag string, field reflect.StructField, value reflect.Value,
 	) error {

@@ -75,13 +75,13 @@ func Test_loadPersistenceFields(t *testing.T) {
 		psName := reflect.TypeOf(ps).Elem().String()
 		t.Run(psName+"/empty", func(t *testing.T) {
 			b := &TestStruct{}
-			err := loadPersistenceFields(b, "test-empty", ps)
+			err := LoadPersistenceFields(b, "test-empty", ps)
 			assert.NoError(t, err)
 		})
 
 		t.Run(psName+"/nil", func(t *testing.T) {
 			var b *TestStruct = nil
-			err := loadPersistenceFields(b, "test-nil", ps)
+			err := LoadPersistenceFields(b, "test-nil", ps)
 			assert.Equal(t, dynamic.ErrCanNotIterateNilPointer, err)
 		})
 
@@ -95,7 +95,7 @@ func Test_loadPersistenceFields(t *testing.T) {
 			assert.NoError(t, err)
 
 			b := &TestStruct{}
-			err = loadPersistenceFields(b, "pointer-field-test", ps)
+			err = LoadPersistenceFields(b, "pointer-field-test", ps)
 			assert.NoError(t, err)
 
 			assert.Equal(t, "10", a.Position.Base.String())
@@ -139,7 +139,7 @@ func Test_storePersistenceFields(t *testing.T) {
 			assert.Equal(t, fixedpoint.NewFromFloat(3343.0), p.AverageCost)
 
 			var b = &TestStruct{}
-			err = loadPersistenceFields(b, id, ps)
+			err = LoadPersistenceFields(b, id, ps)
 			assert.NoError(t, err)
 			assert.Equal(t, a.Integer, b.Integer)
 			assert.Equal(t, a.Integer2, b.Integer2)
@@ -172,7 +172,7 @@ func Test_storePersistenceFields(t *testing.T) {
 			assert.Equal(t, types.PnLModeExcludeFeeFromCost, p.PnLMode)
 
 			var b = &TestStruct{}
-			err = loadPersistenceFields(b, id, ps)
+			err = LoadPersistenceFields(b, id, ps)
 			assert.NoError(t, err)
 			assert.Equal(t, a.Integer, b.Integer)
 			assert.Equal(t, a.Integer2, b.Integer2)

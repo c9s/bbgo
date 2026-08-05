@@ -374,7 +374,7 @@ func (trader *Trader) LoadState(ctx context.Context) error {
 			return customSync.Load(ctx, store)
 		}
 
-		return loadPersistenceFields(strategy, id, ps)
+		return LoadPersistenceFields(strategy, id, ps)
 	})
 }
 
