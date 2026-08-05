@@ -76,6 +76,14 @@ func loadPersistenceFields(obj interface{}, id string, persistence service.Persi
 		}
 
 		newValue := reflect.ValueOf(newValueInf)
+		if !newValue.IsValid() {
+			// The stored value was JSON null (a nil pointer field). json.Unmarshal
+			// turns null into an untyped nil,
+			// so newValue is the zero Value. Leave the field as-is, matching the
+			// missing-key behavior, instead of panicking on the following value.Set.
+			return nil
+		}
+
 		if value.Kind() != reflect.Ptr && newValue.Kind() == reflect.Ptr {
 			newValue = newValue.Elem()
 		}
