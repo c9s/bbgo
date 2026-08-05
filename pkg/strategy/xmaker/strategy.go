@@ -2261,6 +2261,8 @@ func (s *Strategy) directHedge(
 }
 
 func (s *Strategy) tradeRecover(ctx context.Context) {
+	defer s.logger.Info("trade recover worker exited")
+
 	s.wg.Add(1)
 	defer s.wg.Done()
 
@@ -2511,6 +2513,8 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) quoteWorker(ctx context.Context) {
+	defer s.logger.Info("quote worker exited")
+
 	s.wg.Add(1)
 	defer s.wg.Done()
 
@@ -2569,6 +2573,8 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 }
 
 func (s *Strategy) accountUpdater(ctx context.Context) {
+	defer s.logger.Info("account updater worker exited")
+
 	s.wg.Add(1)
 	defer s.wg.Done()
 
@@ -2596,6 +2602,8 @@ func (s *Strategy) accountUpdater(ctx context.Context) {
 }
 
 func (s *Strategy) houseCleanWorker(ctx context.Context) {
+	defer s.logger.Info("house clean worker exited")
+
 	s.wg.Add(1)
 	defer s.wg.Done()
 
@@ -2626,6 +2634,8 @@ func (s *Strategy) getUncoveredPosition() fixedpoint.Value {
 }
 
 func (s *Strategy) hedgeWorker(ctx context.Context) {
+	defer s.logger.Info("hedge worker exited")
+
 	s.wg.Add(1)
 	defer s.wg.Done()
 
