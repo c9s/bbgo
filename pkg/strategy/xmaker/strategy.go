@@ -2079,13 +2079,7 @@ func (s *Strategy) hedge(ctx context.Context) {
 		uncoveredPosition.String(), s.positionExposure.String(),
 	)
 
-	lastPrice := s.lastPrice.Get()
 	sig := s.lastSmoothedAggregatedSignal.Get()
-
-	if lastPrice.IsZero() {
-		s.logger.Warnf("last price is zero, skip hedging")
-	}
-
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
 		if err := s.spreadMakerHedge(ctx, sig); err != nil {
 			s.logger.WithError(err).Errorf("spreadMaker: unable to place spread maker order")
@@ -2115,6 +2109,11 @@ func (s *Strategy) hedge(ctx context.Context) {
 	qty := hedgeDelta.Abs()
 
 	// check dust quantity
+	lastPrice := s.lastPrice.Get()
+	if lastPrice.IsZero() {
+		s.logger.Warnf("last price is zero, hedge quantity is %s", qty.String())
+	}
+
 	if lastPrice.Sign() > 0 && s.hedgeMarket.IsDustQuantity(qty, lastPrice) {
 		s.logger.Debugf("hedge quantity %s is dust, skip hedging", qty.String())
 		return
