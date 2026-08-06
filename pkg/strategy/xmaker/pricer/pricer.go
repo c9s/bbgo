@@ -15,15 +15,23 @@ type CoveredDepth struct {
 	initialDepth     fixedpoint.Value
 	depthBook        *types.DepthBook
 	side             types.SideType
+
+	// if useQuoteQuantity is true, the depth will be interpreted as quote quantity, not base quantity.
+	useQuoteQuantity bool
 }
 
-func NewCoveredDepth(depthBook *types.DepthBook, side types.SideType, initialDepth fixedpoint.Value) *CoveredDepth {
+// NewCoveredDepth creates a new CoveredDepth instance.
+// If useQuoteQuantity is true, the instance will work under the quote depth mode, which means all the depth-related
+// calculations will be based on quote quantity instead of base quantity.
+// Note that it will interpret all the depth-related parameters that are passed to the instance as quote quantity as well.
+func NewCoveredDepth(depthBook *types.DepthBook, side types.SideType, initialDepth fixedpoint.Value, useQuoteQuantity bool) *CoveredDepth {
 	return &CoveredDepth{
 		lastIndex:        -1,
 		initialDepth:     initialDepth,
 		depthBook:        depthBook,
 		side:             side,
 		accumulatedDepth: fixedpoint.Zero,
+		useQuoteQuantity: useQuoteQuantity,
 	}
 }
 
@@ -37,19 +45,23 @@ func (d *CoveredDepth) Cover(depth fixedpoint.Value) {
 
 func (d *CoveredDepth) Pricer() Pricer {
 	return func(i int, price fixedpoint.Value) fixedpoint.Value {
+		depthFunc := d.depthBook.PriceAtDepth
+		if d.useQuoteQuantity {
+			depthFunc = d.depthBook.PriceAtQuoteDepth
+		}
 		if i <= d.lastIndex {
 			// If the index is not increasing, we do not accumulate depth.
 			// This is to prevent re-accumulating depth when the same index is processed again.
 			log.Warnf("FromAccumulatedDepth: index %d is not increasing from last index %d, skipping accumulation", i, d.lastIndex)
-			return d.depthBook.PriceAtDepth(d.side, d.initialDepth)
+			return depthFunc(d.side, d.initialDepth)
 		}
 
 		if d.lastIndex == 0 {
 			// If this is the first index, we set the initial depth.
-			price = d.depthBook.PriceAtDepth(d.side, d.initialDepth)
+			price = depthFunc(d.side, d.initialDepth)
 			d.accumulatedDepth = d.initialDepth
 		} else {
-			price = d.depthBook.PriceAtDepth(d.side, d.accumulatedDepth)
+			price = depthFunc(d.side, d.accumulatedDepth)
 		}
 
 		d.lastIndex = i
@@ -57,8 +69,11 @@ func (d *CoveredDepth) Pricer() Pricer {
 	}
 }
 
-func FromDepthBook(side types.SideType, depthBook *types.DepthBook, depth fixedpoint.Value) Pricer {
+func FromDepthBook(side types.SideType, depthBook *types.DepthBook, depth fixedpoint.Value, useQuoteQuantity bool) Pricer {
 	return func(i int, price fixedpoint.Value) fixedpoint.Value {
+		if useQuoteQuantity {
+			return depthBook.PriceAtQuoteDepth(side, depth)
+		}
 		return depthBook.PriceAtDepth(side, depth)
 	}
 }
