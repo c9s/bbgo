@@ -50,6 +50,11 @@ var log = logrus.WithField("strategy", ID)
 
 var raiseWarningLevelLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 
+// borrowEligibilityWarnLimiter rate-limits the warning emitted when a hedge
+// asset is not borrowable on the margin hedge exchange (borrowability is
+// near-static, so the warning does not need to fire on every quote cycle).
+var borrowEligibilityWarnLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 1)
+
 func nopCover(v fixedpoint.Value) {}
 
 type cancelOrdersBySymbolSide interface {
@@ -244,6 +249,8 @@ type StrategyConfig struct {
 	AuthTimeout types.Duration `json:"authTimeout,omitempty"`
 
 	CircuitBreaker *circuitbreaker.BasicCircuitBreaker `json:"circuitBreaker"`
+
+	BorrowableUpdateInterval types.Duration `json:"borrowableUpdateInterval"`
 }
 
 type Strategy struct {
@@ -1439,6 +1446,46 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	if s.SplitHedge != nil && s.SplitHedge.Enabled {
 		s.logger.Infof("%s splitHedge source price ask/bid = %s/%s (%s)", s.Symbol, bestAskPrice.String(), bestBidPrice.String(), calculateSpread(bestAskPrice, bestBidPrice).Percentage())
 
+		// split hedge is enabled, we need to check there is at least one hedge session is available to place the hedge orders
+		var availableAskSessions []string
+		var availableBidSessions []string
+
+		for _, hedgeMarket := range s.SplitHedge.hedgeMarketInstances {
+			if !hedgeMarket.session.Margin {
+				availableAskSessions = append(availableAskSessions, hedgeMarket.session.Name)
+				availableBidSessions = append(availableBidSessions, hedgeMarket.session.Name)
+				continue
+			}
+			if borrowable := s.getBorrowableAssetResult(hedgeMarket.session, hedgeMarket.market); borrowable != nil {
+				if borrowable.BaseBorrowable {
+					availableAskSessions = append(availableAskSessions, hedgeMarket.session.Name)
+				}
+				if borrowable.QuoteBorrowable {
+					availableBidSessions = append(availableBidSessions, hedgeMarket.session.Name)
+				}
+			} else {
+				// we cannot get the borrowable asset result, we assume the hedge market is available for both ask and bid
+				s.logger.Warnf("unable to get borrowable asset result on %s, assume both ask and bid are available", hedgeMarket.session.Name)
+				availableAskSessions = append(availableAskSessions, hedgeMarket.session.Name)
+				availableBidSessions = append(availableBidSessions, hedgeMarket.session.Name)
+			}
+		}
+		if len(availableAskSessions) == 0 {
+			disableMakerAsk = true
+		}
+		if len(availableBidSessions) == 0 {
+			disableMakerBid = true
+		}
+
+		if borrowEligibilityWarnLimiter.Allow() {
+			if len(availableAskSessions) == 0 {
+				s.logger.Warn("split hedge has no available hedge markets to place maker ask orders, disable maker ask quoting")
+			}
+			if len(availableBidSessions) == 0 {
+				s.logger.Warn("split hedge has no available hedge markets to place maker bid orders, disable maker bid quoting")
+			}
+		}
+
 		if !disableMakerBid {
 			for i := 0; i < s.NumLayers; i++ {
 				bidPrice := bidPriceSpread(i, bestBidPrice)
@@ -1566,7 +1613,66 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			}
 		}
+	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		// synthetic hedge is enabled, both the source market and fiat market has to be available to place the hedge orders
+		for _, hedgeMarket := range []*HedgeMarket{s.SyntheticHedge.sourceMarket, s.SyntheticHedge.fiatMarket} {
+			if !hedgeMarket.session.Margin {
+				continue
+			}
+			if borrowable := s.getBorrowableAssetResult(hedgeMarket.session, hedgeMarket.market); borrowable != nil {
+				if !borrowable.BaseBorrowable {
+					disableMakerBid = true
+				}
+				if !borrowable.QuoteBorrowable {
+					disableMakerAsk = true
+				}
+
+				if borrowEligibilityWarnLimiter.Allow() {
+					if !borrowable.BaseBorrowable {
+						s.logger.Warnf(
+							"%s base currency %s is not borrowable on %s, disabling maker bid orders...",
+							s.Symbol, hedgeMarket.market.BaseCurrency, hedgeMarket.session.ExchangeName,
+						)
+					}
+					if !borrowable.QuoteBorrowable {
+						s.logger.Warnf(
+							"%s quote currency %s is not borrowable on %s, disabling maker ask orders...",
+							s.Symbol, hedgeMarket.market.QuoteCurrency, hedgeMarket.session.ExchangeName,
+						)
+					}
+				}
+			}
+		}
 	} else {
+		// When hedging on a margin account, a maker bid hedge borrows the base
+		// currency and a maker ask hedge borrows the quote currency. If the hedge
+		// exchange currently disallows borrowing an asset, disable the affected maker
+		// side so we stop quoting a hedge we cannot cover.
+		if s.hedgeSession.Margin {
+			if borrowable := s.getBorrowableAssetResult(s.hedgeSession, s.hedgeMarket); borrowable != nil {
+				if !borrowable.BaseBorrowable {
+					disableMakerBid = true
+				}
+				if !borrowable.QuoteBorrowable {
+					disableMakerAsk = true
+				}
+
+				if borrowEligibilityWarnLimiter.Allow() {
+					if !borrowable.BaseBorrowable {
+						s.logger.Warnf(
+							"%s base currency %s is not borrowable on %s, disabling maker bid orders...",
+							s.Symbol, s.hedgeMarket.BaseCurrency, s.hedgeSession.ExchangeName,
+						)
+					}
+					if !borrowable.QuoteBorrowable {
+						s.logger.Warnf(
+							"%s quote currency %s is not borrowable on %s, disabling maker ask orders...",
+							s.Symbol, s.hedgeMarket.QuoteCurrency, s.hedgeSession.ExchangeName,
+						)
+					}
+				}
+			}
+		}
 		// default maker order generation
 		s.logger.Infof("%s source book ticker: ask/bid = %s/%s (%s)", s.Symbol, bestAskPrice.String(), bestBidPrice.String(), calculateSpread(bestAskPrice, bestBidPrice).Percentage())
 		if !disableMakerBid {
@@ -2521,6 +2627,10 @@ func (s *Strategy) Defaults() error {
 		s.AuthTimeout = types.Duration(3 * time.Minute)
 	}
 
+	if s.BorrowableUpdateInterval.Duration() == 0 {
+		s.BorrowableUpdateInterval = types.Duration(5 * time.Minute)
+	}
+
 	return nil
 }
 
@@ -3174,6 +3284,38 @@ func (s *Strategy) CrossRun(
 	} else {
 		s.orderStore.BindStream(s.hedgeSession.UserDataStream)
 		s.tradeCollector.BindStream(s.hedgeSession.UserDataStream)
+	}
+
+	// setup borrowable asset workers
+	var borrowableMarkets []*HedgeMarket
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		for _, hedgeMarket := range s.SplitHedge.hedgeMarketInstances {
+			if !hedgeMarket.session.Margin {
+				continue
+			}
+			borrowableMarkets = append(borrowableMarkets, hedgeMarket)
+		}
+	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		for _, hedgeMarket := range []*HedgeMarket{s.SyntheticHedge.sourceMarket, s.SyntheticHedge.fiatMarket} {
+			if !hedgeMarket.session.Margin {
+				continue
+			}
+			borrowableMarkets = append(borrowableMarkets, hedgeMarket)
+		}
+	} else if s.hedgeSession.Margin {
+		createBorrowableAssetsWorker(
+			s.tradingCtx,
+			s.hedgeSession,
+			s.hedgeMarket,
+		)
+	}
+	for _, hedgeMarket := range borrowableMarkets {
+		market := hedgeMarket.market
+		createBorrowableAssetsWorker(
+			s.tradingCtx,
+			hedgeMarket.session,
+			market,
+		)
 	}
 
 	s.sourceUserDataConnectivity = s.hedgeSession.UserDataConnectivity

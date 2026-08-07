@@ -54,3 +54,7 @@ func (w *Handle) Value() any {
 
 	return w.value
 }
+
+func (w *Handle) Worker() Worker {
+	return w.worker
+}
