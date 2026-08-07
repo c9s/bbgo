@@ -125,3 +125,29 @@ func Test_QueryFuturesIndexPriceKLines(t *testing.T) {
 		}
 	}
 }
+
+func Test_QueryMarginAssets(t *testing.T) {
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "BINANCE")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ex := New(key, secret)
+
+	t.Run("all assets", func(t *testing.T) {
+		assets, err := ex.QueryMarginAssets(context.Background())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, assets)
+	})
+
+	t.Run("assets filter", func(t *testing.T) {
+		assets, err := ex.QueryMarginAssets(context.Background(), "TRX", "USDT")
+		assert.NoError(t, err)
+		assert.NotEmpty(t, assets)
+		for _, asset := range assets {
+			assert.Contains(t, []string{"TRX", "USDT"}, asset.Asset)
+		}
+		assert.Equal(t, 2, len(assets))
+	})
+}

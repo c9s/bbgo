@@ -453,6 +453,42 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(
 	return resp.Amount, nil
 }
 
+// QueryMarginAssets returns the cross-margin asset catalog, describing whether
+// each asset can be borrowed or used as collateral. When assets are given, only
+// those assets are returned.
+func (e *Exchange) QueryMarginAssets(
+	ctx context.Context, assets ...string,
+) ([]types.MarginBorrowableAsset, error) {
+	req := e.client2.NewGetMarginAllAssetsRequest()
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []binanceapi.MarginAllAsset
+	if len(assets) > 0 {
+		filter := make(map[string]struct{})
+		for _, a := range assets {
+			filter[a] = struct{}{}
+		}
+
+		for _, a := range resp {
+			if _, ok := filter[a.AssetName]; ok {
+				filtered = append(filtered, a)
+			}
+		}
+	} else {
+		filtered = resp
+	}
+
+	result := make([]types.MarginBorrowableAsset, 0, len(filtered))
+	for _, a := range filtered {
+		result = append(result, a.MarginBorrowableAsset())
+	}
+
+	return result, nil
+}
+
 func (e *Exchange) borrowRepayAsset(
 	ctx context.Context, asset string, amount fixedpoint.Value, marginType binanceapi.BorrowRepayType,
 ) error {

@@ -28,6 +28,24 @@ type MarginBorrowRepayService interface {
 	QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error)
 }
 
+// MarginBorrowableAsset describes a margin asset and whether it can be borrowed
+// or used as collateral on the (cross) margin account.
+// This is targeting the Binance Exchange by the tme of writing.
+type MarginBorrowableAsset struct {
+	Asset          string
+	IsBorrowable   bool
+	IsMortgageable bool
+	MinBorrow      fixedpoint.Value
+	MinRepay       fixedpoint.Value
+}
+
+// MarginAssetQueryService queries the margin asset catalog of an exchange, e.g.
+// whether a given asset is currently borrowable on the (cross) margin account.
+// This is targeting the Binance Exchange by the tme of writing.
+type MarginAssetQueryService interface {
+	QueryMarginAssets(ctx context.Context, assets ...string) ([]MarginBorrowableAsset, error)
+}
+
 type MarginInterest struct {
 	GID            uint64           `json:"gid" db:"gid"`
 	Exchange       ExchangeName     `json:"exchange" db:"exchange"`
