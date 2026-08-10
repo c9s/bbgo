@@ -856,7 +856,7 @@ func (s *Strategy) getInitialLayerQuantity(i int, price fixedpoint.Value) (fixed
 	if s.QuantityMultiplier.Sign() > 0 && i > 0 {
 		q = fixedpoint.NewFromFloat(
 			q.Float64() * math.Pow(
-				s.QuantityMultiplier.Float64(), float64(i+1),
+				s.QuantityMultiplier.Float64(), float64(i),
 			),
 		)
 	}
@@ -1481,7 +1481,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				// if we bought, then we need to sell the base from the hedge session
 				// if the hedge session is a margin session, we don't need to lock the base asset
 				if makerQuota.QuoteAsset.Lock(requiredQuote) &&
-					(s.hedgeSession.Margin || hedgeQuota.BaseAsset.Lock(bidQuantity)) {
+					(s.DryRun || (s.hedgeSession.Margin || hedgeQuota.BaseAsset.Lock(bidQuantity))) {
 
 					submitOrders = append(
 						submitOrders, types.SubmitOrder{
@@ -1540,7 +1540,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				}
 
 				if makerQuota.BaseAsset.Lock(requiredBase) &&
-					(s.hedgeSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice))) {
+					(s.DryRun || (s.hedgeSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice)))) {
 
 					// if we sell on the maker market, then we need to buy the base from the hedge session
 					submitOrders = append(
@@ -1631,7 +1631,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				// if we bought, then we need to sell the base from the hedge session
 				// if the hedge session is a margin session, we don't need to lock the base asset
 				if makerQuota.QuoteAsset.Lock(requiredQuote) &&
-					(s.hedgeSession.Margin || hedgeQuota.BaseAsset.Lock(bidQuantity)) {
+					(s.DryRun || (s.hedgeSession.Margin || hedgeQuota.BaseAsset.Lock(bidQuantity))) {
 
 					// if we bought, then we need to sell the base from the hedge session
 					submitOrders = append(
@@ -1710,7 +1710,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				}
 
 				if makerQuota.BaseAsset.Lock(requiredBase) &&
-					(s.hedgeSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice))) {
+					(s.DryRun || (s.hedgeSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice)))) {
 
 					// if we bought, then we need to sell the base from the hedge session
 					submitOrders = append(
@@ -1747,7 +1747,22 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	}
 
 	if s.DryRun {
-		s.logger.Infof("[dryRun] maker orders: %+v", submitOrders)
+		var buyOrders, sellOrders []types.SubmitOrder
+		for _, order := range submitOrders {
+			if order.Side == types.SideTypeBuy {
+				buyOrders = append(buyOrders, order)
+			} else {
+				sellOrders = append(sellOrders, order)
+			}
+		}
+		s.logger.Info("[dryRun] maker buy orders:")
+		for i, order := range buyOrders {
+			s.logger.Infof("[dryRun] %d: price=%f, quantity=%f, quote quantity=%s", i, order.Price.Float64(), order.Quantity.Float64(), order.Quantity.Mul(order.Price))
+		}
+		s.logger.Info("[dryRun] maker sell orders:")
+		for i, order := range sellOrders {
+			s.logger.Infof("[dryRun] %d: price=%f, quantity=%f, quote quantity=%s", i, order.Price.Float64(), order.Quantity.Float64(), order.Quantity.Mul(order.Price))
+		}
 		return nil
 	}
 
