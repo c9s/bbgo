@@ -355,7 +355,7 @@ func TestFromDepth(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pricer := FromDepthBook(tt.side, tt.book, tt.depth)
+			pricer := FromDepthBook(tt.side, tt.book, tt.depth, false)
 			got := pricer(tt.call.i, tt.call.price)
 			assert.Equal(t, tt.call.want, got)
 		})
@@ -443,7 +443,7 @@ func TestNewCoveredDepth(t *testing.T) {
 	depthBook := types.NewDepthBook(book)
 	initialDepth := Number(1)
 
-	coveredDepth := NewCoveredDepth(depthBook, types.SideTypeBuy, initialDepth)
+	coveredDepth := NewCoveredDepth(depthBook, types.SideTypeBuy, initialDepth, false)
 	pricer := coveredDepth.Pricer()
 
 	// Assume the order quantity per layer is 1
