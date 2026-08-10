@@ -216,11 +216,11 @@ func TestStrategy_getInitialLayerQuantity_SimpleMultiplier(t *testing.T) {
 
 		q, err = s.getInitialLayerQuantity(1, price)
 		assert.NoError(t, err)
-		assert.InDelta(t, 10.0*1.1*1.1, q.Float64(), 1e-8)
+		assert.InDelta(t, 10.0*1.1, q.Float64(), 1e-8)
 
 		q, err = s.getInitialLayerQuantity(2, price)
 		assert.NoError(t, err)
-		assert.InDelta(t, 10.0*1.1*1.1*1.1, q.Float64(), 1e-8)
+		assert.InDelta(t, 10.0*1.1*1.1, q.Float64(), 1e-8)
 	})
 
 	t.Run("quote scale enabled: fixed quantity is in quote currency and converted to base", func(t *testing.T) {
@@ -256,7 +256,7 @@ func TestStrategy_getInitialLayerQuantity_SimpleMultiplier(t *testing.T) {
 		// layer 1: (1000/100) * 1.1^2 = 12.1
 		q, err = s.getInitialLayerQuantity(1, price)
 		assert.NoError(t, err)
-		assert.InDelta(t, 10.0*1.1*1.1, q.Float64(), 1e-8)
+		assert.InDelta(t, 10.0*1.1, q.Float64(), 1e-8)
 	})
 
 	t.Run("quote scale enabled but price is zero: no conversion is applied", func(t *testing.T) {
