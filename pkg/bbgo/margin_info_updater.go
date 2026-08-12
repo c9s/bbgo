@@ -20,6 +20,9 @@ type MarginInfoUpdater struct {
 
 	assets map[string]fixedpoint.Value
 
+	doneAssets        map[string]struct{}
+	lastResetDoneTime time.Time
+
 	maxBorrowableCallbacks []MaxBorrowableCallback
 
 	mu sync.Mutex
@@ -29,8 +32,9 @@ func NewMarginInfoUpdater(
 	service types.MarginBorrowRepayService,
 ) *MarginInfoUpdater {
 	return &MarginInfoUpdater{
-		assets:  make(map[string]fixedpoint.Value),
-		service: service,
+		assets:     make(map[string]fixedpoint.Value),
+		doneAssets: make(map[string]struct{}),
+		service:    service,
 	}
 }
 
@@ -38,17 +42,23 @@ func NewMarginInfoUpdater(
 func (m *MarginInfoUpdater) Run(
 	ctx context.Context,
 	interval types.Duration,
+	batchSize int,
+	coolDown time.Duration,
 ) {
 	ticker := time.NewTicker(timejitter.Milliseconds(interval.Duration(), 500))
 	defer ticker.Stop()
 
-	m.Update(ctx)
+	m.Update(ctx, batchSize)
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
-			m.Update(ctx)
+		case now := <-ticker.C:
+			if !m.lastResetDoneTime.IsZero() && now.Sub(m.lastResetDoneTime) <= coolDown {
+				// still in cooldown period, skip this update cycle
+				continue
+			}
+			m.Update(ctx, batchSize)
 		}
 	}
 }
@@ -76,11 +86,23 @@ func (m *MarginInfoUpdater) GetMaxBorrowable(asset string) (fixedpoint.Value, bo
 // Update queries the max borrowable amount for each asset and emit update events.
 func (m *MarginInfoUpdater) Update(
 	ctx context.Context,
+	batchSize int,
 ) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	pending := make([]string, 0, len(m.assets))
 	for asset := range m.assets {
+		if _, done := m.doneAssets[asset]; !done {
+			pending = append(pending, asset)
+		}
+	}
+
+	if batchSize > len(pending) {
+		batchSize = len(pending)
+	}
+
+	for _, asset := range pending[:batchSize] {
 		maxBorrowable, err := m.service.QueryMarginAssetMaxBorrowable(
 			ctx,
 			asset,
@@ -92,7 +114,14 @@ func (m *MarginInfoUpdater) Update(
 		}
 
 		m.assets[asset] = maxBorrowable
+		m.doneAssets[asset] = struct{}{}
 
 		m.EmitMaxBorrowable(asset, maxBorrowable)
+	}
+
+	// once every asset has been refreshed, reset to begin a new cycle.
+	if len(m.doneAssets) >= len(m.assets) {
+		m.doneAssets = make(map[string]struct{})
+		m.lastResetDoneTime = time.Now()
 	}
 }
