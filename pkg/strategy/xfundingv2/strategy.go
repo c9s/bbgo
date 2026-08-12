@@ -914,7 +914,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		posDeviation := round.CheckPositionDeviation(
 			tickTime,
 			s.CriticalErrorConfig.MaxMoqDeviation,
-			s.CriticalErrorConfig.MaxMoqDeviation,
+			s.CriticalErrorConfig.MaxQuoteDeviation,
 			lastPrice,
 			time.Minute*15,
 		)
