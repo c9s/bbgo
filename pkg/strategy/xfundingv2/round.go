@@ -1288,7 +1288,7 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.syncState.State == RoundPending || r.isHalted() {
+	if r.syncState.State == RoundPending {
 		// not started yet or halted, do nothing
 		return
 	}
@@ -1311,21 +1311,35 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 	}
 
 	// it's opening or closing, tick the workers
-	if err := r.spotWorker.Tick(currentTime, spotOrderBook); err != nil {
-		r.logger.
-			WithError(err).
-			Warnf(
-				"failed to tick %s spot worker at %s",
-				r.SpotSymbol(), currentTime.Format(time.RFC3339),
-			)
+	tickSpot := true
+	tickFutures := true
+	if r.isHalted() {
+		switch r.syncState.State {
+		case RoundOpening:
+			tickSpot = false
+		case RoundClosing:
+			tickFutures = false
+		}
 	}
-	if err := r.futuresWorker.Tick(currentTime, futuresOrderBook); err != nil {
-		r.logger.
-			WithError(err).
-			Warnf(
-				"failed to tick %s futures worker at %s",
-				r.FuturesSymbol(), currentTime.Format(time.RFC3339),
-			)
+	if tickSpot {
+		if err := r.spotWorker.Tick(currentTime, spotOrderBook); err != nil {
+			r.logger.
+				WithError(err).
+				Warnf(
+					"failed to tick %s spot worker at %s",
+					r.SpotSymbol(), currentTime.Format(time.RFC3339),
+				)
+		}
+	}
+	if tickFutures {
+		if err := r.futuresWorker.Tick(currentTime, futuresOrderBook); err != nil {
+			r.logger.
+				WithError(err).
+				Warnf(
+					"failed to tick %s futures worker at %s",
+					r.FuturesSymbol(), currentTime.Format(time.RFC3339),
+				)
+		}
 	}
 
 	if err := r.rebalance(ctx, currentTime, futuresOrderBook); err != nil {
