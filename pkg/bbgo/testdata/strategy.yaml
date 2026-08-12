@@ -6,12 +6,16 @@ sessions:
     marginInfoUpdaterInterval: 3m0s
     marginInfoUpdaterBatchSize: 3
     marginInfoUpdaterCooldown: 9m0s
+    marginInfoUpdaterTradesBufferCount: 30
+    marginInfoUpdaterBindSession: false
   binance:
     exchange: binance
     envVarPrefix: BINANCE
     marginInfoUpdaterInterval: 5m0s
     marginInfoUpdaterBatchSize: 5
     marginInfoUpdaterCooldown: 15m0s
+    marginInfoUpdaterTradesBufferCount: 30
+    marginInfoUpdaterBindSession: false
 
 
 exchangeStrategies:
