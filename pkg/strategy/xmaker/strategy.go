@@ -1439,6 +1439,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	if s.SplitHedge != nil && s.SplitHedge.Enabled {
 		s.logger.Infof("%s splitHedge source price ask/bid = %s/%s (%s)", s.Symbol, bestAskPrice.String(), bestBidPrice.String(), calculateSpread(bestAskPrice, bestBidPrice).Percentage())
 
+		disableMakerBid, disableMakerAsk = s.splitHedgeBorrowableCheck(disableMakerBid, disableMakerAsk)
+
 		if !disableMakerBid {
 			for i := 0; i < s.NumLayers; i++ {
 				bidPrice := bidPriceSpread(i, bestBidPrice)
@@ -1566,7 +1568,12 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			}
 		}
+	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		// TODO: borrowable check for synthetic hedge
+		s.logger.Debugf("no borrowable check for synthetic hedge...")
 	} else {
+		disableMakerBid, disableMakerAsk = s.simpleHedgeBorrowableCheck(disableMakerBid, disableMakerAsk)
+
 		// default maker order generation
 		s.logger.Infof("%s source book ticker: ask/bid = %s/%s (%s)", s.Symbol, bestAskPrice.String(), bestBidPrice.String(), calculateSpread(bestAskPrice, bestBidPrice).Percentage())
 		if !disableMakerBid {
@@ -3189,6 +3196,36 @@ func (s *Strategy) CrossRun(
 	} else {
 		s.orderStore.BindStream(s.hedgeSession.UserDataStream)
 		s.tradeCollector.BindStream(s.hedgeSession.UserDataStream)
+	}
+
+	// setup borrowable asset workers
+	var borrowableMarkets []*HedgeMarket
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		for _, hedgeMarket := range s.SplitHedge.hedgeMarketInstances {
+			if !hedgeMarket.session.Margin {
+				continue
+			}
+			borrowableMarkets = append(borrowableMarkets, hedgeMarket)
+		}
+	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		for _, hedgeMarket := range []*HedgeMarket{s.SyntheticHedge.sourceMarket, s.SyntheticHedge.fiatMarket} {
+			if !hedgeMarket.session.Margin {
+				continue
+			}
+			borrowableMarkets = append(borrowableMarkets, hedgeMarket)
+		}
+	} else if s.hedgeSession.Margin {
+		addBorrowableAssets(
+			s.hedgeSession,
+			s.hedgeMarket,
+		)
+	}
+	for _, hedgeMarket := range borrowableMarkets {
+		market := hedgeMarket.market
+		addBorrowableAssets(
+			hedgeMarket.session,
+			market,
+		)
 	}
 
 	s.sourceUserDataConnectivity = s.hedgeSession.UserDataConnectivity
