@@ -182,7 +182,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 			Bids:   e.Bids,
 			Asks:   e.Asks,
 		}, e.FirstUpdateID, e.FinalUpdateID, e.PreviousUpdateID); err != nil {
-			log.WithError(err).Errorf("found missing %s update event", e.Symbol)
+			log.WithError(err).Warnf("found missing %s update event", e.Symbol)
 		}
 	})
 
