@@ -350,8 +350,28 @@ type roundNotification struct {
 }
 
 func (n *roundNotification) SlackAttachment() slack.Attachment {
+	var fields []slack.AttachmentField
+	var spotAvgCost, futuresAvgCost fixedpoint.Value
+
+	spotActiveOrder := n.spotWorker.activeOrder
+
+	if n.hasStarted() {
+		if n.State() == RoundClosed {
+			realizedPnL := n.RealizedPnL()
+			spotAvgCost = realizedPnL.SpotPosition.AverageCost
+			futuresAvgCost = realizedPnL.FuturesPosition.AverageCost
+		} else {
+			unrealizedPnL := n.UnrealizedPnL(
+				n.spotPrice,
+				n.futuresPrice,
+			)
+			spotAvgCost = unrealizedPnL.SpotPosition.AverageCost
+			futuresAvgCost = unrealizedPnL.FuturesPosition.AverageCost
+		}
+	}
+
 	title := fmt.Sprintf("Arbitrage Round %s (%s)", n.SpotSymbol(), n.syncState.State)
-	fields := []slack.AttachmentField{
+	fields = append(fields, []slack.AttachmentField{
 		{
 			Title: "Round ID",
 			Value: n.syncState.ID,
@@ -360,8 +380,72 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 		{
 			Title: "Triggered Spot Position",
 			Value: n.syncState.TriggeredSpotTargetPosition.String(),
+			Short: false, // use the whole row for the position
+		},
+	}...)
+
+	fields = append(fields, []slack.AttachmentField{
+		{
+			Title: "Spot Filled Position",
+			Value: fmt.Sprintf("%s@%s", n.spotWorker.FilledPosition().String(), spotAvgCost.String()),
 			Short: true,
 		},
+		{
+			Title: "Futures Filled Position",
+			Value: fmt.Sprintf("%s@%s", n.futuresWorker.FilledPosition().String(), futuresAvgCost.String()),
+			Short: true,
+		},
+	}...)
+
+	spotOrderField := slack.AttachmentField{
+		Title: "Spot Active Order",
+		Value: "NONE",
+		Short: true,
+	}
+	if spotActiveOrder != nil {
+		spotOrderField.Value = fmt.Sprintf(
+			"%s %s/%s@%s",
+			spotActiveOrder.Side,
+			spotActiveOrder.ExecutedQuantity,
+			spotActiveOrder.Quantity,
+			spotActiveOrder.Price,
+		)
+	}
+	futuresActiveOrder := n.futuresWorker.activeOrder
+	futuresOrderField := slack.AttachmentField{
+		Title: "Futures Active Order",
+		Value: "NONE",
+		Short: true,
+	}
+	if futuresActiveOrder != nil {
+		futuresOrderField.Value = fmt.Sprintf(
+			"%s %s/%s@%s",
+			futuresActiveOrder.Side,
+			futuresActiveOrder.ExecutedQuantity,
+			futuresActiveOrder.Quantity,
+			futuresActiveOrder.Price,
+		)
+	}
+
+	fields = append(fields,
+		spotOrderField,
+		futuresOrderField,
+	)
+
+	if n.hasStarted() {
+		if n.State() == RoundClosed {
+			realizedPnL := n.RealizedPnL()
+			fields = append(fields, realizedPnLFields(realizedPnL)...)
+		} else {
+			unrealizedPnL := n.UnrealizedPnL(
+				n.spotPrice,
+				n.futuresPrice,
+			)
+			fields = append(fields, unrealizedPnLFields(unrealizedPnL)...)
+		}
+	}
+
+	fields = append(fields, []slack.AttachmentField{
 		{
 			Title: "Funding Interval in Hours",
 			Value: fmt.Sprintf("%d", n.syncState.FundingIntervalHours),
@@ -382,7 +466,8 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			Value: n.syncState.StartAt.Format(time.RFC3339),
 			Short: true,
 		},
-	}
+	}...)
+
 	switch n.State() {
 	case RoundClosing:
 		fields = append(fields,
@@ -424,69 +509,8 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 		)
+	default:
 	}
-	var spotAvgCost, futuresAvgCost fixedpoint.Value
-	if n.hasStarted() {
-		if n.State() == RoundClosed {
-			realizedPnL := n.RealizedPnL()
-			spotAvgCost = realizedPnL.SpotPosition.AverageCost
-			futuresAvgCost = realizedPnL.FuturesPosition.AverageCost
-			fields = append(fields, realizedPnLFields(realizedPnL)...)
-		} else {
-			unrealizedPnL := n.UnrealizedPnL(
-				n.spotPrice,
-				n.futuresPrice,
-			)
-			spotAvgCost = unrealizedPnL.SpotPosition.AverageCost
-			futuresAvgCost = unrealizedPnL.FuturesPosition.AverageCost
-			fields = append(fields, unrealizedPnLFields(unrealizedPnL)...)
-		}
-	}
-	spotActiveOrder := n.spotWorker.activeOrder
-	spotOrderField := slack.AttachmentField{
-		Title: "Spot Active Order",
-		Value: "NONE",
-		Short: true,
-	}
-	if spotActiveOrder != nil {
-		spotOrderField.Value = fmt.Sprintf(
-			"%s %s/%s@%s",
-			spotActiveOrder.Side,
-			spotActiveOrder.ExecutedQuantity,
-			spotActiveOrder.Quantity,
-			spotActiveOrder.Price,
-		)
-	}
-	futuresActiveOrder := n.futuresWorker.activeOrder
-	futuresOrderField := slack.AttachmentField{
-		Title: "Futures Active Order",
-		Value: "NONE",
-		Short: true,
-	}
-	if futuresActiveOrder != nil {
-		futuresOrderField.Value = fmt.Sprintf(
-			"%s %s/%s@%s",
-			futuresActiveOrder.Side,
-			futuresActiveOrder.ExecutedQuantity,
-			futuresActiveOrder.Quantity,
-			futuresActiveOrder.Price,
-		)
-	}
-
-	fields = append(fields,
-		slack.AttachmentField{
-			Title: "Spot Filled Position",
-			Value: fmt.Sprintf("%s@%s", n.spotWorker.FilledPosition().String(), spotAvgCost.String()),
-			Short: true,
-		},
-		slack.AttachmentField{
-			Title: "Futures Filled Position",
-			Value: fmt.Sprintf("%s@%s", n.futuresWorker.FilledPosition().String(), futuresAvgCost.String()),
-			Short: true,
-		},
-		spotOrderField,
-		futuresOrderField,
-	)
 
 	text := "Arbitrage Round Details"
 	if n.IsCritical && len(n.slackAlert.Mentions) > 0 {
