@@ -347,6 +347,13 @@ func (s *Strategy) CrossRun(
 	}
 	s.logger.Debugf("active rounds: %d, pending rounds: %d, closed rounds: %d", len(s.ActiveRounds), len(s.PendingRounds), len(s.ClosedRoundTasks))
 
+	// hotfix: fix 0 min holding intervals
+	for _, round := range s.ActiveRounds {
+		if round.syncState.MinHoldingIntervals == 0 {
+			round.syncState.MinHoldingIntervals = 1
+		}
+	}
+
 	s.spotSession = sessions[s.SpotSession]
 	s.futuresSession = sessions[s.FuturesSession]
 
@@ -1562,6 +1569,9 @@ func (s *Strategy) calculateMinHoldingIntervals(candidate MarketCandidate, bestP
 		return fixedpoint.Zero, fmt.Errorf("estimated funding fee per interval is zero for candidate %s", candidate.Symbol)
 	}
 	breakEvenIntervals := totalCost.Div(estimateFundingFeePerInterval).Round(0, fixedpoint.Up)
+	if breakEvenIntervals.Sign() <= 0 {
+		breakEvenIntervals = fixedpoint.One
+	}
 	return breakEvenIntervals, nil
 }
 
