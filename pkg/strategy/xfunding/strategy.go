@@ -298,7 +298,6 @@ func (s *Strategy) CrossRun(
 			FundingFeeCurrency: s.futuresMarket.QuoteCurrency,
 			TotalFundingFee:    fixedpoint.Zero,
 			FundingFeeRecords:  nil,
-			LastFundingFeeTime: time.Time{},
 		}
 	}
 
@@ -379,10 +378,10 @@ func (s *Strategy) CrossRun(
 	bbgo.Notify("State: %s", s.State.PositionState.String())
 
 	// sync funding fee txns
-	s.syncFundingFeeRecords(ctx, s.ProfitStats.LastFundingFeeTime)
+	syncFrom, _ := time.Parse(time.RFC3339, "2024-01-01T00:00:00Z")
+	s.syncFundingFeeRecords(ctx, syncFrom)
 
-	// TEST CODE:
-	// s.syncFundingFeeRecords(ctx, time.Now().Add(-3*24*time.Hour))
+	bbgo.Notify(s.ProfitStats)
 
 	switch s.State.PositionState {
 	case PositionClosed:
@@ -833,9 +832,6 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		bbgo.Notify("SpotPosition", s.SpotPosition)
 		bbgo.Notify("FuturesPosition", s.FuturesPosition)
 		bbgo.Notify("NeutralPosition", s.NeutralPosition)
-
-		// DEBUG CODE - triggering closing position automatically
-		// s.startClosingPosition()
 		return
 	}
 
