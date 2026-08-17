@@ -254,10 +254,11 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 		if account.AccountType == types.AccountTypeFutures {
 			openPositions := account.FuturesInfo.Positions.OpenPositions()
 			if len(openPositions) > 0 {
-				for _, position := range openPositions {
+				for key, position := range openPositions {
 					if market, found := session.Market(position.Symbol); found {
 						position.SetMarket(market)
 					}
+					openPositions[key] = position
 				}
 				sessionFuturesPositions[sessionName] = openPositions
 			}
