@@ -363,7 +363,12 @@ func (m FuturesPositionMap) OpenPositions() FuturesPositionMap {
 
 func (p *FuturesPosition) SlackAttachment() slack.Attachment {
 	if p.PositionRisk == nil {
-		return slack.Attachment{}
+		return slack.Attachment{
+			Color:    "#f48536",
+			Title:    fmt.Sprintf("%s Perp", p.Symbol),
+			Fallback: fmt.Sprintf("%s: position risk data unavailable", p.Symbol),
+			Text:     "position risk data unavailable",
+		}
 	}
 
 	var blocks []slack.Block
