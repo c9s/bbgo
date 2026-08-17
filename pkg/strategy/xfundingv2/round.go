@@ -444,6 +444,19 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			fields = append(fields, unrealizedPnLFields(unrealizedPnL)...)
 		}
 	}
+	if len(n.ArbitrageRound.syncState.FundingFeeRecords) > 0 {
+		feeIncomeTotal := fixedpoint.Zero
+		numRecords := fixedpoint.Zero
+		for _, fee := range n.ArbitrageRound.syncState.FundingFeeRecords {
+			feeIncomeTotal = feeIncomeTotal.Add(fee.Amount)
+			numRecords = numRecords.Add(fixedpoint.One)
+		}
+		fields = append(fields, slack.AttachmentField{
+			Title: "Average Funding Income",
+			Value: feeIncomeTotal.Div(numRecords).String(),
+			Short: true,
+		})
+	}
 
 	fields = append(fields, []slack.AttachmentField{
 		{
