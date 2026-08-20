@@ -365,14 +365,11 @@ func (p *FuturesPosition) SlackAttachment() slack.Attachment {
 	if p.PositionRisk == nil {
 		return slack.Attachment{
 			Color:    "#f48536",
-			Title:    fmt.Sprintf("%s Perp", p.Symbol),
+			Title:    fmt.Sprintf("%s Futures Position", p.Symbol),
 			Fallback: fmt.Sprintf("%s: position risk data unavailable", p.Symbol),
 			Text:     "position risk data unavailable",
 		}
 	}
-
-	var blocks []slack.Block
-
 	marginType := "Cross"
 	if p.Isolated {
 		marginType = "Isolated"
@@ -391,11 +388,11 @@ func (p *FuturesPosition) SlackAttachment() slack.Attachment {
 		side = string(PositionClosed)
 	}
 
-	title := fmt.Sprintf("%s %s Perp %s %sX", p.Symbol, side, marginType, p.PositionRisk.Leverage)
+	title := fmt.Sprintf("%s %s Futures Position %s %sX", p.Symbol, side, marginType, p.PositionRisk.Leverage)
 
 	roi := fixedpoint.Zero
 	if !p.PositionRisk.InitialMargin.IsZero() {
-		roi = p.PositionRisk.UnrealizedPnL.Div(p.PositionRisk.InitialMargin).Mul(fixedpoint.NewFromInt(100))
+		roi = p.PositionRisk.UnrealizedPnL.Div(p.PositionRisk.InitialMargin)
 	}
 
 	pnlSign := ""
@@ -407,37 +404,58 @@ func (p *FuturesPosition) SlackAttachment() slack.Attachment {
 		roiSign = "+"
 	}
 
-	blocks = append(blocks, slack.NewSectionBlock(
-		nil,
-		[]*slack.TextBlockObject{
-			slack.NewTextBlockObject(slack.MarkdownType, "_Size / Amount_", false, false),
-			slack.NewTextBlockObject(slack.MarkdownType, "_PNL / ROI%_", false, false),
-			slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*%s %s*\n%s %s",
-				p.Base, p.BaseCurrency, p.PositionRisk.Notional.Abs(), p.QuoteCurrency), false, false),
-			slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*%s%s*\n%s%s%%",
-				pnlSign, p.PositionRisk.UnrealizedPnL, roiSign, roi.FormatString(2)), false, false),
+	fields := []slack.AttachmentField{
+		{
+			Title: "Size",
+			Value: fmt.Sprintf("%s %s", p.Base, p.BaseCurrency),
+			Short: true,
 		},
-		nil,
-	))
+		{
+			Title: "Notional Value",
+			Value: fmt.Sprintf("%s %s", p.PositionRisk.Notional, p.QuoteCurrency),
+			Short: true,
+		},
+		{
+			Title: "PNL",
+			Value: fmt.Sprintf("%s%s", pnlSign, p.PositionRisk.UnrealizedPnL),
+			Short: true,
+		},
+		{
+			Title: "ROI%",
+			Value: fmt.Sprintf("%s%s", roiSign, roi.FormatPercentage(2)),
+			Short: true,
+		},
+		{
+			Title: "Entry Price",
+			Value: p.PositionRisk.EntryPrice.String(),
+			Short: true,
+		},
+		{
+			Title: "Mark Price",
+			Value: p.PositionRisk.MarkPrice.String(),
+			Short: true,
+		},
+		{
+			Title: "Maintenance Margin",
+			Value: p.PositionRisk.MaintMargin.FormatString(2),
+			Short: true,
+		},
+	}
 
 	liqPrice := p.PositionRisk.LiquidationPrice.String()
 	if p.PositionRisk.LiquidationPrice.IsZero() {
 		liqPrice = "--"
 	}
 
-	blocks = append(blocks, slack.NewSectionBlock(
-		nil,
-		[]*slack.TextBlockObject{
-			slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("_Entry Price (%s)_\n%s", p.QuoteCurrency, p.PositionRisk.EntryPrice), false, false),
-			slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("_Mark Price (%s)_\n%s", p.QuoteCurrency, p.PositionRisk.MarkPrice), false, false),
-			slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("_Liq. Price (%s)_\n%s", p.QuoteCurrency, liqPrice), false, false),
-		},
-		nil,
-	))
+	fields = append(fields, slack.AttachmentField{
+		Title: "Liq. Price",
+		Value: liqPrice,
+		Short: true,
+	})
 
 	return slack.Attachment{
 		Color:  color,
 		Title:  title,
-		Blocks: slack.Blocks{BlockSet: blocks},
+		Fields: fields,
 	}
 }
