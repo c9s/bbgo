@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -63,6 +62,8 @@ type Strategy struct {
 
 	DryRun              bool `json:"dryRun"`
 	ClosingAllOnStartup bool `json:"closingAllOnStartup"`
+
+	InstanceTag string `json:"instanceTag"`
 
 	// Session configuration
 	SpotSession    string `json:"spotSession"`
@@ -168,8 +169,7 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) InstanceID() string {
-	symbols := strings.Join(s.CandidateSymbols, "_")
-	return fmt.Sprintf("%s-%s-%s-futures", ID, symbols, s.MarketSelectionConfig.FuturesDirection)
+	return fmt.Sprintf("%s-%s-%s-futures", ID, s.InstanceTag, s.MarketSelectionConfig.FuturesDirection)
 }
 
 func (s *Strategy) Defaults() error {
@@ -298,6 +298,10 @@ func (s *Strategy) Validate() error {
 	}
 	if s.MaxClosingLossRatio.Sign() > 0 {
 		return fmt.Errorf("maxClosingLossRatio should be negative: %s", s.MaxClosingLossRatio)
+	}
+
+	if s.InstanceTag == "" {
+		return errors.New("instanceTag is required")
 	}
 	return nil
 }
