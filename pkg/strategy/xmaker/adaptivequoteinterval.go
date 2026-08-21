@@ -59,8 +59,8 @@ type AdaptiveQuoteInterval struct {
 	scale  *bbgo.LinearScale
 	logger logrus.FieldLogger
 
-	volatilityMetric      prometheus.Gauge    // set from adaptiveQuoteIntervalVolatilityMetrics
-	intervalSecondsMetric prometheus.Observer // set from adaptiveQuoteIntervalSecondsMetrics
+	volatilityMetric           prometheus.Gauge    // set from adaptiveQuoteIntervalVolatilityMetrics
+	intervalMillisecondsMetric prometheus.Observer // set from adaptiveQuoteIntervalMillisecondsMetrics
 }
 
 func (a *AdaptiveQuoteInterval) Defaults() error {
@@ -84,7 +84,7 @@ func (a *AdaptiveQuoteInterval) Defaults() error {
 	// ATRP. These defaults are conservative placeholders and should be calibrated
 	// against the live market/symbol.
 	if a.LowVolatility.IsZero() {
-		a.LowVolatility = fixedpoint.NewFromFloat(0.00005) // 0.005%
+		a.LowVolatility = fixedpoint.NewFromFloat(0.0002) // 0.002%
 	}
 
 	if a.HighVolatility.IsZero() {
@@ -131,7 +131,7 @@ func (a *AdaptiveQuoteInterval) Bind(
 	a.scale = a.buildScale()
 
 	a.volatilityMetric = adaptiveQuoteIntervalVolatilityMetrics.With(metricsLabels)
-	a.intervalSecondsMetric = adaptiveQuoteIntervalSecondsMetrics.With(metricsLabels)
+	a.intervalMillisecondsMetric = adaptiveQuoteIntervalMillisecondsMetrics.With(metricsLabels)
 }
 
 // buildScale constructs the clamped inverse linear scale:
@@ -186,8 +186,8 @@ func (a *AdaptiveQuoteInterval) NextInterval(fallback time.Duration) time.Durati
 		a.volatilityMetric.Set(vol)
 	}
 
-	if a.intervalSecondsMetric != nil {
-		a.intervalSecondsMetric.Observe(interval.Seconds())
+	if a.intervalMillisecondsMetric != nil {
+		a.intervalMillisecondsMetric.Observe(float64(interval.Milliseconds()))
 	}
 
 	if a.logger != nil {
