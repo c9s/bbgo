@@ -1267,9 +1267,16 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 		return
 	}
 
+	var legitSymbols []string
+	for _, symbol := range s.candidateSymbols {
+		if s.canOpenRound(symbol, currentTime) {
+			legitSymbols = append(legitSymbols, symbol)
+		}
+	}
+
 	candidates, err := s.preliminaryMarketSelector.
 		SetActiveRounds(s.ActiveRounds).
-		SelectMarkets(ctx, s.candidateSymbols)
+		SelectMarkets(ctx, legitSymbols)
 	if err != nil {
 		s.logger.WithError(err).Warn("failed to select market candidates")
 		return
@@ -1280,14 +1287,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 	}
 	s.logger.Debugf("candidates: %+v", candidates)
 
-	var legitCandidates []MarketCandidate
-	for _, candidate := range candidates {
-		if s.canOpenRound(candidate.Symbol, currentTime) {
-			legitCandidates = append(legitCandidates, candidate)
-		}
-	}
-	s.logger.Debugf("legit candidates: %+v", legitCandidates)
-	selectedCandidate := s.selectMostProfitableMarket(legitCandidates)
+	selectedCandidate := s.selectMostProfitableMarket(candidates)
 	if selectedCandidate == nil {
 		// no profitable candidate found, nothing to do
 		return

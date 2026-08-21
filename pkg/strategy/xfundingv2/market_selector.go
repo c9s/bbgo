@@ -132,6 +132,9 @@ func (s *MarketSelector) SelectMarkets(ctx context.Context, symbols []string) ([
 	if err != nil {
 		return nil, err
 	}
+	if len(symbols) == 0 {
+		return nil, nil
+	}
 
 	// Step 2: Get funding info
 	fundingInfos, err := queryFundingInfo(ctx, s.service)
