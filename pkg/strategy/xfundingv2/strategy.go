@@ -71,11 +71,15 @@ type Strategy struct {
 
 	// CandidateSymbols is the list of symbols to consider for selection
 	// IMPORTANT: xfundingv2 is now assuming trading on U-major pairs
-	CandidateSymbols       []string         `json:"candidateSymbols"`
-	OpenPositionInterval   types.Duration   `json:"openPositionInterval"`
-	TransitRoundInterval   types.Duration   `json:"transitRoundInterval"`
-	RoundRebalanceInterval types.Duration   `json:"roundRebalanceInterval"`
-	MaxClosingLossRatio    fixedpoint.Value `json:"maxClosingLossRatio"`
+	CandidateSymbols       []string       `json:"candidateSymbols"`
+	OpenPositionInterval   types.Duration `json:"openPositionInterval"`
+	TransitRoundInterval   types.Duration `json:"transitRoundInterval"`
+	RoundRebalanceInterval types.Duration `json:"roundRebalanceInterval"`
+
+	// round closing conditions
+	// TODO: move all the closing conditions into a separate struct
+	MaxClosingLossRatio fixedpoint.Value `json:"maxClosingLossRatio"`
+	MinExitRate         fixedpoint.Value `json:"minExitRate"`
 
 	// TickSymbol is the symbol used for ticking the strategy, default to the first candidate symbol
 	TickSymbol   string         `json:"tickSymbol"`
@@ -205,6 +209,15 @@ func (s *Strategy) Defaults() error {
 		s.MarketSelectionConfig = &MarketSelectionConfig{}
 	}
 	s.MarketSelectionConfig.Defaults()
+
+	if s.MinExitRate.IsZero() {
+		// default to 4% (ref: US short-term treasury rate)
+		s.MinExitRate = fixedpoint.NewFromFloat(0.04) // 4%
+	}
+	s.MinExitRate = fixedpoint.Min(
+		s.MinExitRate,
+		s.MarketSelectionConfig.MinAnnualizedRate,
+	)
 
 	if s.TradeBalanceRatio.IsZero() {
 		s.TradeBalanceRatio = fixedpoint.NewFromFloat(0.8)
@@ -818,7 +831,10 @@ func (s *Strategy) CrossRun(
 				round.SpotSymbol(),
 				round.FuturesSymbol(),
 			)
-			bbgo.Notify("⚠️ Round is set to closing state on startup", round.NewNotification(spotPrice, futuresPrice))
+			bbgo.Notify("⚠️ Round is set to closing state on startup: %s",
+				round.String(),
+				round.NewNotification(spotPrice, futuresPrice),
+			)
 		}
 		s.PendingRounds = make(map[string]*PendingRound)
 		s.mu.Unlock()
@@ -1161,17 +1177,19 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 	}
 
 	// the funding rate has flipped
+	lastAnnualizedFundingRate := AnnualizedRate(fundingRate.LastFundingRate, round.syncState.FundingIntervalHours)
+	spotPrice, futuresPrice, _ := s.getLastPrices(
+		round.SpotSymbol(),
+		round.FuturesSymbol(),
+	)
 	if round.TriggeredFundingRate().Sign()*fundingRate.LastFundingRate.Sign() <= 0 {
-		spotPrice, futuresPrice, _ := s.getLastPrices(
-			round.SpotSymbol(),
-			round.FuturesSymbol(),
-		)
 		rateDiffAbs := fundingRate.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
 		if rateDiffAbs.Compare(s.CriticalErrorConfig.MaxFundingRateFlip) > 0 {
-			bbgo.Notify("🚨 Round funding rate flip is too large: %s -> %s (threshold %s), closing round",
+			bbgo.Notify("🚨 Round funding rate flip is too large: %s -> %s (threshold %s), closing: %s",
 				round.TriggeredFundingRate(),
 				fundingRate.LastFundingRate,
 				s.CriticalErrorConfig.MaxFundingRateFlip,
+				round.String(),
 				round.NewCriticalNotification(spotPrice, futuresPrice),
 			)
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
@@ -1194,9 +1212,10 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 
 		// the round is beyond the max holding time, transit to closing
 		if currentTime.Sub(round.StartedAt()) >= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
-			s.logger.Infof(
-				"[transitOpeningOrReadyRound %s] max holding hours reached, transit state %s -> closing, current funding rate %s: %s",
-				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round,
+			bbgo.Notify(
+				"⚠️ Max holding hours reached, transit state %s -> closing, current funding rate %s: %s",
+				round.State(), fundingRate.LastFundingRate, round.String(),
+				round.NewNotification(spotPrice, futuresPrice),
 			)
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
 			return
@@ -1226,12 +1245,19 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 				"[transitOpeningOrReadyRound %s] unrealized total PnL: %s, next funding income: %s, futures position notional: %s, max closing loss ratio: %s",
 				unrealizedTotalPnL, nextFundingIncome, futuresPositionNotional, s.MaxClosingLossRatio,
 			)
-			s.logger.Infof(
-				"[transitOpeningOrReadyRound %s] transit state %s -> closing, current funding rate %s: %s",
-				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round)
+			bbgo.Notify(
+				"⚠️ Unrealized total PnL too large (%s), transit state %s -> closing, current funding rate %s: %s",
+				unrealizedTotalPnL, round.State(), fundingRate.LastFundingRate, round.String(),
+				round.NewNotification(spotPrice, futuresPrice),
+			)
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
 			return
 		}
+	} else if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 {
+		bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the min exit rate %s, transit state %s -> closing: %s",
+			fundingRate.LastFundingRate, lastAnnualizedFundingRate, s.MinExitRate, round.State(), round.String(),
+			round.NewNotification(spotPrice, futuresPrice),
+		)
 	}
 
 	if s.allowLog(currentTime) {
