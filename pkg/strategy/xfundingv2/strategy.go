@@ -1770,7 +1770,7 @@ func (s *Strategy) newDebugLogger() *logrus.Entry {
 
 func (s *Strategy) notifyStats() {
 	var activeRoundNotifications []any
-	for _, round := range s.ActiveRounds {
+	for _, round := range s.sortedActiveRounds() {
 		spotPrice, futuresPrice, ok := s.getLastPrices(
 			round.SpotSymbol(),
 			round.FuturesSymbol(),
@@ -1806,6 +1806,17 @@ func (s *Strategy) notifyStats() {
 		bbgo.Notify("Pending Rounds", pendingRoundNotifications...)
 	}
 
+}
+
+func (s *Strategy) sortedActiveRounds() []*ArbitrageRound {
+	var rounds []*ArbitrageRound
+	for _, round := range s.ActiveRounds {
+		rounds = append(rounds, round)
+	}
+	sort.Slice(rounds, func(i, j int) bool {
+		return rounds[i].StartedAt().Before(rounds[j].StartedAt())
+	})
+	return rounds
 }
 
 func (s *Strategy) runFundingIncomeWorker(ctx context.Context) {
