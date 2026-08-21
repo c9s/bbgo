@@ -39,9 +39,9 @@ func newTestSession(markets types.MarketMap, balances types.BalanceMap) *bbgo.Ex
 func newDefaultTestStrategy() *Strategy {
 	return &Strategy{
 		MarketSelectionConfig: &MarketSelectionConfig{
-			FuturesDirection:  types.PositionShort,
-			TradeBalanceRatio: Number("0.5"),
+			FuturesDirection: types.PositionShort,
 		},
+		TradeBalanceRatio:   Number("0.5"),
 		MaxPositionExposure: make(map[string]fixedpoint.Value),
 		costEstimator:       NewCostEstimator(),
 		logger:              logrus.StandardLogger(),
@@ -64,7 +64,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 	t.Run("short futures selects candidate with shortest breakeven interval", func(t *testing.T) {
 		s := newDefaultTestStrategy()
 		s.MarketSelectionConfig.FuturesDirection = types.PositionShort
-		s.MarketSelectionConfig.TradeBalanceRatio = Number("1.0")
+		s.TradeBalanceRatio = Number("1.0")
 
 		markets := types.MarketMap{
 			"BTCUSDT": btcMarket,
@@ -127,7 +127,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 	t.Run("long futures selects candidate with shortest breakeven interval", func(t *testing.T) {
 		s := newDefaultTestStrategy()
 		s.MarketSelectionConfig.FuturesDirection = types.PositionLong
-		s.MarketSelectionConfig.TradeBalanceRatio = Number("1.0")
+		s.TradeBalanceRatio = Number("1.0")
 
 		markets := types.MarketMap{
 			"BTCUSDT": btcMarket,
@@ -285,7 +285,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 	t.Run("max position exposure caps short futures position", func(t *testing.T) {
 		s := newDefaultTestStrategy()
 		s.MarketSelectionConfig.FuturesDirection = types.PositionShort
-		s.MarketSelectionConfig.TradeBalanceRatio = Number("1.0")
+		s.TradeBalanceRatio = Number("1.0")
 		s.MaxPositionExposure = map[string]fixedpoint.Value{
 			"ETH": Number("0.5"),
 		}
@@ -328,7 +328,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 	t.Run("max position exposure caps long futures position", func(t *testing.T) {
 		s := newDefaultTestStrategy()
 		s.MarketSelectionConfig.FuturesDirection = types.PositionLong
-		s.MarketSelectionConfig.TradeBalanceRatio = Number("1.0")
+		s.TradeBalanceRatio = Number("1.0")
 		s.MaxPositionExposure = map[string]fixedpoint.Value{
 			"ETH": Number("0.5"),
 		}
@@ -371,7 +371,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 	t.Run("zero funding rate candidate is skipped", func(t *testing.T) {
 		s := newDefaultTestStrategy()
 		s.MarketSelectionConfig.FuturesDirection = types.PositionShort
-		s.MarketSelectionConfig.TradeBalanceRatio = Number("1.0")
+		s.TradeBalanceRatio = Number("1.0")
 
 		markets := types.MarketMap{"BTCUSDT": btcMarket}
 		balances := types.BalanceMap{
@@ -409,7 +409,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 	t.Run("single candidate returns that candidate", func(t *testing.T) {
 		s := newDefaultTestStrategy()
 		s.MarketSelectionConfig.FuturesDirection = types.PositionShort
-		s.MarketSelectionConfig.TradeBalanceRatio = Number("1.0")
+		s.TradeBalanceRatio = Number("1.0")
 
 		markets := types.MarketMap{"ETHUSDT": ethMarket}
 		balances := types.BalanceMap{
