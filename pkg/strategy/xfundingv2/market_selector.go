@@ -33,6 +33,10 @@ type MarketSelectionConfig struct {
 	// Minimum annualized funding rate to consider (e.g., 0.10 = 10%)
 	// recommended to default to 5%
 	MinAnnualizedRate fixedpoint.Value `json:"minAnnualizedRate"`
+	// AnnualizedRateStep is the step size for the required annualized rate for new market candidates.
+	// For example, if there is already an active round with 10% annualized rate, and the step is 1%,
+	// then the next market candidate must have at least 11% annualized rate to be considered.
+	AnnualizedRateStep fixedpoint.Value `json:"annualizedRateStep"`
 
 	MinCollateralRate fixedpoint.Value `json:"minCollateralRate"`
 
@@ -58,6 +62,9 @@ func (c *MarketSelectionConfig) Defaults() {
 	}
 	if c.MinAnnualizedRate.IsZero() {
 		c.MinAnnualizedRate = fixedpoint.NewFromFloat(0.05) // 5%
+	}
+	if c.MinAnnualizedRate.IsZero() {
+		c.MinAnnualizedRate = fixedpoint.NewFromFloat(0.02) // 2%
 	}
 	if c.MinCollateralRate.IsZero() {
 		c.MinCollateralRate = fixedpoint.NewFromFloat(0.95)
@@ -108,8 +115,10 @@ type FuturesInfoService interface {
 // MarketSelector selects the best market based on funding rate and liquidity
 type MarketSelector struct {
 	MarketSelectionConfig
-	service FuturesInfoService
-	logger  logrus.FieldLogger
+
+	activeRounds map[string]*ArbitrageRound
+	service      FuturesInfoService
+	logger       logrus.FieldLogger
 }
 
 // NewMarketSelector creates a new MarketSelector
@@ -175,13 +184,15 @@ func (s *MarketSelector) SelectMarkets(ctx context.Context, symbols []string) ([
 			continue
 		}
 		annualized := AnnualizedRate(idx.LastFundingRate, info.FundingIntervalHours)
+		numActiveRounds := fixedpoint.NewFromInt(int64(len(s.activeRounds)))
+		requiredAnnualizedRate := s.MinAnnualizedRate.Add(s.AnnualizedRateStep.Mul(numActiveRounds))
 		labels := prometheus.Labels{
 			"symbol": idx.Symbol,
 		}
 		annualizedFundingRateMetrics.With(labels).Set(annualized.Float64())
 		fundingRateMetrics.With(labels).Set(idx.LastFundingRate.Float64())
 
-		if annualized.Abs().Compare(s.MinAnnualizedRate) < 0 {
+		if annualized.Abs().Compare(requiredAnnualizedRate) < 0 {
 			continue
 		}
 
@@ -226,6 +237,11 @@ func (s *MarketSelector) SelectMarkets(ctx context.Context, symbols []string) ([
 	}
 
 	return candidates, nil
+}
+
+func (s *MarketSelector) SetActiveRounds(rounds map[string]*ArbitrageRound) *MarketSelector {
+	s.activeRounds = rounds
+	return s
 }
 
 // queryFundingRates queries funding rates for the given symbols

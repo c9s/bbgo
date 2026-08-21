@@ -1263,7 +1263,9 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 	// Only open new round when there is none
 	// TODO: support multiple rounds for different symbols concurrently (e.g BTCUSDT and ETHUSDT)
 	if len(s.allRounds()) == 0 {
-		candidates, err := s.preliminaryMarketSelector.SelectMarkets(ctx, s.candidateSymbols)
+		candidates, err := s.preliminaryMarketSelector.
+			SetActiveRounds(s.ActiveRounds).
+			SelectMarkets(ctx, s.candidateSymbols)
 		if err != nil {
 			s.logger.WithError(err).Warn("failed to select market candidates")
 			return
