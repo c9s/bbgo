@@ -193,7 +193,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			p.StrategyInstanceID = instanceID
 			bbgo.Notify(&p)
 
-			s.ProfitStats.AddProfit(p)
+			s.ProfitStats.AddProfit(&p)
 			bbgo.Notify(&s.ProfitStats)
 
 			s.Environment.RecordPosition(s.Position, trade, &p)
