@@ -92,6 +92,8 @@ type Strategy struct {
 	// Market selection criteria
 	MarketSelectionConfig *MarketSelectionConfig      `json:"marketSelection,omitempty"`
 	MaxPositionExposure   map[string]fixedpoint.Value `json:"maxPositionExposure"`
+	// TradeBalanceRatio is the ratio of the asset balance to be invested on the spot market.
+	TradeBalanceRatio fixedpoint.Value `json:"tradeBalanceRatio"`
 
 	HaltRoundNotificationInterval types.Duration `json:"haltRoundNotificationInterval"`
 	haltNotificationLimiters      map[string]*rate.Limiter
@@ -203,6 +205,11 @@ func (s *Strategy) Defaults() error {
 		s.MarketSelectionConfig = &MarketSelectionConfig{}
 	}
 	s.MarketSelectionConfig.Defaults()
+
+	if s.TradeBalanceRatio.IsZero() {
+		s.TradeBalanceRatio = fixedpoint.NewFromFloat(0.8)
+	}
+
 	if s.QuoteCurrency == "" {
 		s.QuoteCurrency = "USDT"
 	}
@@ -1375,6 +1382,8 @@ func (s *Strategy) filterMarketByCapSize(ctx context.Context, symbols []string) 
 		}
 		if _, found := topAssets[market.BaseCurrency]; found {
 			candidateSymbols = append(candidateSymbols, symbol)
+		} else {
+			bbgo.Notify("skipping %s as it's not in the top cap assets", symbol)
 		}
 	}
 	return candidateSymbols
@@ -1388,7 +1397,7 @@ func (s *Strategy) filterMarketBothListed(symbols []string) []string {
 		if spotOk && futuresOk {
 			candidateSymbols = append(candidateSymbols, symbol)
 		} else {
-			s.logger.Infof("skipping %s as it's not listed on both spot and futures", symbol)
+			bbgo.Notify("skipping %s as it's not listed on both spot and futures", symbol)
 		}
 	}
 	return candidateSymbols
@@ -1421,7 +1430,7 @@ func (s *Strategy) filterMarketCollateralRate(ctx context.Context, symbols []str
 		if rate.Compare(s.MarketSelectionConfig.MinCollateralRate) >= 0 {
 			candidateSymbols = append(candidateSymbols, market.Symbol)
 		} else {
-			s.logger.Infof("skipping %s due to low collateral rate: %s", market.Symbol, rate.String())
+			bbgo.Notify("skipping %s due to low collateral rate: %s", market.Symbol, rate.String())
 		}
 	}
 	return candidateSymbols
@@ -1460,7 +1469,7 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 			if !ok {
 				continue
 			}
-			totalQuoteAmount := quoteBalance.Available.Mul(s.MarketSelectionConfig.TradeBalanceRatio)
+			totalQuoteAmount := s.quoteAmountForBet(quoteBalance.Available)
 			// long spot -> trade on the sell side of the order book
 			// targetSize = totalQuoteAmount / (price * feeRateFactor)
 			sellBook := s.spotOrderBooks[candidate.Symbol].SideBook(types.SideTypeSell)
@@ -1487,7 +1496,7 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 			}
 			// totalQuoteAmount = price * totalBase and targetSize = totalQuoteAmount / (price * feeRateFactor)
 			// so targetSize = totalBase / feeRateFactor
-			totalBase := baseBalance.Available.Mul(s.MarketSelectionConfig.TradeBalanceRatio)
+			totalBase := baseBalance.Available.Mul(s.TradeBalanceRatio)
 			targetSize = totalBase.Div(feeRateFactor)
 			// long futures -> trade on the sell side of the order book
 			sellBook := s.futuresOrderBooks[candidate.Symbol].SideBook(types.SideTypeSell)
@@ -1544,6 +1553,15 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 	bestCandidate.MinHoldingDuration = time.Duration(numHoldingHours) * time.Hour
 	bestCandidate.TargetFuturesPosition = targetPosition
 	return bestCandidate
+}
+
+func (s *Strategy) quoteAmountForBet(quoteAvailable fixedpoint.Value) fixedpoint.Value {
+	remainingCandidates := len(s.candidateSymbols) - len(s.ActiveRounds)
+	if remainingCandidates == 1 {
+		// the last symbol, use all the available quote balance for the bet
+		return quoteAvailable
+	}
+	return quoteAvailable.Mul(s.TradeBalanceRatio)
 }
 
 func (s *Strategy) calculateMinHoldingIntervals(candidate MarketCandidate, bestPrice, targetPosition fixedpoint.Value) (fixedpoint.Value, error) {
