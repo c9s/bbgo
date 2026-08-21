@@ -1267,94 +1267,90 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 		return
 	}
 
-	// Only open new round when there is none
-	// TODO: support multiple rounds for different symbols concurrently (e.g BTCUSDT and ETHUSDT)
-	if len(s.allRounds()) == 0 {
-		candidates, err := s.preliminaryMarketSelector.
-			SetActiveRounds(s.ActiveRounds).
-			SelectMarkets(ctx, s.candidateSymbols)
-		if err != nil {
-			s.logger.WithError(err).Warn("failed to select market candidates")
-			return
-		}
-		if len(candidates) == 0 {
-			// no candidates, nothing to do
-			return
-		}
-		s.logger.Debugf("candidates: %+v", candidates)
+	candidates, err := s.preliminaryMarketSelector.
+		SetActiveRounds(s.ActiveRounds).
+		SelectMarkets(ctx, s.candidateSymbols)
+	if err != nil {
+		s.logger.WithError(err).Warn("failed to select market candidates")
+		return
+	}
+	if len(candidates) == 0 {
+		// no candidates, nothing to do
+		return
+	}
+	s.logger.Debugf("candidates: %+v", candidates)
 
-		var legitCandidates []MarketCandidate
-		for _, candidate := range candidates {
-			if s.canOpenRound(candidate.Symbol, currentTime) {
-				legitCandidates = append(legitCandidates, candidate)
-			}
+	var legitCandidates []MarketCandidate
+	for _, candidate := range candidates {
+		if s.canOpenRound(candidate.Symbol, currentTime) {
+			legitCandidates = append(legitCandidates, candidate)
 		}
-		s.logger.Debugf("legit candidates: %+v", legitCandidates)
-		selectedCandidate := s.selectMostProfitableMarket(legitCandidates)
-		if selectedCandidate == nil {
-			// no profitable candidate found, nothing to do
+	}
+	s.logger.Debugf("legit candidates: %+v", legitCandidates)
+	selectedCandidate := s.selectMostProfitableMarket(legitCandidates)
+	if selectedCandidate == nil {
+		// no profitable candidate found, nothing to do
+		return
+	}
+	s.logger.Debugf("most profitable candidate for new round: %+v", selectedCandidate)
+
+	// open new round if the estimated break-even holding interval is within the max holding hours
+	if selectedCandidate.MinHoldingDuration <= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
+		spotExecutor := s.spotGeneralOrderExecutors[selectedCandidate.Symbol]
+		spotTwap, err := NewTWAPWorker(ctx, selectedCandidate.Symbol, s.spotSession, spotExecutor, s.TWAPWorkerConfig)
+		spotTwap.SetLogger(s.logger)
+		spotTwap.Executor().SetDryRun(s.DryRun)
+		if err != nil || spotTwap == nil {
+			s.logger.WithError(err).Errorf("failed to create TWAP worker for spot %s", selectedCandidate.Symbol)
 			return
 		}
-		s.logger.Debugf("most profitable candidate for new round: %+v", selectedCandidate)
-
-		// open new round if the estimated break-even holding interval is within the max holding hours
-		if selectedCandidate.MinHoldingDuration <= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
-			spotExecutor := s.spotGeneralOrderExecutors[selectedCandidate.Symbol]
-			spotTwap, err := NewTWAPWorker(ctx, selectedCandidate.Symbol, s.spotSession, spotExecutor, s.TWAPWorkerConfig)
-			spotTwap.SetLogger(s.logger)
-			spotTwap.Executor().SetDryRun(s.DryRun)
-			if err != nil || spotTwap == nil {
-				s.logger.WithError(err).Errorf("failed to create TWAP worker for spot %s", selectedCandidate.Symbol)
-				return
-			}
-			spotTwap.SetTargetPosition(selectedCandidate.TargetFuturesPosition.Neg())
-			futuresExecutor := s.futuresGeneralOrderExecutors[selectedCandidate.Symbol]
-			futuresTwap, err := NewTWAPWorker(ctx, selectedCandidate.Symbol, s.futuresSession, futuresExecutor, s.TWAPWorkerConfig)
-			futuresTwap.SetLogger(s.logger)
-			futuresTwap.Executor().SetDryRun(s.DryRun)
-			if err != nil || futuresTwap == nil {
-				s.logger.WithError(err).Errorf("failed to create TWAP worker for futures %s", selectedCandidate.Symbol)
-				return
-			}
-			round := NewArbitrageRound(
-				selectedCandidate.PremiumIndex,
-				s.spotSession.Exchange.Name(),
-				s.futuresSession.Exchange.Name(),
-				selectedCandidate.MinHoldingIntervals,
-				selectedCandidate.FundingIntervalHours,
-				s.Leverage,
-				spotTwap,
-				futuresTwap,
-				s.futuresService,
-				s.MarketSelectionConfig.FuturesDirection,
-				s.RoundRebalanceInterval.Duration(),
-			)
-			round.SetLogger(s.logger)
-			round.SetSpotExchangeFeeRates(
-				s.costEstimator.GetSpotFeeRate(),
-			)
-			round.SetFuturesExchangeFeeRates(
-				s.costEstimator.GetFuturesFeeRate(),
-			)
-			round.SetSlackAlert(s.SlackAlert)
-			roundAnnualizedTriggerRateMetrics.With(
-				prometheus.Labels{
-					"strategy_id": s.InstanceID(),
-					"symbol":      selectedCandidate.Symbol,
-				},
-			).Set(round.AnnualizedRate().Float64())
-			// enqueue the new round to pending rounds for further processing
-			s.PendingRounds[selectedCandidate.Symbol] = &PendingRound{
-				Round: round,
-			}
-			bbgo.Notify("🆕 Created new pending round: %s", round.SpotSymbol())
-		} else {
-			s.logger.Debugf("selected candidate %s min holding duration too long: %s > %s, skipping",
-				selectedCandidate.Symbol,
-				selectedCandidate.MinHoldingDuration,
-				s.MarketSelectionConfig.MaxHoldingDuration.Duration(),
-			)
+		spotTwap.SetTargetPosition(selectedCandidate.TargetFuturesPosition.Neg())
+		futuresExecutor := s.futuresGeneralOrderExecutors[selectedCandidate.Symbol]
+		futuresTwap, err := NewTWAPWorker(ctx, selectedCandidate.Symbol, s.futuresSession, futuresExecutor, s.TWAPWorkerConfig)
+		futuresTwap.SetLogger(s.logger)
+		futuresTwap.Executor().SetDryRun(s.DryRun)
+		if err != nil || futuresTwap == nil {
+			s.logger.WithError(err).Errorf("failed to create TWAP worker for futures %s", selectedCandidate.Symbol)
+			return
 		}
+		round := NewArbitrageRound(
+			selectedCandidate.PremiumIndex,
+			s.spotSession.Exchange.Name(),
+			s.futuresSession.Exchange.Name(),
+			selectedCandidate.MinHoldingIntervals,
+			selectedCandidate.FundingIntervalHours,
+			s.Leverage,
+			spotTwap,
+			futuresTwap,
+			s.futuresService,
+			s.MarketSelectionConfig.FuturesDirection,
+			s.RoundRebalanceInterval.Duration(),
+		)
+		round.SetLogger(s.logger)
+		round.SetSpotExchangeFeeRates(
+			s.costEstimator.GetSpotFeeRate(),
+		)
+		round.SetFuturesExchangeFeeRates(
+			s.costEstimator.GetFuturesFeeRate(),
+		)
+		round.SetSlackAlert(s.SlackAlert)
+		roundAnnualizedTriggerRateMetrics.With(
+			prometheus.Labels{
+				"strategy_id": s.InstanceID(),
+				"symbol":      selectedCandidate.Symbol,
+			},
+		).Set(round.AnnualizedRate().Float64())
+		// enqueue the new round to pending rounds for further processing
+		s.PendingRounds[selectedCandidate.Symbol] = &PendingRound{
+			Round: round,
+		}
+		bbgo.Notify("🆕 Created new pending round: %s", round.SpotSymbol())
+	} else {
+		s.logger.Debugf("selected candidate %s min holding duration too long: %s > %s, skipping",
+			selectedCandidate.Symbol,
+			selectedCandidate.MinHoldingDuration,
+			s.MarketSelectionConfig.MaxHoldingDuration.Duration(),
+		)
 	}
 }
 
