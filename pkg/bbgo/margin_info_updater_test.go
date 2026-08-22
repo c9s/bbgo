@@ -65,7 +65,11 @@ func TestMarginInfoUpdater_GetMaxBorrowable(t *testing.T) {
 	svc := newMockMarginBorrowRepayService(map[string]fixedpoint.Value{
 		"BTC": fixedpoint.NewFromFloat(1.5),
 	})
-	updater := NewMarginInfoUpdater(svc)
+	config := MarginInfoUpdaterConfig{
+		BatchSize: 1,
+	}
+	config.Defaults()
+	updater := NewMarginInfoUpdater(svc, config)
 
 	t.Run("untracked asset is not found", func(t *testing.T) {
 		amount, ok := updater.GetMaxBorrowable("BTC")
@@ -82,7 +86,7 @@ func TestMarginInfoUpdater_GetMaxBorrowable(t *testing.T) {
 	})
 
 	t.Run("reports the queried amount after Update", func(t *testing.T) {
-		updater.Update(context.Background(), 1)
+		updater.Update(context.Background())
 
 		amount, ok := updater.GetMaxBorrowable("BTC")
 		assert.True(t, ok)
@@ -97,8 +101,12 @@ func TestMarginInfoUpdater_Update(t *testing.T) {
 			"ETH": fixedpoint.NewFromFloat(2),
 			"SOL": fixedpoint.NewFromFloat(3),
 		}
+		config := MarginInfoUpdaterConfig{
+			BatchSize: len(values),
+		}
+		config.Defaults()
 		svc := newMockMarginBorrowRepayService(values)
-		updater := NewMarginInfoUpdater(svc)
+		updater := NewMarginInfoUpdater(svc, config)
 
 		emitted := map[string]fixedpoint.Value{}
 		updater.OnMaxBorrowable(func(asset string, amount fixedpoint.Value) {
@@ -110,7 +118,7 @@ func TestMarginInfoUpdater_Update(t *testing.T) {
 		}
 
 		// batch size >= number of assets => all done in one pass
-		updater.Update(context.Background(), len(values))
+		updater.Update(context.Background())
 
 		for asset, want := range values {
 			amount, ok := updater.GetMaxBorrowable(asset)
@@ -133,7 +141,11 @@ func TestMarginInfoUpdater_Update(t *testing.T) {
 		}
 
 		svc := newMockMarginBorrowRepayService(values)
-		updater := NewMarginInfoUpdater(svc)
+		config := MarginInfoUpdaterConfig{
+			BatchSize: batchSize,
+		}
+		config.Defaults()
+		updater := NewMarginInfoUpdater(svc, config)
 
 		emitCount := map[string]int{}
 		updater.OnMaxBorrowable(func(asset string, amount fixedpoint.Value) {
@@ -145,13 +157,13 @@ func TestMarginInfoUpdater_Update(t *testing.T) {
 		}
 
 		// A single Update only processes batchSize assets.
-		updater.Update(context.Background(), batchSize)
+		updater.Update(context.Background())
 		assert.Len(t, updater.doneAssets, batchSize, "only one batch processed per Update")
 
 		// ceil(5/2) = 3 Update calls are needed to cover every asset. Run the two
 		// remaining passes to complete the cycle.
-		updater.Update(context.Background(), batchSize)
-		updater.Update(context.Background(), batchSize)
+		updater.Update(context.Background())
+		updater.Update(context.Background())
 
 		// Every asset must have been refreshed exactly once with the correct value.
 		for asset, want := range values {
@@ -175,18 +187,22 @@ func TestMarginInfoUpdater_Update(t *testing.T) {
 			"SOL": fixedpoint.NewFromFloat(3),
 		}
 		svc := newMockMarginBorrowRepayService(values)
-		updater := NewMarginInfoUpdater(svc)
+		config := MarginInfoUpdaterConfig{
+			BatchSize: len(values),
+		}
+		config.Defaults()
+		updater := NewMarginInfoUpdater(svc, config)
 
 		for asset := range values {
 			updater.AddBorrowableAssets(asset)
 		}
 
 		// first cycle
-		updater.Update(context.Background(), len(values))
+		updater.Update(context.Background())
 		assert.Empty(t, updater.doneAssets, "cycle completes and resets")
 
 		// second cycle: each asset should be queried again
-		updater.Update(context.Background(), len(values))
+		updater.Update(context.Background())
 		for asset := range values {
 			assert.Equal(t, 2, svc.getQueryCount(asset), "queried again in the next cycle: %s", asset)
 		}
@@ -199,7 +215,11 @@ func TestMarginInfoUpdater_Update(t *testing.T) {
 		}
 		svc := newMockMarginBorrowRepayService(values)
 		svc.errs["ETH"] = fmt.Errorf("boom")
-		updater := NewMarginInfoUpdater(svc)
+		config := MarginInfoUpdaterConfig{
+			BatchSize: 10,
+		}
+		config.Defaults()
+		updater := NewMarginInfoUpdater(svc, config)
 
 		emitted := map[string]fixedpoint.Value{}
 		updater.OnMaxBorrowable(func(asset string, amount fixedpoint.Value) {
@@ -209,7 +229,7 @@ func TestMarginInfoUpdater_Update(t *testing.T) {
 		updater.AddBorrowableAssets("BTC", "ETH")
 
 		// large batch so both are attempted in one pass
-		updater.Update(context.Background(), 10)
+		updater.Update(context.Background())
 
 		// BTC succeeded; ETH errored so it is neither recorded as done nor emitted.
 		btc, ok := updater.GetMaxBorrowable("BTC")
@@ -228,7 +248,7 @@ func TestMarginInfoUpdater_Update(t *testing.T) {
 		delete(svc.errs, "ETH")
 		svc.mu.Unlock()
 
-		updater.Update(context.Background(), 10)
+		updater.Update(context.Background())
 		eth, ok := updater.GetMaxBorrowable("ETH")
 		assert.True(t, ok)
 		assert.Equal(t, "2", eth.String())
@@ -238,10 +258,13 @@ func TestMarginInfoUpdater_Update(t *testing.T) {
 
 	t.Run("no assets is a no-op", func(t *testing.T) {
 		svc := newMockMarginBorrowRepayService(nil)
-		updater := NewMarginInfoUpdater(svc)
+		config := MarginInfoUpdaterConfig{
+			BatchSize: 5,
+		}
+		updater := NewMarginInfoUpdater(svc, config)
 
 		assert.NotPanics(t, func() {
-			updater.Update(context.Background(), 5)
+			updater.Update(context.Background())
 		})
 	})
 }
