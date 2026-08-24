@@ -744,19 +744,6 @@ func (s *Strategy) CrossRun(
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
 				round.HandleSpotTrade(trade, s.spotSession.Account, trade.Time.Time())
-
-				spotFilledPosition := round.SpotWorker().FilledPosition()
-				filledRatio := spotFilledPosition.Div(round.TriggeredTargetPosition()).Abs()
-				if round.State() == RoundClosing {
-					filledRatio = fixedpoint.One.Sub(filledRatio)
-				}
-				roundPositionFilledRatioMetrics.With(
-					prometheus.Labels{
-						"strategy_id": s.InstanceID(),
-						"symbol":      round.SpotSymbol(),
-						"accountType": "spot",
-					},
-				).Set(filledRatio.Float64())
 			}
 		}
 	})
@@ -767,19 +754,6 @@ func (s *Strategy) CrossRun(
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
 				round.HandleFuturesTrade(trade, s.futuresSession.Account, trade.Time.Time())
-
-				futuresFilledPosition := round.FuturesWorker().FilledPosition()
-				filledRatio := futuresFilledPosition.Div(round.TriggeredTargetPosition()).Abs()
-				if round.State() == RoundClosing {
-					filledRatio = fixedpoint.One.Sub(filledRatio)
-				}
-				roundPositionFilledRatioMetrics.With(
-					prometheus.Labels{
-						"strategy_id": s.InstanceID(),
-						"symbol":      round.SpotSymbol(),
-						"accountType": "futures",
-					},
-				).Set(filledRatio.Float64())
 			}
 		}
 	})
@@ -928,36 +902,17 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		round.Tick(ctx, tickTime, spotOrderBook, futuresOrderBook)
 
 		// 1.2 transit active rounds
-		lastPrice := s.spotLastPrices[round.SpotSymbol()]
+		spotPrice, futuresPrice, lastPricesOk := s.getLastPrices(
+			round.SpotSymbol(),
+			round.FuturesSymbol(),
+		)
 		posDeviation := round.CheckPositionDeviation(
 			tickTime,
 			s.CriticalErrorConfig.MaxMoqDeviation,
 			s.CriticalErrorConfig.MaxQuoteDeviation,
-			lastPrice,
+			spotPrice,
 			time.Minute*15,
 		)
-		// record the round spot/futures positions
-		roundPositionMetrics.With(
-			prometheus.Labels{
-				"strategy_id": s.InstanceID(),
-				"symbol":      round.SpotSymbol(),
-				"accountType": "spot",
-			},
-		).Set(posDeviation.SpotFilled.Float64())
-		roundPositionMetrics.With(
-			prometheus.Labels{
-				"strategy_id": s.InstanceID(),
-				"symbol":      round.FuturesSymbol(),
-				"accountType": "futures",
-			},
-		).Set(posDeviation.FuturesFilled.Float64())
-		roundQuantityDeviationMetrics.With(
-			prometheus.Labels{
-				"strategy_id": s.InstanceID(),
-				"symbol":      round.SpotSymbol(),
-			},
-		).Set(posDeviation.DeviatedQuantity.Float64())
-
 		if round.State() != RoundReady {
 			// check if the round is halted or should be halted
 			halted := round.IsHalted()
@@ -1022,6 +977,9 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		}
 
 		s.transitRound(ctx, round, tickTime)
+		if lastPricesOk {
+			round.RecordMetrics(posDeviation, spotPrice, futuresPrice)
+		}
 		// all transitions are done, check if the state has changed
 		currentState := round.State()
 		if oriState != currentState {
@@ -1139,38 +1097,41 @@ func (s *Strategy) transitRound(ctx context.Context, round *ArbitrageRound, curr
 		return
 	}
 
+	// update the funding rate
+	timedCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+
+	index, err := s.futuresService.QueryPremiumIndex(timedCtx, round.FuturesSymbol())
+	if err != nil {
+		return
+	}
+	// update the last funding rate for the round metrics
+	round.SetLastFundingRate(index.LastFundingRate)
+
 	oriState := round.State()
 	switch oriState {
 	case RoundOpening, RoundReady:
-		s.transitOpeningOrReadyRoundToClosing(ctx, round, currentTime)
+		s.transitOpeningOrReadyRoundToClosing(round, index, currentTime)
 	case RoundClosing:
-		s.transitClosingRound(ctx, round, currentTime)
+		s.transitClosingRound(round, currentTime)
 	}
 	s.logger.Debugf("transit state for round %s: %s -> %s", round.SpotSymbol(), oriState, round.State())
 	round.SetUpdateTime(currentTime)
 }
 
-func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, round *ArbitrageRound, currentTime time.Time) {
+func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, index *types.PremiumIndex, currentTime time.Time) {
 	// if the current funding rate is still favorable, stay in current state, otherwise transit to closing
-	timedCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-	defer cancel()
-
-	fundingRate, err := s.futuresService.QueryPremiumIndex(timedCtx, round.FuturesSymbol())
-	if err != nil {
-		return
-	}
-
-	// the funding rate has flipped
-	if round.TriggeredFundingRate().Sign()*fundingRate.LastFundingRate.Sign() <= 0 {
+	if round.TriggeredFundingRate().Sign()*index.LastFundingRate.Sign() <= 0 {
+		// the funding rate has flipped
 		spotPrice, futuresPrice, _ := s.getLastPrices(
 			round.SpotSymbol(),
 			round.FuturesSymbol(),
 		)
-		rateDiffAbs := fundingRate.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
+		rateDiffAbs := index.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
 		if rateDiffAbs.Compare(s.CriticalErrorConfig.MaxFundingRateFlip) > 0 {
 			bbgo.Notify("🚨 Round funding rate flip is too large: %s -> %s (threshold %s), closing round",
 				round.TriggeredFundingRate(),
-				fundingRate.LastFundingRate,
+				index.LastFundingRate,
 				s.CriticalErrorConfig.MaxFundingRateFlip,
 				round.NewCriticalNotification(spotPrice, futuresPrice),
 			)
@@ -1178,7 +1139,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 			return
 		} else {
 			bbgo.Notify("⚠️ Round funding rate flipped %s -> %s (%s)",
-				round.TriggeredFundingRate(), fundingRate.LastFundingRate, round.SpotSymbol(),
+				round.TriggeredFundingRate(), index.LastFundingRate, round.SpotSymbol(),
 				round.NewNotification(spotPrice, futuresPrice),
 			)
 		}
@@ -1187,7 +1148,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 		if round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals() {
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound] still within min holding hours, keep holding, current funding rate %s: %s",
-				fundingRate.LastFundingRate, round,
+				index.LastFundingRate, round,
 			)
 			return
 		}
@@ -1196,7 +1157,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 		if currentTime.Sub(round.StartedAt()) >= s.MarketSelectionConfig.MaxHoldingDuration.Duration() {
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound %s] max holding hours reached, transit state %s -> closing, current funding rate %s: %s",
-				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round,
+				currentTime.Format(time.RFC3339), round.State(), index.LastFundingRate, round,
 			)
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
 			return
@@ -1215,7 +1176,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 		// long position -> last funding rate is positive due to the flipped rate
 		// the product of the flipped rate and the position is positive
 		// we need to negate the product to get the next funding income, which should be negative -> expected loss
-		nextFundingIncome := fundingRate.LastFundingRate.Mul(futuresPosition).Neg()
+		nextFundingIncome := index.LastFundingRate.Mul(futuresPosition).Neg()
 		unrealizedPnL := round.UnrealizedPnL(spotPrice, futuresPrice)
 		unrealizedTotalPnL := unrealizedPnL.TotalPnL()
 		// the unrealized PnL is positive or the expected unrealized net PnL is below the max closing loss ratio, transit to closing
@@ -1228,7 +1189,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 			)
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound %s] transit state %s -> closing, current funding rate %s: %s",
-				currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round)
+				currentTime.Format(time.RFC3339), round.State(), index.LastFundingRate, round)
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
 			return
 		}
@@ -1237,12 +1198,12 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(ctx context.Context, roun
 	if s.allowLog(currentTime) {
 		s.logger.Infof(
 			"[transitOpeningOrReadyRound %s] round stays %s, current funding rate %s: %s",
-			currentTime.Format(time.RFC3339), round.State(), fundingRate.LastFundingRate, round,
+			currentTime.Format(time.RFC3339), round.State(), index.LastFundingRate, round,
 		)
 	}
 }
 
-func (s *Strategy) transitClosingRound(ctx context.Context, round *ArbitrageRound, currentTime time.Time) {
+func (s *Strategy) transitClosingRound(round *ArbitrageRound, currentTime time.Time) {
 	// the round is expired and is in closing state, keep it closing until it's closed
 	if s.allowLog(currentTime) {
 		s.logger.Infof("[transitClosingRound %s] round is closing: %s",
@@ -1326,6 +1287,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			s.MarketSelectionConfig.FuturesDirection,
 			s.RoundRebalanceInterval.Duration(),
 		)
+		round.SetupMetrics(s)
 		round.SetLogger(s.logger)
 		round.SetSpotExchangeFeeRates(
 			s.costEstimator.GetSpotFeeRate(),
@@ -1334,12 +1296,6 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 			s.costEstimator.GetFuturesFeeRate(),
 		)
 		round.SetSlackAlert(s.SlackAlert)
-		roundAnnualizedTriggerRateMetrics.With(
-			prometheus.Labels{
-				"strategy_id": s.InstanceID(),
-				"symbol":      selectedCandidate.Symbol,
-			},
-		).Set(round.AnnualizedRate().Float64())
 		// enqueue the new round to pending rounds for further processing
 		s.PendingRounds[selectedCandidate.Symbol] = &PendingRound{
 			Round: round,
@@ -1697,14 +1653,6 @@ func (s *Strategy) closedRoundStats(round *ArbitrageRound, tickTime time.Time) {
 	} else {
 		s.logger.Warnf("circuit breaker not found for symbol %s when recording profit: %s", round.SpotSymbol(), pnl)
 	}
-	labels := prometheus.Labels{
-		"strategy_id": s.InstanceID(),
-		"symbol":      round.SpotSymbol(),
-	}
-	roundHoldingIntervalMetrics.With(labels).Set(
-		float64(round.NumHoldingIntervals(tickTime)),
-	)
-	roundNetPnLMetrics.With(labels).Set(pnl.NetPnL().Float64())
 
 	// insert closed round records into database
 	if s.roundInsertService != nil {

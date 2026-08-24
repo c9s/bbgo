@@ -13,6 +13,7 @@ import (
 
 func (r *ArbitrageRound) Initialize(ctx context.Context, s *Strategy) error {
 	r.SetLogger(s.logger)
+	r.SetupMetrics(s)
 	if s.futuresSession.Exchange.Name() != r.syncState.FuturesExchangeName {
 		return fmt.Errorf("[ArbitrageRound] futures exchange name mismatch: expected %s, got %s",
 			r.syncState.FuturesExchangeName, s.futuresSession.Exchange.Name())
