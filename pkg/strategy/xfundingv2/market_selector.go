@@ -7,7 +7,6 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
 
@@ -184,11 +183,6 @@ func (s *MarketSelector) SelectMarkets(ctx context.Context, symbols []string) ([
 		annualized := AnnualizedRate(idx.LastFundingRate, info.FundingIntervalHours)
 		numActiveRounds := fixedpoint.NewFromInt(int64(len(s.activeRounds)))
 		requiredAnnualizedRate := s.MinAnnualizedRate.Add(s.AnnualizedRateStep.Mul(numActiveRounds))
-		labels := prometheus.Labels{
-			"symbol": idx.Symbol,
-		}
-		annualizedFundingRateMetrics.With(labels).Set(annualized.Float64())
-		fundingRateMetrics.With(labels).Set(idx.LastFundingRate.Float64())
 
 		if annualized.Abs().Compare(requiredAnnualizedRate) < 0 {
 			continue
