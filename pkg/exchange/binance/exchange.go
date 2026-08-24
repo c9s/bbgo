@@ -1008,10 +1008,13 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		}
 
 		order, err = req.Do(ctx)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			return toGlobalOrder(order, e.IsMargin)
 		}
-		return toGlobalOrder(order, e.IsMargin)
+		if shouldFallbackToQueryClosedOrder(err) {
+			return e.queryClosedOrder(ctx, q)
+		}
+		return nil, err
 	}
 
 	if e.IsFutures {
@@ -1030,10 +1033,57 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	}
 
 	order, err = req.Do(ctx)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return toGlobalOrder(order, e.IsMargin)
 	}
-	return toGlobalOrder(order, e.IsMargin)
+	if shouldFallbackToQueryClosedOrder(err) {
+		return e.queryClosedOrder(ctx, q)
+	}
+	return nil, err
+}
+
+func shouldFallbackToQueryClosedOrder(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "code=-2013")
+}
+
+func (e *Exchange) queryClosedOrder(
+	ctx context.Context, q types.OrderQuery,
+) (*types.Order, error) {
+	log.Warnf("failed to query order, trying to fallback to closed order: %+v", q)
+
+	if q.OrderID == "" || q.Symbol == "" {
+		// no order id or no symbol provided, we can not query closed order, return the error directly
+		return nil, fmt.Errorf("unable to fallback to closed order with the query: %+v", q)
+	}
+
+	oid, err := strconv.ParseUint(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse order id %s when fallback: %w", q.OrderID, err)
+	}
+
+	orders, err := e.QueryClosedOrders(
+		ctx,
+		q.Symbol,
+		time.Time{}, // dummy
+		time.Time{}, // dummy
+		oid-1,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("got query error when fallback: %w", err)
+	}
+
+	for _, order := range orders {
+		if order.OrderID == oid {
+			return &order, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to query order when fallback: %+v", q)
 }
 
 func (e *Exchange) QueryClosedOrders(
