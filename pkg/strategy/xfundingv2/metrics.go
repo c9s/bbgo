@@ -24,26 +24,10 @@ var annualizedFundingRateMetrics = promauto.NewGaugeVec(
 	[]string{"symbol"},
 )
 
-var roundAnnualizedTriggerRateMetrics = promauto.NewGaugeVec(
+var roundTotalPnLMetrics = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "xfundingv2_round_annualized_trigger_rate",
-		Help: "Annualized triggering funding rate of the arbitrage round",
-	},
-	[]string{"strategy_id", "symbol"},
-)
-
-var roundHoldingIntervalMetrics = promauto.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "xfundingv2_round_holding_interval",
-		Help: "Holding interval of the arbitrage round in seconds",
-	},
-	[]string{"strategy_id", "symbol"},
-)
-
-var roundNetPnLMetrics = promauto.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "xfundingv2_round_net_pnl",
-		Help: "Net PnL of the arbitrage round",
+		Name: "xfundingv2_round_total_pnl",
+		Help: "Total PnL of the arbitrage round",
 	},
 	[]string{"strategy_id", "symbol"},
 )
@@ -59,7 +43,7 @@ var roundPositionFilledRatioMetrics = promauto.NewGaugeVec(
 var roundPositionMetrics = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "xfundingv2_round_position",
-		Help: "Spot position of the arbitrage round",
+		Help: "position of the arbitrage round",
 	},
 	[]string{"strategy_id", "symbol", "accountType"},
 )

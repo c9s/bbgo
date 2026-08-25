@@ -35,7 +35,7 @@ func TestAdaptiveQuoteInterval_Defaults(t *testing.T) {
 	assert.Equal(t, 30, a.Warmup)
 	assert.Equal(t, time.Second, a.MinInterval.Duration())
 	assert.Equal(t, time.Minute, a.MaxInterval.Duration())
-	assert.InDelta(t, 0.00005, a.LowVolatility.Float64(), 1e-12)
+	assert.InDelta(t, 0.0002, a.LowVolatility.Float64(), 1e-12)
 	assert.InDelta(t, 0.001, a.HighVolatility.Float64(), 1e-12)
 }
 
