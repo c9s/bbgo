@@ -1320,7 +1320,7 @@ func (r *ArbitrageRound) State() RoundState {
 	return r.syncState.State
 }
 
-func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Duration) {
+func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Duration, futuresLastPrice fixedpoint.Value) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -1329,6 +1329,10 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 	// re-synced after each futures fill in handleFuturesTradeForClose, so spot
 	// only trades once the collateral has been transferred back from futures.
 	r.futuresWorker.SetTargetPosition(fixedpoint.Zero)
+	futuresRemaining := r.futuresWorker.RemainingQuantity()
+	if !futuresLastPrice.IsZero() && r.FuturesMarket().IsDustQuantity(futuresRemaining, futuresLastPrice) {
+		r.spotWorker.SetTargetPosition(fixedpoint.Zero)
+	}
 	r.spotWorker.ResetTime(currentTime, duration)
 	r.futuresWorker.ResetTime(currentTime, duration)
 
