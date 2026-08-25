@@ -543,7 +543,7 @@ func runLeaderFollowerScenario(t *testing.T, sc directionScenario) {
 	//      the spot worker tick its own closing slice.
 	// =========================================================================
 	closeTime := startTime.Add(20 * time.Minute)
-	round.SetClosing(closeTime, types.Duration(10*time.Minute))
+	round.SetClosing(closeTime, types.Duration(10*time.Minute), fixedpoint.Zero)
 	assert.Equal(t, RoundClosing, round.State())
 	assert.Equal(t, fixedpoint.Zero, futuresWorker.TargetPosition(),
 		"SetClosing drives the futures target to zero so it leads the close")

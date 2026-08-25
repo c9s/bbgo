@@ -802,11 +802,11 @@ func (s *Strategy) CrossRun(
 			if round.State() == RoundClosing {
 				continue
 			}
-			round.SetClosing(time.Now(), s.TWAPWorkerConfig.ClosingDuration)
 			spotPrice, futuresPrice, _ := s.getLastPrices(
 				round.SpotSymbol(),
 				round.FuturesSymbol(),
 			)
+			round.SetClosing(time.Now(), s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
 			bbgo.Notify("⚠️ Round is set to closing state on startup: %s",
 				round.String(),
 				round.NewNotification(spotPrice, futuresPrice),
@@ -1155,7 +1155,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 				round.String(),
 				round.NewCriticalNotification(spotPrice, futuresPrice),
 			)
-			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
 			return
 		} else {
 			bbgo.Notify("⚠️ Round funding rate flipped %s -> %s (%s)",
@@ -1180,7 +1180,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 				round.State(), index.LastFundingRate, round.String(),
 				round.NewNotification(spotPrice, futuresPrice),
 			)
-			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
 			return
 		}
 		// the round is already beyond the min holding time and the funding rate has flipped
@@ -1213,7 +1213,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 				unrealizedTotalPnL, round.State(), index.LastFundingRate, round.String(),
 				round.NewNotification(spotPrice, futuresPrice),
 			)
-			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
 			return
 		}
 	} else if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 {
@@ -1928,6 +1928,7 @@ func (s *Strategy) runLastPriceWorker(ctx context.Context) {
 
 	s.updateLastPriceC = make(chan time.Time, 5)
 	s.logger.Info("starting last price worker")
+	s.updateLastPrices(ctx)
 	go func() {
 		defer s.logger.Info("last price worker exited")
 		for {
@@ -1950,20 +1951,38 @@ func (s *Strategy) updateLastPrices(ctx context.Context) error {
 	timedCtx, cancel := context.WithTimeout(ctx, 40*time.Second)
 	defer cancel()
 
+	updatedSymbols := make(map[string]struct{})
 	for _, symbol := range s.candidateSymbols {
-		// update spot price
-		if ticker, err := s.spotSession.Exchange.QueryTicker(timedCtx, symbol); err != nil {
-			return err
-		} else {
-			s.spotLastPrices[symbol] = ticker.Last
+		if err := s.updateLastPricesForSymbol(timedCtx, symbol); err != nil {
+			s.logger.WithError(err).Warnf("failed to update last prices for %s", symbol)
 		}
+		updatedSymbols[symbol] = struct{}{}
+	}
 
-		// update futures price
-		if index, err := s.futuresService.QueryPremiumIndex(timedCtx, symbol); err != nil {
-			return err
-		} else {
-			s.futuresMarkPrices[symbol] = index.MarkPrice
+	for _, round := range s.allRounds() {
+		symbol := round.SpotSymbol()
+		if _, found := updatedSymbols[symbol]; !found {
+			if err := s.updateLastPricesForSymbol(timedCtx, symbol); err != nil {
+				s.logger.WithError(err).Warnf("failed to update last prices for %s", symbol)
+			}
 		}
+	}
+	return nil
+}
+
+func (s *Strategy) updateLastPricesForSymbol(ctx context.Context, symbol string) error {
+	// update spot price
+	if ticker, err := s.spotSession.Exchange.QueryTicker(ctx, symbol); err != nil {
+		return err
+	} else {
+		s.spotLastPrices[symbol] = ticker.Last
+	}
+
+	// update futures price
+	if index, err := s.futuresService.QueryPremiumIndex(ctx, symbol); err != nil {
+		return err
+	} else {
+		s.futuresMarkPrices[symbol] = index.MarkPrice
 	}
 	return nil
 }
@@ -1973,18 +1992,20 @@ func (s *Strategy) closeDelistedRounds(currentTime time.Time) {
 	for _, symbol := range s.CandidateSymbols {
 		listedCandidates[symbol] = struct{}{}
 	}
+
 	for _, round := range s.allRounds() {
 		state := round.State()
-		if state == RoundClosed || state == RoundClosing {
+		if state == RoundClosed {
 			continue
 		}
 		symbol := round.SpotSymbol()
+		_, futuresPrice, _ := s.getLastPrices(round.SpotSymbol(), round.FuturesSymbol())
 		if _, found := listedCandidates[symbol]; !found {
 			s.logger.Warnf(
 				"delisted round detected, closing it: %s",
 				round.String(),
 			)
-			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
 		}
 	}
 
