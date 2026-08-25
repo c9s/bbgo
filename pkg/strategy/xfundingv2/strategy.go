@@ -714,12 +714,14 @@ func (s *Strategy) CrossRun(
 			return err
 		}
 
+		currentTime := time.Now()
 		for _, round := range s.ActiveRounds {
-			if err := round.SyncFundingFeeRecords(s.ctx, time.Now()); err != nil {
+			if err := round.SyncFundingFeeRecords(s.ctx, currentTime); err != nil {
 				return fmt.Errorf("failed to sync funding fee records for round %s: %w", round.SpotSymbol(), err)
 			}
 			s.logger.Debugf("funding fee records synced for round %s", round)
 		}
+		s.closeDelistedRounds(currentTime)
 	}
 
 	// setup metrics for positions
@@ -1964,4 +1966,26 @@ func (s *Strategy) updateLastPrices(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func (s *Strategy) closeDelistedRounds(currentTime time.Time) {
+	listedCandidates := make(map[string]struct{})
+	for _, symbol := range s.CandidateSymbols {
+		listedCandidates[symbol] = struct{}{}
+	}
+	for _, round := range s.allRounds() {
+		state := round.State()
+		if state == RoundClosed || state == RoundClosing {
+			continue
+		}
+		symbol := round.SpotSymbol()
+		if _, found := listedCandidates[symbol]; !found {
+			s.logger.Warnf(
+				"delisted round detected, closing it: %s",
+				round.String(),
+			)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
+		}
+	}
+
 }
