@@ -1643,22 +1643,23 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 	// get balance
 	balance, ok := account.Balance(asset)
 	if !ok {
-		return fmt.Errorf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round)
-	}
-	// compute the amount to transfer back to spot account
-	residualAmount := s.computeResidualCollateral(task, balance)
+		// the exchange may skip the asset with 0 balance, so we assume the balance is 0 if it's not found
+		s.logger.Warnf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round.String())
+	} else {
+		// compute the amount to transfer back to spot account
+		residualAmount := s.computeResidualCollateral(task, balance)
 
-	// transfer the collateral back to spot account when the available balance is sufficient
-	if residualAmount.Sign() > 0 {
-		if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
-			return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
-		} else {
+		// transfer the collateral back to spot account when the available balance is sufficient
+		if residualAmount.Sign() > 0 {
+			if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
+				return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
+			}
 			spotPrice, futuresPrice, _ := s.getLastPrices(
 				round.SpotSymbol(),
 				round.FuturesSymbol(),
 			)
 			bbgo.Notify("⬅️ Transferred %s %s back to spot account",
-				balance.Available,
+				residualAmount,
 				asset,
 				round.NewNotification(spotPrice, futuresPrice),
 			)
