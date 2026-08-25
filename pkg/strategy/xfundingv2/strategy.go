@@ -1214,7 +1214,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration)
 			return
 		}
-	} else if index.LastFundingRate.Abs().Compare(s.MinExitRate) <= 0 {
+	} else if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 {
 		bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the min exit rate %s, transit state %s -> closing: %s",
 			index.LastFundingRate, lastAnnualizedFundingRate, s.MinExitRate, round.State(), round.String(),
 			round.NewNotification(spotPrice, futuresPrice),
