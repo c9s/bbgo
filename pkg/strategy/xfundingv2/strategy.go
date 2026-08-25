@@ -1205,7 +1205,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		// NOTE: MaxClosingLossRatio is negative
 		if unrealizedTotalPnL.Sign() > 0 || unrealizedTotalPnL.Add(nextFundingIncome).Div(futuresPositionNotional).Compare(s.MaxClosingLossRatio) < 0 {
 			s.logger.Debugf(
-				"[transitOpeningOrReadyRound %s] unrealized total PnL: %s, next funding income: %s, futures position notional: %s, max closing loss ratio: %s",
+				"[transitOpeningOrReadyRound] unrealized total PnL: %s, next funding income: %s, futures position notional: %s, max closing loss ratio: %s",
 				unrealizedTotalPnL, nextFundingIncome, futuresPositionNotional, s.MaxClosingLossRatio,
 			)
 			bbgo.Notify(
@@ -1217,10 +1217,19 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 			return
 		}
 	} else if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 {
-		bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the min exit rate %s, transit state %s -> closing: %s",
-			index.LastFundingRate, lastAnnualizedFundingRate, s.MinExitRate, round.State(), round.String(),
-			round.NewNotification(spotPrice, futuresPrice),
-		)
+		totalPnL := round.UnrealizedPnL(spotPrice, futuresPrice).TotalPnL()
+		if totalPnL.Sign() > 0 {
+			// the round is generating profit but the funding rate is below the min exit rate, transit to closing
+			bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the min exit rate %s, transit state %s -> closing: %s",
+				index.LastFundingRate, lastAnnualizedFundingRate, s.MinExitRate, round.State(), round.String(),
+				round.NewNotification(spotPrice, futuresPrice),
+			)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
+			return
+		} else {
+			s.logger.Infof("[transitOpeningOrReadyRound] last funding rate %s(annualized %s) is below the min exit rate %s with total PnL %s, keep holding: %s",
+				index.LastFundingRate, lastAnnualizedFundingRate, s.MinExitRate, totalPnL, round.String())
+		}
 	}
 
 	if s.allowLog(currentTime) {
