@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
@@ -57,6 +58,7 @@ type ArbitrageRound struct {
 	lastRebalanceTime time.Time
 	rebalanceInterval time.Duration
 
+	lastFundingRate           fixedpoint.Value
 	lastFundingIncomeSyncTime time.Time
 
 	futuresService                                FuturesService
@@ -64,6 +66,14 @@ type ArbitrageRound struct {
 
 	spotSession, futuresSession *bbgo.ExchangeSession
 	retryTransferTickC          chan time.Time
+
+	// metrics
+	fundingRateMetric                               prometheus.Gauge
+	annualizedFundingRateMetric                     prometheus.Gauge
+	totalPnLMetric                                  prometheus.Gauge
+	spotPositionMetric, futuresPositionMetric       prometheus.Gauge
+	spotFilledRatioMetric, futuresFilledRatioMetric prometheus.Gauge
+	quantityDeviationMetric                         prometheus.Gauge
 
 	logger     logrus.FieldLogger
 	slackAlert slackalert.SlackAlert
@@ -112,6 +122,100 @@ func NewArbitrageRound(
 		rebalanceInterval:  rebalanceInterval,
 		futuresService:     futuresService,
 		retryTransferTickC: make(chan time.Time, 100),
+	}
+}
+
+func (r *ArbitrageRound) SetupMetrics(s *Strategy) {
+	id := s.InstanceID()
+	symbol := r.SpotSymbol()
+
+	r.fundingRateMetric = fundingRateMetrics.With(
+		prometheus.Labels{
+			"symbol": symbol,
+		},
+	)
+	r.annualizedFundingRateMetric = annualizedFundingRateMetrics.With(
+		prometheus.Labels{
+			"symbol": symbol,
+		},
+	)
+
+	r.totalPnLMetric = roundTotalPnLMetrics.With(
+		prometheus.Labels{
+			"strategy_id": id,
+			"symbol":      symbol,
+		},
+	)
+
+	r.spotPositionMetric = roundPositionMetrics.With(
+		prometheus.Labels{
+			"strategy_id": id,
+			"symbol":      symbol,
+			"accountType": "spot",
+		},
+	)
+	r.futuresPositionMetric = roundPositionMetrics.With(
+		prometheus.Labels{
+			"strategy_id": id,
+			"symbol":      symbol,
+			"accountType": "futures",
+		},
+	)
+	r.spotFilledRatioMetric = roundPositionFilledRatioMetrics.With(
+		prometheus.Labels{
+			"strategy_id": id,
+			"symbol":      symbol,
+			"accountType": "spot",
+		},
+	)
+	r.futuresFilledRatioMetric = roundPositionFilledRatioMetrics.With(
+		prometheus.Labels{
+			"strategy_id": id,
+			"symbol":      symbol,
+			"accountType": "futures",
+		},
+	)
+
+	r.quantityDeviationMetric = roundQuantityDeviationMetrics.With(
+		prometheus.Labels{
+			"strategy_id": id,
+			"symbol":      symbol,
+		},
+	)
+}
+
+func (r *ArbitrageRound) RecordMetrics(posDeviation PositionDeviation, spotPrice, futuresPrice fixedpoint.Value) {
+	if r.totalPnLMetric != nil {
+		unrealizedPnL := r.UnrealizedPnL(spotPrice, futuresPrice)
+		r.totalPnLMetric.Set(unrealizedPnL.TotalPnL().Float64())
+	}
+
+	if !r.lastFundingRate.IsZero() && r.fundingRateMetric != nil && r.annualizedFundingRateMetric != nil {
+		annualizedRate := AnnualizedRate(r.lastFundingRate, r.syncState.FundingIntervalHours)
+		r.fundingRateMetric.Set(r.lastFundingRate.Float64())
+		r.annualizedFundingRateMetric.Set(annualizedRate.Float64())
+	}
+
+	if r.spotPositionMetric != nil && r.futuresPositionMetric != nil {
+		r.spotPositionMetric.Set(posDeviation.SpotFilled.Float64())
+		r.futuresPositionMetric.Set(posDeviation.FuturesFilled.Float64())
+	}
+
+	if r.spotFilledRatioMetric != nil && r.futuresFilledRatioMetric != nil {
+		spotFilledPosition := r.SpotWorker().FilledPosition()
+		spotFilledRatio := spotFilledPosition.Div(r.TriggeredTargetPosition()).Abs()
+		futuresFilledPosition := r.FuturesWorker().FilledPosition()
+		futuresFilledRatio := futuresFilledPosition.Div(r.TriggeredTargetPosition()).Abs()
+		if r.State() == RoundClosing {
+			spotFilledRatio = fixedpoint.One.Sub(spotFilledRatio)
+			futuresFilledRatio = fixedpoint.One.Sub(futuresFilledRatio)
+		}
+		r.spotFilledRatioMetric.Set(spotFilledRatio.Float64())
+		r.futuresFilledRatioMetric.Set(futuresFilledRatio.Float64())
+	}
+
+	if r.quantityDeviationMetric != nil {
+		r.quantityDeviationMetric.Set(posDeviation.DeviatedQuantity.Float64())
 	}
 }
 
@@ -190,6 +294,13 @@ func (r *ArbitrageRound) FuturesFeeAssetAmount() fixedpoint.Value {
 	defer r.mu.Unlock()
 
 	return r.syncState.FuturesFeeAssetAmount
+}
+
+func (r *ArbitrageRound) SetLastFundingRate(rate fixedpoint.Value) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.lastFundingRate = rate
 }
 
 // RequiredFeeAssetAmount returns the required fee asset amount for the round based on its current state and position.
