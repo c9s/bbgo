@@ -80,6 +80,7 @@ type Strategy struct {
 	// TODO: move all the closing conditions into a separate struct
 	MaxClosingLossRatio fixedpoint.Value `json:"maxClosingLossRatio"`
 	MinExitRate         fixedpoint.Value `json:"minExitRate"`
+	HardMinExitRate     fixedpoint.Value `json:"hardMinExitRate"`
 
 	// TickSymbol is the symbol used for ticking the strategy, default to the first candidate symbol
 	TickSymbol   string         `json:"tickSymbol"`
@@ -219,6 +220,10 @@ func (s *Strategy) Defaults() error {
 		s.MarketSelectionConfig.MinAnnualizedRate,
 	)
 
+	if s.HardMinExitRate.IsZero() {
+		s.HardMinExitRate = s.MinExitRate.Div(fixedpoint.Two)
+	}
+
 	if s.TradeBalanceRatio.IsZero() {
 		s.TradeBalanceRatio = fixedpoint.NewFromFloat(0.8)
 	}
@@ -322,6 +327,16 @@ func (s *Strategy) Validate() error {
 
 	if s.InstanceTag == "" {
 		return errors.New("instanceTag is required")
+	}
+
+	if s.MinExitRate.Sign() < 0 {
+		return fmt.Errorf("minExitRate should be positive: %s", s.MinExitRate)
+	}
+	if s.HardMinExitRate.Sign() < 0 {
+		return fmt.Errorf("hardMinExitRate should be positive: %s", s.HardMinExitRate)
+	}
+	if s.HardMinExitRate.Compare(s.MinExitRate) > 0 {
+		return fmt.Errorf("expecting hardMinExitRate ≤ minExitRate, got %s and %s", s.HardMinExitRate, s.MinExitRate)
 	}
 	return nil
 }
@@ -1144,6 +1159,8 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		round.SpotSymbol(),
 		round.FuturesSymbol(),
 	)
+
+	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals()
 	if round.TriggeredFundingRate().Sign()*index.LastFundingRate.Sign() <= 0 {
 		// the funding rate has flipped
 		rateDiffAbs := index.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
@@ -1165,7 +1182,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		}
 
 		// the round is still within the min holding time, keep holding
-		if round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals() {
+		if withinMinHoldingTime {
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound] still within min holding hours, keep holding, current funding rate %s: %s",
 				index.LastFundingRate, round,
@@ -1205,7 +1222,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		// NOTE: MaxClosingLossRatio is negative
 		if unrealizedTotalPnL.Sign() > 0 || unrealizedTotalPnL.Add(nextFundingIncome).Div(futuresPositionNotional).Compare(s.MaxClosingLossRatio) < 0 {
 			s.logger.Debugf(
-				"[transitOpeningOrReadyRound %s] unrealized total PnL: %s, next funding income: %s, futures position notional: %s, max closing loss ratio: %s",
+				"[transitOpeningOrReadyRound] unrealized total PnL: %s, next funding income: %s, futures position notional: %s, max closing loss ratio: %s",
 				unrealizedTotalPnL, nextFundingIncome, futuresPositionNotional, s.MaxClosingLossRatio,
 			)
 			bbgo.Notify(
@@ -1216,11 +1233,30 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
 			return
 		}
-	} else if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 {
-		bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the min exit rate %s, transit state %s -> closing: %s",
-			index.LastFundingRate, lastAnnualizedFundingRate, s.MinExitRate, round.State(), round.String(),
-			round.NewNotification(spotPrice, futuresPrice),
-		)
+	} else if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 && !withinMinHoldingTime {
+		// check hard min exit rate
+		if lastAnnualizedFundingRate.Abs().Compare(s.HardMinExitRate) <= 0 {
+			bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the hard min exit rate %s, transit state %s -> closing: %s",
+				index.LastFundingRate, lastAnnualizedFundingRate, s.HardMinExitRate, round.State(), round.String(),
+				round.NewNotification(spotPrice, futuresPrice),
+			)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
+			return
+		}
+		// check min exit rate and total PnL
+		totalPnL := round.UnrealizedPnL(spotPrice, futuresPrice).TotalPnL()
+		if totalPnL.Sign() > 0 {
+			// the round is generating profit but the funding rate is below the min exit rate, transit to closing
+			bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the min exit rate %s with total PnL %s, transit state %s -> closing: %s",
+				index.LastFundingRate, lastAnnualizedFundingRate, s.MinExitRate, totalPnL, round.State(), round.String(),
+				round.NewNotification(spotPrice, futuresPrice),
+			)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
+			return
+		} else {
+			s.logger.Infof("[transitOpeningOrReadyRound] last funding rate %s(annualized %s) is below the min exit rate %s with total PnL %s, keep holding: %s",
+				index.LastFundingRate, lastAnnualizedFundingRate, s.MinExitRate, totalPnL, round.String())
+		}
 	}
 
 	if s.allowLog(currentTime) {
@@ -1643,22 +1679,23 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 	// get balance
 	balance, ok := account.Balance(asset)
 	if !ok {
-		return fmt.Errorf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round)
-	}
-	// compute the amount to transfer back to spot account
-	residualAmount := s.computeResidualCollateral(task, balance)
+		// the exchange may skip the asset with 0 balance, so we assume the balance is 0 if it's not found
+		s.logger.Warnf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round.String())
+	} else {
+		// compute the amount to transfer back to spot account
+		residualAmount := s.computeResidualCollateral(task, balance)
 
-	// transfer the collateral back to spot account when the available balance is sufficient
-	if residualAmount.Sign() > 0 {
-		if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
-			return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
-		} else {
+		// transfer the collateral back to spot account when the available balance is sufficient
+		if residualAmount.Sign() > 0 {
+			if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
+				return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
+			}
 			spotPrice, futuresPrice, _ := s.getLastPrices(
 				round.SpotSymbol(),
 				round.FuturesSymbol(),
 			)
 			bbgo.Notify("⬅️ Transferred %s %s back to spot account",
-				balance.Available,
+				residualAmount,
 				asset,
 				round.NewNotification(spotPrice, futuresPrice),
 			)
