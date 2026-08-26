@@ -1159,6 +1159,8 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		round.SpotSymbol(),
 		round.FuturesSymbol(),
 	)
+
+	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals()
 	if round.TriggeredFundingRate().Sign()*index.LastFundingRate.Sign() <= 0 {
 		// the funding rate has flipped
 		rateDiffAbs := index.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
@@ -1180,7 +1182,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		}
 
 		// the round is still within the min holding time, keep holding
-		if round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals() {
+		if withinMinHoldingTime {
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound] still within min holding hours, keep holding, current funding rate %s: %s",
 				index.LastFundingRate, round,
@@ -1231,7 +1233,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
 			return
 		}
-	} else if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 {
+	} else if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 && !withinMinHoldingTime {
 		// check hard min exit rate
 		if lastAnnualizedFundingRate.Abs().Compare(s.HardMinExitRate) <= 0 {
 			bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the hard min exit rate %s, transit state %s -> closing: %s",
