@@ -328,6 +328,16 @@ func (s *Strategy) Validate() error {
 	if s.InstanceTag == "" {
 		return errors.New("instanceTag is required")
 	}
+
+	if s.MinExitRate.Sign() < 0 {
+		return fmt.Errorf("minExitRate should be positive: %s", s.MinExitRate)
+	}
+	if s.HardMinExitRate.Sign() < 0 {
+		return fmt.Errorf("hardMinExitRate should be positive: %s", s.HardMinExitRate)
+	}
+	if s.HardMinExitRate.Compare(s.MinExitRate) > 0 {
+		return fmt.Errorf("expecting hardMinExitRate ≤ minExitRate, got %s and %s", s.HardMinExitRate, s.MinExitRate)
+	}
 	return nil
 }
 
