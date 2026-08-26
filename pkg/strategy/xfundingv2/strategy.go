@@ -80,6 +80,7 @@ type Strategy struct {
 	// TODO: move all the closing conditions into a separate struct
 	MaxClosingLossRatio fixedpoint.Value `json:"maxClosingLossRatio"`
 	MinExitRate         fixedpoint.Value `json:"minExitRate"`
+	HardMinExitRate     fixedpoint.Value `json:"hardMinExitRate"`
 
 	// TickSymbol is the symbol used for ticking the strategy, default to the first candidate symbol
 	TickSymbol   string         `json:"tickSymbol"`
@@ -218,6 +219,10 @@ func (s *Strategy) Defaults() error {
 		s.MinExitRate,
 		s.MarketSelectionConfig.MinAnnualizedRate,
 	)
+
+	if s.HardMinExitRate.IsZero() {
+		s.HardMinExitRate = s.MinExitRate.Div(fixedpoint.Two)
+	}
 
 	if s.TradeBalanceRatio.IsZero() {
 		s.TradeBalanceRatio = fixedpoint.NewFromFloat(0.8)
@@ -1217,11 +1222,21 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 			return
 		}
 	} else if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 {
+		// check hard min exit rate
+		if lastAnnualizedFundingRate.Abs().Compare(s.HardMinExitRate) <= 0 {
+			bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the hard min exit rate %s, transit state %s -> closing: %s",
+				index.LastFundingRate, lastAnnualizedFundingRate, s.HardMinExitRate, round.State(), round.String(),
+				round.NewNotification(spotPrice, futuresPrice),
+			)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
+			return
+		}
+		// check min exit rate and total PnL
 		totalPnL := round.UnrealizedPnL(spotPrice, futuresPrice).TotalPnL()
 		if totalPnL.Sign() > 0 {
 			// the round is generating profit but the funding rate is below the min exit rate, transit to closing
-			bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the min exit rate %s, transit state %s -> closing: %s",
-				index.LastFundingRate, lastAnnualizedFundingRate, s.MinExitRate, round.State(), round.String(),
+			bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the min exit rate %s with total PnL %s, transit state %s -> closing: %s",
+				index.LastFundingRate, lastAnnualizedFundingRate, s.MinExitRate, totalPnL, round.State(), round.String(),
 				round.NewNotification(spotPrice, futuresPrice),
 			)
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
