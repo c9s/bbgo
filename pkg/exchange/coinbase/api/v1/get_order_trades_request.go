@@ -29,8 +29,8 @@ type TradeSnapshot []Trade
 type GetOrderTradesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	orderID    string      `param:"order_id"`
-	productID  string      `param:"product_id"` // one of order_id or product_id is required
+	orderID    *string     `param:"order_id"`
+	productID  *string     `param:"product_id"` // one of order_id or product_id is required
 	limit      int         `param:"limit"`
 	before     *uint64     `param:"before"` // pagination id, which is the trade_id (exclusive, newer)
 	after      *uint64     `param:"after"`  // pagination id, which is the trade_id (exclusive, older)
