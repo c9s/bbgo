@@ -954,10 +954,6 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				s.logger.Warnf("round %s position deviation: %+v", roundSymbol, posDeviation)
 				// the round is originally not halted but the deviation is too large -> we need to halt the round
 				round.Halt(tickTime)
-				spotPrice, futuresPrice, _ := s.getLastPrices(
-					round.SpotSymbol(),
-					round.FuturesSymbol(),
-				)
 				bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required: spot filled %s, futures filled %s (deviation: %s@%s)",
 					roundSymbol,
 					posDeviation.SpotFilled, posDeviation.FuturesFilled,
@@ -975,10 +971,6 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 					posDeviation.SpotFilled,
 					posDeviation.FuturesFilled,
 					posDeviation.LastPrice,
-				)
-				spotPrice, futuresPrice, _ := s.getLastPrices(
-					round.SpotSymbol(),
-					round.FuturesSymbol(),
 				)
 				bbgo.Notify("✅ Round %s resumed as hedge deviation back to normal. It was halted at %s.",
 					roundSymbol,
@@ -1010,8 +1002,10 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		}
 
 		s.transitRound(ctx, round, tickTime)
-		if lastPricesOk {
-			round.RecordMetrics(posDeviation, spotPrice, futuresPrice)
+		if lastPricesOk && s.futuresSession.Account != nil {
+			round.RecordMetrics(s.futuresSession.Account.FuturesInfo, posDeviation, spotPrice, futuresPrice)
+		} else {
+			s.logger.Warnf("unable to record metrics for round %s, lastPricesOk: %v, futuresAccount: %v", round.SpotSymbol(), lastPricesOk, s.futuresSession.Account)
 		}
 		// all transitions are done, check if the state has changed
 		currentState := round.State()

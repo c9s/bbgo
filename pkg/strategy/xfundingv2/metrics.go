@@ -56,6 +56,30 @@ var roundQuantityDeviationMetrics = promauto.NewGaugeVec(
 	[]string{"strategy_id", "symbol"},
 )
 
+var maintMarginRatioMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_maintenance_margin_ratio",
+		Help: "Maintenance margin ratio of the symbol (1.0 -> liquidation)",
+	},
+	[]string{"strategy_id", "symbol"},
+)
+
+var spotFuturesBasisRateMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_spot_futures_basis_rate",
+		Help: "Spot-futures basis rate of the symbol, (spot - futrues) / spot",
+	},
+	[]string{"strategy_id", "symbol"},
+)
+
+var liquidationDistanceRateMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_liquidation_distance_rate",
+		Help: "Liquidation distance rate of the symbol, (liq. price - futures price) / futures price",
+	},
+	[]string{"strategy_id", "symbol"},
+)
+
 var tickDurationMetrics = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "xfundingv2_tick_duration",

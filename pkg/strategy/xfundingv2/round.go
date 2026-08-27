@@ -74,6 +74,9 @@ type ArbitrageRound struct {
 	spotPositionMetric, futuresPositionMetric       prometheus.Gauge
 	spotFilledRatioMetric, futuresFilledRatioMetric prometheus.Gauge
 	quantityDeviationMetric                         prometheus.Gauge
+	spotFuturesBasisRateMetric                      prometheus.Gauge
+	maintMarginRatioMetric                          prometheus.Gauge
+	liqDistanceMetric                               prometheus.Gauge
 
 	logger     logrus.FieldLogger
 	slackAlert slackalert.SlackAlert
@@ -182,9 +185,30 @@ func (r *ArbitrageRound) SetupMetrics(s *Strategy) {
 			"symbol":      symbol,
 		},
 	)
+
+	r.spotFuturesBasisRateMetric = spotFuturesBasisRateMetrics.With(
+		prometheus.Labels{
+			"strategy_id": id,
+			"symbol":      symbol,
+		},
+	)
+
+	r.maintMarginRatioMetric = maintMarginRatioMetrics.With(
+		prometheus.Labels{
+			"strategy_id": id,
+			"symbol":      symbol,
+		},
+	)
+
+	r.liqDistanceMetric = liquidationDistanceRateMetrics.With(
+		prometheus.Labels{
+			"strategy_id": id,
+			"symbol":      symbol,
+		},
+	)
 }
 
-func (r *ArbitrageRound) RecordMetrics(posDeviation PositionDeviation, spotPrice, futuresPrice fixedpoint.Value) {
+func (r *ArbitrageRound) RecordMetrics(futuresAccount *types.FuturesAccount, posDeviation PositionDeviation, spotPrice, futuresPrice fixedpoint.Value) {
 	if r.totalPnLMetric != nil {
 		unrealizedPnL := r.UnrealizedPnL(spotPrice, futuresPrice)
 		r.totalPnLMetric.Set(unrealizedPnL.TotalPnL().Float64())
@@ -216,6 +240,30 @@ func (r *ArbitrageRound) RecordMetrics(posDeviation PositionDeviation, spotPrice
 
 	if r.quantityDeviationMetric != nil {
 		r.quantityDeviationMetric.Set(posDeviation.DeviatedQuantity.Float64())
+	}
+
+	if futuresAccount != nil {
+		openPositions := futuresAccount.Positions.OpenPositions()
+		key := types.PositionKey{
+			Symbol: r.FuturesSymbol(),
+			Side:   r.syncState.DirectionPolicy.Direction,
+		}
+		if pos, found := openPositions[key]; found && pos.PositionRisk != nil {
+			if r.maintMarginRatioMetric != nil {
+				marginRatio := pos.PositionRisk.MaintMargin.Div(futuresAccount.TotalMarginBalance)
+				r.maintMarginRatioMetric.Set(marginRatio.Float64())
+			}
+			if r.liqDistanceMetric != nil && !futuresPrice.IsZero() {
+				liqPrice := pos.PositionRisk.LiquidationPrice
+				liqDistance := liqPrice.Sub(futuresPrice).Div(futuresPrice)
+				r.liqDistanceMetric.Set(liqDistance.Float64())
+			}
+		}
+	}
+
+	if r.spotFuturesBasisRateMetric != nil && !spotPrice.IsZero() {
+		basisRate := spotPrice.Sub(futuresPrice).Div(spotPrice)
+		r.spotFuturesBasisRateMetric.Set(basisRate.Float64())
 	}
 }
 
