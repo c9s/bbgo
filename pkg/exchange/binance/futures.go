@@ -691,6 +691,10 @@ func (e *Exchange) queryFuturesOrder(ctx context.Context, q types.OrderQuery) (*
 	// Try to query regular order first
 	if order, err := e.queryRegularFuturesOrder(ctx, q); err == nil {
 		return order, nil
+	} else if shouldFallbackToQueryClosedOrder(err) {
+		if order, err2 := e.queryClosedOrder(ctx, q); err2 == nil {
+			return order, nil
+		}
 	}
 
 	// If regular order query fails, try algo order
