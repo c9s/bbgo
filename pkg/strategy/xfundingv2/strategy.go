@@ -69,6 +69,9 @@ type Strategy struct {
 	SpotSession    string `json:"spotSession"`
 	FuturesSession string `json:"futuresSession"`
 
+	FuturesAccountUpdatePeriod types.Duration `json:"futuresAccountUpdatePeriod"`
+	futuresAccountUpdater      *FuturesAccountUpdater
+
 	// CandidateSymbols is the list of symbols to consider for selection
 	// IMPORTANT: xfundingv2 is now assuming trading on U-major pairs
 	CandidateSymbols       []string       `json:"candidateSymbols"`
@@ -180,6 +183,10 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Defaults() error {
+	if s.FuturesAccountUpdatePeriod.Duration() == 0 {
+		s.FuturesAccountUpdatePeriod = types.Duration(time.Minute * 5)
+	}
+
 	if len(s.CandidateSymbols) == 0 {
 		return errors.New("empty candidateSymbols")
 	}
@@ -759,6 +766,9 @@ func (s *Strategy) CrossRun(
 	// start the last price updater worker
 	s.runLastPriceWorker(s.ctx)
 
+	// start futures account updater
+	s.runFuturesAccountUpdater(s.ctx)
+
 	// setup callbacks
 	s.spotSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.TickSymbol, s.TickInterval, func(kline types.KLine) {
 		// end time of the kline is hh:mm:ss.999 -> add 1ms to round it up
@@ -923,6 +933,15 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	}
 	s.lastTickTime = tickTime
 
+	select {
+	case s.futuresAccountUpdater.C <- tickTime:
+	default:
+		s.logger.Warnf(
+			"futures account updater tick channel is full, skip tick time: %s",
+			tickTime,
+		)
+	}
+
 	// start processing
 	// 1. process existing active rounds
 	// We need to tick the active rounds first since we need to proceed the underlying workers to update the positions.
@@ -1002,8 +1021,10 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		}
 
 		s.transitRound(ctx, round, tickTime)
-		if lastPricesOk && s.futuresSession.Account != nil {
-			round.RecordMetrics(s.futuresSession.Account.FuturesInfo, posDeviation, spotPrice, futuresPrice)
+
+		futuresAccount := s.futuresSession.GetAccount()
+		if lastPricesOk && futuresAccount != nil {
+			round.RecordMetrics(futuresAccount.FuturesInfo, posDeviation, spotPrice, futuresPrice)
 		} else {
 			s.logger.Warnf("unable to record metrics for round %s, lastPricesOk: %v, futuresAccount: %v", round.SpotSymbol(), lastPricesOk, s.futuresSession.Account)
 		}

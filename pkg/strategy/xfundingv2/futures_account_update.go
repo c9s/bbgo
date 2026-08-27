@@ -62,11 +62,11 @@ func (u *FuturesAccountUpdater) Start(ctx context.Context) {
 	})
 }
 
-func (s *Strategy) runFuturesAccountUpdater(ctx context.Context, updatePeriod time.Duration) {
-	updater := NewFuturesAccountUpdater(
+func (s *Strategy) runFuturesAccountUpdater(ctx context.Context) {
+	s.futuresAccountUpdater = NewFuturesAccountUpdater(
 		s.futuresSession.UpdateAccount,
 		s.logger,
-		updatePeriod,
+		s.FuturesAccountUpdatePeriod.Duration(),
 	)
-	updater.Start(ctx)
+	s.futuresAccountUpdater.Start(ctx)
 }
