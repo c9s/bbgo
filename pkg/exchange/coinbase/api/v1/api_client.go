@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	DefaultHTTPTimeout = 15 * time.Second
+	DefaultHTTPTimeout = time.Minute
 	ProductionAPIURL   = "https://api.exchange.coinbase.com"
 )
 
