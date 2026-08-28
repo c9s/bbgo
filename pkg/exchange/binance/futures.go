@@ -78,6 +78,7 @@ func (e *Exchange) TransferFuturesAccountAsset(
 	req.Asset(asset)
 	req.Amount(amount.String())
 
+	// TODO: Add support for coin-margined futures transfer types
 	switch io {
 	case types.TransferIn:
 		req.TransferType(binanceapi.FuturesTransferSpotToUsdtFutures)
