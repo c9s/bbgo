@@ -385,13 +385,13 @@ func (s *Strategy) CrossRun(
 	if s.ActiveRounds == nil {
 		s.ActiveRounds = make(map[string]*ArbitrageRound)
 	}
-	if s.PendingRounds == nil {
-		s.PendingRounds = make(map[string]*PendingRound)
-	}
 	if s.ClosedRoundTasks == nil {
 		s.ClosedRoundTasks = make(map[string]*CloseRoundTask)
 	}
-	s.logger.Debugf("active rounds: %d, pending rounds: %d, closed rounds: %d", len(s.ActiveRounds), len(s.PendingRounds), len(s.ClosedRoundTasks))
+	s.logger.Debugf("active rounds: %d, closed rounds: %d", len(s.ActiveRounds), len(s.ClosedRoundTasks))
+
+	// cleanup pending rounds on startup
+	s.PendingRounds = make(map[string]*PendingRound)
 
 	// hotfix: fix 0 min holding intervals
 	for _, round := range s.ActiveRounds {
@@ -837,7 +837,6 @@ func (s *Strategy) CrossRun(
 				round.NewNotification(spotPrice, futuresPrice),
 			)
 		}
-		s.PendingRounds = make(map[string]*PendingRound)
 		s.mu.Unlock()
 	}
 	bbgo.Notify("✅ Strategy %s is up and running with %d candidate symbols: %v",

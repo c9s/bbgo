@@ -164,7 +164,10 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 			Quantity: buyQuantity,
 		}
 		if market.IsDustQuantity(buyQuantity, bestAskPrice) {
-			orderForm.Quantity = market.MinNotional.Mul(fixedpoint.NewFromFloat(1.05)).Div(bestAskPrice)
+			orderForm.Quantity = fixedpoint.Max(
+				market.MinNotional.Mul(fixedpoint.NewFromFloat(1.05)).Div(bestAskPrice),
+				market.MinQuantity,
+			)
 		}
 		orderExecutor, found := s.spotGeneralOrderExecutors[s.FeeSymbol]
 		if !found {
@@ -172,7 +175,7 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 		}
 		s.logger.Debugf("fee order form: %+v", orderForm)
 		if createdOrders, err := orderExecutor.SubmitOrders(ctx, orderForm); err != nil {
-			return fmt.Errorf("failed to buy fee asset for pending rounds: %w", err)
+			return fmt.Errorf("failed to submit fee asset order %v for pending rounds: %w", orderForm, err)
 		} else {
 			timedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 			defer cancel()
