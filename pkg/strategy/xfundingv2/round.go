@@ -212,17 +212,36 @@ func (r *ArbitrageRound) RecordMetrics(futuresAccount *types.FuturesAccount, pos
 	if r.totalPnLMetric != nil {
 		unrealizedPnL := r.UnrealizedPnL(spotPrice, futuresPrice)
 		r.totalPnLMetric.Set(unrealizedPnL.TotalPnL().Float64())
+	} else {
+		r.logger.Warnf(
+			"unable to record total PnL metric for round %s", r.SpotSymbol(),
+		)
 	}
 
 	if !r.lastFundingRate.IsZero() && r.fundingRateMetric != nil && r.annualizedFundingRateMetric != nil {
 		annualizedRate := AnnualizedRate(r.lastFundingRate, r.syncState.FundingIntervalHours)
 		r.fundingRateMetric.Set(r.lastFundingRate.Float64())
 		r.annualizedFundingRateMetric.Set(annualizedRate.Float64())
+	} else {
+		r.logger.Warnf(
+			"unable to record funding rate metrics for round %s: lastFundingRate=%s, fundingRateMetric=%v, annualizedFundingRateMetric=%v",
+			r.SpotSymbol(),
+			r.lastFundingRate.String(),
+			r.fundingRateMetric,
+			r.annualizedFundingRateMetric,
+		)
 	}
 
 	if r.spotPositionMetric != nil && r.futuresPositionMetric != nil {
 		r.spotPositionMetric.Set(posDeviation.SpotFilled.Float64())
 		r.futuresPositionMetric.Set(posDeviation.FuturesFilled.Float64())
+	} else {
+		r.logger.Warnf(
+			"unable to record position metrics for round %s: spotPositionMetric=%v, futuresPositionMetric=%v",
+			r.SpotSymbol(),
+			r.spotPositionMetric,
+			r.futuresPositionMetric,
+		)
 	}
 
 	if r.spotFilledRatioMetric != nil && r.futuresFilledRatioMetric != nil {
@@ -236,10 +255,22 @@ func (r *ArbitrageRound) RecordMetrics(futuresAccount *types.FuturesAccount, pos
 		}
 		r.spotFilledRatioMetric.Set(spotFilledRatio.Float64())
 		r.futuresFilledRatioMetric.Set(futuresFilledRatio.Float64())
+	} else {
+		r.logger.Warnf(
+			"unable to record filled ratio metrics for round %s: spotFilledRatioMetric=%v, futuresFilledRatioMetric=%v",
+			r.SpotSymbol(),
+			r.spotFilledRatioMetric,
+			r.futuresFilledRatioMetric,
+		)
 	}
 
 	if r.quantityDeviationMetric != nil {
 		r.quantityDeviationMetric.Set(posDeviation.DeviatedQuantity.Float64())
+	} else {
+		r.logger.Warnf(
+			"unable to record quantity deviation metric for round %s",
+			r.SpotSymbol(),
+		)
 	}
 
 	if futuresAccount != nil {
@@ -252,18 +283,43 @@ func (r *ArbitrageRound) RecordMetrics(futuresAccount *types.FuturesAccount, pos
 			if r.maintMarginRatioMetric != nil {
 				marginRatio := pos.PositionRisk.MaintMargin.Div(futuresAccount.TotalMarginBalance)
 				r.maintMarginRatioMetric.Set(marginRatio.Float64())
+			} else {
+				r.logger.Warnf(
+					"unable to record maintenance margin ratio metric for round %s",
+					r.SpotSymbol(),
+				)
 			}
+
 			if r.liqDistanceMetric != nil && !futuresPrice.IsZero() {
 				liqPrice := pos.PositionRisk.LiquidationPrice
 				liqDistance := liqPrice.Sub(futuresPrice).Div(futuresPrice)
 				r.liqDistanceMetric.Set(liqDistance.Float64())
+			} else {
+				r.logger.Warnf(
+					"unable to record liquidation distance metric for round %s: liqDistanceMetric=%v, futuresPrice=%s",
+					r.SpotSymbol(),
+					r.liqDistanceMetric,
+					futuresPrice.String(),
+				)
 			}
 		}
+	} else {
+		r.logger.Warnf(
+			"unable to record maintenance margin ratio and liquidation distance metrics for round %s: futuresAccount is nil",
+			r.SpotSymbol(),
+		)
 	}
 
 	if r.spotFuturesBasisRateMetric != nil && !spotPrice.IsZero() {
 		basisRate := spotPrice.Sub(futuresPrice).Div(spotPrice)
 		r.spotFuturesBasisRateMetric.Set(basisRate.Float64())
+	} else {
+		r.logger.Warnf(
+			"unable to record spot-futures basis rate metric for round %s: spotFuturesBasisRateMetric=%v, spotPrice=%s",
+			r.SpotSymbol(),
+			r.spotFuturesBasisRateMetric,
+			spotPrice.String(),
+		)
 	}
 }
 
