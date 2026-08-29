@@ -72,6 +72,9 @@ func (c *MarketSelectionConfig) Defaults() {
 	if c.RequiredTakerQuoteVolume24h.IsZero() {
 		c.RequiredTakerQuoteVolume24h = fixedpoint.NewFromFloat(100000)
 	}
+	if c.AnnualizedRateStep.IsZero() {
+		c.AnnualizedRateStep = fixedpoint.NewFromFloat(0.02) // 2%
+	}
 	if c.TopNCap == 0 {
 		c.TopNCap = 10
 	}
