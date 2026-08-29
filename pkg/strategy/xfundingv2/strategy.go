@@ -89,9 +89,10 @@ type Strategy struct {
 	TickSymbol   string         `json:"tickSymbol"`
 	TickInterval types.Interval `json:"tickInterval"`
 
-	FeeSymbol       string                      `json:"feeSymbol"`
-	FeeDiscountRate map[string]fixedpoint.Value `json:"feeDiscountRate"`
-	QuoteCurrency   string                      `json:"quoteCurrency"`
+	FeeSymbol             string                      `json:"feeSymbol"`
+	MinNotionalMultiplier fixedpoint.Value            `json:"minNotionalMultiplier"`
+	FeeDiscountRate       map[string]fixedpoint.Value `json:"feeDiscountRate"`
+	QuoteCurrency         string                      `json:"quoteCurrency"`
 
 	PendingRoundGracePeriod types.Duration   `json:"pendingRoundGracePeriod"`
 	MaxPendingRoundRetry    int              `json:"maxPendingRoundRetry"`
@@ -102,6 +103,8 @@ type Strategy struct {
 	MaxPositionExposure   map[string]fixedpoint.Value `json:"maxPositionExposure"`
 	// TradeBalanceRatio is the ratio of the asset balance to be invested on the spot market.
 	TradeBalanceRatio fixedpoint.Value `json:"tradeBalanceRatio"`
+	// LastTradeBalanceRatio is the ratio of the asset balance to be invested on the spot market for the last candidate symbol.
+	LastTradeBalanceRatio fixedpoint.Value `json:"lastTradeBalanceRatio"`
 
 	HaltRoundNotificationInterval types.Duration `json:"haltRoundNotificationInterval"`
 	haltNotificationLimiters      map[string]*rate.Limiter
@@ -234,6 +237,9 @@ func (s *Strategy) Defaults() error {
 	if s.TradeBalanceRatio.IsZero() {
 		s.TradeBalanceRatio = fixedpoint.NewFromFloat(0.8)
 	}
+	if s.LastTradeBalanceRatio.IsZero() {
+		s.LastTradeBalanceRatio = fixedpoint.NewFromFloat(0.9)
+	}
 
 	if s.QuoteCurrency == "" {
 		s.QuoteCurrency = "USDT"
@@ -267,6 +273,9 @@ func (s *Strategy) Defaults() error {
 	}
 	if _, ok := s.FeeDiscountRate["futures"]; !ok {
 		s.FeeDiscountRate["futures"] = fixedpoint.NewFromFloat(0.10)
+	}
+	if s.MinNotionalMultiplier.IsZero() {
+		s.MinNotionalMultiplier = fixedpoint.NewFromFloat(1.3)
 	}
 
 	if s.Leverage.IsZero() {
@@ -344,6 +353,9 @@ func (s *Strategy) Validate() error {
 	}
 	if s.HardMinExitRate.Compare(s.MinExitRate) > 0 {
 		return fmt.Errorf("expecting hardMinExitRate ≤ minExitRate, got %s and %s", s.HardMinExitRate, s.MinExitRate)
+	}
+	if s.MinNotionalMultiplier.Compare(fixedpoint.One) < 0 {
+		return fmt.Errorf("minNotionalMultiplier should be greater than or equal to 1: %s", s.MinNotionalMultiplier)
 	}
 	return nil
 }
@@ -1500,6 +1512,9 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 				continue
 			}
 			totalQuoteAmount := s.quoteAmountForBet(quoteBalance.Available)
+			if totalQuoteAmount.IsZero() {
+				continue
+			}
 			// long spot -> trade on the sell side of the order book
 			// targetSize = totalQuoteAmount / (price * feeRateFactor)
 			sellBook := s.spotOrderBooks[candidate.Symbol].SideBook(types.SideTypeSell)
@@ -1589,7 +1604,7 @@ func (s *Strategy) quoteAmountForBet(quoteAvailable fixedpoint.Value) fixedpoint
 	remainingCandidates := len(s.candidateSymbols) - len(s.ActiveRounds)
 	if remainingCandidates == 1 {
 		// the last symbol, use all the available quote balance for the bet
-		return quoteAvailable
+		return quoteAvailable.Mul(s.LastTradeBalanceRatio)
 	}
 	return quoteAvailable.Mul(s.TradeBalanceRatio)
 }
