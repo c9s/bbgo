@@ -57,6 +57,7 @@ func (u *FuturesAccountUpdater) Start(ctx context.Context) {
 					u.logger.WithError(err).Warn("failed to update futures account")
 					continue
 				}
+				u.logger.Info("futures account updated")
 			}
 		}
 	})

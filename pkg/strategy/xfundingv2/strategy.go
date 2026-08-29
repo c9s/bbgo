@@ -783,7 +783,7 @@ func (s *Strategy) CrossRun(
 
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
-				round.HandleSpotTrade(trade, s.spotSession.Account, trade.Time.Time())
+				round.HandleSpotTrade(trade, s.spotSession.GetAccount(), trade.Time.Time())
 			}
 		}
 	})
@@ -793,7 +793,7 @@ func (s *Strategy) CrossRun(
 
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
-				round.HandleFuturesTrade(trade, s.futuresSession.Account, trade.Time.Time())
+				round.HandleFuturesTrade(trade, s.futuresSession.GetAccount(), trade.Time.Time())
 			}
 		}
 	})
@@ -1025,7 +1025,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 		if lastPricesOk && futuresAccount != nil {
 			round.RecordMetrics(futuresAccount.FuturesInfo, posDeviation, spotPrice, futuresPrice)
 		} else {
-			s.logger.Warnf("unable to record metrics for round %s, lastPricesOk: %v, futuresAccount: %v", round.SpotSymbol(), lastPricesOk, s.futuresSession.Account)
+			s.logger.Warnf("unable to record metrics for round %s, lastPricesOk: %v, futuresAccount: %v", round.SpotSymbol(), lastPricesOk, futuresAccount)
 		}
 		// all transitions are done, check if the state has changed
 		currentState := round.State()
