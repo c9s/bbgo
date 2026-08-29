@@ -164,9 +164,11 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 			Quantity: buyQuantity,
 		}
 		if market.IsDustQuantity(buyQuantity, bestAskPrice) {
-			orderForm.Quantity = fixedpoint.Max(
-				market.MinNotional.Mul(fixedpoint.NewFromFloat(1.05)).Div(bestAskPrice),
-				market.MinQuantity,
+			orderForm.Quantity = market.TruncateQuantity(
+				fixedpoint.Max(
+					market.MinNotional.Mul(s.MinNotionalMultiplier).Div(bestAskPrice),
+					market.MinQuantity,
+				),
 			)
 		}
 		orderExecutor, found := s.spotGeneralOrderExecutors[s.FeeSymbol]

@@ -89,9 +89,10 @@ type Strategy struct {
 	TickSymbol   string         `json:"tickSymbol"`
 	TickInterval types.Interval `json:"tickInterval"`
 
-	FeeSymbol       string                      `json:"feeSymbol"`
-	FeeDiscountRate map[string]fixedpoint.Value `json:"feeDiscountRate"`
-	QuoteCurrency   string                      `json:"quoteCurrency"`
+	FeeSymbol             string                      `json:"feeSymbol"`
+	MinNotionalMultiplier fixedpoint.Value            `json:"minNotionalMultiplier"`
+	FeeDiscountRate       map[string]fixedpoint.Value `json:"feeDiscountRate"`
+	QuoteCurrency         string                      `json:"quoteCurrency"`
 
 	PendingRoundGracePeriod types.Duration   `json:"pendingRoundGracePeriod"`
 	MaxPendingRoundRetry    int              `json:"maxPendingRoundRetry"`
@@ -268,6 +269,9 @@ func (s *Strategy) Defaults() error {
 	if _, ok := s.FeeDiscountRate["futures"]; !ok {
 		s.FeeDiscountRate["futures"] = fixedpoint.NewFromFloat(0.10)
 	}
+	if s.MinNotionalMultiplier.IsZero() {
+		s.MinNotionalMultiplier = fixedpoint.NewFromFloat(1.3)
+	}
 
 	if s.Leverage.IsZero() {
 		s.Leverage = fixedpoint.NewFromInt(2)
@@ -344,6 +348,9 @@ func (s *Strategy) Validate() error {
 	}
 	if s.HardMinExitRate.Compare(s.MinExitRate) > 0 {
 		return fmt.Errorf("expecting hardMinExitRate ≤ minExitRate, got %s and %s", s.HardMinExitRate, s.MinExitRate)
+	}
+	if s.MinNotionalMultiplier.Compare(fixedpoint.One) < 0 {
+		return fmt.Errorf("minNotionalMultiplier should be greater than or equal to 1: %s", s.MinNotionalMultiplier)
 	}
 	return nil
 }
