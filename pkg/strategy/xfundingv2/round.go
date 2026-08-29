@@ -971,10 +971,10 @@ func (r *ArbitrageRound) doRetryTransfers(currentTime time.Time) {
 		switch transfer.Direction {
 		case types.TransferOut:
 			// the round should be in closing state
-			r.handleFuturesTradeForClose(transfer.Trade, r.futuresSession.Account, currentTime)
+			r.handleFuturesTradeForClose(transfer.Trade, r.futuresSession.GetAccount(), currentTime)
 		case types.TransferIn:
 			// the round should be in opening state
-			r.handleSpotTradeForOpen(transfer.Trade, r.spotSession.Account, currentTime)
+			r.handleSpotTradeForOpen(transfer.Trade, r.spotSession.GetAccount(), currentTime)
 		default:
 			r.logger.Warnf("unknown transfer direction for retry: %s", transfer.Direction)
 		}
