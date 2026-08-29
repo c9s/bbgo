@@ -103,6 +103,8 @@ type Strategy struct {
 	MaxPositionExposure   map[string]fixedpoint.Value `json:"maxPositionExposure"`
 	// TradeBalanceRatio is the ratio of the asset balance to be invested on the spot market.
 	TradeBalanceRatio fixedpoint.Value `json:"tradeBalanceRatio"`
+	// LastTradeBalanceRatio is the ratio of the asset balance to be invested on the spot market for the last candidate symbol.
+	LastTradeBalanceRatio fixedpoint.Value `json:"lastTradeBalanceRatio"`
 
 	HaltRoundNotificationInterval types.Duration `json:"haltRoundNotificationInterval"`
 	haltNotificationLimiters      map[string]*rate.Limiter
@@ -234,6 +236,9 @@ func (s *Strategy) Defaults() error {
 
 	if s.TradeBalanceRatio.IsZero() {
 		s.TradeBalanceRatio = fixedpoint.NewFromFloat(0.8)
+	}
+	if s.LastTradeBalanceRatio.IsZero() {
+		s.LastTradeBalanceRatio = fixedpoint.NewFromFloat(0.9)
 	}
 
 	if s.QuoteCurrency == "" {
@@ -1507,6 +1512,9 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 				continue
 			}
 			totalQuoteAmount := s.quoteAmountForBet(quoteBalance.Available)
+			if totalQuoteAmount.IsZero() {
+				continue
+			}
 			// long spot -> trade on the sell side of the order book
 			// targetSize = totalQuoteAmount / (price * feeRateFactor)
 			sellBook := s.spotOrderBooks[candidate.Symbol].SideBook(types.SideTypeSell)
@@ -1596,7 +1604,7 @@ func (s *Strategy) quoteAmountForBet(quoteAvailable fixedpoint.Value) fixedpoint
 	remainingCandidates := len(s.candidateSymbols) - len(s.ActiveRounds)
 	if remainingCandidates == 1 {
 		// the last symbol, use all the available quote balance for the bet
-		return quoteAvailable
+		return quoteAvailable.Mul(s.LastTradeBalanceRatio)
 	}
 	return quoteAvailable.Mul(s.TradeBalanceRatio)
 }
