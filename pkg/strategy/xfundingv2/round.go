@@ -302,6 +302,8 @@ func (r *ArbitrageRound) RecordMetrics(futuresAccount *types.FuturesAccount, pos
 					futuresPrice.String(),
 				)
 			}
+		} else {
+			r.logger.Warnf("position not found for key: %+v", key)
 		}
 	} else {
 		r.logger.Warnf(
