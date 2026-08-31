@@ -279,7 +279,13 @@ func (r *ArbitrageRound) RecordMetrics(futuresAccount *types.FuturesAccount, pos
 			Symbol: r.FuturesSymbol(),
 			Side:   r.syncState.DirectionPolicy.Direction,
 		}
-		if pos, found := openPositions[key]; found && pos.PositionRisk != nil {
+		pos, found := openPositions[key]
+		if !found {
+			// the side is "BOTH" on Binance when the position is one-way (non-hedged)
+			key.Side = types.PositionType("BOTH")
+			pos, found = openPositions[key]
+		}
+		if found && pos.PositionRisk != nil {
 			if r.maintMarginRatioMetric != nil {
 				marginRatio := pos.PositionRisk.MaintMargin.Div(futuresAccount.TotalMarginBalance)
 				r.maintMarginRatioMetric.Set(marginRatio.Float64())
