@@ -282,7 +282,7 @@ type ExchangeSession struct {
 }
 
 // NewExchangeSession creates a new exchange session instance
-// NOTE: make sure it intialize the session as the way as InitExchange
+// NOTE: make sure it initializes the session in the same way as InitExchange
 // TODO: unify the session creation and initialization (ex: calling InitExchange in NewExchangeSession)
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	userDataStream := exchange.NewStream()
