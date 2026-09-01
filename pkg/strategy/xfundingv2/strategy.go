@@ -1059,24 +1059,23 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 					notification,
 				)
 			case RoundClosed:
+				// no need to attach a notification here for closed round
+				// since there will be other notifications for it
 				bbgo.Notify("🔴 Round is closed: %s",
-					round.SpotSymbol(),
-					notification,
+					round.String(),
 				)
-			}
-		}
 
-		// enque closed active rounds
-		if round.State() == RoundClosed {
-			s.logger.Infof("move round to closed queue: %s", round)
-			// stop the round
-			round.Stop()
-			// remove from active round queue
-			delete(s.ActiveRounds, round.SpotSymbol())
-			// add to closed round queue for cleanup
-			s.ClosedRoundTasks[round.SpotSymbol()] = &CloseRoundTask{
-				Round:    round,
-				RetryCnt: 0,
+				// enque closed active rounds
+				s.logger.Infof("move round to closed queue: %s", round)
+				// stop the round
+				round.Stop()
+				// remove from active round queue
+				delete(s.ActiveRounds, round.SpotSymbol())
+				// add to closed round queue for cleanup
+				s.ClosedRoundTasks[round.SpotSymbol()] = &CloseRoundTask{
+					Round:    round,
+					RetryCnt: 0,
+				}
 			}
 		}
 	}
