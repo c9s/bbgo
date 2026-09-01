@@ -194,6 +194,166 @@ func TestArbitrageRound_NumHoldingIntervals(t *testing.T) {
 	})
 }
 
+// seedFundingRecords populates the round with n funding-fee records, each with
+// the given amount. This drives both AvgFundingIncome() (== amount) and the
+// len(FundingFeeRecords) > 6 gate that enables the dynamic adjustment path in
+// MinHoldingIntervals.
+func seedFundingRecords(round *ArbitrageRound, n int, amount fixedpoint.Value) {
+	for i := 1; i <= n; i++ {
+		round.syncState.FundingFeeRecords[int64(i)] = FundingFee{
+			RoundID: round.syncState.ID,
+			Asset:   "USDT",
+			Amount:  amount,
+			Txn:     int64(i),
+		}
+	}
+}
+
+// seedLegTrade registers an order on the worker's executor and records a single
+// fill for it. ArbitrageRound.realizedPnL() rebuilds the leg positions from
+// Executor().AllTrades(), and AddTrade only keeps a trade whose order is known,
+// so the order must be inserted first.
+func seedLegTrade(worker *TWAPWorker, trade types.Trade) {
+	exec := worker.Executor()
+	order := types.Order{
+		OrderID:     trade.OrderID,
+		SubmitOrder: types.SubmitOrder{Symbol: trade.Symbol, Side: trade.Side},
+	}
+	exec.syncState.Orders[trade.OrderID] = order.AsQuery()
+	exec.AddTrade(trade)
+}
+
+// seedHedgedPosition opens a 1-unit spot-long / futures-short hedge at basisPrice
+// on both legs. With no exchange fee rates configured, the round's unrealized PnL
+// at mark prices (spotPrice, futuresPrice) is exactly
+//
+//	(spotPrice - basisPrice) + (basisPrice - futuresPrice) == spotPrice - futuresPrice
+//
+// which lets a subtest dial the total PnL to a known value.
+func seedHedgedPosition(round *ArbitrageRound, basisPrice fixedpoint.Value) {
+	seedLegTrade(round.spotWorker, makeTrade(1, 1, types.SideTypeBuy, basisPrice, Number(1.0)))
+	seedLegTrade(round.futuresWorker, makeTrade(101, 101, types.SideTypeSell, basisPrice, Number(1.0)))
+}
+
+func TestArbitrageRound_MinHoldingIntervals(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Funding at 08:00 UTC, 8h interval → FundingIntervalStart = 00:00 UTC.
+	nextFundingTime := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
+	startAt := time.Date(2024, 1, 1, 0, 30, 0, 0, time.UTC)
+	// FundingIntervalStart (00:00) → NumHoldingIntervals(intervalStart) == 0.
+	intervalStart := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	// 08:00 is exactly one 8h interval after FundingIntervalStart.
+	afterOneInterval := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
+
+	spotPrice := Number(90.0)
+	futuresPrice := Number(100.0)
+
+	t.Run("returns configured value when spot price is zero", func(t *testing.T) {
+		round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
+		seedFundingRecords(round, 7, Number(1.0))
+		seedHedgedPosition(round, Number(100.0))
+
+		result := round.MinHoldingIntervals(afterOneInterval, fixedpoint.Zero, futuresPrice)
+		assert.Equal(t, 3, result)
+		assert.Equal(t, 3, round.syncState.MinHoldingIntervals, "min holding intervals must not be mutated")
+	})
+
+	t.Run("returns configured value when futures price is zero", func(t *testing.T) {
+		round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
+		seedFundingRecords(round, 7, Number(1.0))
+		seedHedgedPosition(round, Number(100.0))
+
+		result := round.MinHoldingIntervals(afterOneInterval, spotPrice, fixedpoint.Zero)
+		assert.Equal(t, 3, result)
+		assert.Equal(t, 3, round.syncState.MinHoldingIntervals, "min holding intervals must not be mutated")
+	})
+
+	t.Run("returns configured value without enough funding records", func(t *testing.T) {
+		round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
+		round.syncState.StartAt = startAt
+		// Only 6 records (<= 6) → dynamic adjustment disabled even though the
+		// hedged position would otherwise be at a loss.
+		seedFundingRecords(round, 6, Number(1.0))
+		seedHedgedPosition(round, Number(100.0))
+
+		result := round.MinHoldingIntervals(afterOneInterval, spotPrice, futuresPrice)
+		assert.Equal(t, 3, result)
+		assert.Equal(t, 3, round.syncState.MinHoldingIntervals, "min holding intervals must not be mutated")
+	})
+
+	t.Run("returns configured value when total pnl is positive", func(t *testing.T) {
+		round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
+		round.syncState.StartAt = startAt
+		// No open position → unrealized PnL is zero, so total PnL is just the
+		// positive funding income (7 * 1.0).
+		seedFundingRecords(round, 7, Number(1.0))
+
+		result := round.MinHoldingIntervals(afterOneInterval, spotPrice, futuresPrice)
+		assert.Equal(t, 3, result)
+		assert.Equal(t, 3, round.syncState.MinHoldingIntervals, "min holding intervals must not be mutated")
+	})
+
+	t.Run("returns configured value when average funding income is non-positive", func(t *testing.T) {
+		round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
+		round.syncState.StartAt = startAt
+		// Negative funding income → avgFeeIncome <= 0, so no adjustment even though
+		// the hedged position is at a loss (total PnL is negative here).
+		seedFundingRecords(round, 7, Number(-1.0))
+		seedHedgedPosition(round, Number(100.0))
+
+		result := round.MinHoldingIntervals(afterOneInterval, spotPrice, futuresPrice)
+		assert.Equal(t, 3, result)
+		assert.Equal(t, 3, round.syncState.MinHoldingIntervals, "min holding intervals must not be mutated")
+	})
+
+	t.Run("does not adjust when remaining intervals cover breakeven", func(t *testing.T) {
+		round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
+		round.syncState.StartAt = startAt
+		// avgFeeIncome = 1.0, funding income = 7.0, unrealized = 90 - 100 = -10
+		// → total PnL = -3 → breakEvenIntervals = ceil(3/1) = 3.
+		seedFundingRecords(round, 7, Number(1.0))
+		seedHedgedPosition(round, Number(100.0))
+
+		// currentTime at FundingIntervalStart → NumHoldingIntervals = 0,
+		// remaining = 3 - 0 = 3 >= breakEven (3) → no adjustment.
+		result := round.MinHoldingIntervals(intervalStart, spotPrice, futuresPrice)
+		assert.Equal(t, 3, result)
+		assert.Equal(t, 3, round.syncState.MinHoldingIntervals, "min holding intervals must not be mutated")
+	})
+
+	t.Run("adjusts min holding intervals upward when breakeven exceeds remaining", func(t *testing.T) {
+		round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
+		round.syncState.StartAt = startAt
+		// Same total PnL = -3 → breakEvenIntervals = 3.
+		seedFundingRecords(round, 7, Number(1.0))
+		seedHedgedPosition(round, Number(100.0))
+
+		// currentTime one interval in → NumHoldingIntervals = 1,
+		// remaining = 3 - 1 = 2 < breakEven (3)
+		// → adjusted = 3 + (3 - 2) = 4.
+		result := round.MinHoldingIntervals(afterOneInterval, spotPrice, futuresPrice)
+		assert.Equal(t, 4, result)
+		assert.Equal(t, 4, round.syncState.MinHoldingIntervals, "adjusted value must be persisted")
+	})
+
+	t.Run("adjusts by the full breakeven shortfall for a larger loss", func(t *testing.T) {
+		round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
+		round.syncState.StartAt = startAt
+		// unrealized = 85 - 100 = -15, funding income = 7.0
+		// → total PnL = -8 → breakEvenIntervals = ceil(8/1) = 8.
+		seedFundingRecords(round, 7, Number(1.0))
+		seedHedgedPosition(round, Number(100.0))
+
+		// NumHoldingIntervals = 1, remaining = 2 < breakEven (8)
+		// → adjusted = 3 + (8 - 2) = 9.
+		result := round.MinHoldingIntervals(afterOneInterval, Number(85.0), futuresPrice)
+		assert.Equal(t, 9, result)
+		assert.Equal(t, 9, round.syncState.MinHoldingIntervals, "adjusted value must be persisted")
+	})
+}
+
 func TestArbitrageRound_TotalFundingIncome(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
