@@ -1185,7 +1185,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		round.FuturesSymbol(),
 	)
 
-	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals()
+	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals(currentTime, spotPrice, futuresPrice)
 	if round.TriggeredFundingRate().Sign()*index.LastFundingRate.Sign() <= 0 {
 		// the funding rate has flipped
 		rateDiffAbs := index.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
