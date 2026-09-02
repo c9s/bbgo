@@ -405,13 +405,6 @@ func (s *Strategy) CrossRun(
 	// cleanup pending rounds on startup
 	s.PendingRounds = make(map[string]*PendingRound)
 
-	// hotfix: fix 0 min holding intervals
-	for _, round := range s.ActiveRounds {
-		if round.syncState.MinHoldingIntervals == 0 {
-			round.syncState.MinHoldingIntervals = 1
-		}
-	}
-
 	s.spotSession = sessions[s.SpotSession]
 	s.futuresSession = sessions[s.FuturesSession]
 

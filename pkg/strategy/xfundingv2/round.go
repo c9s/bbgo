@@ -98,6 +98,9 @@ func NewArbitrageRound(
 	}
 	fundingIntervalStart := fundingRate.NextFundingTime.Add(-time.Duration(fundingIntervalHours) * time.Hour)
 	fundingIntervalEnd := fundingRate.NextFundingTime.Add(-time.Second)
+	if minHoldingIntervals <= 0 {
+		minHoldingIntervals = 1
+	}
 	return &ArbitrageRound{
 		syncState: ArbitrageRoundSyncState{
 			ID:                          uuid.NewString(),
