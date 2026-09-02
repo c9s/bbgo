@@ -514,34 +514,36 @@ func (r *ArbitrageRound) MinHoldingIntervals(currentTime time.Time, spotPrice, f
 		return r.syncState.MinHoldingIntervals
 	}
 
-	// adjust the min holding intervals based on the current total PnL
-	// hold the position until the total PnL breaks even with the average funding income
+	oriMinHoldingIntervals := r.syncState.MinHoldingIntervals
 	avgFeeIncome := r.AvgFundingIncome()
 	totalPnL := r.UnrealizedPnL(spotPrice, futuresPrice).TotalPnL()
-	if totalPnL.Sign() > 0 || avgFeeIncome.Sign() <= 0 {
-		return r.syncState.MinHoldingIntervals
-	}
-
-	oriMinHoldingIntervals := r.syncState.MinHoldingIntervals
-	breakEvenIntervals := fixedpoint.Max(
-		totalPnL.Abs().Div(avgFeeIncome).Round(0, fixedpoint.Up),
-		fixedpoint.One,
-	).Int()
 	numHoldingIntervals := r.NumHoldingIntervals(currentTime)
-	remainingIntervals := r.syncState.MinHoldingIntervals - numHoldingIntervals
-
-	if remainingIntervals >= breakEvenIntervals {
-		return r.syncState.MinHoldingIntervals
-	}
-
-	r.syncState.MinHoldingIntervals += breakEvenIntervals - remainingIntervals
-	r.logger.Infof(
-		"[ArbitrageRound] adjusted min holding intervals (%s): %d -> %d",
-		r.SpotSymbol(),
-		oriMinHoldingIntervals,
-		r.syncState.MinHoldingIntervals,
+	r.syncState.MinHoldingIntervals = dynamicHoldingIntervals(
+		avgFeeIncome, totalPnL, oriMinHoldingIntervals, numHoldingIntervals,
 	)
+	if r.syncState.MinHoldingIntervals != oriMinHoldingIntervals {
+		r.logger.Infof(
+			"[ArbitrageRound] adjusted min holding intervals (%s): %d -> %d",
+			r.SpotSymbol(),
+			oriMinHoldingIntervals,
+			r.syncState.MinHoldingIntervals,
+		)
+	}
 	return r.syncState.MinHoldingIntervals
+}
+
+func dynamicHoldingIntervals(avgFeeIncome, totalPnL fixedpoint.Value, oriMinHoldingIntervals, numHoldingIntervals int) int {
+	// adjust the min holding intervals based on the current total PnL
+	// hold the position until the total PnL breaks even with the average funding income
+	if totalPnL.Sign() > 0 || avgFeeIncome.Sign() <= 0 {
+		return oriMinHoldingIntervals
+	}
+	breakEvenIntervals := totalPnL.Abs().Div(avgFeeIncome)
+	if breakEvenIntervals.Compare(fixedpoint.One) < 0 {
+		return oriMinHoldingIntervals
+	}
+	breakEvenIntervals = breakEvenIntervals.Round(0, fixedpoint.Up)
+	return numHoldingIntervals + breakEvenIntervals.Int()
 }
 
 func (r *ArbitrageRound) TargetPosition() fixedpoint.Value {
