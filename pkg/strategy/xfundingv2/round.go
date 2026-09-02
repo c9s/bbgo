@@ -98,6 +98,9 @@ func NewArbitrageRound(
 	}
 	fundingIntervalStart := fundingRate.NextFundingTime.Add(-time.Duration(fundingIntervalHours) * time.Hour)
 	fundingIntervalEnd := fundingRate.NextFundingTime.Add(-time.Second)
+	if minHoldingIntervals <= 0 {
+		minHoldingIntervals = 1
+	}
 	return &ArbitrageRound{
 		syncState: ArbitrageRoundSyncState{
 			ID:                          uuid.NewString(),
@@ -503,7 +506,41 @@ func (r *ArbitrageRound) NumHoldingIntervals(currentTime time.Time) int {
 	return int(elapsed / intervalDuration)
 }
 
-func (r *ArbitrageRound) MinHoldingIntervals() int {
+func (r *ArbitrageRound) MinHoldingIntervals(currentTime time.Time, spotPrice, futuresPrice fixedpoint.Value) int {
+	// only enable the dynamic adjustment of min holding intervals when there are
+	// 1. a valid spot and futures price
+	// 2. enough funding fee records to calculate the average funding income
+	if spotPrice.IsZero() || futuresPrice.IsZero() || len(r.syncState.FundingFeeRecords) <= 6 {
+		return r.syncState.MinHoldingIntervals
+	}
+
+	// adjust the min holding intervals based on the current total PnL
+	// hold the position until the total PnL breaks even with the average funding income
+	avgFeeIncome := r.AvgFundingIncome()
+	totalPnL := r.UnrealizedPnL(spotPrice, futuresPrice).TotalPnL()
+	if totalPnL.Sign() > 0 || avgFeeIncome.Sign() <= 0 {
+		return r.syncState.MinHoldingIntervals
+	}
+
+	oriMinHoldingIntervals := r.syncState.MinHoldingIntervals
+	breakEvenIntervals := fixedpoint.Max(
+		totalPnL.Abs().Div(avgFeeIncome).Round(0, fixedpoint.Up),
+		fixedpoint.One,
+	).Int()
+	numHoldingIntervals := r.NumHoldingIntervals(currentTime)
+	remainingIntervals := r.syncState.MinHoldingIntervals - numHoldingIntervals
+
+	if remainingIntervals >= breakEvenIntervals {
+		return r.syncState.MinHoldingIntervals
+	}
+
+	r.syncState.MinHoldingIntervals += breakEvenIntervals - remainingIntervals
+	r.logger.Infof(
+		"[ArbitrageRound] adjusted min holding intervals (%s): %d -> %d",
+		r.SpotSymbol(),
+		oriMinHoldingIntervals,
+		r.syncState.MinHoldingIntervals,
+	)
 	return r.syncState.MinHoldingIntervals
 }
 
@@ -667,16 +704,11 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			fields = append(fields, unrealizedPnLFields(unrealizedPnL)...)
 		}
 	}
-	if len(n.ArbitrageRound.syncState.FundingFeeRecords) > 0 {
-		feeIncomeTotal := fixedpoint.Zero
-		numRecords := fixedpoint.Zero
-		for _, fee := range n.ArbitrageRound.syncState.FundingFeeRecords {
-			feeIncomeTotal = feeIncomeTotal.Add(fee.Amount)
-			numRecords = numRecords.Add(fixedpoint.One)
-		}
+	avgFundingIncome := n.ArbitrageRound.AvgFundingIncome()
+	if !avgFundingIncome.IsZero() {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Average Funding Income",
-			Value: feeIncomeTotal.Div(numRecords).String(),
+			Value: avgFundingIncome.String(),
 			Short: true,
 		})
 	}
@@ -959,6 +991,23 @@ func (r *ArbitrageRound) syncFundingFeeRecords(ctx context.Context, currentTime 
 	}
 	r.logger.Debugf("synced funding fee records: %+v", r.syncState.FundingFeeRecords)
 	return nil
+}
+
+func (r *ArbitrageRound) AvgFundingIncome() fixedpoint.Value {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(r.syncState.FundingFeeRecords) == 0 {
+		return fixedpoint.Zero
+	}
+
+	feeIncomeTotal := fixedpoint.Zero
+	numRecords := fixedpoint.Zero
+	for _, fee := range r.syncState.FundingFeeRecords {
+		feeIncomeTotal = feeIncomeTotal.Add(fee.Amount)
+		numRecords = numRecords.Add(fixedpoint.One)
+	}
+	return feeIncomeTotal.Div(numRecords)
 }
 
 func (r *ArbitrageRound) Start(ctx context.Context,

@@ -405,13 +405,6 @@ func (s *Strategy) CrossRun(
 	// cleanup pending rounds on startup
 	s.PendingRounds = make(map[string]*PendingRound)
 
-	// hotfix: fix 0 min holding intervals
-	for _, round := range s.ActiveRounds {
-		if round.syncState.MinHoldingIntervals == 0 {
-			round.syncState.MinHoldingIntervals = 1
-		}
-	}
-
 	s.spotSession = sessions[s.SpotSession]
 	s.futuresSession = sessions[s.FuturesSession]
 
@@ -1185,7 +1178,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		round.FuturesSymbol(),
 	)
 
-	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals()
+	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals(currentTime, spotPrice, futuresPrice)
 	if round.TriggeredFundingRate().Sign()*index.LastFundingRate.Sign() <= 0 {
 		// the funding rate has flipped
 		rateDiffAbs := index.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
