@@ -1154,6 +1154,7 @@ func (s *Strategy) transitRound(ctx context.Context, round *ArbitrageRound, curr
 
 	index, err := s.futuresService.QueryPremiumIndex(timedCtx, round.FuturesSymbol())
 	if err != nil {
+		s.logger.WithError(err).Warnf("failed to query premium index for round: %s", round.String())
 		return
 	}
 	// update the last funding rate for the round metrics
