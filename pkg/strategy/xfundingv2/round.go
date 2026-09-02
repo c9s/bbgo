@@ -732,6 +732,16 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			Short: true,
 		},
 		{
+			Title: "Last Funding Rate",
+			Value: n.lastFundingRate.String(),
+			Short: true,
+		},
+		{
+			Title: "Annualized Last Funding Rate",
+			Value: AnnualizedRate(n.lastFundingRate, n.syncState.FundingIntervalHours).Percentage(),
+			Short: true,
+		},
+		{
 			Title: "Start Time",
 			Value: n.syncState.StartAt.Format(time.RFC3339),
 			Short: true,
