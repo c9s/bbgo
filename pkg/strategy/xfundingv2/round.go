@@ -733,7 +733,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 		},
 		{
 			Title: "Last Funding Rate",
-			Value: n.lastFundingRate.String(),
+			Value: n.lastFundingRate.Percentage(),
 			Short: true,
 		},
 		{
