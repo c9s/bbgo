@@ -26,17 +26,19 @@ const (
 	ExchangeBybit    ExchangeName = "bybit"
 	ExchangeCoinBase ExchangeName = "coinbase"
 	ExchangeBitfinex ExchangeName = "bitfinex"
+	ExchangeBackpack ExchangeName = "backpack"
 )
 
 var SupportedExchanges = map[ExchangeName]struct{}{
-	ExchangeMax:      struct{}{},
-	ExchangeBinance:  struct{}{},
-	ExchangeOKEx:     struct{}{},
-	ExchangeKucoin:   struct{}{},
-	ExchangeBitget:   struct{}{},
-	ExchangeBybit:    struct{}{},
-	ExchangeCoinBase: struct{}{},
-	ExchangeBitfinex: struct{}{},
+	ExchangeMax:      {},
+	ExchangeBinance:  {},
+	ExchangeOKEx:     {},
+	ExchangeKucoin:   {},
+	ExchangeBitget:   {},
+	ExchangeBybit:    {},
+	ExchangeCoinBase: {},
+	ExchangeBitfinex: {},
+	ExchangeBackpack: {},
 	// note: we are not using "backtest"
 }
 
