@@ -107,18 +107,20 @@ func NewGeneralOrderExecutor(
 	if executor.position != nil && session.Margin {
 		market := executor.position.Market
 		marginInfoUpdater := session.GetMarginInfoUpdater()
-		marginInfoUpdater.AddBorrowableAssets(market.BaseCurrency, market.QuoteCurrency)
-		marginInfoUpdater.OnMaxBorrowable(func(asset string, amount fixedpoint.Value) {
-			switch asset {
-			case market.BaseCurrency:
-				log.Infof("updating margin base asset %s max borrowable amount: %f", asset, amount.Float64())
-				executor.marginBaseMaxBorrowable = amount
-			case market.QuoteCurrency:
-				log.Infof("updating margin quote asset %s max borrowable amount: %f", asset, amount.Float64())
-				executor.marginQuoteMaxBorrowable = amount
-			default:
-			}
-		})
+		if marginInfoUpdater != nil {
+			marginInfoUpdater.AddBorrowableAssets(market.BaseCurrency, market.QuoteCurrency)
+			marginInfoUpdater.OnMaxBorrowable(func(asset string, amount fixedpoint.Value) {
+				switch asset {
+				case market.BaseCurrency:
+					log.Infof("updating margin base asset %s max borrowable amount: %f", asset, amount.Float64())
+					executor.marginBaseMaxBorrowable = amount
+				case market.QuoteCurrency:
+					log.Infof("updating margin quote asset %s max borrowable amount: %f", asset, amount.Float64())
+					executor.marginQuoteMaxBorrowable = amount
+				default:
+				}
+			})
+		}
 	}
 
 	return executor

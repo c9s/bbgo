@@ -50,14 +50,17 @@ func setMarginInfoUpdater(session *bbgo.ExchangeSession, updater *bbgo.MarginInf
 // the given per-asset amounts (assets present in the map are "found").
 func newBorrowableUpdater(values map[string]fixedpoint.Value) *bbgo.MarginInfoUpdater {
 	svc := &mockMarginBorrowRepayService{maxBorrowable: values}
-	updater := bbgo.NewMarginInfoUpdater(svc)
+	config := bbgo.MarginInfoUpdaterConfig{
+		BatchSize: len(values),
+	}
+	updater := bbgo.NewMarginInfoUpdater(svc, config)
 
 	assets := make([]string, 0, len(values))
 	for asset := range values {
 		assets = append(assets, asset)
 	}
 	updater.AddBorrowableAssets(assets...)
-	updater.Update(context.Background(), len(assets))
+	updater.Update(context.Background())
 	return updater
 }
 
