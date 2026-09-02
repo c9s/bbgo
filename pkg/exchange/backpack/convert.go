@@ -2,6 +2,7 @@ package backpack
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -313,4 +314,193 @@ func clientOrderIDString(clientID uint32) string {
 	}
 
 	return fmt.Sprintf("%d", clientID)
+}
+
+// toGlobalPriceVolumeSlice converts the order book levels of one side.
+//
+// Backpack returns both sides in ascending price order, but types.SliceOrderBook reads the best
+// bid from Bids[0], so the bids have to come out in descending order. The levels are sorted
+// rather than reversed so that the result stays correct if the exchange ever changes the order
+// it sends them in.
+//
+// A zero quantity means the level was removed and must survive the conversion: that is how an
+// incremental update tells the order book to delete it.
+func toGlobalPriceVolumeSlice(levels []backpackapi.PriceLevel, descending bool) types.PriceVolumeSlice {
+	slice := make(types.PriceVolumeSlice, 0, len(levels))
+	for _, level := range levels {
+		slice = append(slice, types.PriceVolume{
+			Price:  level.Price,
+			Volume: level.Quantity,
+		})
+	}
+
+	sort.Slice(slice, func(i, j int) bool {
+		if descending {
+			return slice[i].Price.Compare(slice[j].Price) > 0
+		}
+
+		return slice[i].Price.Compare(slice[j].Price) < 0
+	})
+
+	return slice
+}
+
+func toGlobalOrderBook(symbol string, depth *backpackapi.Depth) types.SliceOrderBook {
+	return types.SliceOrderBook{
+		Symbol:       symbol,
+		Bids:         toGlobalPriceVolumeSlice(depth.Bids, true),
+		Asks:         toGlobalPriceVolumeSlice(depth.Asks, false),
+		Time:         depth.Timestamp.Time(),
+		LastUpdateId: int64(depth.LastUpdateId),
+	}
+}
+
+func depthEventToGlobalOrderBook(e *backpackapi.DepthEvent) types.SliceOrderBook {
+	return types.SliceOrderBook{
+		Symbol:       toGlobalSymbol(e.Symbol),
+		Bids:         toGlobalPriceVolumeSlice(e.Bids, true),
+		Asks:         toGlobalPriceVolumeSlice(e.Asks, false),
+		Time:         e.EventTime.Time(),
+		LastUpdateId: e.LastUpdateId,
+	}
+}
+
+func bookTickerEventToGlobalBookTicker(e *backpackapi.BookTickerEvent) types.BookTicker {
+	return types.BookTicker{
+		Symbol:   toGlobalSymbol(e.Symbol),
+		Buy:      e.BidPrice,
+		BuySize:  e.BidQuantity,
+		Sell:     e.AskPrice,
+		SellSize: e.AskQuantity,
+	}
+}
+
+// tradeEventToGlobalTrade converts a public market trade.
+//
+// The payload has no quote quantity, so it is derived, and the taker side is the reverse of the
+// maker side that "m" reports.
+func tradeEventToGlobalTrade(e *backpackapi.TradeEvent) types.Trade {
+	// m reports whether the buyer was the maker, so the taker is on the sell side when it is set
+	side := types.SideTypeBuy
+	if e.IsBuyerMaker {
+		side = types.SideTypeSell
+	}
+
+	return types.Trade{
+		ID:            uint64(e.TradeId),
+		Exchange:      types.ExchangeBackpack,
+		Price:         e.Price,
+		Quantity:      e.Quantity,
+		QuoteQuantity: e.Price.Mul(e.Quantity),
+		Symbol:        toGlobalSymbol(e.Symbol),
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       e.IsBuyerMaker,
+		Time:          types.Time(e.EventTime.Time()),
+	}
+}
+
+func tickerEventToGlobalTicker(e *backpackapi.TickerEvent) types.Ticker {
+	return types.Ticker{
+		Time:   e.EventTime.Time(),
+		Volume: e.Volume,
+		Last:   e.Close,
+		Open:   e.Open,
+		High:   e.High,
+		Low:    e.Low,
+	}
+}
+
+// kLineEventToGlobalKLine converts a kline push.
+//
+// The payload carries no quote volume and no interval; the interval is filled in by the parser
+// from the stream name.
+func kLineEventToGlobalKLine(e *backpackapi.KLineEvent) types.KLine {
+	interval := types.Interval(e.Interval)
+	startTime := e.StartTime.Time()
+
+	return types.KLine{
+		Exchange:  types.ExchangeBackpack,
+		Symbol:    toGlobalSymbol(e.Symbol),
+		StartTime: types.Time(startTime),
+		// keep the binance rule the REST conversion follows, rather than the exclusive end time
+		// the payload reports
+		EndTime:        types.Time(startTime.Add(interval.Duration() - time.Millisecond)),
+		Interval:       interval,
+		Open:           e.Open,
+		High:           e.High,
+		Low:            e.Low,
+		Close:          e.Close,
+		Volume:         e.Volume,
+		NumberOfTrades: uint64(e.Trades),
+		Closed:         e.Closed,
+	}
+}
+
+func balanceUpdateEventToGlobalBalance(e *backpackapi.BalanceUpdateEvent) types.Balance {
+	balance := types.NewZeroBalance(e.Asset)
+	balance.Available = e.Available
+	// staked funds are not tradable either
+	balance.Locked = e.Locked.Add(e.Staked)
+	balance.NetAsset = e.Available.Add(balance.Locked)
+	return balance
+}
+
+// orderUpdateEventToGlobalOrder converts an account.orderUpdate push.
+func orderUpdateEventToGlobalOrder(e *backpackapi.OrderUpdateEvent) (*types.Order, error) {
+	status, err := toGlobalOrderStatus(e.Status)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: clientOrderIDString(e.ClientOrderId),
+			Symbol:        toGlobalSymbol(e.Symbol),
+			Side:          toGlobalSide(e.Side),
+			// the websocket spells the order type upper case, OrderType() normalizes it
+			Type:        toGlobalOrderType(e.OrderType.OrderType(), e.PostOnly),
+			Price:       e.Price,
+			Quantity:    e.Quantity,
+			TimeInForce: toGlobalTimeInForce(e.TimeInForce),
+			ReduceOnly:  e.ReduceOnly,
+		},
+		Exchange:         types.ExchangeBackpack,
+		OrderID:          toGlobalOrderID(e.OrderId),
+		UUID:             e.OrderId,
+		Status:           status,
+		OriginalStatus:   string(e.Status),
+		ExecutedQuantity: e.ExecutedQuantity,
+		IsWorking:        e.Status.IsWorking(),
+		CreationTime:     types.Time(e.EventTime.Time()),
+		UpdateTime:       types.Time(e.EventTime.Time()),
+	}, nil
+}
+
+// orderUpdateEventToGlobalTrade converts the fill carried by an orderFill event.
+//
+// Only an orderFill event has a trade id; every other order update reports null there.
+func orderUpdateEventToGlobalTrade(e *backpackapi.OrderUpdateEvent) (types.Trade, bool) {
+	if e.TradeId == nil {
+		return types.Trade{}, false
+	}
+
+	side := toGlobalSide(e.Side)
+
+	return types.Trade{
+		ID:            uint64(*e.TradeId),
+		OrderID:       toGlobalOrderID(e.OrderId),
+		OrderUUID:     e.OrderId,
+		Exchange:      types.ExchangeBackpack,
+		Price:         e.FillPrice,
+		Quantity:      e.FillQuantity,
+		QuoteQuantity: e.FillPrice.Mul(e.FillQuantity),
+		Symbol:        toGlobalSymbol(e.Symbol),
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       e.IsMaker,
+		Time:          types.Time(e.EventTime.Time()),
+		Fee:           e.Fee,
+		FeeCurrency:   e.FeeSymbol,
+	}, true
 }

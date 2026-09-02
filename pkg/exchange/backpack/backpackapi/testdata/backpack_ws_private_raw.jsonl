@@ -1,0 +1,4 @@
+{"data":{"E":1788368290063153,"O":"USER","Q":"20.1520","S":"Ask","T":1788368290062979,"V":"RejectTaker","X":"New","Z":"0","e":"orderAccepted","f":"GTC","i":"59887375336","o":"LIMIT","p":"1.0076","q":"20","r":false,"s":"USDT_USDC","t":null,"y":true,"z":"0"},"stream":"account.orderUpdate"}
+{"data":{"A":"10","E":1788368290063168,"L":"20","S":"0","T":1788368290062981,"a":"USDT","e":"balanceUpdate"},"stream":"account.balanceUpdate"}
+{"data":{"E":1788368293114025,"O":"USER","Q":"20.1520","S":"Ask","T":1788368293113270,"V":"RejectTaker","X":"Cancelled","Z":"0","e":"orderCancelled","f":"GTC","i":"59887375336","o":"LIMIT","p":"1.0076","q":"20","r":false,"s":"USDT_USDC","t":null,"y":true,"z":"0"},"stream":"account.orderUpdate"}
+{"data":{"A":"30","E":1788368293114040,"L":"0","S":"0","T":1788368293113274,"a":"USDT","e":"balanceUpdate"},"stream":"account.balanceUpdate"}

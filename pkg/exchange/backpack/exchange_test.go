@@ -77,11 +77,13 @@ func TestExchange_basics(t *testing.T) {
 	assert.Equal(t, types.ExchangeBackpack, ex.Name())
 	assert.Equal(t, PlatformToken, ex.PlatformFeeCurrency())
 
-	// the websocket stream is not implemented yet, but NewStream still has to return a usable
-	// value because bbgo.NewExchangeSession binds a connectivity watcher to it
 	stream := ex.NewStream()
 	if assert.NotNil(t, stream) {
-		assert.ErrorIs(t, stream.Connect(context.Background()), ErrStreamNotImplemented)
+		assert.IsType(t, &Stream{}, stream)
+
+		// the market data stream is public, the user data stream is not
+		stream.SetPublicOnly()
+		assert.True(t, stream.GetPublicOnly())
 	}
 }
 
