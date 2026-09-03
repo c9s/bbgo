@@ -137,6 +137,12 @@ An exchange adapter has two halves. Read the matching guide before touching eith
 Both use `pkg/exchange/{okex,binance,coinbase}` as reference implementations. See also
 `doc/development/adding-new-exchange.md` for the end-to-end checklist.
 
+Exchange-specific notes, to read before extending that adapter:
+
+- **Backpack** — `doc/development/exchange-backpack.md`. ed25519 signing and the per-endpoint
+  "instruction" binding, the spot/perp symbol collapse, order-id and timestamp quirks, order
+  book side ordering, the WebSocket envelope, and what a futures/perp PR has to change.
+
 Generated files (`*_requestgen.go`, `*_callbacks.go`) are committed — re-run
 `go generate ./pkg/exchange/<name>/...` and commit the result when you change their inputs.
 
