@@ -1,7 +1,7 @@
 ---
 exchangeStrategies:
   - on: max
-    # automaticaly buy coins when the balance is lower than the threshold
+    # automatically buy coins when the balance is lower than the threshold
     autobuy:
       symbol: MAXTWD
       schedule: "@every 1s"
