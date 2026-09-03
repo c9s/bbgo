@@ -731,22 +731,28 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			Value: n.AnnualizedRate().Percentage(),
 			Short: true,
 		},
-		{
-			Title: "Last Funding Rate",
-			Value: n.lastFundingRate.Percentage(),
-			Short: true,
-		},
-		{
-			Title: "Annualized Last Funding Rate",
-			Value: AnnualizedRate(n.lastFundingRate, n.syncState.FundingIntervalHours).Percentage(),
-			Short: true,
-		},
-		{
-			Title: "Start Time",
-			Value: n.syncState.StartAt.Format(time.RFC3339),
-			Short: true,
-		},
 	}...)
+
+	if !n.lastFundingRate.IsZero() {
+		fields = append(fields, []slack.AttachmentField{
+			{
+				Title: "Last Funding Rate",
+				Value: n.lastFundingRate.Percentage(),
+				Short: true,
+			},
+			{
+				Title: "Annualized Last Funding Rate",
+				Value: AnnualizedRate(n.lastFundingRate, n.syncState.FundingIntervalHours).Percentage(),
+				Short: true,
+			},
+		}...)
+	}
+
+	fields = append(fields, slack.AttachmentField{
+		Title: "Start Time",
+		Value: n.syncState.StartAt.Format(time.RFC3339),
+		Short: true,
+	})
 
 	switch n.State() {
 	case RoundClosing:
