@@ -801,6 +801,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 		Text:   text,
 		Color:  n.stateColor(),
 		Fields: fields,
+		Footer: fmt.Sprintf("last updated at %s", n.LastUpdateTime().Format(time.RFC3339)),
 	}
 }
 
