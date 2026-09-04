@@ -60,9 +60,6 @@ var ServerTimestamp = time.Now().Unix()
 // reqCount is used for nonce, this variable counts the API request count.
 var reqCount uint64 = 1
 
-// globalTimeOffset is used for nonce
-var globalTimeOffset int64 = 0
-
 var disableUserAgentHeader = false
 
 // create type alias
@@ -293,7 +290,7 @@ func (c *Client) GetNonce(apiKey string) int64 {
 	c.mu.Lock()
 	now := time.Now()
 	seconds := now.Unix()
-	offset := atomic.LoadInt64(&globalTimeOffset)
+	offset := atomic.LoadInt64(&ServerTimeOffset)
 	next := (seconds + offset) * 1000
 	if last, ok := c.apiKeyNonce[apiKey]; ok {
 		if next <= last {
