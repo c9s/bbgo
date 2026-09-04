@@ -1,0 +1,580 @@
+[
+  {
+    "timestamp": "2026-09-02T15:06:28.792769+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/api/v1/markets?marketType=SPOT",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Age": [
+          "58"
+        ],
+        "Cache-Control": [
+          "public, s-maxage=300, stale-while-revalidate=600, stale-if-error=3600",
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Wed, 02 Sep 2026 07:05:30 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Accept-Encoding",
+          "Origin"
+        ],
+        "Via": [
+          "1.1 19a90699652ee37245e6bbbc135815e6.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "jAm4UPgZx8ZXwpoHLsRO9iowCQ3_MyQZ6Tv2AlT0S8LQEMt-3M_PjA=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Hit from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[{\"baseSymbol\":\"SOL\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.01\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":\"1.0025\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.03\",\"minMultiplier\":\"0.97\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.99\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.01\",\"minPriceUpdateMultiplier\":\"0.9975\",\"tickSize\":\"0.01\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"SOL_USDC\",\"visible\":true},{\"baseSymbol\":\"PYTH\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"PYTH_USDC\",\"visible\":true},{\"baseSymbol\":\"JTO\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.1\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"JTO_USDC\",\"visible\":true},{\"baseSymbol\":\"HNT\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.1\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"HNT_USDC\",\"visible\":true},{\"baseSymbol\":\"MOBILE\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.0000001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"MOBILE_USDC\",\"visible\":true},{\"baseSymbol\":\"BONK\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.000000001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10000\",\"stepSize\":\"10000\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"BONK_USDC\",\"visible\":true},{\"baseSymbol\":\"WIF\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"WIF_USDC\",\"visible\":true},{\"baseSymbol\":\"USDT\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.001\",\"borrowEntryFeeMinMultiplier\":\"0.999\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.005\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":\"1.0005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.01\",\"minMultiplier\":\"0.99\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.995\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.1\",\"minPriceUpdateMultiplier\":\"0.9995\",\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"USDT_USDC\",\"visible\":true},{\"baseSymbol\":\"JUP\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.24\",\"minMultiplier\":\"0.88\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"JUP_USDC\",\"visible\":true},{\"baseSymbol\":\"RENDER\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"RENDER_USDC\",\"visible\":true},{\"baseSymbol\":\"WEN\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.000001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"WEN_USDC\",\"visible\":true},{\"baseSymbol\":\"BTC\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.01\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":\"1.0025\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.03\",\"minMultiplier\":\"0.97\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.99\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.1\",\"minPriceUpdateMultiplier\":\"0.9975\",\"tickSize\":\"0.1\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.00001\",\"stepSize\":\"0.00001\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"BTC_USDC\",\"visible\":true},{\"baseSymbol\":\"W\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10\",\"stepSize\":\"10\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"W_USDC\",\"visible\":true},{\"baseSymbol\":\"TNSR\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"TNSR_USDC\",\"visible\":true},{\"baseSymbol\":\"PRCL\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"PRCL_USDC\",\"visible\":true},{\"baseSymbol\":\"MEW\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.000001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"MEW_USDC\",\"visible\":true},{\"baseSymbol\":\"BOME\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.000001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"BOME_USDC\",\"visible\":true},{\"baseSymbol\":\"RAY\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"RAY_USDC\",\"visible\":true},{\"baseSymbol\":\"HONEY\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"HONEY_USDC\",\"visible\":true},{\"baseSymbol\":\"KMNO\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10\",\"stepSize\":\"10\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"KMNO_USDC\",\"visible\":true},{\"baseSymbol\":\"ETH\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.01\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":\"1.0025\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.03\",\"minMultiplier\":\"0.97\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.99\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.01\",\"minPriceUpdateMultiplier\":\"0.9975\",\"tickSize\":\"0.01\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.0001\",\"stepSize\":\"0.0001\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"ETH_USDC\",\"visible\":true},{\"baseSymbol\":\"DRIFT\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"DRIFT_USDC\",\"visible\":true},{\"baseSymbol\":\"PEPE\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.000000001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10000\",\"stepSize\":\"10000\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"PEPE_USDC\",\"visible\":true},{\"baseSymbol\":\"SHIB\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.000000001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10000\",\"stepSize\":\"10000\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"SHIB_USDC\",\"visible\":true},{\"baseSymbol\":\"LINK\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"LINK_USDC\",\"visible\":true},{\"baseSymbol\":\"UNI\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"UNI_USDC\",\"visible\":true},{\"baseSymbol\":\"ONDO\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"ONDO_USDC\",\"visible\":true},{\"baseSymbol\":\"STRK\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10\",\"stepSize\":\"10\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"STRK_USDC\",\"visible\":true},{\"baseSymbol\":\"WLD\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"WLD_USDC\",\"visible\":true},{\"baseSymbol\":\"IO\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"IO_USDC\",\"visible\":true},{\"baseSymbol\":\"ZRO\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"ZRO_USDC\",\"visible\":true},{\"baseSymbol\":\"LDO\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":28800000,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"LDO_USDC\",\"visible\":true},{\"baseSymbol\":\"AAVE\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.01\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.01\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"AAVE_USDC\",\"visible\":true},{\"baseSymbol\":\"CLOUD\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10\",\"stepSize\":\"10\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"CLOUD_USDC\",\"visible\":true},{\"baseSymbol\":\"POL\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10\",\"stepSize\":\"10\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"POL_USDC\",\"visible\":true},{\"baseSymbol\":\"MOODENG\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"MOODENG_USDC\",\"visible\":true},{\"baseSymbol\":\"DBR\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.5\",\"minMultiplier\":\"0.5\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"DBR_USDC\",\"visible\":true},{\"baseSymbol\":\"ACT\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"ACT_USDC\",\"visible\":true},{\"baseSymbol\":\"GOAT\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"GOAT_USDC\",\"visible\":true},{\"baseSymbol\":\"APE\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10\",\"stepSize\":\"10\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"APE_USDC\",\"visible\":true},{\"baseSymbol\":\"ENA\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"ENA_USDC\",\"visible\":true},{\"baseSymbol\":\"ME\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"ME_USDC\",\"visible\":true},{\"baseSymbol\":\"PENGU\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"100\",\"stepSize\":\"100\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"PENGU_USDC\",\"visible\":true},{\"baseSymbol\":\"SONIC\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"SONIC_USDC\",\"visible\":true},{\"baseSymbol\":\"TRUMP\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"TRUMP_USDC\",\"visible\":true},{\"baseSymbol\":\"MELANIA\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.001\",\"stepSize\":\"0.001\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"MELANIA_USDC\",\"visible\":true},{\"baseSymbol\":\"J\",\"createdAt\":\"2025-01-22T05:29:05.254170\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"J_USDC\",\"visible\":true},{\"baseSymbol\":\"SUI\",\"createdAt\":\"2025-04-28T06:55:39.539393\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"SUI_USDC\",\"visible\":true},{\"baseSymbol\":\"WAL\",\"createdAt\":\"2025-05-28T23:08:15.777523\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"WAL_USDC\",\"visible\":true},{\"baseSymbol\":\"DEEP\",\"createdAt\":\"2025-05-28T23:08:25.156860\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"DEEP_USDC\",\"visible\":true},{\"baseSymbol\":\"SEND\",\"createdAt\":\"2025-05-28T23:08:34.618455\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.06\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.24\",\"minMultiplier\":\"0.76\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.94\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"SEND_USDC\",\"visible\":true},{\"baseSymbol\":\"BLUE\",\"createdAt\":\"2025-05-28T23:08:44.130031\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10\",\"stepSize\":\"10\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"BLUE_USDC\",\"visible\":true},{\"baseSymbol\":\"HAEDAL\",\"createdAt\":\"2025-05-28T23:08:53.459663\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"HAEDAL_USDC\",\"visible\":true},{\"baseSymbol\":\"NS\",\"createdAt\":\"2025-05-28T23:09:03.002893\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"1.25\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"NS_USDC\",\"visible\":true},{\"baseSymbol\":\"FRAG\",\"createdAt\":\"2025-06-30T11:44:54.694081\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":null,\"borrowEntryFeeMinMultiplier\":null,\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"1.25\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.1\",\"minMultiplier\":\"0.9\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"FRAG_USDC\",\"visible\":true},{\"baseSymbol\":\"PUMP\",\"createdAt\":\"2025-07-13T22:34:21.979527\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.1\",\"minMultiplier\":\"0.9\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.000001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"100\",\"stepSize\":\"100\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"PUMP_USDC\",\"visible\":true},{\"baseSymbol\":\"WCT\",\"createdAt\":\"2025-07-13T22:38:50.454611\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"1.25\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.1\",\"minMultiplier\":\"0.9\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"WCT_USDC\",\"visible\":true},{\"baseSymbol\":\"ES\",\"createdAt\":\"2025-07-15T21:51:55.584156\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"1.25\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.75\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"ES_USDC\",\"visible\":true},{\"baseSymbol\":\"SEI\",\"createdAt\":\"2025-07-30T00:36:02.380176\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.1\",\"minMultiplier\":\"0.9\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"SEI_USDC\",\"visible\":true},{\"baseSymbol\":\"DOGE\",\"createdAt\":\"2025-08-01T05:33:03.507828\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.1\",\"minMultiplier\":\"0.9\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"DOGE_USDC\",\"visible\":true},{\"baseSymbol\":\"XRP\",\"createdAt\":\"2025-08-19T01:12:01.245383\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.06\",\"minMultiplier\":\"0.94\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"XRP_USDC\",\"visible\":true},{\"baseSymbol\":\"APT\",\"createdAt\":\"2025-08-21T13:07:39.821453\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.04\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.06\",\"minMultiplier\":\"0.94\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.96\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.001\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"APT_USDC\",\"visible\":true},{\"baseSymbol\":\"WLFI\",\"createdAt\":\"2025-09-01T06:07:21.448456\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.09\",\"minMultiplier\":\"0.91\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"WLFI_USDC\",\"visible\":true},{\"baseSymbol\":\"SWTCH\",\"createdAt\":\"2025-09-09T01:45:52.365123\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10\",\"stepSize\":\"10\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"SWTCH_USDC\",\"visible\":true},{\"baseSymbol\":\"FLOCK\",\"createdAt\":\"2025-09-22T00:46:53.176267\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"FLOCK_USDC\",\"visible\":true},{\"baseSymbol\":\"0G\",\"createdAt\":\"2025-09-22T10:06:08.385098\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.18\",\"minMultiplier\":\"0.82\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"0G_USDC\",\"visible\":true},{\"baseSymbol\":\"XPL\",\"createdAt\":\"2025-09-25T03:09:48.284411\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.12\",\"minMultiplier\":\"0.88\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"XPL_USDC\",\"visible\":true},{\"baseSymbol\":\"HYPE\",\"createdAt\":\"2025-09-26T10:20:32.741199\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.04\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.06\",\"minMultiplier\":\"0.94\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.96\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.001\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"HYPE_USDC\",\"visible\":true},{\"baseSymbol\":\"2Z\",\"createdAt\":\"2025-10-02T02:41:49.487369\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.12\",\"minMultiplier\":\"0.88\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"2Z_USDC\",\"visible\":true},{\"baseSymbol\":\"BNB\",\"createdAt\":\"2025-10-05T21:37:50.437893\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"2\",\"maxPrice\":\"5000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.03\",\"minMultiplier\":\"0.97\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.1\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.01\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.001\",\"stepSize\":\"0.001\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"BNB_USDC\",\"visible\":true},{\"baseSymbol\":\"PIPE\",\"createdAt\":\"2025-10-08T02:01:29.121510\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.33\",\"minMultiplier\":\"0.67\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"PIPE_USDC\",\"visible\":true},{\"baseSymbol\":\"ZEUS\",\"createdAt\":\"2025-10-10T09:30:17.162154\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.09\",\"minMultiplier\":\"0.91\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10\",\"stepSize\":\"10\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"ZEUS_USDC\",\"visible\":true},{\"baseSymbol\":\"MET\",\"createdAt\":\"2025-10-23T05:21:37.310454\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.09\",\"minMultiplier\":\"0.91\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"MET_USDC\",\"visible\":true},{\"baseSymbol\":\"APR\",\"createdAt\":\"2025-10-23T05:23:05.308433\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.27\",\"minMultiplier\":\"0.73\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"APR_USDC\",\"visible\":true},{\"baseSymbol\":\"MON\",\"createdAt\":\"2025-11-23T22:16:42.733529\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.09\",\"minMultiplier\":\"0.91\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.000001\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10\",\"stepSize\":\"10\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"MON_USDC\",\"visible\":true},{\"baseSymbol\":\"STABLE\",\"createdAt\":\"2025-12-08T03:51:35.378894\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.12\",\"minMultiplier\":\"0.88\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.000001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10\",\"stepSize\":\"10\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"STABLE_USDC\",\"visible\":true},{\"baseSymbol\":\"FOGO\",\"createdAt\":\"2026-01-15T04:20:16.969654\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.000001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"10\",\"stepSize\":\"10\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"FOGO_USDC\",\"visible\":true},{\"baseSymbol\":\"LIT\",\"createdAt\":\"2026-01-16T12:20:59.719034\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.09\",\"minMultiplier\":\"0.91\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.1\",\"stepSize\":\"0.1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Closed\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"LIT_USDC\",\"visible\":true},{\"baseSymbol\":\"SKR\",\"createdAt\":\"2026-01-20T23:19:23.720743\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.15\",\"minMultiplier\":\"0.85\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.0000001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.000001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"100\",\"stepSize\":\"100\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"SKR_USDC\",\"visible\":true},{\"baseSymbol\":\"PAXG\",\"createdAt\":\"2026-02-04T14:00:04.590773\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"2\",\"maxPrice\":\"20000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.05\",\"minMultiplier\":\"0.95\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.1\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.1\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.0001\",\"stepSize\":\"0.0001\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"PAXG_USDC\",\"visible\":true},{\"baseSymbol\":\"ZEC\",\"createdAt\":\"2026-03-16T04:16:26.947620\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.04\",\"maxMultiplier\":\"2\",\"maxPrice\":\"10000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.05\",\"minMultiplier\":\"0.95\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.96\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.01\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.01\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"ZEC_USDC\",\"visible\":true},{\"baseSymbol\":\"BP\",\"createdAt\":\"2026-03-23T09:32:35.328679\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.05\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":null,\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.95\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"BP_USDC\",\"visible\":true},{\"baseSymbol\":\"SPCX.US\",\"createdAt\":\"2026-06-22T10:24:38.310743\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.01\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.05\",\"minMultiplier\":\"0.95\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.99\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.01\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.01\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":\"STOCK\",\"symbol\":\"SPCX.US_USDC\",\"visible\":true},{\"baseSymbol\":\"MU.US\",\"createdAt\":\"2026-06-22T10:24:54.943878\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.01\",\"maxMultiplier\":\"2\",\"maxPrice\":\"10000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.05\",\"minMultiplier\":\"0.95\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.99\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.01\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.01\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":\"STOCK\",\"symbol\":\"MU.US_USDC\",\"visible\":true},{\"baseSymbol\":\"SNDK.US\",\"createdAt\":\"2026-07-08T19:10:56.441250\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.01\",\"maxMultiplier\":\"2\",\"maxPrice\":\"10000\",\"maxPriceUpdateMultiplier\":null,\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.05\",\"minMultiplier\":\"0.95\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.99\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.01\",\"minPriceUpdateMultiplier\":null,\"tickSize\":\"0.01\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":\"STOCK\",\"symbol\":\"SNDK.US_USDC\",\"visible\":true},{\"baseSymbol\":\"SKHY.US\",\"createdAt\":\"2026-07-17T00:20:04.019391\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.01\",\"maxMultiplier\":\"2\",\"maxPrice\":\"10000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.05\",\"minMultiplier\":\"0.95\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.99\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.01\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.01\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"0.01\",\"stepSize\":\"0.01\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":\"STOCK\",\"symbol\":\"SKHY.US_USDC\",\"visible\":true},{\"baseSymbol\":\"TRX\",\"createdAt\":\"2026-07-27T02:32:39.761644\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.01\",\"borrowEntryFeeMinMultiplier\":\"0.99\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.03\",\"maxMultiplier\":\"2\",\"maxPrice\":\"1000\",\"maxPriceUpdateMultiplier\":\"1.005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.05\",\"minMultiplier\":\"0.95\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.97\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.00001\",\"minPriceUpdateMultiplier\":\"0.995\",\"tickSize\":\"0.00001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":null,\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"TRX_USDC\",\"visible\":true}]"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T15:06:28.988283+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/api/v1/ticker?symbol=USDT_USDC",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Age": [
+          "13"
+        ],
+        "Cache-Control": [
+          "public, s-maxage=20, stale-while-revalidate=10, stale-if-error=3600"
+        ],
+        "Content-Length": [
+          "203"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Wed, 02 Sep 2026 07:06:15 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 19a90699652ee37245e6bbbc135815e6.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "SCdWBdRq64YhFJWMaJcaMDAPvu4eJlOP8UpFZS6es4iHN4oSHYEr8A=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Hit from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"firstPrice\":\"0.9997\",\"high\":\"0.9999\",\"lastPrice\":\"0.9997\",\"low\":\"0.9995\",\"priceChange\":\"0\",\"priceChangePercent\":\"0\",\"quoteVolume\":\"8391843.0719\",\"symbol\":\"USDT_USDC\",\"trades\":\"3256\",\"volume\":\"8394252\"}"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T15:06:29.036862+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/api/v1/depth?limit=5\u0026symbol=USDT_USDC",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "262"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Wed, 02 Sep 2026 07:06:29 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 19a90699652ee37245e6bbbc135815e6.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "d78XSYI87v4ydWGcPo553nwZOlqVJEnzaL3PKukvB9wvZIFMG_DKxQ=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"asks\":[[\"0.9997\",\"53269\"],[\"0.9998\",\"164130\"],[\"0.9999\",\"413582\"],[\"1\",\"279220\"],[\"1.0001\",\"12576\"]],\"bids\":[[\"0.9992\",\"13060\"],[\"0.9993\",\"63017\"],[\"0.9994\",\"62808\"],[\"0.9995\",\"53871\"],[\"0.9996\",\"88146\"]],\"lastUpdateId\":\"36711500\",\"timestamp\":1788332789064033}"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T15:06:29.082903+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.backpack.exchange/api/v1/order",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "/8Iu4tIe88kBj26pgoVzO/piqshZ+pJyTzWeAf4xl0Qm0yZjtRcMkVIojF8UVns1FAUxC9wpbTECS/5JrJujBA=="
+        ],
+        "X-Timestamp": [
+          "1788332789037"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "588"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Wed, 02 Sep 2026 07:06:29 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 19a90699652ee37245e6bbbc135815e6.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "Mkb2uvtYJRUPSR1WUhiE0aLyXNKsA-0MrMERjUtP49kd62n3P5WTEg=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"clientId\":null,\"createdAt\":1788332789109,\"executedQuantity\":\"0\",\"executedQuoteQuantity\":\"0\",\"id\":\"59787279606\",\"orderType\":\"Limit\",\"postOnly\":true,\"price\":\"1.0076\",\"quantity\":\"20\",\"reduceOnly\":null,\"relatedOrderId\":null,\"selfTradePrevention\":\"RejectTaker\",\"side\":\"Ask\",\"status\":\"New\",\"stopLossLimitPrice\":null,\"stopLossTriggerBy\":null,\"stopLossTriggerPrice\":null,\"strategyId\":null,\"symbol\":\"USDT_USDC\",\"takeProfitLimitPrice\":null,\"takeProfitTriggerBy\":null,\"takeProfitTriggerPrice\":null,\"timeInForce\":\"GTC\",\"triggerBy\":null,\"triggerPrice\":null,\"triggerQuantity\":null,\"triggeredAt\":null}"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T15:06:29.153833+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/api/v1/order?orderId=59787279606\u0026symbol=USDT_USDC",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "WPFJ4GcAf+mLm+7FqaLGO9i7xjUESDR/eWT11Gl3UOWot0lJAcHYd+7REVCRgJXHsqzTGAlp4FtfVlMuiznBBA=="
+        ],
+        "X-Timestamp": [
+          "1788332789083"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "588"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Wed, 02 Sep 2026 07:06:29 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 19a90699652ee37245e6bbbc135815e6.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "piD6GrIkRQN_kFb-uaPanBh29aNU1mfYvQCWEQkWsMtPDGtQfoB3oQ=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"clientId\":null,\"createdAt\":1788332789109,\"executedQuantity\":\"0\",\"executedQuoteQuantity\":\"0\",\"id\":\"59787279606\",\"orderType\":\"Limit\",\"postOnly\":true,\"price\":\"1.0076\",\"quantity\":\"20\",\"reduceOnly\":null,\"relatedOrderId\":null,\"selfTradePrevention\":\"RejectTaker\",\"side\":\"Ask\",\"status\":\"New\",\"stopLossLimitPrice\":null,\"stopLossTriggerBy\":null,\"stopLossTriggerPrice\":null,\"strategyId\":null,\"symbol\":\"USDT_USDC\",\"takeProfitLimitPrice\":null,\"takeProfitTriggerBy\":null,\"takeProfitTriggerPrice\":null,\"timeInForce\":\"GTC\",\"triggerBy\":null,\"triggerPrice\":null,\"triggerQuantity\":null,\"triggeredAt\":null}"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T15:06:29.203691+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/api/v1/orders?marketType=SPOT\u0026symbol=USDT_USDC",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "vkV4UxAD/VNt2mfs6AlVg3k9VOOrWyPb5XrfOxd2WsjG03Hw/Kdhseh70hVSgIuplzd4CsIaoJV2GuPgYyYJBw=="
+        ],
+        "X-Timestamp": [
+          "1788332789154"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "590"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Wed, 02 Sep 2026 07:06:29 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 19a90699652ee37245e6bbbc135815e6.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "PBCgcITUDT4ytyEbiFMsaN-QAhGITZ74ef9C9-FsbVf-sNreaOolCg=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[{\"clientId\":null,\"createdAt\":1788332789109,\"executedQuantity\":\"0\",\"executedQuoteQuantity\":\"0\",\"id\":\"59787279606\",\"orderType\":\"Limit\",\"postOnly\":true,\"price\":\"1.0076\",\"quantity\":\"20\",\"reduceOnly\":null,\"relatedOrderId\":null,\"selfTradePrevention\":\"RejectTaker\",\"side\":\"Ask\",\"status\":\"New\",\"stopLossLimitPrice\":null,\"stopLossTriggerBy\":null,\"stopLossTriggerPrice\":null,\"strategyId\":null,\"symbol\":\"USDT_USDC\",\"takeProfitLimitPrice\":null,\"takeProfitTriggerBy\":null,\"takeProfitTriggerPrice\":null,\"timeInForce\":\"GTC\",\"triggerBy\":null,\"triggerPrice\":null,\"triggerQuantity\":null,\"triggeredAt\":null}]"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T15:06:29.267199+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/wapi/v1/history/fills?limit=1000\u0026orderId=59787279606\u0026symbol=USDT_USDC",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "fBJtVLTYv4wQYazh8u7gYo8UBAG+8LqqanhapLuBSS3ZPko1Lj8m7Usqirf3F4cGZ6FDyezuA/6GWG+Ib3z+DQ=="
+        ],
+        "X-Timestamp": [
+          "1788332789204"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "no-store",
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "2"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Wed, 02 Sep 2026 07:06:29 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 19a90699652ee37245e6bbbc135815e6.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "sj-4QHgi3ZyeymXEDTDtv9tND0GQlXc4PFEarcDFpionALJe2ZABLA=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Current-Page": [
+          "1"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Page-Count": [
+          "1"
+        ],
+        "X-Page-Size": [
+          "1"
+        ],
+        "X-Total": [
+          "0"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[]"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T15:06:29.324826+08:00",
+    "request": {
+      "method": "DELETE",
+      "url": "https://api.backpack.exchange/api/v1/order",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "qTK62xlOi+LHs/ChpaKIRzlatjKMVFouvvyvfEg3YiyQWeaLWy6DJaiDxIKcptvLQ319iPNDY7BTMwNovNECBg=="
+        ],
+        "X-Timestamp": [
+          "1788332789269"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "594"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Wed, 02 Sep 2026 07:06:29 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 19a90699652ee37245e6bbbc135815e6.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "Ayo0IY6Iz4hq7LPWudwpHdC0i_CC7nl_uGrMd5C31EkX9XNaT9ruXg=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"clientId\":null,\"createdAt\":1788332789109,\"executedQuantity\":\"0\",\"executedQuoteQuantity\":\"0\",\"id\":\"59787279606\",\"orderType\":\"Limit\",\"postOnly\":true,\"price\":\"1.0076\",\"quantity\":\"20\",\"reduceOnly\":null,\"relatedOrderId\":null,\"selfTradePrevention\":\"RejectTaker\",\"side\":\"Ask\",\"status\":\"Cancelled\",\"stopLossLimitPrice\":null,\"stopLossTriggerBy\":null,\"stopLossTriggerPrice\":null,\"strategyId\":null,\"symbol\":\"USDT_USDC\",\"takeProfitLimitPrice\":null,\"takeProfitTriggerBy\":null,\"takeProfitTriggerPrice\":null,\"timeInForce\":\"GTC\",\"triggerBy\":null,\"triggerPrice\":null,\"triggerQuantity\":null,\"triggeredAt\":null}"
+    }
+  }
+]

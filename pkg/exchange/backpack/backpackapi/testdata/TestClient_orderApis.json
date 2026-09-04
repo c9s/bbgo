@@ -1,0 +1,526 @@
+[
+  {
+    "timestamp": "2026-09-02T01:54:03.930701+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/api/v1/market?symbol=USDT_USDC",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Alt-Svc": [
+          "h3=\":443\"; ma=86400"
+        ],
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "862"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 01 Sep 2026 17:54:04 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 98356305f9e9512175b34bae946e4112.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "pt3BfR8uv3AhcLud6qUQaHCx7oefEQ3UEdoqwBulu8NtgZclGh0-lA=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"baseSymbol\":\"USDT\",\"createdAt\":\"2025-01-21T06:34:54.691858\",\"filters\":{\"price\":{\"borrowEntryFeeMaxMultiplier\":\"1.001\",\"borrowEntryFeeMinMultiplier\":\"0.999\",\"discoveryBoundBand\":null,\"maxImpactMultiplier\":\"1.005\",\"maxMultiplier\":\"2\",\"maxPrice\":null,\"maxPriceUpdateMultiplier\":\"1.0005\",\"meanMarkPriceBand\":{\"maxMultiplier\":\"1.01\",\"minMultiplier\":\"0.99\"},\"meanPremiumBand\":null,\"minImpactMultiplier\":\"0.995\",\"minMultiplier\":\"0.25\",\"minPrice\":\"0.1\",\"minPriceUpdateMultiplier\":\"0.9995\",\"tickSize\":\"0.0001\"},\"quantity\":{\"maxQuantity\":null,\"minQuantity\":\"1\",\"stepSize\":\"1\"}},\"fundingInterval\":null,\"fundingRateLowerBound\":null,\"fundingRateUpperBound\":null,\"imfFunction\":null,\"marketType\":\"SPOT\",\"mmfFunction\":null,\"openInterestLimit\":\"0\",\"orderBookState\":\"Open\",\"positionLimitWeight\":null,\"quoteSymbol\":\"USDC\",\"rwaMarketType\":null,\"symbol\":\"USDT_USDC\",\"visible\":true}"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T01:54:03.977709+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/api/v1/ticker?symbol=USDT_USDC",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Age": [
+          "16"
+        ],
+        "Alt-Svc": [
+          "h3=\":443\"; ma=86400"
+        ],
+        "Cache-Control": [
+          "public, s-maxage=20, stale-while-revalidate=10, stale-if-error=3600"
+        ],
+        "Content-Length": [
+          "215"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 01 Sep 2026 17:53:48 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 98356305f9e9512175b34bae946e4112.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "ZCmMKp7Ae6-X7JGSYFCiqr6cId2eUsRS7w-uR0ag1tLQRjDKSXYKog=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Hit from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"firstPrice\":\"0.9999\",\"high\":\"0.9999\",\"lastPrice\":\"0.9998\",\"low\":\"0.9996\",\"priceChange\":\"-0.0001\",\"priceChangePercent\":\"-0.0001\",\"quoteVolume\":\"8079299.2523\",\"symbol\":\"USDT_USDC\",\"trades\":\"3073\",\"volume\":\"8081300\"}"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T01:54:04.024948+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.backpack.exchange/api/v1/order",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "ozUNqqYl74GYH6jpFfacQgKLnNBCJm++6Bb6KBSFU+rdZJiY2Pm0JyoXWDfZtSm1ldCTnFUy0Z739ReIFzrDDQ=="
+        ],
+        "X-Timestamp": [
+          "1788285243978"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Alt-Svc": [
+          "h3=\":443\"; ma=86400"
+        ],
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "588"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 01 Sep 2026 17:54:04 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 98356305f9e9512175b34bae946e4112.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "VBGcEzajf4p5rhI1ywQkeGEjho4aaslF-J62lH21NXouLBB5mtssCQ=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"clientId\":null,\"createdAt\":1788285244094,\"executedQuantity\":\"0\",\"executedQuoteQuantity\":\"0\",\"id\":\"59669287267\",\"orderType\":\"Limit\",\"postOnly\":true,\"price\":\"1.0077\",\"quantity\":\"20\",\"reduceOnly\":null,\"relatedOrderId\":null,\"selfTradePrevention\":\"RejectTaker\",\"side\":\"Ask\",\"status\":\"New\",\"stopLossLimitPrice\":null,\"stopLossTriggerBy\":null,\"stopLossTriggerPrice\":null,\"strategyId\":null,\"symbol\":\"USDT_USDC\",\"takeProfitLimitPrice\":null,\"takeProfitTriggerBy\":null,\"takeProfitTriggerPrice\":null,\"timeInForce\":\"GTC\",\"triggerBy\":null,\"triggerPrice\":null,\"triggerQuantity\":null,\"triggeredAt\":null}"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T01:54:04.075987+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/api/v1/order?orderId=59669287267\u0026symbol=USDT_USDC",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "za6RdIOF0G/cggwRSgcsW2ULFFKY77KDAPLnX3+DFl0l2OwuKXYJSW9XOYMj6BS0VSvdtq4DDnBw36+b1LydCg=="
+        ],
+        "X-Timestamp": [
+          "1788285244025"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Alt-Svc": [
+          "h3=\":443\"; ma=86400"
+        ],
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "588"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 01 Sep 2026 17:54:04 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 98356305f9e9512175b34bae946e4112.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "cPhk128B2cRpgiprt25oR_KI8nEV_ESEM4FG1zPPB3qKedS9S-kuTw=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"clientId\":null,\"createdAt\":1788285244094,\"executedQuantity\":\"0\",\"executedQuoteQuantity\":\"0\",\"id\":\"59669287267\",\"orderType\":\"Limit\",\"postOnly\":true,\"price\":\"1.0077\",\"quantity\":\"20\",\"reduceOnly\":null,\"relatedOrderId\":null,\"selfTradePrevention\":\"RejectTaker\",\"side\":\"Ask\",\"status\":\"New\",\"stopLossLimitPrice\":null,\"stopLossTriggerBy\":null,\"stopLossTriggerPrice\":null,\"strategyId\":null,\"symbol\":\"USDT_USDC\",\"takeProfitLimitPrice\":null,\"takeProfitTriggerBy\":null,\"takeProfitTriggerPrice\":null,\"timeInForce\":\"GTC\",\"triggerBy\":null,\"triggerPrice\":null,\"triggerQuantity\":null,\"triggeredAt\":null}"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T01:54:04.126466+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/api/v1/orders?symbol=USDT_USDC",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "p6FcV36NnwpitShH/JOBq0ktM46Gvoh9mVFOKvyJnSVDnxJsNCcY5JbNqncIqPcUcFLhpGBRcyKC+1WRLfBrBA=="
+        ],
+        "X-Timestamp": [
+          "1788285244076"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Alt-Svc": [
+          "h3=\":443\"; ma=86400"
+        ],
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "590"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 01 Sep 2026 17:54:04 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 98356305f9e9512175b34bae946e4112.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "eAqiDuzNUbp6Txt9QfN9wtRzBKKbxwbAEmx1MQu8elSsPrb84l8N5w=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[{\"clientId\":null,\"createdAt\":1788285244094,\"executedQuantity\":\"0\",\"executedQuoteQuantity\":\"0\",\"id\":\"59669287267\",\"orderType\":\"Limit\",\"postOnly\":true,\"price\":\"1.0077\",\"quantity\":\"20\",\"reduceOnly\":null,\"relatedOrderId\":null,\"selfTradePrevention\":\"RejectTaker\",\"side\":\"Ask\",\"status\":\"New\",\"stopLossLimitPrice\":null,\"stopLossTriggerBy\":null,\"stopLossTriggerPrice\":null,\"strategyId\":null,\"symbol\":\"USDT_USDC\",\"takeProfitLimitPrice\":null,\"takeProfitTriggerBy\":null,\"takeProfitTriggerPrice\":null,\"timeInForce\":\"GTC\",\"triggerBy\":null,\"triggerPrice\":null,\"triggerQuantity\":null,\"triggeredAt\":null}]"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T01:54:04.178336+08:00",
+    "request": {
+      "method": "DELETE",
+      "url": "https://api.backpack.exchange/api/v1/order",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "EpsPEA8mBpNc2B+ZODEzpXfCyN9p8L+Ezo3sT+HNv6pOoRlJjbZNyriatYTwhyjrPSFEPMSBrROz2nVrWr4QBA=="
+        ],
+        "X-Timestamp": [
+          "1788285244126"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Alt-Svc": [
+          "h3=\":443\"; ma=86400"
+        ],
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "594"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 01 Sep 2026 17:54:04 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 98356305f9e9512175b34bae946e4112.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "lgEJPlnQljbIgFgrqjY928ZSoSrweGQemiUANW35ywvPMTeRzXmVnw=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"clientId\":null,\"createdAt\":1788285244094,\"executedQuantity\":\"0\",\"executedQuoteQuantity\":\"0\",\"id\":\"59669287267\",\"orderType\":\"Limit\",\"postOnly\":true,\"price\":\"1.0077\",\"quantity\":\"20\",\"reduceOnly\":null,\"relatedOrderId\":null,\"selfTradePrevention\":\"RejectTaker\",\"side\":\"Ask\",\"status\":\"Cancelled\",\"stopLossLimitPrice\":null,\"stopLossTriggerBy\":null,\"stopLossTriggerPrice\":null,\"strategyId\":null,\"symbol\":\"USDT_USDC\",\"takeProfitLimitPrice\":null,\"takeProfitTriggerBy\":null,\"takeProfitTriggerPrice\":null,\"timeInForce\":\"GTC\",\"triggerBy\":null,\"triggerPrice\":null,\"triggerQuantity\":null,\"triggeredAt\":null}"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T01:54:04.729546+08:00",
+    "request": {
+      "method": "DELETE",
+      "url": "https://api.backpack.exchange/api/v1/orders",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "KvC4pf/Gk/+q5jbbwj0QKVzVJEKrOTpvAmh5liRaE36SOSF1hTTKn87QDzCeiQk60xvd+onfHxWpER3zcT6NCA=="
+        ],
+        "X-Timestamp": [
+          "1788285244679"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Alt-Svc": [
+          "h3=\":443\"; ma=86400"
+        ],
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "2"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 01 Sep 2026 17:54:04 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 98356305f9e9512175b34bae946e4112.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "1tozbpV_SVO3mHrTLU1_irWGPAz-idvq9_FatVHOAkFFl1RjUo--HA=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[]"
+    }
+  }
+]

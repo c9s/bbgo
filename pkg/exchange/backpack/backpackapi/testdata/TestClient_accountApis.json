@@ -1,0 +1,230 @@
+[
+  {
+    "timestamp": "2026-09-02T01:54:14.540055+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/api/v1/capital",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "g4SBYijVKFZKktQluJaNxOUhuMVMOersn+MN8uKwNuF6NaXPUuJONrbiLXKZ5KZQbebH6KciuR7YQnyP0BDlCw=="
+        ],
+        "X-Timestamp": [
+          "1788285254464"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "53"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 01 Sep 2026 17:54:14 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 48235506e76f994b875648be76f96e52.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "9__RKRw7hZHa57Nd7fEcgR6OA4kg8lmS-eGrq52_IYtQSHwgyZKVdw=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"USDT\":{\"available\":\"30\",\"locked\":\"0\",\"staked\":\"0\"}}"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T01:54:14.587136+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/api/v1/capital/collateral",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "jr8wmD2vNWfZNAx31cwOqWAYil+Y6Oe2bHE5+YqQRtjhr/gO+UrP3UNOyijXyu79oWviBayT0tPW5Ka/+D3hAQ=="
+        ],
+        "X-Timestamp": [
+          "1788285254540"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "491"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 01 Sep 2026 17:54:14 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 48235506e76f994b875648be76f96e52.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "IY4V36NbX6k7VfR2KCLd01ZhiGDDdqfsc4tvwCUjhARvw7DYxeFbQg=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "{\"assetsValue\":\"28.49145\",\"borrowLiability\":\"0\",\"collateral\":[{\"assetMarkPrice\":\"0.9997\",\"availableQuantity\":\"30\",\"balanceNotional\":\"29.991\",\"collateralValue\":\"28.49145\",\"collateralWeight\":\"0.95\",\"lendQuantity\":\"0\",\"openOrderQuantity\":\"0\",\"symbol\":\"USDT\",\"totalQuantity\":\"30\"}],\"imf\":\"1\",\"liabilitiesValue\":\"0\",\"marginFraction\":null,\"mmf\":\"0.007\",\"netEquity\":\"28.49145\",\"netEquityAvailable\":\"28.49145\",\"netEquityLocked\":\"0\",\"netExposureFutures\":\"0\",\"pnlUnrealized\":\"0\",\"unsettledEquity\":\"0\"}"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T01:54:14.63513+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/api/v1/position",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "dDRddhBt4yxnFA9OJa2gRVH5qjfcMGBr5Ma3klW10fY7IUcjocRheH6lBg/1DmwNy2tX8l4Hf75rjjVzgbN0Bw=="
+        ],
+        "X-Timestamp": [
+          "1788285254587"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cache-Control": [
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "2"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 01 Sep 2026 17:54:14 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 48235506e76f994b875648be76f96e52.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "1FjvQKbu_QuWRbVxLxOO6IYZzVonLTok8APDQr4cNM-aHjExhm4EHw=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[]"
+    }
+  }
+]
