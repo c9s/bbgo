@@ -523,8 +523,10 @@ func (r *ArbitrageRound) MinHoldingIntervals(currentTime time.Time, spotPrice, f
 	)
 	if r.syncState.MinHoldingIntervals != oriMinHoldingIntervals {
 		r.logger.Infof(
-			"[ArbitrageRound] adjusted min holding intervals (%s): %d -> %d",
+			"[ArbitrageRound] adjusted min holding intervals (%s), total PnL %s, avg fee income %s: %d -> %d",
 			r.SpotSymbol(),
+			totalPnL,
+			avgFeeIncome,
 			oriMinHoldingIntervals,
 			r.syncState.MinHoldingIntervals,
 		)
@@ -532,12 +534,14 @@ func (r *ArbitrageRound) MinHoldingIntervals(currentTime time.Time, spotPrice, f
 	return r.syncState.MinHoldingIntervals
 }
 
+// dynamicHoldingIntervals adjusts the min holding intervals based on the current total PnL
+// hold the position until the total PnL breaks even with the average funding income
 func dynamicHoldingIntervals(avgFeeIncome, totalPnL fixedpoint.Value, oriMinHoldingIntervals, numHoldingIntervals int) int {
-	// adjust the min holding intervals based on the current total PnL
-	// hold the position until the total PnL breaks even with the average funding income
+	// if total PnL is positive or fee income is negative, assume the position can be closed immediately
 	if totalPnL.Sign() > 0 || avgFeeIncome.Sign() <= 0 {
-		return oriMinHoldingIntervals
+		return numHoldingIntervals
 	}
+
 	breakEvenIntervals := totalPnL.Abs().Div(avgFeeIncome)
 	if breakEvenIntervals.Compare(fixedpoint.One) < 0 {
 		return oriMinHoldingIntervals
