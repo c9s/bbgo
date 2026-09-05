@@ -1132,7 +1132,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 
 func (s *Strategy) transitRound(ctx context.Context, round *ArbitrageRound, currentTime time.Time) {
 	// still in the first funding interval, do not transit
-	if round.NumHoldingIntervals(currentTime) <= 1 {
+	if round.NumHoldingIntervals(currentTime) < 1 {
 		if round.LastUpdateTime().IsZero() {
 			round.SetUpdateTime(currentTime)
 		}
