@@ -93,6 +93,7 @@ type Strategy struct {
 	MinNotionalMultiplier fixedpoint.Value            `json:"minNotionalMultiplier"`
 	FeeDiscountRate       map[string]fixedpoint.Value `json:"feeDiscountRate"`
 	QuoteCurrency         string                      `json:"quoteCurrency"`
+	FeeAssetCheckInterval types.Duration              `json:"feeAssetCheckInterval"`
 
 	PendingRoundGracePeriod types.Duration   `json:"pendingRoundGracePeriod"`
 	MaxPendingRoundRetry    int              `json:"maxPendingRoundRetry"`
@@ -171,7 +172,8 @@ type Strategy struct {
 	// nil when no database is configured (e.g. backtesting).
 	roundInsertService *RoundInsertService
 
-	fundingIncomeC chan time.Time
+	fundingIncomeC   chan time.Time
+	lastFeeCheckTime time.Time
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -280,6 +282,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.Leverage.IsZero() {
 		s.Leverage = fixedpoint.NewFromInt(2)
+	}
+
+	if s.FeeAssetCheckInterval.Duration() == 0 {
+		s.FeeAssetCheckInterval = types.Duration(time.Hour)
 	}
 
 	return nil
@@ -500,6 +506,9 @@ func (s *Strategy) CrossRun(
 		spotFeeRate.MakerFeeRate = spotFeeRate.MakerFeeRate.Mul(discountFactor)
 		spotFeeRate.TakerFeeRate = spotFeeRate.TakerFeeRate.Mul(discountFactor)
 	}
+	s.logger.Infof("spot fee rate: %v", spotFeeRate)
+	s.logger.Infof("futures fee rate: %v", futuresFeeRate)
+
 	s.costEstimator = NewCostEstimator()
 	s.costEstimator.
 		SetFuturesFeeRate(futuresFeeRate).
@@ -950,6 +959,21 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	// 1. process existing active rounds
 	// We need to tick the active rounds first since we need to proceed the underlying workers to update the positions.
 	// So that the following checks can accurately reflect the current status of the rounds.
+
+	// 1.0 check fee asset balance for opening/closing rounds
+	var positioningRounds []*ArbitrageRound
+	for _, round := range s.ActiveRounds {
+		switch round.State() {
+		case RoundOpening, RoundClosing:
+			positioningRounds = append(positioningRounds, round)
+		}
+	}
+	if err := s.checkSufficientFeeAssetBalance(ctx, tickTime, positioningRounds); err != nil {
+		s.logger.WithError(err).Warnf(
+			"fee asset balance check failed for rounds: %v", positioningRounds,
+		)
+	}
+
 	for _, round := range s.ActiveRounds {
 		// 1.1 tick existing active rounds
 		spotOrderBook := s.spotOrderBooks[round.SpotSymbol()].Copy()
