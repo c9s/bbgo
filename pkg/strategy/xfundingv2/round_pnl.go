@@ -48,6 +48,10 @@ func (p *RoundRealizedPnL) TotalPnL() fixedpoint.Value {
 	)
 }
 
+func (p *RoundRealizedPnL) SpotNotional() fixedpoint.Value {
+	return p.SpotPosition.AverageCost.Mul(p.SpotPosition.Base).Abs()
+}
+
 func (r *ArbitrageRound) RealizedPnL() *RoundRealizedPnL {
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -3,6 +3,7 @@ package xfundingv2
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -534,6 +535,25 @@ func (r *ArbitrageRound) MinHoldingIntervals(currentTime time.Time, spotPrice, f
 	return r.syncState.MinHoldingIntervals
 }
 
+func (r *ArbitrageRound) FundingRecordsDescending(limit int) []FundingFee {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var records []FundingFee
+	for _, record := range r.syncState.FundingFeeRecords {
+		records = append(records, record)
+	}
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].Time.After(records[j].Time)
+	})
+
+	if limit < 0 || len(records) <= limit {
+		return records
+	}
+
+	return records[:limit]
+}
+
 // dynamicHoldingIntervals adjusts the min holding intervals based on the current total PnL
 // hold the position until the total PnL breaks even with the average funding income
 func dynamicHoldingIntervals(avgFeeIncome, totalPnL fixedpoint.Value, oriMinHoldingIntervals, numHoldingIntervals int) int {
@@ -650,15 +670,17 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 		},
 	}...)
 
+	spotTarget := n.spotWorker.TargetPosition()
+	futuresTarget := n.futuresWorker.TargetPosition()
 	fields = append(fields, []slack.AttachmentField{
 		{
 			Title: "Spot Filled Position",
-			Value: fmt.Sprintf("%s@%s", n.spotWorker.FilledPosition().String(), spotAvgCost.String()),
+			Value: fmt.Sprintf("%s(%s)@%s", n.spotWorker.FilledPosition().String(), spotTarget.String(), spotAvgCost.String()),
 			Short: true,
 		},
 		{
 			Title: "Futures Filled Position",
-			Value: fmt.Sprintf("%s@%s", n.futuresWorker.FilledPosition().String(), futuresAvgCost.String()),
+			Value: fmt.Sprintf("%s(%s)@%s", n.futuresWorker.FilledPosition().String(), futuresTarget.String(), futuresAvgCost.String()),
 			Short: true,
 		},
 	}...)
@@ -1665,6 +1687,8 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 					"failed to tick %s spot worker at %s",
 					r.SpotSymbol(), currentTime.Format(time.RFC3339),
 				)
+		} else {
+			r.logger.Infof("spot worker ticked: %s", r.String())
 		}
 	}
 	if tickFutures {
@@ -1675,6 +1699,8 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 					"failed to tick %s futures worker at %s",
 					r.FuturesSymbol(), currentTime.Format(time.RFC3339),
 				)
+		} else {
+			r.logger.Infof("futures worker ticked: %s", r.String())
 		}
 	}
 
