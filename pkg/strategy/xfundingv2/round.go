@@ -1687,6 +1687,8 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 					"failed to tick %s spot worker at %s",
 					r.SpotSymbol(), currentTime.Format(time.RFC3339),
 				)
+		} else {
+			r.logger.Infof("spot worker ticked: %s", r.String())
 		}
 	}
 	if tickFutures {
@@ -1697,6 +1699,8 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 					"failed to tick %s futures worker at %s",
 					r.FuturesSymbol(), currentTime.Format(time.RFC3339),
 				)
+		} else {
+			r.logger.Infof("futures worker ticked: %s", r.String())
 		}
 	}
 
