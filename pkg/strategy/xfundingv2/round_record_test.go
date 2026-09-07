@@ -206,6 +206,7 @@ func TestRoundInsertService_ActiveRoundSnapshot(t *testing.T) {
 			FuturesPnL:           fixedpoint.NewFromFloat(0.3),
 			FuturesNetPnL:        fixedpoint.NewFromFloat(0.1),
 			NetPnL:               fixedpoint.NewFromFloat(3.5),
+			StartedAt:            time.Now().Add(-24 * time.Hour),
 		},
 		SpotPosition:         fixedpoint.NewFromFloat(1.0),
 		FuturesPosition:      fixedpoint.NewFromFloat(-1.0),
