@@ -93,10 +93,8 @@ func (e *Exchange) GetClient() *backpackapi.RestClient {
 }
 
 // NewStream returns the websocket stream.
-//
-// The stream is not implemented yet; the returned value fails on Connect. See stream.go.
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream()
+	return NewStream(e, e.client)
 }
 
 // getMarketType returns the market type the exchange currently operates on.
@@ -150,6 +148,26 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	return markets, nil
 }
 
+// QueryDepth returns an order book snapshot together with its last update id.
+//
+// The websocket depth stream sends incremental updates carrying a first/last update id range,
+// so the snapshot id is what lets depth.Buffer line the two up.
+func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (types.SliceOrderBook, int64, error) {
+	if err := queryTickerLimiter.Wait(ctx); err != nil {
+		return types.SliceOrderBook{}, 0, fmt.Errorf("depth rate limiter wait error: %w", err)
+	}
+
+	req := e.client.NewGetDepthRequest()
+	req.Symbol(e.getLocalSymbol(symbol))
+
+	depth, err := req.Do(ctx)
+	if err != nil {
+		return types.SliceOrderBook{}, 0, err
+	}
+
+	return toGlobalOrderBook(symbol, depth), int64(depth.LastUpdateId), nil
+}
+
 // QueryTicker returns the 24h ticker of a symbol.
 //
 // The Backpack ticker endpoint carries no bid/ask, so the top of the order book is fetched
@@ -182,13 +200,13 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 		return &ticker, nil
 	}
 
-	// the API returns both sides in ascending price order, so the best bid is the last one
-	if len(depth.Bids) > 0 {
-		ticker.Buy = depth.Bids[len(depth.Bids)-1].Price
+	book := toGlobalOrderBook(symbol, depth)
+	if bestBid, ok := book.BestBid(); ok {
+		ticker.Buy = bestBid.Price
 	}
 
-	if len(depth.Asks) > 0 {
-		ticker.Sell = depth.Asks[0].Price
+	if bestAsk, ok := book.BestAsk(); ok {
+		ticker.Sell = bestAsk.Price
 	}
 
 	return &ticker, nil

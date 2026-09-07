@@ -466,3 +466,78 @@ func TestIsLocalSymbolOfMarketType(t *testing.T) {
 	assert.True(t, isLocalSymbolOfMarketType("SOL_USDC_PERP", backpackapi.MarketTypePerp))
 	assert.False(t, isLocalSymbolOfMarketType("SOL_USDC", backpackapi.MarketTypePerp))
 }
+
+// TestToGlobalOrderBookOrdering guards the order book side ordering.
+//
+// Backpack sends both sides in ascending price order, but types.SliceOrderBook.BestBid reads
+// Bids[0], so the bids have to be flipped. Getting this wrong produces a book whose best bid is
+// the *worst* price on the book, which still looks plausible in a log.
+func TestToGlobalOrderBookOrdering(t *testing.T) {
+	payload := `{
+      "asks": [["101.01","1"],["101.02","2"],["101.03","3"]],
+      "bids": [["100.96","1"],["100.97","2"],["100.98","3"]],
+      "lastUpdateId": "4324419962",
+      "timestamp": 1788283696669335
+    }`
+
+	var depth backpackapi.Depth
+	if !assert.NoError(t, json.Unmarshal([]byte(payload), &depth)) {
+		return
+	}
+
+	book := toGlobalOrderBook("SOLUSDC", &depth)
+
+	assert.Equal(t, "SOLUSDC", book.Symbol)
+	assert.Equal(t, int64(4324419962), book.LastUpdateId)
+
+	bestBid, ok := book.BestBid()
+	if assert.True(t, ok) {
+		assert.Equal(t, "100.98", bestBid.Price.String(), "the best bid is the highest bid")
+	}
+
+	bestAsk, ok := book.BestAsk()
+	if assert.True(t, ok) {
+		assert.Equal(t, "101.01", bestAsk.Price.String(), "the best ask is the lowest ask")
+	}
+
+	assert.True(t, bestBid.Price.Compare(bestAsk.Price) < 0, "the book must not be crossed")
+
+	// the bids descend and the asks ascend
+	for i := 1; i < len(book.Bids); i++ {
+		assert.True(t, book.Bids[i-1].Price.Compare(book.Bids[i].Price) > 0)
+	}
+
+	for i := 1; i < len(book.Asks); i++ {
+		assert.True(t, book.Asks[i-1].Price.Compare(book.Asks[i].Price) < 0)
+	}
+}
+
+// TestDepthEventToGlobalOrderBook checks the same ordering for an incremental update, and that
+// a removed level survives as a zero quantity.
+func TestDepthEventToGlobalOrderBook(t *testing.T) {
+	payload := `{"stream":"depth.SOL_USDC","data":{
+      "E":1788367430247494,"T":1788367430246081,"U":4330360995,
+      "a":[["98.97","22.39"],["98.99","0"]],"b":[["98.90","1"],["98.95","2"]],
+      "e":"depth","s":"SOL_USDC","u":4330360996}}`
+
+	event, err := backpackapi.ParseWebsocketMessage([]byte(payload))
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	depthEvent, ok := event.(*backpackapi.DepthEvent)
+	if !assert.True(t, ok) {
+		return
+	}
+
+	book := depthEventToGlobalOrderBook(depthEvent)
+	assert.Equal(t, "SOLUSDC", book.Symbol)
+	assert.Equal(t, int64(4330360996), book.LastUpdateId)
+
+	assert.Equal(t, "98.95", book.Bids[0].Price.String(), "the bids descend")
+	assert.Equal(t, "98.97", book.Asks[0].Price.String(), "the asks ascend")
+
+	// a removed level arrives as a zero quantity and must not be dropped
+	assert.Len(t, book.Asks, 2)
+	assert.True(t, book.Asks[1].Volume.IsZero())
+}
