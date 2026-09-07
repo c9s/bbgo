@@ -81,9 +81,11 @@ type Strategy struct {
 
 	// round closing conditions
 	// TODO: move all the closing conditions into a separate struct
-	MaxClosingLossRatio fixedpoint.Value `json:"maxClosingLossRatio"`
-	MinExitRate         fixedpoint.Value `json:"minExitRate"`
-	HardMinExitRate     fixedpoint.Value `json:"hardMinExitRate"`
+	MaxClosingLossRatio              fixedpoint.Value `json:"maxClosingLossRatio"`
+	MinExitRate                      fixedpoint.Value `json:"minExitRate"`
+	HardMinExitRate                  fixedpoint.Value `json:"hardMinExitRate"`
+	ExitPnLRatio                     fixedpoint.Value `json:"exitPnLRatio"`
+	ConsecutiveNegFundingIncomeLimit int              `json:"consecutiveNegFundingIncomeLimit"`
 
 	// TickSymbol is the symbol used for ticking the strategy, default to the first candidate symbol
 	TickSymbol   string         `json:"tickSymbol"`
@@ -232,6 +234,14 @@ func (s *Strategy) Defaults() error {
 
 	if s.HardMinExitRate.IsZero() {
 		s.HardMinExitRate = s.MinExitRate.Div(fixedpoint.Two)
+	}
+
+	if s.ExitPnLRatio.IsZero() {
+		s.ExitPnLRatio = fixedpoint.NewFromFloat(0.0005) // 0.05%
+	}
+
+	if s.ConsecutiveNegFundingIncomeLimit == 0 {
+		s.ConsecutiveNegFundingIncomeLimit = 3
 	}
 
 	if s.TradeBalanceRatio.IsZero() {
@@ -1174,10 +1184,18 @@ func (s *Strategy) transitRound(ctx context.Context, round *ArbitrageRound, curr
 func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, index *types.PremiumIndex, currentTime time.Time) {
 	// if the current funding rate is still favorable, stay in current state, otherwise transit to closing
 	lastAnnualizedFundingRate := AnnualizedRate(index.LastFundingRate, round.syncState.FundingIntervalHours)
-	spotPrice, futuresPrice, _ := s.getLastPrices(
+	spotPrice, futuresPrice, pricesOk := s.getLastPrices(
 		round.SpotSymbol(),
 		round.FuturesSymbol(),
 	)
+
+	if !pricesOk {
+		s.logger.Warnf(
+			"[transitOpeningOrReadyRoundToClosing] failed to get last prices, skipping transit: %s",
+			round.String(),
+		)
+		return
+	}
 
 	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals(currentTime, spotPrice, futuresPrice)
 	if round.TriggeredFundingRate().Sign()*index.LastFundingRate.Sign() <= 0 {
@@ -1252,7 +1270,29 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
 			return
 		}
-	} else if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 && !withinMinHoldingTime {
+	}
+
+	negFundingIncomeCnt := 0
+	for _, record := range round.FundingRecordsDescending(3) {
+		if record.Amount.Sign() < 0 {
+			negFundingIncomeCnt++
+		}
+	}
+	if negFundingIncomeCnt >= s.ConsecutiveNegFundingIncomeLimit {
+		bbgo.Notify(
+			"⚠️ Consecutive negative funding income detected (%s), transit state %s -> closing: %s",
+			negFundingIncomeCnt, round.State(), round.String(),
+			round.NewNotification(spotPrice, futuresPrice),
+		)
+		round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
+		return
+	}
+
+	if round.State() != RoundReady {
+		return
+	}
+
+	if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 && !withinMinHoldingTime {
 		// check hard min exit rate
 		if lastAnnualizedFundingRate.Abs().Compare(s.HardMinExitRate) <= 0 {
 			bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the hard min exit rate %s, transit state %s -> closing: %s",
@@ -1263,10 +1303,12 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 			return
 		}
 		// check min exit rate and total PnL
-		totalPnL := round.UnrealizedPnL(spotPrice, futuresPrice).TotalPnL()
-		if totalPnL.Sign() > 0 {
-			// the round is generating profit but the funding rate is below the min exit rate, transit to closing
-			bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the min exit rate %s with total PnL %s, transit state %s -> closing: %s",
+		unrealizedPnL := round.UnrealizedPnL(spotPrice, futuresPrice)
+		spotNotional := unrealizedPnL.SpotNotional()
+		totalPnL := unrealizedPnL.TotalPnL()
+		if totalPnL.Sign() > 0 && totalPnL.Div(spotNotional).Compare(s.ExitPnLRatio) >= 0 {
+			// the round is generating profit but the funding rate is below the soft min exit rate, transit to closing
+			bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the soft min exit rate %s with total PnL %s, transit state %s -> closing: %s",
 				index.LastFundingRate, lastAnnualizedFundingRate, s.MinExitRate, totalPnL, round.State(), round.String(),
 				round.NewNotification(spotPrice, futuresPrice),
 			)

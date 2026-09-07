@@ -3,6 +3,7 @@ package xfundingv2
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -532,6 +533,25 @@ func (r *ArbitrageRound) MinHoldingIntervals(currentTime time.Time, spotPrice, f
 		)
 	}
 	return r.syncState.MinHoldingIntervals
+}
+
+func (r *ArbitrageRound) FundingRecordsDescending(limit int) []FundingFee {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var records []FundingFee
+	for _, record := range r.syncState.FundingFeeRecords {
+		records = append(records, record)
+	}
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].Time.After(records[j].Time)
+	})
+
+	if limit < 0 || len(records) <= limit {
+		return records
+	}
+
+	return records[:limit]
 }
 
 // dynamicHoldingIntervals adjusts the min holding intervals based on the current total PnL
