@@ -206,17 +206,21 @@ func Test_dynamicHoldingIntervals(t *testing.T) {
 			totalPnL               fixedpoint.Value
 			oriMinHoldingIntervals int
 			numHoldingIntervals    int
+			expected               int
 		}{
-			{"positive total pnl", avgFeeIncome, Number(5.0), 3, 2},
-			{"zero total pnl", avgFeeIncome, fixedpoint.Zero, 3, 2},
-			{"non-positive average funding income", fixedpoint.Zero, Number(-5.0), 3, 2},
-			{"negative average funding income", Number(-1.0), Number(-5.0), 3, 2},
-			{"breakeven below one interval", avgFeeIncome, Number(-0.5), 3, 2},
+			// profitable or non-positive fee income → the position can be closed
+			// immediately, so fall back to the elapsed holding intervals.
+			{"positive total pnl", avgFeeIncome, Number(5.0), 3, 2, 2},
+			{"non-positive average funding income", fixedpoint.Zero, Number(-5.0), 3, 2, 2},
+			{"negative average funding income", Number(-1.0), Number(-5.0), 3, 2, 2},
+			// break-even below one interval → keep the configured value.
+			{"zero total pnl", avgFeeIncome, fixedpoint.Zero, 3, 2, 3},
+			{"breakeven below one interval", avgFeeIncome, Number(-0.5), 3, 2, 3},
 		}
 		for _, c := range cases {
 			t.Run(c.name, func(t *testing.T) {
 				got := dynamicHoldingIntervals(c.avgFeeIncome, c.totalPnL, c.oriMinHoldingIntervals, c.numHoldingIntervals)
-				assert.Equal(t, c.oriMinHoldingIntervals, got)
+				assert.Equal(t, c.expected, got)
 			})
 		}
 	})
@@ -241,14 +245,14 @@ func Test_dynamicHoldingIntervals(t *testing.T) {
 			expected            int
 		}{
 			// increasing: the loss deepens faster than time elapses.
-			{"no loss yet", Number(5.0), 0, baseline}, // profit → hold at baseline
-			{"loss appears", Number(-3.0), 0, 3},      // 0 + ceil(3/1)
-			{"loss grows", Number(-5.0), 1, 6},        // 1 + ceil(5/1)
-			{"loss deepens", Number(-6.0), 2, 8},      // 2 + ceil(6/1)
+			{"no loss yet", Number(5.0), 0, 0},   // profit → close immediately at elapsed intervals
+			{"loss appears", Number(-3.0), 0, 3}, // 0 + ceil(3/1)
+			{"loss grows", Number(-5.0), 1, 6},   // 1 + ceil(5/1)
+			{"loss deepens", Number(-6.0), 2, 8}, // 2 + ceil(6/1)
 			// decreasing: the loss shrinks as funding income accrues.
 			{"loss recovering", Number(-4.0), 3, 7},      // 3 + ceil(4/1)
 			{"loss shrinks further", Number(-2.0), 4, 6}, // 4 + ceil(2/1)
-			{"back to profit", Number(1.0), 5, 6},        // profit → hold at last value
+			{"back to profit", Number(1.0), 5, 5},        // profit → close immediately at elapsed intervals
 		}
 
 		ori := baseline
@@ -260,8 +264,8 @@ func Test_dynamicHoldingIntervals(t *testing.T) {
 			ori = out
 		}
 
-		// The sequence first increases (3 → 8) then decreases (8 → 6).
-		assert.Equal(t, []int{3, 3, 6, 8, 7, 6, 6}, got)
+		// The sequence first increases (0 → 8) then decreases (8 → 5).
+		assert.Equal(t, []int{0, 3, 6, 8, 7, 6, 5}, got)
 	})
 }
 
