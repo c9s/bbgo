@@ -670,15 +670,17 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 		},
 	}...)
 
+	spotTarget := n.spotWorker.TargetPosition()
+	futuresTarget := n.futuresWorker.TargetPosition()
 	fields = append(fields, []slack.AttachmentField{
 		{
 			Title: "Spot Filled Position",
-			Value: fmt.Sprintf("%s@%s", n.spotWorker.FilledPosition().String(), spotAvgCost.String()),
+			Value: fmt.Sprintf("%s(%s)@%s", n.spotWorker.FilledPosition().String(), spotTarget.String(), spotAvgCost.String()),
 			Short: true,
 		},
 		{
 			Title: "Futures Filled Position",
-			Value: fmt.Sprintf("%s@%s", n.futuresWorker.FilledPosition().String(), futuresAvgCost.String()),
+			Value: fmt.Sprintf("%s(%s)@%s", n.futuresWorker.FilledPosition().String(), futuresTarget.String(), futuresAvgCost.String()),
 			Short: true,
 		},
 	}...)
