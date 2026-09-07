@@ -60,8 +60,13 @@ type Strategy struct {
 	// lock before update the strategy state, such as current round, selected market, etc
 	mu sync.Mutex
 
-	DryRun              bool `json:"dryRun"`
-	ClosingAllOnStartup bool `json:"closingAllOnStartup"`
+	DryRun                 bool     `json:"dryRun"`
+	ClosingAllOnStartup    bool     `json:"closingAllOnStartup"`
+	RemoveOnStartupSymbols []string `json:"removeOnStartupSymbols"`
+
+	// AppliedStartupRemovals records the symbols whose active rounds have already been
+	// removed on a previous startup for the current RemoveOnStartupSymbols config.
+	AppliedStartupRemovals map[string]struct{} `persistence:"appliedStartupRemovals"`
 
 	InstanceTag string `json:"instanceTag"`
 
@@ -414,6 +419,9 @@ func (s *Strategy) CrossRun(
 
 	// cleanup pending rounds on startup
 	s.PendingRounds = make(map[string]*PendingRound)
+
+	// remove the symbols that are configured to be removed on startup
+	s.removeRoundsOnStartup()
 
 	s.spotSession = sessions[s.SpotSession]
 	s.futuresSession = sessions[s.FuturesSession]
@@ -2110,4 +2118,51 @@ func (s *Strategy) closeDelistedRounds(currentTime time.Time) {
 		}
 	}
 
+}
+
+func (s *Strategy) removeRoundsOnStartup() {
+	if bbgo.IsBackTesting {
+		return
+	}
+	if s.AppliedStartupRemovals == nil {
+		s.AppliedStartupRemovals = make(map[string]struct{})
+	}
+
+	configured := make(map[string]struct{}, len(s.RemoveOnStartupSymbols))
+	for _, symbol := range s.RemoveOnStartupSymbols {
+		configured[symbol] = struct{}{}
+	}
+
+	// prune symbols that are no longer configured so that re-adding them later triggers
+	// the removal again. This is what removes the need for the two-step reset: to remove a
+	// round again (same or different symbol) the operator just edits RemoveOnStartupSymbols.
+	for symbol := range s.AppliedStartupRemovals {
+		if _, ok := configured[symbol]; !ok {
+			delete(s.AppliedStartupRemovals, symbol)
+		}
+	}
+
+	for _, symbol := range s.RemoveOnStartupSymbols {
+		// already removed on a previous startup with the same config; skip so we don't
+		// delete a round that was legitimately re-opened on the same symbol after removal.
+		if _, done := s.AppliedStartupRemovals[symbol]; done {
+			continue
+		}
+		// mark as handled regardless of whether an active round currently exists, so that
+		// a round opened later on the same symbol is not deleted on the next restart.
+		s.AppliedStartupRemovals[symbol] = struct{}{}
+
+		round, found := s.ActiveRounds[symbol]
+		if !found {
+			s.logger.Warnf("no active round found for symbol %s to remove on startup", symbol)
+			continue
+		}
+		s.logger.Warnf(
+			"removing active round on startup for symbol %s: %s",
+			symbol, round.String(),
+		)
+		delete(s.ActiveRounds, symbol)
+		delete(s.SpotPositions, round.SpotSymbol())
+		delete(s.FuturesPositions, round.FuturesSymbol())
+	}
 }
