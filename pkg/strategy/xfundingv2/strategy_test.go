@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -444,5 +445,107 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 		assert.NotNil(t, result)
 		assert.Equal(t, "ETHUSDT", result.Symbol)
 		assert.Equal(t, 8, result.FundingIntervalHours)
+	})
+}
+
+func TestRemoveRoundsOnStartup(t *testing.T) {
+	// helper to build a strategy with the given active-round symbols populated.
+	newStrategyWithRounds := func(t *testing.T, ctrl *gomock.Controller, symbols ...string) *Strategy {
+		s := newDefaultTestStrategy()
+		s.ActiveRounds = make(map[string]*ArbitrageRound)
+		s.SpotPositions = make(map[string]*types.Position)
+		s.FuturesPositions = make(map[string]*types.Position)
+		nextFundingTime := time.Now().Add(time.Hour)
+		for _, symbol := range symbols {
+			round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
+			s.ActiveRounds[symbol] = round
+			s.SpotPositions[symbol] = &types.Position{}
+			s.FuturesPositions[symbol] = &types.Position{}
+		}
+		return s
+	}
+
+	t.Run("removes configured active round once and records it", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		s := newStrategyWithRounds(t, ctrl, "BTCUSDT", "ETHUSDT")
+		s.RemoveOnStartupSymbols = []string{"BTCUSDT"}
+
+		s.removeRoundsOnStartup()
+
+		_, btcActive := s.ActiveRounds["BTCUSDT"]
+		assert.False(t, btcActive, "BTCUSDT round should be removed")
+		_, ethActive := s.ActiveRounds["ETHUSDT"]
+		assert.True(t, ethActive, "ETHUSDT round should be untouched")
+		_, btcSpot := s.SpotPositions["BTCUSDT"]
+		assert.False(t, btcSpot, "BTCUSDT spot position should be cleared")
+		_, btcFutures := s.FuturesPositions["BTCUSDT"]
+		assert.False(t, btcFutures, "BTCUSDT futures position should be cleared")
+		assert.Contains(t, s.AppliedStartupRemovals, "BTCUSDT")
+	})
+
+	t.Run("does not delete a re-opened round on subsequent startup", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		// first startup removes BTCUSDT and records it in the persisted set.
+		s := newStrategyWithRounds(t, ctrl, "BTCUSDT")
+		s.RemoveOnStartupSymbols = []string{"BTCUSDT"}
+		s.removeRoundsOnStartup()
+
+		// simulate a restart: the persisted set survives, and a new BTCUSDT round was
+		// legitimately opened again while running (still configured for removal).
+		newRound, _ := newTestArbitrageRound(t, ctrl, 8, 3, time.Now().Add(time.Hour))
+		s.ActiveRounds["BTCUSDT"] = newRound
+		s.removeRoundsOnStartup()
+
+		_, btcActive := s.ActiveRounds["BTCUSDT"]
+		assert.True(t, btcActive, "re-opened BTCUSDT round must be preserved on restart")
+	})
+
+	t.Run("re-adding a symbol after config change triggers removal again", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		// startup 1: remove BTCUSDT.
+		s := newStrategyWithRounds(t, ctrl, "BTCUSDT")
+		s.RemoveOnStartupSymbols = []string{"BTCUSDT"}
+		s.removeRoundsOnStartup()
+		assert.Contains(t, s.AppliedStartupRemovals, "BTCUSDT")
+
+		// startup 2: operator drops BTCUSDT from config -> it is pruned from the set,
+		// so no two-step "empty config" restart is required.
+		s.RemoveOnStartupSymbols = nil
+		s.removeRoundsOnStartup()
+		assert.NotContains(t, s.AppliedStartupRemovals, "BTCUSDT")
+
+		// startup 3: operator re-adds BTCUSDT (a new round exists again) -> removed again.
+		newRound, _ := newTestArbitrageRound(t, ctrl, 8, 3, time.Now().Add(time.Hour))
+		s.ActiveRounds["BTCUSDT"] = newRound
+		s.RemoveOnStartupSymbols = []string{"BTCUSDT"}
+		s.removeRoundsOnStartup()
+		_, btcActive := s.ActiveRounds["BTCUSDT"]
+		assert.False(t, btcActive, "BTCUSDT round should be removed again after re-adding to config")
+	})
+
+	t.Run("switching to a different symbol removes only the new one", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		s := newStrategyWithRounds(t, ctrl, "BTCUSDT", "ETHUSDT")
+
+		// startup 1: remove BTCUSDT.
+		s.RemoveOnStartupSymbols = []string{"BTCUSDT"}
+		s.removeRoundsOnStartup()
+
+		// startup 2: switch config directly to ETHUSDT -> BTCUSDT pruned, ETHUSDT removed.
+		s.RemoveOnStartupSymbols = []string{"ETHUSDT"}
+		s.removeRoundsOnStartup()
+
+		_, ethActive := s.ActiveRounds["ETHUSDT"]
+		assert.False(t, ethActive, "ETHUSDT round should be removed after switching config")
+		assert.Contains(t, s.AppliedStartupRemovals, "ETHUSDT")
+		assert.NotContains(t, s.AppliedStartupRemovals, "BTCUSDT")
 	})
 }
