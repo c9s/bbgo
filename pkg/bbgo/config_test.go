@@ -80,16 +80,20 @@ func TestLoadConfig(t *testing.T) {
 							"envVarPrefix":              "MAX",
 							"marginInfoUpdaterInterval": "3m0s",
 							// json.Unmarshal decodes numbers into float64, so we need to use float64 here to match the unmarshaled value.
-							"marginInfoUpdaterBatchSize": float64(3),
-							"marginInfoUpdaterCooldown":  "9m0s",
+							"marginInfoUpdaterBatchSize":         float64(3),
+							"marginInfoUpdaterCooldown":          "9m0s",
+							"marginInfoUpdaterTradesBufferCount": float64(30),
+							"marginInfoUpdaterBindSession":       false,
 						},
 						"binance": map[string]interface{}{
 							"exchange":                  "binance",
 							"envVarPrefix":              "BINANCE",
 							"marginInfoUpdaterInterval": "5m0s",
 							// json.Unmarshal decodes numbers into float64, so we need to use float64 here to match the unmarshaled value.
-							"marginInfoUpdaterBatchSize": float64(5),
-							"marginInfoUpdaterCooldown":  "15m0s",
+							"marginInfoUpdaterBatchSize":         float64(5),
+							"marginInfoUpdaterCooldown":          "15m0s",
+							"marginInfoUpdaterTradesBufferCount": float64(30),
+							"marginInfoUpdaterBindSession":       false,
 						},
 					},
 					"build": map[string]interface{}{

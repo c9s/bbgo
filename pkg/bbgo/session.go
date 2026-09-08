@@ -143,9 +143,8 @@ type ExchangeSessionConfig struct {
 	SubAccount   string             `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
 
 	// Margin Assets Configs
-	MarginInfoUpdaterInterval  types.Duration `json:"marginInfoUpdaterInterval" yaml:"marginInfoUpdaterInterval"`
-	MarginInfoUpdaterBatchSize int            `json:"marginInfoUpdaterBatchSize" yaml:"marginInfoUpdaterBatchSize"`
-	MarginInfoUpdaterCooldown  types.Duration `json:"marginInfoUpdaterCooldown" yaml:"marginInfoUpdaterCooldown"`
+	// we embed the config struct here for backward compatibility
+	MarginInfoUpdaterConfig `yaml:",inline"`
 
 	MakerFeeRateConfig *fixedpoint.Value `json:"makerFeeRate,omitempty" yaml:"makerFeeRate"`
 	TakerFeeRateConfig *fixedpoint.Value `json:"takerFeeRate,omitempty" yaml:"takerFeeRate"`
@@ -678,29 +677,21 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 	// session-wide max borrowable updating worker
 	if !session.PublicOnly && session.Margin {
-		if session.MarginInfoUpdaterInterval == 0 {
-			session.MarginInfoUpdaterInterval = defaultMarginInfoUpdaterInterval
-		}
-		if session.MarginInfoUpdaterBatchSize == 0 {
-			session.MarginInfoUpdaterBatchSize = defaultMarginInfoUpdateBatchSize
-		}
-		if session.MarginInfoUpdaterCooldown == 0 {
-			session.MarginInfoUpdaterCooldown = defaultMarginInfoUpdaterCooldown
-		}
+		session.MarginInfoUpdaterConfig.Defaults()
 
 		if service, ok := session.Exchange.(types.MarginBorrowRepayService); ok {
-			marginUpdater := NewMarginInfoUpdater(service)
+			marginUpdater := NewMarginInfoUpdater(service, session.MarginInfoUpdaterConfig)
+			if session.MarginInfoUpdaterConfig.BindSession {
+				if err := marginUpdater.Bind(session); err != nil {
+					return fmt.Errorf("failed to bind margin info updater: %w", err)
+				}
+			}
 			session.marginInfoUpdater = marginUpdater
 
 			session.UserDataStream.OnStart(func() {
-				session.logger.Infof("starting margin info updater with update interval: %s", session.MarginInfoUpdaterInterval.Duration())
+				session.logger.Infof("starting margin info updater with config: %+v", session.MarginInfoUpdaterConfig)
 
-				go session.marginInfoUpdater.Run(
-					ctx,
-					session.MarginInfoUpdaterInterval,
-					session.MarginInfoUpdaterBatchSize,
-					session.MarginInfoUpdaterCooldown.Duration(),
-				)
+				go session.marginInfoUpdater.Run(ctx)
 			})
 		}
 	}
