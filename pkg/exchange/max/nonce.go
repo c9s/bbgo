@@ -20,6 +20,10 @@ import (
 // matching/cancel engine, so resending with a fresh nonce is safe (no duplicate
 // action).
 func isMaxNonceError(err error) bool {
+	if err == nil {
+		return false
+	}
+
 	var responseErr *requestgen.ErrResponse
 	if !errors.As(err, &responseErr) {
 		return false

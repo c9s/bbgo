@@ -497,6 +497,12 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 			if err := retryOnNonceError(ctx, func() error {
 				_, err := req.Do(ctx)
+				if isMaxNonceError(err) {
+					log.WithError(err).Warnf(
+						"cancel group id %d orders encountered nonce error",
+						groupID,
+					)
+				}
 				return err
 			}); err != nil {
 				log.WithError(err).Errorf("group id %d order cancel error", groupID)
@@ -520,6 +526,12 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 		if err := retryOnNonceError(ctx, func() error {
 			_, err := req.Do(ctx)
+			if isMaxNonceError(err) {
+				log.WithError(err).WithFields(logFields).Warnf(
+					"cancel order encountered nonce error, order=%v",
+					o.AsQuery(),
+				)
+			}
 			return err
 		}); err != nil {
 			log.WithError(err).WithFields(logFields).Errorf("order cancel error")
