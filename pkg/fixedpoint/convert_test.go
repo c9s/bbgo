@@ -122,3 +122,31 @@ func Test_FormatString(t *testing.T) {
 		})
 	}
 }
+
+func Test_Trunc(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		{input: "0", expected: "0"},
+		{input: "1", expected: "1"},
+		{input: "-1", expected: "-1"},
+		{input: "1.5", expected: "1"},
+		{input: "-1.5", expected: "-1"},
+		{input: "0.5", expected: "0"},
+		{input: "-0.5", expected: "0"},
+		{input: "1.00000001", expected: "1"},
+		{input: "-1.00000001", expected: "-1"},
+		{input: "123.456", expected: "123"},
+		{input: "-123.456", expected: "-123"},
+		{input: "0.00000001", expected: "0"},
+		{input: "-0.00000001", expected: "0"},
+	}
+
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("trunc(%s) = %s", c.input, c.expected), func(t *testing.T) {
+			v := MustNewFromString(c.input)
+			assert.Equal(t, c.expected, v.Trunc().String())
+		})
+	}
+}

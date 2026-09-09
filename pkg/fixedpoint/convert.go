@@ -36,7 +36,7 @@ const (
 
 // Trunc returns the integer portion (truncating any fractional part)
 func (v Value) Trunc() Value {
-	return NewFromFloat(math.Floor(v.Float64()))
+	return NewFromFloat(math.Trunc(v.Float64()))
 }
 
 func (v Value) Round(r int, mode RoundingMode) Value {
