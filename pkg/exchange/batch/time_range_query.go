@@ -144,6 +144,12 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 
 			if !sentAny {
 				log.Debugf("batch querying %T: %d/%d records are not sent", q.Type, listLen, listLen)
+				if q.JumpIfEmpty > 0 {
+					startTime = startTime.Add(q.JumpIfEmpty)
+					if startTime.Before(endTime) {
+						continue
+					}
+				}
 				return
 			}
 		}
