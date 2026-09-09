@@ -164,3 +164,76 @@ func TestNewMutexOrderBook_SkipListBackend(t *testing.T) {
 	book := NewMutexOrderBook("BTCUSDT", ExchangeBinance)
 	assert.IsType(t, &SkipListOrderBook{}, book.orderBook)
 }
+
+func TestSkipListOrderBook_ResetPreservesSegmentLengths(t *testing.T) {
+	segLens := []int{2, 2, 2}
+	book := NewSkipListOrderBookWithSegmentLengths("BTCUSDT", segLens)
+
+	// Load resets both sides, which must not fall back to the package defaults
+	book.Load(SliceOrderBook{
+		Symbol: "BTCUSDT",
+		Bids:   pvSlice(2800, 1),
+		Asks:   pvSlice(2810, 1),
+	})
+	assert.Equal(t, segLens, book.segLens)
+	assert.Equal(t, 3, book.Bids.MaxLevel())
+	assert.Equal(t, 3, book.Asks.MaxLevel())
+
+	book.Reset()
+	assert.Equal(t, 3, book.Bids.MaxLevel())
+	assert.Equal(t, 3, book.Asks.MaxLevel())
+}
+
+func TestSkipListOrderBook_CopyPreservesSegmentLengths(t *testing.T) {
+	book := NewSkipListOrderBookWithSegmentLengths("BTCUSDT", []int{2, 2, 2})
+	book.Load(SliceOrderBook{
+		Symbol: "BTCUSDT",
+		Bids:   pvSlice(2800, 1, 2790, 2),
+		Asks:   pvSlice(2810, 1, 2820, 2),
+	})
+
+	c := book.CopyDepth(1).(*SkipListOrderBook)
+	assert.Equal(t, 3, c.Bids.MaxLevel())
+	assert.Equal(t, 3, c.Asks.MaxLevel())
+}
+
+func TestSkipListOrderBook_DefaultSegmentLengths(t *testing.T) {
+	book := NewSkipListOrderBook("BTCUSDT")
+	assert.Equal(t, defaultSkipListMaxLevel, book.Bids.MaxLevel())
+	assert.Equal(t, defaultSkipListMaxLevel, book.Asks.MaxLevel())
+
+	// the caller's slice must not be retained or mutated by the constructor
+	segLens := []int{1, 1}
+	custom := NewSkipListOrderBookWithSegmentLengths("BTCUSDT", segLens)
+	assert.Equal(t, []int{1, 1}, segLens, "constructor must not mutate the caller's slice")
+	assert.Equal(t, 2, custom.Bids.MaxLevel())
+
+	// an empty segLens falls back to the tuned defaults rather than an unusable book
+	fallback := NewSkipListOrderBookWithSegmentLengths("BTCUSDT", nil)
+	assert.Equal(t, defaultSkipListMaxLevel, fallback.Bids.MaxLevel())
+}
+
+// a book built with the tuned defaults must behave identically to one built with the
+// skiplist package defaults, at a depth well past what a real book reaches
+func TestSkipListOrderBook_SegmentLengthsDoNotChangeOrdering(t *testing.T) {
+	snapshot := makeOrderBookSnapshot("BTCUSDT", 8000)
+
+	ref := NewSkipListOrderBookWithSegmentLengths("BTCUSDT", segmentLengthsForTest(32, 2))
+	ref.Load(snapshot)
+
+	book := NewSkipListOrderBook("BTCUSDT")
+	book.Load(snapshot)
+
+	assert.Equal(t, 8000, book.Bids.Len())
+	assert.Equal(t, 8000, book.Asks.Len())
+	assert.Equal(t, ref.SideBook(SideTypeBuy), book.SideBook(SideTypeBuy))
+	assert.Equal(t, ref.SideBook(SideTypeSell), book.SideBook(SideTypeSell))
+}
+
+func segmentLengthsForTest(maxLevel, seg int) []int {
+	segLens := make([]int, maxLevel)
+	for i := range segLens {
+		segLens[i] = seg
+	}
+	return segLens
+}
