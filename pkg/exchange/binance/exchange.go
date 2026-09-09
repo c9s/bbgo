@@ -1758,12 +1758,14 @@ func (e *Exchange) configureFuturesOptions(options map[string]any) (err error) {
 	defer func() {
 		if err == nil {
 			log.Infof("toggle Futures Burn BNB response: %+v", resp)
+		} else {
+			log.WithError(err).Warn("toggle Futures Burn BNB error")
 		}
 	}()
 	if err != nil {
 		if err2, ok := err.(*requestgen.ErrResponse); ok {
 			errResp := &Error{}
-			if jsonErr := json.Unmarshal(err2.Response.Body, errResp); jsonErr != nil && errResp.Code == -4145 {
+			if jsonErr := json.Unmarshal(err2.Response.Body, errResp); jsonErr == nil && errResp.Code == -4145 {
 				// futures BNB burn is already set to the requested value, no need to switch -> ignore the error
 				err = nil
 			}
@@ -1792,9 +1794,10 @@ func (e *Exchange) configureSpotOptions(options map[string]any) error {
 
 	resp, err := req.Do(ctx)
 	if err != nil {
+		log.WithError(err).Warn("toggle Spot Burn BNB failed")
 		return err
 	}
-	log.Infof("toggle Burn BNB response: %+v", resp)
+	log.Infof("toggle Spot Burn BNB response: %+v", resp)
 	return nil
 }
 
