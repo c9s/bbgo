@@ -131,6 +131,12 @@ func (r *ArbitrageRound) UnrealizedPnL(spotPrice, futuresPrice fixedpoint.Value)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	return r.unrealizedPnL(spotPrice, futuresPrice)
+}
+
+// unrealizedPnL calculates the unrealized profit and loss of the round by the
+// given mark prices without locking. The caller must already hold r.mu.
+func (r *ArbitrageRound) unrealizedPnL(spotPrice, futuresPrice fixedpoint.Value) *RoundUnrealizedPnL {
 	realized := r.realizedPnL()
 
 	result := &RoundUnrealizedPnL{
