@@ -12,6 +12,28 @@ import (
 
 const defaultSkipListSideBookLimit = 200
 
+// The skip list defaults (32 levels, promote with probability 1/2) are sized for lists of
+// billions of entries, while an order book side holds thousands. That oversizing is not
+// free: every Set and Delete allocates an update slice of maxLevel node pointers, so
+// maxLevel multiplies the cost of the websocket update path.
+//
+// These values address roughly 4^10 (~1M) price levels, which leaves ample headroom over
+// the deepest books we see, and measurably cut both time and allocation per update
+// compared to the package defaults. See BenchmarkOrderBook_UpdateVolume.
+const (
+	defaultSkipListMaxLevel      = 10
+	defaultSkipListSegmentLength = 4
+)
+
+func defaultSkipListSegmentLengths() []int {
+	segLens := make([]int, defaultSkipListMaxLevel)
+	for i := range segLens {
+		segLens[i] = defaultSkipListSegmentLength
+	}
+
+	return segLens
+}
+
 type priceLevelSkipList = skiplist.SkipList[fixedpoint.Value, fixedpoint.Value]
 
 // priceAscending orders prices from low to high, which is the natural order of the ask side.
@@ -34,17 +56,44 @@ type SkipListOrderBook struct {
 	Bids   *priceLevelSkipList
 	Asks   *priceLevelSkipList
 
+	// segLens is kept so that Reset and CopyDepth rebuild the sides with the same shape
+	// the book was created with, instead of silently falling back to the package defaults
+	// on every snapshot load and stream reconnect.
+	segLens []int
+
 	lastUpdateTime time.Time
 
 	loadCallbacks   []func(book *SkipListOrderBook)
 	updateCallbacks []func(book *SkipListOrderBook)
 }
 
+// newPriceLevelSkipList builds one side of the book. It hands skiplist.New its own copy of
+// segLens because New sanitizes the slice in place and then retains it.
+func newPriceLevelSkipList(cmp skiplist.Comparator[fixedpoint.Value], segLens []int) *priceLevelSkipList {
+	return skiplist.New[fixedpoint.Value, fixedpoint.Value](cmp, append([]int(nil), segLens...)...)
+}
+
 func NewSkipListOrderBook(symbol string) *SkipListOrderBook {
+	return NewSkipListOrderBookWithSegmentLengths(symbol, defaultSkipListSegmentLengths())
+}
+
+// NewSkipListOrderBookWithSegmentLengths creates a book whose sides use the given per-level
+// segment lengths, which control the maximum height of the skip list and the promotion
+// probability at each level. It exists for tests and benchmarks that compare shapes; normal
+// callers should use NewSkipListOrderBook and get the tuned defaults. An empty segLens
+// falls back to those defaults.
+func NewSkipListOrderBookWithSegmentLengths(symbol string, segLens []int) *SkipListOrderBook {
+	if len(segLens) == 0 {
+		segLens = defaultSkipListSegmentLengths()
+	} else {
+		segLens = append([]int(nil), segLens...)
+	}
+
 	return &SkipListOrderBook{
-		Symbol: symbol,
-		Bids:   skiplist.New[fixedpoint.Value, fixedpoint.Value](priceDescending),
-		Asks:   skiplist.New[fixedpoint.Value, fixedpoint.Value](priceAscending),
+		Symbol:  symbol,
+		Bids:    newPriceLevelSkipList(priceDescending, segLens),
+		Asks:    newPriceLevelSkipList(priceAscending, segLens),
+		segLens: segLens,
 	}
 }
 
@@ -117,8 +166,12 @@ func (b *SkipListOrderBook) Update(book SliceOrderBook) {
 }
 
 func (b *SkipListOrderBook) Reset() {
-	b.Bids = skiplist.New[fixedpoint.Value, fixedpoint.Value](priceDescending)
-	b.Asks = skiplist.New[fixedpoint.Value, fixedpoint.Value](priceAscending)
+	if len(b.segLens) == 0 {
+		b.segLens = defaultSkipListSegmentLengths()
+	}
+
+	b.Bids = newPriceLevelSkipList(priceDescending, b.segLens)
+	b.Asks = newPriceLevelSkipList(priceAscending, b.segLens)
 }
 
 func updateSkipListSide(sl *priceLevelSkipList, pvs PriceVolumeSlice) {
@@ -137,15 +190,17 @@ func (b *SkipListOrderBook) update(book SliceOrderBook) {
 	b.lastUpdateTime = time.Now()
 }
 
-func copySkipList(src *priceLevelSkipList, cmp skiplist.Comparator[fixedpoint.Value], limit int) *priceLevelSkipList {
-	dst := skiplist.New[fixedpoint.Value, fixedpoint.Value](cmp)
+// copySkipListInto copies up to limit entries from src into dst in src's own order.
+// A limit <= 0 copies everything. dst is written into rather than allocated here because
+// constructing a skip list is expensive (it seeds its own rand source), so the lists the
+// constructor already built are reused instead of being thrown away.
+func copySkipListInto(dst, src *priceLevelSkipList, limit int) {
 	n := 0
 	src.Ascend(func(price, volume fixedpoint.Value) bool {
 		dst.Set(price, volume)
 		n++
 		return !(limit > 0 && n >= limit)
 	})
-	return dst
 }
 
 func (b *SkipListOrderBook) Copy() OrderBook {
@@ -153,9 +208,9 @@ func (b *SkipListOrderBook) Copy() OrderBook {
 }
 
 func (b *SkipListOrderBook) CopyDepth(limit int) OrderBook {
-	book := NewSkipListOrderBook(b.Symbol)
-	book.Bids = copySkipList(b.Bids, priceDescending, limit)
-	book.Asks = copySkipList(b.Asks, priceAscending, limit)
+	book := NewSkipListOrderBookWithSegmentLengths(b.Symbol, b.segLens)
+	copySkipListInto(book.Bids, b.Bids, limit)
+	copySkipListInto(book.Asks, b.Asks, limit)
 	book.lastUpdateTime = b.lastUpdateTime
 	return book
 }

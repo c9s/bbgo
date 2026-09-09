@@ -104,6 +104,10 @@ func (sl *SkipList[K, V]) Seed(seed int64) {
 // Len returns the number of elements in the skip list.
 func (sl *SkipList[K, V]) Len() int { return sl.length }
 
+// MaxLevel returns the maximum node height this skip list was configured with, which is
+// the number of segment lengths given to New.
+func (sl *SkipList[K, V]) MaxLevel() int { return sl.maxLevel }
+
 // Get finds and returns the Value associated with Key.
 func (sl *SkipList[K, V]) Get(key K) (V, bool) {
 	x := sl.head
