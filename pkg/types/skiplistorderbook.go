@@ -137,15 +137,17 @@ func (b *SkipListOrderBook) update(book SliceOrderBook) {
 	b.lastUpdateTime = time.Now()
 }
 
-func copySkipList(src *priceLevelSkipList, cmp skiplist.Comparator[fixedpoint.Value], limit int) *priceLevelSkipList {
-	dst := skiplist.New[fixedpoint.Value, fixedpoint.Value](cmp)
+// copySkipListInto copies up to limit entries from src into dst in src's own order.
+// A limit <= 0 copies everything. dst is written into rather than allocated here because
+// constructing a skip list is expensive (it seeds its own rand source), so the lists the
+// constructor already built are reused instead of being thrown away.
+func copySkipListInto(dst, src *priceLevelSkipList, limit int) {
 	n := 0
 	src.Ascend(func(price, volume fixedpoint.Value) bool {
 		dst.Set(price, volume)
 		n++
 		return !(limit > 0 && n >= limit)
 	})
-	return dst
 }
 
 func (b *SkipListOrderBook) Copy() OrderBook {
@@ -154,8 +156,8 @@ func (b *SkipListOrderBook) Copy() OrderBook {
 
 func (b *SkipListOrderBook) CopyDepth(limit int) OrderBook {
 	book := NewSkipListOrderBook(b.Symbol)
-	book.Bids = copySkipList(b.Bids, priceDescending, limit)
-	book.Asks = copySkipList(b.Asks, priceAscending, limit)
+	copySkipListInto(book.Bids, b.Bids, limit)
+	copySkipListInto(book.Asks, b.Asks, limit)
 	book.lastUpdateTime = b.lastUpdateTime
 	return book
 }
