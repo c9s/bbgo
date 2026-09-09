@@ -36,6 +36,18 @@ func BenchmarkOrderBook_Load(b *testing.B) {
 		}
 	})
 
+	b.Run("SkipListOrderBook", func(b *testing.B) {
+		book := NewSkipListOrderBook("ETHUSDT")
+		for i := 0; i < b.N; i++ {
+			for _, ask := range asks {
+				book.Asks.Set(ask.Price, ask.Volume)
+			}
+			for _, bid := range bids {
+				book.Bids.Set(bid.Price, bid.Volume)
+			}
+		}
+	})
+
 	b.Run("OrderBook", func(b *testing.B) {
 		book := &SliceOrderBook{}
 		for i := 0; i < b.N; i++ {
@@ -71,6 +83,25 @@ func BenchmarkOrderBook_UpdateAndInsert(b *testing.B) {
 				rbBook.Asks.Upsert(price, fixedpoint.One)
 			} else {
 				rbBook.Bids.Upsert(price, fixedpoint.One)
+			}
+		}
+	})
+
+	slBook := NewSkipListOrderBook("ETHUSDT")
+	for _, ask := range asks {
+		slBook.Asks.Set(ask.Price, ask.Volume)
+	}
+	for _, bid := range bids {
+		slBook.Bids.Set(bid.Price, bid.Volume)
+	}
+
+	b.Run("SkipListOrderBook", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			var price = fixedpoint.NewFromFloat(rand.Float64() * 2000.0)
+			if price.Compare(fixedpoint.NewFromInt(1000)) >= 0 {
+				slBook.Asks.Set(price, fixedpoint.One)
+			} else {
+				slBook.Bids.Set(price, fixedpoint.One)
 			}
 		}
 	})
