@@ -382,6 +382,11 @@ func (s *Strategy) Validate() error {
 	if s.MinNotionalMultiplier.Compare(fixedpoint.One) < 0 {
 		return fmt.Errorf("minNotionalMultiplier should be greater than or equal to 1: %s", s.MinNotionalMultiplier)
 	}
+
+	if err := s.TWAPWorkerConfig.Validate(); err != nil {
+		return fmt.Errorf("invalid TWAP worker config: %w", err)
+	}
+
 	return nil
 }
 

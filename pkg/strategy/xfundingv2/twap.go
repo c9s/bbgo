@@ -76,6 +76,28 @@ func (c *TWAPWorkerConfig) Defaults() {
 	}
 }
 
+func (c *TWAPWorkerConfig) Validate() error {
+	if c.Duration <= 0 {
+		return fmt.Errorf("duration must be positive")
+	}
+	if c.ClosingDuration <= 0 {
+		return fmt.Errorf("closing duration must be positive")
+	}
+	if c.NumSlices <= 0 {
+		return fmt.Errorf("numSlices must be positive")
+	}
+	if c.OrderType != TWAPOrderTypeMaker && c.OrderType != TWAPOrderTypeTaker {
+		return fmt.Errorf("invalid order type: %s", c.OrderType)
+	}
+	if c.CheckInterval <= 0 {
+		return fmt.Errorf("check interval must be positive")
+	}
+	if c.MinSliceNotional.Sign() < 0 {
+		return fmt.Errorf("minSliceNotional must be non-negative")
+	}
+	return nil
+}
+
 type TWAPWorker struct {
 	syncState   TWAPWorkerSyncState
 	activeOrder *types.Order
