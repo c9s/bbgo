@@ -1551,7 +1551,7 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 
 // setReady updates the round state to ready without locking. The caller must
 // already hold r.mu.
-func (r *ArbitrageRound) setReady(currentTime time.Time) {
+func (r *ArbitrageRound) setReady(currentTime time.Time, spotPrice, futuresPrice fixedpoint.Value) {
 	if !r.syncState.ReadyAt.IsZero() {
 		return
 	}
@@ -1562,6 +1562,22 @@ func (r *ArbitrageRound) setReady(currentTime time.Time) {
 	if oriOrder := r.futuresWorker.syncAndResetActiveOrder(); oriOrder != nil {
 		r.logger.Debugf("[setReady] reseting futures order: %s", oriOrder)
 	}
+
+	// adjust the holding intervals according to the latest mid prices.
+	// setReady is called with r.mu held, so use the unlocked variant to
+	// avoid re-acquiring the (non-reentrant) mutex.
+	unrealizedPnL := r.unrealizedPnL(spotPrice, futuresPrice)
+	totalPnL := unrealizedPnL.TotalPnL()
+	if totalPnL.Sign() < 0 {
+		fundingRate := r.syncState.TriggeredFundingRate
+		futuresNotional := unrealizedPnL.FuturesPosition.AverageCost.Mul(
+			unrealizedPnL.FuturesPosition.Base,
+		)
+		feeIncome := futuresNotional.Mul(fundingRate).Abs()
+		minHolding := unrealizedPnL.TotalPnL().Div(feeIncome).Round(0, fixedpoint.Up).Int()
+		r.syncState.MinHoldingIntervals = minHolding
+	}
+
 	r.syncState.State = RoundReady
 	r.syncState.ReadyAt = currentTime
 }
@@ -1721,7 +1737,7 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 		futuresIsDust := r.futuresWorker.Market().IsDustQuantity(futuresRemaining.Abs(), futuresMidPrice)
 
 		if spotIsDust && futuresIsDust {
-			r.setReady(currentTime)
+			r.setReady(currentTime, spotMidPrice, futuresMidPrice)
 			return
 		}
 	}
