@@ -62,6 +62,10 @@ func (r *ArbitrageRound) Initialize(ctx context.Context, s *Strategy) error {
 	}
 	r.rebalanceInterval = s.RoundRebalanceInterval.Duration()
 
+	// re-supply leader/follower configs so a restored round flips roles correctly
+	// when it later closes. Restored workers keep their persisted order type.
+	r.SetTWAPConfigs(s.TWAPWorkerConfig, s.followerTWAPWorkerConfig)
+
 	return nil
 }
 

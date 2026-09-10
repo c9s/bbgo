@@ -56,6 +56,11 @@ type ArbitrageRound struct {
 	futuresWorker *TWAPWorker
 	haltedAt      time.Time
 
+	// leader/follower TWAP configs, supplied by the strategy. The follower always
+	// uses taker orders. Not persisted; re-supplied on construction and restore.
+	leaderTWAPConfig   TWAPWorkerConfig
+	followerTWAPConfig TWAPWorkerConfig
+
 	lastRebalanceTime time.Time
 	rebalanceInterval time.Duration
 
@@ -1515,6 +1520,14 @@ func (r *ArbitrageRound) FuturesWorker() *TWAPWorker {
 	return r.futuresWorker
 }
 
+// SetTWAPConfigs supplies the leader and follower TWAP configs used to assign
+// worker order types when the round flips roles at closing. The follower config
+// uses taker orders.
+func (r *ArbitrageRound) SetTWAPConfigs(leader, follower TWAPWorkerConfig) {
+	r.leaderTWAPConfig = leader
+	r.followerTWAPConfig = follower
+}
+
 func (r *ArbitrageRound) FuturesMarket() types.Market {
 	return r.futuresWorker.Market()
 }
@@ -1541,6 +1554,11 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 	}
 	r.spotWorker.ResetTime(currentTime, duration)
 	r.futuresWorker.ResetTime(currentTime, duration)
+
+	// closing flips leader/follower: futures now leads (configured order type),
+	// spot now follows (taker orders to hedge reliably).
+	r.futuresWorker.SetConfig(r.leaderTWAPConfig)
+	r.spotWorker.SetConfig(r.followerTWAPConfig)
 
 	r.syncState.State = RoundClosing
 	r.syncState.ClosingAt = currentTime
