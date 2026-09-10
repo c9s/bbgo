@@ -137,6 +137,17 @@ func TestMarginResponseParsing(t *testing.T) {
 	}
 }
 
+func TestParseTwapUpdate(t *testing.T) {
+	event, err := parseWebSocketEvent([]byte(`{"e":"TWAP_UPDATE","E":1774248826691,"tu":{"si":5172798,"st":"FUTURES_TWAP","ss":"EXPIRED","eq":"40.83","ea":"356.23770000","ap":"8.72490081","s":"LINKUSDT","ut":1774248826690}}`))
+
+	assert.NoError(t, err)
+	update, ok := event.(*TwapUpdateEvent)
+	assert.True(t, ok)
+	assert.Equal(t, int64(5172798), update.Update.StrategyID)
+	assert.Equal(t, "LINKUSDT", update.Update.Symbol)
+	assert.Equal(t, "EXPIRED", update.Update.Status)
+}
+
 func TestParseOrderUpdate(t *testing.T) {
 	payload := `{
   "e": "executionReport",        // Event type
