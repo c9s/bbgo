@@ -1004,3 +1004,28 @@ func TestTWAPWorker_Misc(t *testing.T) {
 		assert.True(t, result)
 	})
 }
+
+func TestTWAPWorker_SetConfig(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	makerConfig := TWAPWorkerConfig{
+		Duration:  types.Duration(10 * time.Minute),
+		NumSlices: 4,
+		OrderType: TWAPOrderTypeMaker,
+	}
+	worker, _, _, _ := newTestTWAPWorker(t, ctrl, makerConfig)
+
+	assert.Equal(t, TWAPOrderTypeMaker, worker.OrderType())
+	assert.Equal(t, TWAPOrderTypeMaker, worker.Executor().syncState.Config.OrderType)
+
+	takerConfig := makerConfig
+	takerConfig.OrderType = TWAPOrderTypeTaker
+	worker.SetConfig(takerConfig)
+
+	// both the worker and its underlying executor should reflect the new order type
+	assert.Equal(t, TWAPOrderTypeTaker, worker.OrderType())
+	assert.Equal(t, TWAPOrderTypeTaker, worker.Executor().syncState.Config.OrderType)
+	// unrelated config parameters are preserved
+	assert.Equal(t, 4, worker.syncState.Config.NumSlices)
+}
