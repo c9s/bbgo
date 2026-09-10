@@ -126,6 +126,19 @@ func (w *TWAPWorker) SetTargetPosition(targetPosition fixedpoint.Value) {
 	w.syncState.TargetPosition = targetPosition
 }
 
+// OrderType returns the worker's configured order type (maker or taker).
+func (w *TWAPWorker) OrderType() TWAPOrderType {
+	return w.syncState.Config.OrderType
+}
+
+// SetConfig replaces the worker's config parameters and propagates them to the
+// underlying executor. It only touches config (e.g. to switch order type when
+// the leader/follower role flips); runtime state is preserved.
+func (w *TWAPWorker) SetConfig(config TWAPWorkerConfig) {
+	w.syncState.Config = config
+	w.syncState.TWAPExecutor.SetConfig(config)
+}
+
 func (w *TWAPWorker) SetLogger(logger logrus.FieldLogger) {
 	accountType := "spot"
 	if w.syncState.TWAPExecutor.IsFutures() {
