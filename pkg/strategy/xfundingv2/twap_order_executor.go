@@ -226,6 +226,7 @@ func (o *TWAPExecutor) PlaceOrder(quantity fixedpoint.Value, side types.SideType
 	timedCtx, cancel := context.WithTimeout(o.ctx, 500*time.Millisecond)
 	defer cancel()
 
+	o.logger.Infof("[TWAPExecutor] submitting order: %+v", order)
 	createdOrders, err := o.executor.SubmitOrders(timedCtx, order)
 	if err != nil || len(createdOrders) == 0 {
 		return nil, fmt.Errorf("failed to submit order: %+v, %v", order, err)

@@ -625,9 +625,9 @@ func (w *TWAPWorker) shouldUpdateActiveOrder(orderBook types.OrderBook) bool {
 		return false
 	}
 
-	// taker orders are IOC — always refresh
+	// taker orders are IOC, if it's filled, do not update
 	if w.syncState.Config.OrderType == TWAPOrderTypeTaker {
-		return true
+		return w.activeOrder.Status != types.OrderStatusFilled
 	}
 
 	newPrice, err := w.syncState.TWAPExecutor.GetPrice(w.activeOrder.Side, orderBook)
