@@ -105,6 +105,11 @@ type Strategy struct {
 	MaxPendingRoundRetry    int              `json:"maxPendingRoundRetry"`
 	TWAPWorkerConfig        TWAPWorkerConfig `json:"twap"`
 
+	// followerTWAPWorkerConfig is derived from TWAPWorkerConfig (the leader config)
+	// with taker orders, so the follower TWAP worker can hedge the leader's fills
+	// reliably by crossing the spread. Set in Defaults.
+	followerTWAPWorkerConfig TWAPWorkerConfig
+
 	// Market selection criteria
 	MarketSelectionConfig *MarketSelectionConfig      `json:"marketSelection,omitempty"`
 	MaxPositionExposure   map[string]fixedpoint.Value `json:"maxPositionExposure"`
@@ -335,6 +340,11 @@ func (s *Strategy) Initialize() error {
 	s.futuresMarkPrices = make(map[string]fixedpoint.Value)
 	s.spotLastPrices = make(map[string]fixedpoint.Value)
 
+	// The follower TWAP worker always crosses the spread with taker orders so it can
+	// hedge the leader's fills reliably; the leader keeps the configured order type.
+	s.followerTWAPWorkerConfig = s.TWAPWorkerConfig
+	s.followerTWAPWorkerConfig.OrderType = TWAPOrderTypeTaker
+
 	return nil
 }
 
@@ -372,6 +382,11 @@ func (s *Strategy) Validate() error {
 	if s.MinNotionalMultiplier.Compare(fixedpoint.One) < 0 {
 		return fmt.Errorf("minNotionalMultiplier should be greater than or equal to 1: %s", s.MinNotionalMultiplier)
 	}
+
+	if err := s.TWAPWorkerConfig.Validate(); err != nil {
+		return fmt.Errorf("invalid TWAP worker config: %w", err)
+	}
+
 	return nil
 }
 
@@ -1400,7 +1415,8 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 		}
 		spotTwap.SetTargetPosition(selectedCandidate.TargetFuturesPosition.Neg())
 		futuresExecutor := s.futuresGeneralOrderExecutors[selectedCandidate.Symbol]
-		futuresTwap, err := NewTWAPWorker(ctx, selectedCandidate.Symbol, s.futuresSession, futuresExecutor, s.TWAPWorkerConfig)
+		// during opening, futures is the follower -> use taker orders to hedge reliably
+		futuresTwap, err := NewTWAPWorker(ctx, selectedCandidate.Symbol, s.futuresSession, futuresExecutor, s.followerTWAPWorkerConfig)
 		futuresTwap.SetLogger(s.logger)
 		futuresTwap.Executor().SetDryRun(s.DryRun)
 		if err != nil || futuresTwap == nil {
@@ -1422,6 +1438,8 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 		)
 		round.SetupMetrics(s)
 		round.SetLogger(s.logger)
+		// provide the leader/follower configs so the round can flip roles when closing
+		round.SetTWAPConfigs(s.TWAPWorkerConfig, s.followerTWAPWorkerConfig)
 		round.SetSpotExchangeFeeRates(
 			s.costEstimator.GetSpotFeeRate(),
 		)

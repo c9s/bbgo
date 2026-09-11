@@ -76,6 +76,28 @@ func (c *TWAPWorkerConfig) Defaults() {
 	}
 }
 
+func (c *TWAPWorkerConfig) Validate() error {
+	if c.Duration <= 0 {
+		return fmt.Errorf("duration must be positive")
+	}
+	if c.ClosingDuration <= 0 {
+		return fmt.Errorf("closing duration must be positive")
+	}
+	if c.NumSlices <= 0 {
+		return fmt.Errorf("numSlices must be positive")
+	}
+	if c.OrderType != TWAPOrderTypeMaker && c.OrderType != TWAPOrderTypeTaker {
+		return fmt.Errorf("invalid order type: %s", c.OrderType)
+	}
+	if c.CheckInterval <= 0 {
+		return fmt.Errorf("check interval must be positive")
+	}
+	if c.MinSliceNotional.Sign() < 0 {
+		return fmt.Errorf("minSliceNotional must be non-negative")
+	}
+	return nil
+}
+
 type TWAPWorker struct {
 	syncState   TWAPWorkerSyncState
 	activeOrder *types.Order
@@ -124,6 +146,19 @@ func NewTWAPWorker(
 // SetTargetPosition sets the target position for the TWAP worker.
 func (w *TWAPWorker) SetTargetPosition(targetPosition fixedpoint.Value) {
 	w.syncState.TargetPosition = targetPosition
+}
+
+// OrderType returns the worker's configured order type (maker or taker).
+func (w *TWAPWorker) OrderType() TWAPOrderType {
+	return w.syncState.Config.OrderType
+}
+
+// SetConfig replaces the worker's config parameters and propagates them to the
+// underlying executor. It only touches config (e.g. to switch order type when
+// the leader/follower role flips); runtime state is preserved.
+func (w *TWAPWorker) SetConfig(config TWAPWorkerConfig) {
+	w.syncState.Config = config
+	w.syncState.TWAPExecutor.SetConfig(config)
 }
 
 func (w *TWAPWorker) SetLogger(logger logrus.FieldLogger) {
@@ -590,9 +625,9 @@ func (w *TWAPWorker) shouldUpdateActiveOrder(orderBook types.OrderBook) bool {
 		return false
 	}
 
-	// taker orders are IOC — always refresh
+	// taker orders are IOC, if it's filled, do not update
 	if w.syncState.Config.OrderType == TWAPOrderTypeTaker {
-		return true
+		return w.activeOrder.Status != types.OrderStatusFilled
 	}
 
 	newPrice, err := w.syncState.TWAPExecutor.GetPrice(w.activeOrder.Side, orderBook)

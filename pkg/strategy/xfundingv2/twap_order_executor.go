@@ -66,6 +66,12 @@ func (o *TWAPExecutor) SetDryRun(dryRun bool) {
 	o.dryRun = dryRun
 }
 
+// SetConfig replaces the executor's config parameters (e.g. to switch order
+// type when the leader/follower role flips). Runtime state is preserved.
+func (o *TWAPExecutor) SetConfig(config TWAPWorkerConfig) {
+	o.syncState.Config = config
+}
+
 func (o *TWAPExecutor) Market() types.Market {
 	return o.syncState.Market
 }
@@ -220,6 +226,7 @@ func (o *TWAPExecutor) PlaceOrder(quantity fixedpoint.Value, side types.SideType
 	timedCtx, cancel := context.WithTimeout(o.ctx, 500*time.Millisecond)
 	defer cancel()
 
+	o.logger.Infof("[TWAPExecutor] submitting order: %+v", order)
 	createdOrders, err := o.executor.SubmitOrders(timedCtx, order)
 	if err != nil || len(createdOrders) == 0 {
 		return nil, fmt.Errorf("failed to submit order: %+v, %v", order, err)

@@ -719,3 +719,49 @@ func setupDeltaNeutralMockExchange(mockExchange *mocks.MockExchange, mockOrderQu
 		QueryOrderTrades(gomock.Any(), gomock.Any()).
 		Return([]types.Trade{}, nil).AnyTimes()
 }
+
+func TestArbitrageRound_FollowerUsesTakerOrders(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// leader keeps the configured (maker) order type; follower is derived as taker.
+	leaderConfig := TWAPWorkerConfig{
+		Duration:  types.Duration(10 * time.Minute),
+		NumSlices: 2,
+		OrderType: TWAPOrderTypeMaker,
+	}
+	followerConfig := leaderConfig
+	followerConfig.OrderType = TWAPOrderTypeTaker
+
+	// mirror checkOpenNewRound: spot (opening leader) uses the leader config,
+	// futures (opening follower) uses the follower config.
+	spotWorker, _, _, _ := newTestTWAPWorker(t, ctrl, leaderConfig)
+	spotWorker.SetTargetPosition(Number(1.0))
+	futuresWorker, _, _, _ := newTestTWAPWorker(t, ctrl, followerConfig)
+	futuresWorker.SetTargetPosition(Number(-1.0))
+
+	fundingRate := &types.PremiumIndex{
+		LastFundingRate: Number(0.001),
+		NextFundingTime: time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC),
+	}
+	round := NewArbitrageRound(
+		fundingRate,
+		types.ExchangeBinance, types.ExchangeBinance,
+		3, 8, Number(3), spotWorker, futuresWorker, &mockFuturesService{},
+		types.PositionShort, time.Minute)
+	round.SetLogger(logrus.WithField("test", "follower_taker"))
+	round.SetTWAPConfigs(leaderConfig, followerConfig)
+
+	// opening: spot leads (maker), futures follows (taker)
+	assert.Equal(t, TWAPOrderTypeMaker, round.SpotWorker().OrderType())
+	assert.Equal(t, TWAPOrderTypeTaker, round.FuturesWorker().OrderType())
+
+	round.SetClosing(time.Date(2024, 1, 1, 2, 0, 0, 0, time.UTC), types.Duration(time.Hour), fixedpoint.Zero)
+
+	// closing flips: futures leads (maker), spot follows (taker)
+	assert.Equal(t, TWAPOrderTypeTaker, round.SpotWorker().OrderType())
+	assert.Equal(t, TWAPOrderTypeMaker, round.FuturesWorker().OrderType())
+	// executor configs stay in sync with their workers
+	assert.Equal(t, TWAPOrderTypeTaker, round.SpotWorker().Executor().syncState.Config.OrderType)
+	assert.Equal(t, TWAPOrderTypeMaker, round.FuturesWorker().Executor().syncState.Config.OrderType)
+}
