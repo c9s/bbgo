@@ -228,4 +228,38 @@ func TestQueryTradesToUpdateTwinOrderBook(t *testing.T) {
 		assert.True(book.GetTwinOrder(fixedpoint.NewFromInt(500)).Exist())
 		assert.Equal(orders[1].OrderID, book.GetTwinOrder(fixedpoint.NewFromInt(500)).GetOrder().OrderID)
 	})
+
+	t.Run("query trades skips market order without error", func(t *testing.T) {
+		book := newTwinOrderBook(pins)
+		mockTradeHistoryService := mocks.NewMockExchangeTradeHistoryService(mockCtrl)
+		mockOrderQueryService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+
+		trades := []types.Trade{
+			{
+				ID:      10,
+				OrderID: 10,
+				Symbol:  symbol,
+				Time:    types.Time(time.Now().Add(-1 * time.Hour)),
+			},
+		}
+		marketOrder := types.Order{
+			OrderID: 10,
+			Status:  types.OrderStatusFilled,
+			SubmitOrder: types.SubmitOrder{
+				Symbol:    symbol,
+				Side:      types.SideTypeSell,
+				OrderType: types.OrderTypeMarket,
+				Price:     fixedpoint.Zero,
+			},
+		}
+
+		mockTradeHistoryService.EXPECT().QueryTrades(gomock.Any(), gomock.Any(), gomock.Any()).Return(trades, nil).Times(1)
+		mockOrderQueryService.EXPECT().QueryOrder(gomock.Any(), types.OrderQuery{
+			Symbol:  symbol,
+			OrderID: "10",
+		}).Return(&marketOrder, nil)
+
+		assert.NoError(queryTradesToUpdateTwinOrderBook(ctx, symbol, book, mockTradeHistoryService, mockOrderQueryService, book.SyncOrderMap(), time.Now().Add(-24*time.Hour), time.Now(), nil))
+		assert.Equal(0, book.Size())
+	})
 }
