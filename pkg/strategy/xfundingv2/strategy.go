@@ -14,10 +14,12 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
@@ -176,6 +178,10 @@ type Strategy struct {
 
 	logger     logrus.FieldLogger
 	logLimiter *rate.Limiter
+
+	// slackEvtID is the interactive-message dispatch key for this strategy
+	// instance. It's for the interactive close round feature.
+	slackEvtID string
 
 	lastTickTime time.Time
 
@@ -883,6 +889,15 @@ func (s *Strategy) CrossRun(
 		s.candidateSymbols,
 	)
 
+	// wire the interactive "Close Round" button. It's always on when a Slack
+	// interaction dispatcher is available; silently skipped otherwise.
+	if dispatcher, err := interact.GetDispatcher(); err != nil {
+		s.logger.Warnf("xfundingv2 interactive close round disabled: %s", err)
+	} else {
+		s.slackEvtID = uuid.NewString()
+		setupCloseRoundInteraction(s, dispatcher)
+	}
+
 	// Register shutdown handler to persist state
 	bbgo.OnShutdown(s.ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -1237,7 +1252,6 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		} else {
 			bbgo.Notify("⚠️ Round funding rate flipped %s -> %s (%s)",
 				round.TriggeredFundingRate(), index.LastFundingRate, round.SpotSymbol(),
-				round.NewNotification(spotPrice, futuresPrice),
 			)
 		}
 
@@ -1780,14 +1794,9 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 			if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
 				return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
 			}
-			spotPrice, futuresPrice, _ := s.getLastPrices(
-				round.SpotSymbol(),
-				round.FuturesSymbol(),
-			)
 			bbgo.Notify("⬅️ Transferred %s %s back to spot account",
 				residualAmount,
 				asset,
-				round.NewNotification(spotPrice, futuresPrice),
 			)
 		}
 	}
@@ -1872,23 +1881,6 @@ func (s *Strategy) newDebugLogger() *logrus.Entry {
 }
 
 func (s *Strategy) notifyStats() {
-	var activeRoundNotifications []any
-	for _, round := range s.sortedActiveRounds() {
-		spotPrice, futuresPrice, ok := s.getLastPrices(
-			round.SpotSymbol(),
-			round.FuturesSymbol(),
-		)
-		if !ok {
-			continue
-		}
-		activeRoundNotifications = append(activeRoundNotifications, round.NewNotification(spotPrice, futuresPrice))
-		if s.roundInsertService != nil {
-			if err := s.roundInsertService.InsertActiveRound(round, spotPrice, futuresPrice); err != nil {
-				s.logger.WithError(err).Warnf("failed to insert active round to database: %s", round)
-			}
-		}
-	}
-
 	var pendingRoundNotifications []any
 	for _, pendingRound := range s.PendingRounds {
 		spotPrice, futuresPrice, _ := s.getLastPrices(
@@ -1902,8 +1894,36 @@ func (s *Strategy) notifyStats() {
 		len(s.ActiveRounds),
 		len(s.PendingRounds),
 	)
-	if len(activeRoundNotifications) > 0 {
-		bbgo.Notify("Active Rounds", activeRoundNotifications...)
+	for _, round := range s.sortedActiveRounds() {
+		spotPrice, futuresPrice, ok := s.getLastPrices(
+			round.SpotSymbol(),
+			round.FuturesSymbol(),
+		)
+		if !ok {
+			s.logger.Warnf(
+				"failed to get last prices, skipping notification: %s",
+				round.String(),
+			)
+			continue
+		}
+
+		// additionally emit an interactive "Close Round" message for Ready rounds
+		// so an operator can close them on demand. The plain attachment above is
+		// left unchanged, so the round still appears in the "Active Rounds" batch.
+		if s.slackEvtID != "" && round.State() == RoundReady {
+			bbgo.Notify(
+				newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice),
+				round.NewNotification(spotPrice, futuresPrice),
+			)
+		} else {
+			bbgo.Notify(round.NewNotification(spotPrice, futuresPrice))
+		}
+
+		if s.roundInsertService != nil {
+			if err := s.roundInsertService.InsertActiveRound(round, spotPrice, futuresPrice); err != nil {
+				s.logger.WithError(err).Warnf("failed to insert active round to database: %s", round)
+			}
+		}
 	}
 	if len(pendingRoundNotifications) > 0 {
 		bbgo.Notify("Pending Rounds", pendingRoundNotifications...)
