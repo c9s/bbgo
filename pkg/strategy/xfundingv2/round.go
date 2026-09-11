@@ -1592,7 +1592,7 @@ func (r *ArbitrageRound) setReady(currentTime time.Time, spotPrice, futuresPrice
 			unrealizedPnL.FuturesPosition.Base,
 		)
 		feeIncome := futuresNotional.Mul(fundingRate).Abs()
-		minHolding := unrealizedPnL.TotalPnL().Div(feeIncome).Round(0, fixedpoint.Up).Int()
+		minHolding := totalPnL.Abs().Div(feeIncome).Round(0, fixedpoint.Up).Int()
 		r.syncState.MinHoldingIntervals = minHolding
 	}
 
