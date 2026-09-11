@@ -3,10 +3,12 @@ package xfundingv2
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 )
 
@@ -153,4 +155,93 @@ func removeBlockByID(oriBlocks []slack.Block, id string) []slack.Block {
 		blocks = append(blocks, block)
 	}
 	return blocks
+}
+
+// setupCloseRoundInteraction registers the button-click handler for this
+// strategy instance, keyed by s.slackEvtID. All interactive close-round messages
+// emitted by this instance carry that slackEvtID context block, so their clicks
+// route here. The clicked button's value is the round's spot symbol.
+func setupCloseRoundInteraction(s *Strategy, dispatcher *interact.InteractiveMessageDispatcher) {
+	dispatcher.Register(s.slackEvtID, newCloseRoundHandler(s))
+}
+
+// newCloseRoundHandler builds the interactive-message handler closure over the
+// strategy. It is split out from setupCloseRoundInteraction so it can be invoked
+// directly in tests without a dispatcher.
+func newCloseRoundHandler(s *Strategy) interact.InteractiveMessageHandler {
+	return func(
+		user slack.User, oriMessage slack.Message, actionID string, actionValue string,
+	) ([]interact.InteractionMessageUpdate, error) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		symbol, roundID := decodeCloseRoundValue(actionValue)
+		round, ok := s.ActiveRounds[symbol]
+		// The close only affects the exact round the notification was attached
+		// to: the live round under this symbol must still be the same round ID.
+		if !ok || round.ID() != roundID {
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks: removeBlockByID(
+						oriMessage.Blocks.BlockSet,
+						buttonsBlockID,
+					),
+					PostInThread: false,
+				},
+				{
+					Blocks: []slack.Block{
+						buildTextBlock(fmt.Sprintf(
+							"🔴 Round `%s` (`%s`) is no longer closeable (requested by %s)",
+							symbol, roundID, user.Name,
+						)),
+					},
+					PostInThread: true,
+				},
+			}, nil
+		}
+
+		switch actionID {
+		case closeRoundActionID:
+			// first click: swap the single button for Confirm / Cancel. No state change.
+			blocks := removeBlockByID(
+				oriMessage.Blocks.BlockSet,
+				buttonsBlockID,
+			)
+			blocks = append(blocks, buildConfirmButtonsBlock(symbol, roundID))
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks:       blocks,
+					PostInThread: false,
+				},
+			}, nil
+		case confirmCloseActionID:
+			_, futuresPrice, _ := s.getLastPrices(round.SpotSymbol(), round.FuturesSymbol())
+			round.SetClosing(time.Now(), s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks:       removeBlockByID(oriMessage.Blocks.BlockSet, buttonsBlockID),
+					PostInThread: false,
+				},
+				{
+					Blocks: []slack.Block{
+						buildTextBlock(fmt.Sprintf("✅ Round `%s` (`%s`) set to closing by %s", symbol, roundID, user.Name))},
+					PostInThread: true,
+				},
+			}, nil
+
+		default:
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks: removeBlockByID(oriMessage.Blocks.BlockSet,
+						buttonsBlockID,
+					),
+					PostInThread: false,
+				},
+				{
+					Blocks:       []slack.Block{buildTextBlock("Invalid action ID: " + actionID)},
+					PostInThread: true,
+				},
+			}, nil
+		}
+	}
 }
