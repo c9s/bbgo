@@ -151,8 +151,8 @@ func TestCloseRoundInteraction(t *testing.T) {
 		value := encodeCloseRoundValue(symbol, round.ID())
 		updates, err := handler(slack.User{Name: "alice"}, closeRoundMessage(c), confirmCloseActionID, value)
 		assert.NoError(t, err)
-		// confirm produces the main update plus a threaded acknowledgement
-		assert.Len(t, updates, 2)
+		// confirm produces a single update replacing the message with the acknowledgement
+		assert.Len(t, updates, 1)
 		// the buttons block is stripped after confirm
 		assert.False(t, hasBlockID(updates[0].Blocks, buttonsBlockID))
 		assert.Equal(t, RoundClosing, round.State(), "confirm must set the round to closing")

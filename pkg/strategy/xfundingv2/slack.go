@@ -19,6 +19,8 @@ var (
 // buttonsBlockID is the block ID of the action block that holds the
 // interactive buttons. It is removed/replaced after a click.
 const buttonsBlockID = "xfundingv2_close_round_buttons"
+const titleTextBlockID = "xfundingv2_close_round_title"
+const instructionBlockID = "xfundingv2_close_round_instruction"
 
 // action IDs for the interactive close-round buttons.
 const (
@@ -96,11 +98,16 @@ func (c *interactiveCloseRound) SlackBlocks() []slack.Block {
 		),
 	}
 
-	blocks = append(blocks, buildTextBlock(fmt.Sprintf(
-		"🟢 Ready Round %s (%s)\nPress *Close Round* to close it.",
-		c.symbol,
-		c.roundID,
-	)))
+	blocks = append(blocks,
+		buildTextBlock(
+			fmt.Sprintf(
+				"🟢 Ready Round %s (%s)",
+				c.symbol,
+				c.roundID,
+			),
+			titleTextBlockID),
+		buildTextBlock("Press *Close Round* to close it.", instructionBlockID),
+	)
 
 	blocks = append(blocks, buildCloseRoundButtonsBlock(c.symbol, c.roundID))
 	return blocks
@@ -134,7 +141,11 @@ func buildConfirmButtonsBlock(symbol, roundID string) slack.Block {
 	)
 }
 
-func buildTextBlock(text string) slack.Block {
+func buildTextBlock(text, blockID string) slack.Block {
+	var options []slack.SectionBlockOption
+	if blockID != "" {
+		options = append(options, slack.SectionBlockOptionBlockID(blockID))
+	}
 	return slack.NewSectionBlock(
 		slack.NewTextBlockObject(
 			slack.MarkdownType,
@@ -143,13 +154,18 @@ func buildTextBlock(text string) slack.Block {
 			false,
 		),
 		nil, nil,
+		options...,
 	)
 }
 
-func removeBlockByID(oriBlocks []slack.Block, id string) []slack.Block {
+func removeBlockByID(oriBlocks []slack.Block, ids ...string) []slack.Block {
 	var blocks []slack.Block
+	idsMap := make(map[string]struct{})
+	for _, id := range ids {
+		idsMap[id] = struct{}{}
+	}
 	for _, block := range oriBlocks {
-		if block.ID() == id {
+		if _, exists := idsMap[block.ID()]; exists {
 			continue // skip block
 		}
 		blocks = append(blocks, block)
@@ -184,16 +200,20 @@ func newCloseRoundHandler(s *Strategy) interact.InteractiveMessageHandler {
 				{
 					Blocks: removeBlockByID(
 						oriMessage.Blocks.BlockSet,
+						instructionBlockID,
 						buttonsBlockID,
 					),
 					PostInThread: false,
 				},
 				{
 					Blocks: []slack.Block{
-						buildTextBlock(fmt.Sprintf(
-							"🔴 Round `%s` (`%s`) is no longer closeable (requested by %s)",
-							symbol, roundID, user.Name,
-						)),
+						buildTextBlock(
+							fmt.Sprintf(
+								"🔴 Round `%s` (`%s`) is no longer closeable (requested by %s)",
+								symbol, roundID, user.Name,
+							),
+							"",
+						),
 					},
 					PostInThread: true,
 				},
@@ -205,9 +225,13 @@ func newCloseRoundHandler(s *Strategy) interact.InteractiveMessageHandler {
 			// first click: swap the single button for Confirm / Cancel. No state change.
 			blocks := removeBlockByID(
 				oriMessage.Blocks.BlockSet,
+				instructionBlockID,
 				buttonsBlockID,
 			)
-			blocks = append(blocks, buildConfirmButtonsBlock(symbol, roundID))
+			blocks = append(blocks,
+				buildTextBlock("Press *Confirm Close* to confirm.", instructionBlockID),
+				buildConfirmButtonsBlock(symbol, roundID),
+			)
 			return []interact.InteractionMessageUpdate{
 				{
 					Blocks:       blocks,
@@ -219,13 +243,15 @@ func newCloseRoundHandler(s *Strategy) interact.InteractiveMessageHandler {
 			round.SetClosing(time.Now(), s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
 			return []interact.InteractionMessageUpdate{
 				{
-					Blocks:       removeBlockByID(oriMessage.Blocks.BlockSet, buttonsBlockID),
-					PostInThread: false,
-				},
-				{
 					Blocks: []slack.Block{
-						buildTextBlock(fmt.Sprintf("✅ Round `%s` (`%s`) set to closing by %s", symbol, roundID, user.Name))},
-					PostInThread: true,
+						buildTextBlock(
+							fmt.Sprintf(
+								"✅ Round `%s` (`%s`) set to closing by `%s` at `%s`",
+								symbol, roundID, user.Name, time.Now().Format(time.RFC3339),
+							),
+							"",
+						)},
+					PostInThread: false,
 				},
 			}, nil
 
@@ -238,7 +264,7 @@ func newCloseRoundHandler(s *Strategy) interact.InteractiveMessageHandler {
 					PostInThread: false,
 				},
 				{
-					Blocks:       []slack.Block{buildTextBlock("Invalid action ID: " + actionID)},
+					Blocks:       []slack.Block{buildTextBlock("Invalid action ID: "+actionID, "")},
 					PostInThread: true,
 				},
 			}, nil
