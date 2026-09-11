@@ -32,6 +32,7 @@ const (
 	EventTypeTrade                   EventType = "trade"
 	EventTypeAggTrade                EventType = "aggTrade"
 	EventTypeForceOrder              EventType = "forceOrder"
+	EventTypeTwapUpdate              EventType = "TWAP_UPDATE"
 
 	// EventTypeListStatus is for OCO order update
 	// see https://developers.binance.com/docs/margin_trading/trade-data-stream/Event-Order-Update
@@ -351,6 +352,22 @@ type ResultEvent struct {
 	Status int            `json:"status"`
 }
 
+type TwapUpdateEvent struct {
+	EventBase
+	Update TwapUpdate `json:"tu"`
+}
+
+type TwapUpdate struct {
+	StrategyID       int64                      `json:"si"`
+	StrategyType     string                     `json:"st"`
+	Status           string                     `json:"ss"`
+	ExecutedQuantity fixedpoint.Value           `json:"eq"`
+	ExecutedAmount   fixedpoint.Value           `json:"ea"`
+	AveragePrice     fixedpoint.Value           `json:"ap"`
+	Symbol           string                     `json:"s"`
+	UpdateTime       types.MillisecondTimestamp `json:"ut"`
+}
+
 type ErrorEvent struct {
 	Id         int         `json:"id"`
 	Status     int         `json:"status"`
@@ -453,6 +470,10 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 
 	case EventTypeForceOrder:
 		var event ForceOrderEvent
+		err = json.Unmarshal(message, &event)
+		return &event, err
+	case EventTypeTwapUpdate:
+		var event TwapUpdateEvent
 		err = json.Unmarshal(message, &event)
 		return &event, err
 	case EventServerShutdown:
