@@ -448,7 +448,7 @@ func (n *Notifier) Notify(obj interface{}, args ...interface{}) {
 	n.NotifyTo(n.channel, obj, args...)
 }
 
-func filterSlackAttachments(args []interface{}) (slackAttachments []slack.Attachment, pureArgs []interface{}) {
+func filterSlackAttachments(args []interface{}) (slackAttachments []slack.Attachment, slackBlocks []slack.Block, pureArgs []interface{}) {
 	var firstAttachmentOffset = -1
 	for idx, arg := range args {
 		switch a := arg.(type) {
@@ -486,6 +486,10 @@ func filterSlackAttachments(args []interface{}) (slackAttachments []slack.Attach
 			slackAttachments = append(slackAttachments, slack.Attachment{
 				Title: text,
 			})
+		case slack.Block:
+			slackBlocks = append(slackBlocks, a)
+		case SlackBlocksCreator:
+			slackBlocks = append(slackBlocks, a.SlackBlocks()...)
 		}
 	}
 
@@ -494,7 +498,7 @@ func filterSlackAttachments(args []interface{}) (slackAttachments []slack.Attach
 		pureArgs = args[:firstAttachmentOffset]
 	}
 
-	return slackAttachments, pureArgs
+	return slackAttachments, slackBlocks, pureArgs
 }
 
 func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}) {
@@ -502,27 +506,33 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 		channel = n.channel
 	}
 
-	slackAttachments, pureArgs := filterSlackAttachments(args)
+	slackAttachments, blocks, pureArgs := filterSlackAttachments(args)
 
 	var opts []slack.MsgOption
 
 	switch a := obj.(type) {
 	case string:
 		opts = append(opts, slack.MsgOptionText(fmt.Sprintf(a, pureArgs...), true),
-			slack.MsgOptionAttachments(slackAttachments...))
+			slack.MsgOptionAttachments(slackAttachments...),
+			slack.MsgOptionBlocks(blocks...),
+		)
 
 	case slack.Attachment:
 		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{a}, slackAttachments...)...))
+		opts = append(opts, slack.MsgOptionBlocks(blocks...))
 
 	case *slack.Attachment:
 		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{*a}, slackAttachments...)...))
+		opts = append(opts, slack.MsgOptionBlocks(blocks...))
 
 	case SlackBlocksCreator:
 		opts = append(opts, slack.MsgOptionBlocks(a.SlackBlocks()...))
+		opts = append(opts, slack.MsgOptionBlocks(blocks...))
 
 	case SlackAttachmentCreator:
 		// convert object to slack attachment (if supported)
 		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{a.SlackAttachment()}, slackAttachments...)...))
+		opts = append(opts, slack.MsgOptionBlocks(blocks...))
 
 	default:
 		log.Errorf("slack message conversion error, unsupported object: %T %+v", a, a)
