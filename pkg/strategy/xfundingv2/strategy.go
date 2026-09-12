@@ -1357,7 +1357,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 
 	// nothing critical happened
 	var args []any = []any{
-		round.TriggeredFundingRate(), index.LastFundingRate, round.SpotSymbol(),
+		round.TriggeredFundingRate().String(), index.LastFundingRate.String(), round.SpotSymbol(),
 	}
 	// if it's within the minimum holding time, add an interactive close round notification
 	if withinMinHoldingTime && s.slackEvtID != "" {
@@ -1374,7 +1374,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 	if s.allowLog(currentTime) {
 		s.logger.Infof(
 			"[transitOpeningOrReadyRound %s] round stays %s, current funding rate %s: %s",
-			currentTime.Format(time.RFC3339), round.State(), index.LastFundingRate, round,
+			currentTime.Format(time.RFC3339), round.State().String(), index.LastFundingRate.String(), round.String(),
 		)
 	}
 }
@@ -1383,7 +1383,7 @@ func (s *Strategy) transitClosingRound(round *ArbitrageRound, currentTime time.T
 	// the round is expired and is in closing state, keep it closing until it's closed
 	if s.allowLog(currentTime) {
 		s.logger.Infof("[transitClosingRound %s] round is closing: %s",
-			currentTime.Format(time.RFC3339), round)
+			currentTime.Format(time.RFC3339), round.String())
 	}
 }
 
