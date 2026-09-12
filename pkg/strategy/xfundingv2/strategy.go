@@ -1926,11 +1926,15 @@ func (s *Strategy) notifyStats() {
 		// left unchanged, so the round still appears in the "Active Rounds" batch.
 		if s.slackEvtID != "" && round.State() == RoundReady {
 			bbgo.Notify(
+				" ", // dummy text for fixing slack notification error
 				newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice),
 				round.NewNotification(spotPrice, futuresPrice),
 			)
 		} else {
-			bbgo.Notify(round.NewNotification(spotPrice, futuresPrice))
+			bbgo.Notify(
+				" ", // dummy text for fixing slack notification error
+				round.NewNotification(spotPrice, futuresPrice),
+			)
 		}
 
 		if s.roundInsertService != nil {
