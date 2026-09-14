@@ -1285,6 +1285,7 @@ func handleOrderUpdate(twapWorker *TWAPWorker, update types.Order) {
 	activeOrder := twapWorker.ActiveOrder()
 	if activeOrder != nil && activeOrder.OrderID == update.OrderID {
 		activeOrder.Update(update)
+		twapWorker.logger.Infof("[handleOrderUpdate] active order updated: %s", activeOrder)
 	}
 	twapWorker.Executor().UpdateOrder(update)
 }

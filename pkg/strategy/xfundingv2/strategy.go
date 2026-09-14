@@ -110,7 +110,8 @@ type Strategy struct {
 	// followerTWAPWorkerConfig is derived from TWAPWorkerConfig (the leader config)
 	// with taker orders, so the follower TWAP worker can hedge the leader's fills
 	// reliably by crossing the spread. Set in Defaults.
-	followerTWAPWorkerConfig TWAPWorkerConfig
+	UseFollowerTWAPWorkerConfig bool `json:"useFollowerTWAPWorkerConfig"`
+	followerTWAPWorkerConfig    TWAPWorkerConfig
 
 	// Market selection criteria
 	MarketSelectionConfig *MarketSelectionConfig      `json:"marketSelection,omitempty"`
@@ -346,10 +347,12 @@ func (s *Strategy) Initialize() error {
 	s.futuresMarkPrices = make(map[string]fixedpoint.Value)
 	s.spotLastPrices = make(map[string]fixedpoint.Value)
 
-	// The follower TWAP worker always crosses the spread with taker orders so it can
-	// hedge the leader's fills reliably; the leader keeps the configured order type.
 	s.followerTWAPWorkerConfig = s.TWAPWorkerConfig
-	s.followerTWAPWorkerConfig.OrderType = TWAPOrderTypeTaker
+	// If follower twap enabled, the follower TWAP worker always crosses the spread with
+	// taker orders so it can hedge the leader's fills reliably; the leader keeps the configured order type.
+	if s.UseFollowerTWAPWorkerConfig {
+		s.followerTWAPWorkerConfig.OrderType = TWAPOrderTypeTaker
+	}
 
 	return nil
 }
@@ -1025,7 +1028,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				s.logger.Warnf("round %s position deviation: %+v", roundSymbol, posDeviation)
 				// the round is originally not halted but the deviation is too large -> we need to halt the round
 				round.Halt(tickTime)
-				bbgo.Notify("💥 Round %s halted due to large hedge deviation. Manual intervention is required: spot filled %s, futures filled %s (deviation: %s@%s)",
+				bbgo.Notify("💥 Round %s halted due to large hedge deviation. Might need manual intervention: spot filled %s, futures filled %s (deviation: %s@%s)",
 					roundSymbol,
 					posDeviation.SpotFilled, posDeviation.FuturesFilled,
 					posDeviation.DeviatedQuantity,
@@ -1061,7 +1064,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 				)
 				if found && limiter.AllowN(tickTime, 1) {
 					// send notification for rounds that have been halted for a while.
-					bbgo.Notify("💥 Round %s halted for %s (since %s). Manual intervention is required",
+					bbgo.Notify("💥 Round %s halted for %s (since %s). Might need manual intervention",
 						roundSymbol,
 						elapsed.String(),
 						haltedAt.Format(time.RFC3339),
@@ -1090,21 +1093,19 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			notification := round.NewNotification(spotPrice, futuresPrice)
 			switch currentState {
 			case RoundReady:
-				bbgo.Notify("🟢 Round entered ready state: %s",
-					round.SpotSymbol(),
+				args := []any{
 					notification,
-				)
+				}
+				if s.slackEvtID != "" {
+					args = append(args, newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice))
+				}
+				bbgo.Notify("🟢 Round entered ready state: "+round.SpotSymbol(), args...)
 			case RoundClosing:
-				bbgo.Notify("🟡 Round is closing: %s",
-					round.SpotSymbol(),
-					notification,
-				)
+				bbgo.Notify("🟡 Round is closing: "+round.SpotSymbol(), notification)
 			case RoundClosed:
 				// no need to attach a notification here for closed round
 				// since there will be other notifications for it
-				bbgo.Notify("🔴 Round is closed: %s",
-					round.String(),
-				)
+				bbgo.Notify("🔴 Round is closed: " + round.String())
 
 				// enque closed active rounds
 				s.logger.Infof("move round to closed queue: %s", round)
@@ -1249,10 +1250,6 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 			)
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
 			return
-		} else {
-			bbgo.Notify("⚠️ Round funding rate flipped %s -> %s (%s)",
-				round.TriggeredFundingRate(), index.LastFundingRate, round.SpotSymbol(),
-			)
 		}
 
 		// the round is still within the min holding time, keep holding
@@ -1328,6 +1325,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 	if round.State() != RoundReady {
 		return
 	}
+	// from here, the round is ready
 
 	if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 && !withinMinHoldingTime {
 		// check hard min exit rate
@@ -1357,10 +1355,26 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		}
 	}
 
+	// nothing critical happened
+	var args []any = []any{
+		round.TriggeredFundingRate().String(), index.LastFundingRate.String(), round.SpotSymbol(),
+	}
+	// if it's within the minimum holding time, add an interactive close round notification
+	if withinMinHoldingTime && s.slackEvtID != "" {
+		spotPrice, futuresPrice, _ := s.getLastPrices(
+			round.SpotSymbol(),
+			round.FuturesSymbol(),
+		)
+		args = append(args, newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice))
+	}
+	bbgo.Notify("⚠️ Round funding rate flipped %s -> %s (%s)",
+		args...,
+	)
+
 	if s.allowLog(currentTime) {
 		s.logger.Infof(
 			"[transitOpeningOrReadyRound %s] round stays %s, current funding rate %s: %s",
-			currentTime.Format(time.RFC3339), round.State(), index.LastFundingRate, round,
+			currentTime.Format(time.RFC3339), round.State().String(), index.LastFundingRate.String(), round.String(),
 		)
 	}
 }
@@ -1369,7 +1383,7 @@ func (s *Strategy) transitClosingRound(round *ArbitrageRound, currentTime time.T
 	// the round is expired and is in closing state, keep it closing until it's closed
 	if s.allowLog(currentTime) {
 		s.logger.Infof("[transitClosingRound %s] round is closing: %s",
-			currentTime.Format(time.RFC3339), round)
+			currentTime.Format(time.RFC3339), round.String())
 	}
 }
 
@@ -1912,11 +1926,15 @@ func (s *Strategy) notifyStats() {
 		// left unchanged, so the round still appears in the "Active Rounds" batch.
 		if s.slackEvtID != "" && round.State() == RoundReady {
 			bbgo.Notify(
+				" ", // dummy text for fixing slack notification error
 				newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice),
 				round.NewNotification(spotPrice, futuresPrice),
 			)
 		} else {
-			bbgo.Notify(round.NewNotification(spotPrice, futuresPrice))
+			bbgo.Notify(
+				" ", // dummy text for fixing slack notification error
+				round.NewNotification(spotPrice, futuresPrice),
+			)
 		}
 
 		if s.roundInsertService != nil {
