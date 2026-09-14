@@ -104,7 +104,7 @@ func TestNotifyInteractiveCloseRound(t *testing.T) {
 
 	spotPrice, futuresPrice, _ := s.getLastPrices("BTCUSDT", "BTCUSDT")
 	c := newInteractiveCloseRound(round, s.slackEvtID, Number(50000.0), Number(50010.0))
-	bbgo.Notify("Active Rounds", round.NewNotification(spotPrice, futuresPrice), c)
+	bbgo.Notify(c, round.NewNotification(spotPrice, futuresPrice))
 
 	// the Slack notifier posts asynchronously and socket mode delivers clicks on
 	// its own goroutine; keep the process alive so the handler can run.
