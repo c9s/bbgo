@@ -447,10 +447,29 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(
 
 	resp, err := req.Do(ctx)
 	if err != nil {
+		if isBinanceErrorCode(err, -3045) {
+			// the system does not have enough asset now, treat as no max borrowable amount
+			return fixedpoint.Zero, nil
+		}
 		return fixedpoint.Zero, err
 	}
 
 	return resp.Amount, nil
+}
+
+// isBinanceErrorCode reports whether err is a Binance API error response with the given error code.
+func isBinanceErrorCode(err error, code int) bool {
+	err2, ok := err.(*requestgen.ErrResponse)
+	if !ok {
+		return false
+	}
+
+	errResp := &Error{}
+	if jsonErr := json.Unmarshal(err2.Response.Body, errResp); jsonErr != nil {
+		return false
+	}
+
+	return errResp.Code == code
 }
 
 func (e *Exchange) borrowRepayAsset(
@@ -1763,12 +1782,9 @@ func (e *Exchange) configureFuturesOptions(options map[string]any) (err error) {
 		}
 	}()
 	if err != nil {
-		if err2, ok := err.(*requestgen.ErrResponse); ok {
-			errResp := &Error{}
-			if jsonErr := json.Unmarshal(err2.Response.Body, errResp); jsonErr == nil && errResp.Code == -4145 {
-				// futures BNB burn is already set to the requested value, no need to switch -> ignore the error
-				err = nil
-			}
+		if isBinanceErrorCode(err, -4145) {
+			// futures BNB burn is already set to the requested value, no need to switch -> ignore the error
+			err = nil
 		}
 	}
 	return err
