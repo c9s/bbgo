@@ -442,7 +442,7 @@ func queryTradesToUpdateTwinOrderBook(
 			// add 1 to avoid duplicate
 			fromTradeID = trade.ID + 1
 
-			if order.Type.IsMarket() || order.Price.IsZero() {
+			if order.Type == types.OrderTypeMarket || order.Price.IsZero() {
 				if logger != nil {
 					logger("[Recover] skip market order #%d", order.OrderID)
 				}
