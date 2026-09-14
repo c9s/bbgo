@@ -1304,6 +1304,25 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
 			return
 		}
+
+		if withinMinHoldingTime {
+			// if it's within the minimum holding time, add an interactive close round notification
+			msg := fmt.Sprintf(
+				"⚠️ Round funding rate flipped %s -> %s (%s)",
+				round.TriggeredFundingRate().String(), index.LastFundingRate.String(), round.SpotSymbol(),
+			)
+			if s.slackEvtID != "" {
+				spotPrice, futuresPrice, _ := s.getLastPrices(
+					round.SpotSymbol(),
+					round.FuturesSymbol(),
+				)
+				// send a interactive close round notification when funding rate flipped
+				closeRoundNotification := newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice).SetText(msg)
+				bbgo.Notify(closeRoundNotification)
+			} else {
+				bbgo.Notify(msg)
+			}
+		}
 	}
 
 	negFundingIncomeCnt := 0
@@ -1356,27 +1375,6 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 	}
 
 	// nothing critical happened
-	// if it's within the minimum holding time, add an interactive close round notification
-	msg := fmt.Sprintf(
-		"⚠️ Round funding rate flipped %s -> %s (%s)",
-		round.TriggeredFundingRate().String(), index.LastFundingRate.String(), round.SpotSymbol(),
-	)
-	if withinMinHoldingTime {
-		if s.slackEvtID != "" {
-			spotPrice, futuresPrice, _ := s.getLastPrices(
-				round.SpotSymbol(),
-				round.FuturesSymbol(),
-			)
-			// send a interactive close round notification when funding rate flipped
-			bbgo.Notify(
-				msg,
-				newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice),
-			)
-		} else {
-			bbgo.Notify(msg)
-		}
-	}
-
 	if s.allowLog(currentTime) {
 		s.logger.Infof(
 			"[transitOpeningOrReadyRound %s] round stays %s, current funding rate %s: %s",

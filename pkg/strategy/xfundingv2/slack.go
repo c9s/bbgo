@@ -21,6 +21,7 @@ var (
 const buttonsBlockID = "xfundingv2_close_round_buttons"
 const titleTextBlockID = "xfundingv2_close_round_title"
 const instructionBlockID = "xfundingv2_close_round_instruction"
+const textBlockID = "xfundingv2_close_round_text"
 
 // action IDs for the interactive close-round buttons.
 const (
@@ -37,6 +38,7 @@ const (
 // round's spot symbol) and re-located from s.ActiveRounds under s.mu when the
 // operator confirms. This is idempotent and leak-free under periodic re-emission.
 type interactiveCloseRound struct {
+	text string
 	// slackEvtID is the dispatch key. It is rendered as a context block so the
 	// dispatcher can route button clicks on this message to the handler
 	// registered for this strategy instance. IMPORTANT: do not omit it.
@@ -84,6 +86,11 @@ func decodeCloseRoundValue(value string) (symbol, roundID string) {
 	return symbol, roundID
 }
 
+func (c *interactiveCloseRound) SetText(text string) *interactiveCloseRound {
+	c.text = text
+	return c
+}
+
 func (c *interactiveCloseRound) SlackBlocks() []slack.Block {
 	// The context block ID is the dispatch key. IMPORTANT: keep this block.
 	blocks := []slack.Block{
@@ -96,6 +103,9 @@ func (c *interactiveCloseRound) SlackBlocks() []slack.Block {
 				false,
 			),
 		),
+	}
+	if c.text != "" {
+		blocks = append(blocks, buildTextBlock(c.text, textBlockID))
 	}
 
 	blocks = append(blocks,
