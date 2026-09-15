@@ -1067,7 +1067,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	// after canceling maker orders, check whether the hedge base asset is
 	// borrowable. If not, enter a cooldown and skip placing new orders this
 	// cycle; following calls back off via the cooldown gate above.
-	if s.NoBorrowableCooldown.Duration() > 0 {
+	if s.NoBorrowableCooldown.Duration() > 0 && s.cooldownAt.IsZero() {
 		if result := getBorrowableAssetResult(s.hedgeSession, s.hedgeMarket, s.logger); result != nil && !result.BaseBorrowable {
 			s.cooldownAt = time.Now()
 			s.logger.Warnf("%s hedge base %s not borrowable on %s, entering %s no-borrowable cooldown",
