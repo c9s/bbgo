@@ -449,6 +449,7 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(
 	if err != nil {
 		if isBinanceErrorCode(err, -3045) {
 			// the system does not have enough asset now, treat as no max borrowable amount
+			log.WithError(err).Warnf("system does not have enough asset, returning zero max borrowable amount")
 			return fixedpoint.Zero, nil
 		}
 		return fixedpoint.Zero, err
