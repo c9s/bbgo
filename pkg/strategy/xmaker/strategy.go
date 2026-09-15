@@ -244,6 +244,8 @@ type StrategyConfig struct {
 	AuthTimeout types.Duration `json:"authTimeout,omitempty"`
 
 	CircuitBreaker *circuitbreaker.BasicCircuitBreaker `json:"circuitBreaker"`
+
+	NoBorrowableCooldown types.Duration `json:"noBorrowableCooldown,omitempty"`
 }
 
 type Strategy struct {
@@ -306,6 +308,7 @@ type Strategy struct {
 
 	reportProfitStatsRateLimiter *rate.Limiter
 	circuitBreakerAlertLimiter   *rate.Limiter
+	cooldownLogLimiter           *rate.Limiter
 
 	logger logrus.FieldLogger
 
@@ -361,6 +364,8 @@ type Strategy struct {
 	connectorManager *types.ConnectorManager
 
 	profitChanged int64
+
+	cooldownAt time.Time
 }
 
 func (s *Strategy) ID() string {
@@ -1010,6 +1015,21 @@ func (s *Strategy) allowMarginHedge(
 }
 
 func (s *Strategy) updateQuote(ctx context.Context) error {
+	// no-borrowable cooldown gate: cooldownAt is the start time of an active
+	// cooldown (zero = not cooling down). While cooling down, skip quoting
+	// entirely; once the window elapses, reset and resume this cycle.
+	if s.NoBorrowableCooldown.Duration() > 0 && !s.cooldownAt.IsZero() {
+		if time.Since(s.cooldownAt) < s.NoBorrowableCooldown.Duration() {
+			if s.cooldownLogLimiter.Allow() {
+				s.logger.Warnf("%s in no-borrowable cooldown (started %s ago), skip quoting",
+					s.Symbol, time.Since(s.cooldownAt))
+			}
+			return nil
+		}
+
+		s.cooldownAt = time.Time{}
+	}
+
 	if !s.hedgeSession.Connectivity.IsConnected() {
 		s.logger.Warnf("source session is disconnected, skipping update quote")
 		return nil
@@ -1042,6 +1062,18 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	if s.activeMakerOrders.NumOfOrders() > 0 {
 		s.logger.Warnf("unable to cancel all %s orders, skipping placing maker orders", s.Symbol)
 		return nil
+	}
+
+	// after canceling maker orders, check whether the hedge base asset is
+	// borrowable. If not, enter a cooldown and skip placing new orders this
+	// cycle; following calls back off via the cooldown gate above.
+	if s.NoBorrowableCooldown.Duration() > 0 {
+		if result := getBorrowableAssetResult(s.hedgeSession, s.hedgeMarket, s.logger); result != nil && !result.BaseBorrowable {
+			s.cooldownAt = time.Now()
+			s.logger.Warnf("%s hedge base %s not borrowable on %s, entering %s no-borrowable cooldown",
+				s.Symbol, s.hedgeMarket.BaseCurrency, s.hedgeSession.Name, s.NoBorrowableCooldown.Duration())
+			return nil
+		}
 	}
 
 	sig, err := s.AggregateSignal(ctx)
@@ -2499,6 +2531,7 @@ func (s *Strategy) Defaults() error {
 	s.circuitBreakerAlertLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 2)
 	s.reportProfitStatsRateLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 1)
 	s.hedgeErrorLimiter = rate.NewLimiter(rate.Every(1*time.Minute), 1)
+	s.cooldownLogLimiter = rate.NewLimiter(rate.Every(10*time.Minute), 1)
 
 	// Set SourceSymbol to Symbol if not set
 	if s.SourceSymbol == "" {
