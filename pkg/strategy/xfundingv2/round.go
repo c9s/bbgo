@@ -80,6 +80,7 @@ type ArbitrageRound struct {
 	spotPositionMetric, futuresPositionMetric       prometheus.Gauge
 	spotFilledRatioMetric, futuresFilledRatioMetric prometheus.Gauge
 	quantityDeviationMetric                         prometheus.Gauge
+	quantityQuoteDeviationMetric                    prometheus.Gauge
 	spotFuturesBasisRateMetric                      prometheus.Gauge
 	maintMarginRatioMetric                          prometheus.Gauge
 	liqDistanceMetric                               prometheus.Gauge
@@ -194,6 +195,12 @@ func (r *ArbitrageRound) SetupMetrics(s *Strategy) {
 			"symbol":      symbol,
 		},
 	)
+	r.quantityQuoteDeviationMetric = roundQuantityQuoteDeviationMetrics.With(
+		prometheus.Labels{
+			"strategy_id": id,
+			"symbol":      symbol,
+		},
+	)
 
 	r.spotFuturesBasisRateMetric = spotFuturesBasisRateMetrics.With(
 		prometheus.Labels{
@@ -273,11 +280,12 @@ func (r *ArbitrageRound) RecordMetrics(futuresAccount *types.FuturesAccount, pos
 		)
 	}
 
-	if r.quantityDeviationMetric != nil {
+	if r.quantityDeviationMetric != nil && r.quantityQuoteDeviationMetric != nil {
 		r.quantityDeviationMetric.Set(posDeviation.DeviatedQuantity.Float64())
+		r.quantityQuoteDeviationMetric.Set(posDeviation.DeviatedQuoteQuantity.Float64())
 	} else {
 		r.logger.Warnf(
-			"unable to record quantity deviation metric for round %s",
+			"unable to record quantity deviation metrics for round %s",
 			r.SpotSymbol(),
 		)
 	}
