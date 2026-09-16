@@ -1333,7 +1333,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 	}
 	if negFundingIncomeCnt >= s.ConsecutiveNegFundingIncomeLimit {
 		bbgo.Notify(
-			"⚠️ Consecutive negative funding income detected (%s), transit state %s -> closing: %s",
+			"⚠️ Consecutive negative funding income detected (%d), transit state %s -> closing: %s",
 			negFundingIncomeCnt, round.State(), round.String(),
 			round.NewNotification(spotPrice, futuresPrice),
 		)
@@ -1928,15 +1928,13 @@ func (s *Strategy) notifyStats() {
 		// additionally emit an interactive "Close Round" message for Ready rounds
 		// so an operator can close them on demand. The plain attachment above is
 		// left unchanged, so the round still appears in the "Active Rounds" batch.
-		if round.State() == RoundReady {
-			if s.slackEvtID != "" {
-				bbgo.Notify(
-					round.NewNotification(spotPrice, futuresPrice),
-					newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice),
-				)
-			} else {
-				bbgo.Notify(round.NewNotification(spotPrice, futuresPrice))
-			}
+		if round.State() == RoundReady && s.slackEvtID != "" {
+			bbgo.Notify(
+				round.NewNotification(spotPrice, futuresPrice),
+				newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice),
+			)
+		} else {
+			bbgo.Notify(round.NewNotification(spotPrice, futuresPrice))
 		}
 
 		if s.roundInsertService != nil {
