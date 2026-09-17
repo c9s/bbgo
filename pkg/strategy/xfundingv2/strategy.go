@@ -975,6 +975,15 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			tickDurationMetrics.With(prometheus.Labels{
 				"strategy_id": s.InstanceID(),
 			}).Set(duration.Seconds())
+
+			tradesBufferUntilizationMetrics.With(prometheus.Labels{
+				"strategy_id": s.InstanceID(),
+				"channel":     "spot",
+			}).Set(float64(len(s.spotTradeC)) / float64(s.TradesBufferSize))
+			tradesBufferUntilizationMetrics.With(prometheus.Labels{
+				"strategy_id": s.InstanceID(),
+				"channel":     "futures",
+			}).Set(float64(len(s.futuresTradeC)) / float64(s.TradesBufferSize))
 		}()
 	}
 	// lock the strategy to ensure all the updates to the active rounds are seen

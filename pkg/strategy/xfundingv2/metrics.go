@@ -95,3 +95,11 @@ var tickDurationMetrics = promauto.NewGaugeVec(
 	},
 	[]string{"strategy_id"},
 )
+
+var tradesBufferUntilizationMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_trades_buffer_utilization",
+		Help: "Utilization of the trades buffer channel",
+	},
+	[]string{"strategy_id", "channel"},
+)
