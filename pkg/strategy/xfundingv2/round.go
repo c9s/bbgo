@@ -520,17 +520,24 @@ func (r *ArbitrageRound) NumHoldingIntervals(currentTime time.Time) int {
 	return int(elapsed / intervalDuration)
 }
 
-func (r *ArbitrageRound) MinHoldingIntervals(currentTime time.Time, spotPrice, futuresPrice fixedpoint.Value) int {
+func (r *ArbitrageRound) MinHoldingIntervals() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.syncState.MinHoldingIntervals
+}
+
+func (r *ArbitrageRound) updateMinHoldingIntervals(currentTime time.Time, spotPrice, futuresPrice fixedpoint.Value) {
 	// only enable the dynamic adjustment of min holding intervals when there are
 	// 1. a valid spot and futures price
 	// 2. enough funding fee records to calculate the average funding income
 	if spotPrice.IsZero() || futuresPrice.IsZero() || len(r.syncState.FundingFeeRecords) <= 6 {
-		return r.syncState.MinHoldingIntervals
+		return
 	}
 
 	oriMinHoldingIntervals := r.syncState.MinHoldingIntervals
-	avgFeeIncome := r.AvgFundingIncome()
-	totalPnL := r.UnrealizedPnL(spotPrice, futuresPrice).TotalPnL()
+	avgFeeIncome := r.avgFundingIncome()
+	totalPnL := r.unrealizedPnL(spotPrice, futuresPrice).TotalPnL()
 	numHoldingIntervals := r.NumHoldingIntervals(currentTime)
 	r.syncState.MinHoldingIntervals = dynamicHoldingIntervals(
 		avgFeeIncome, totalPnL, oriMinHoldingIntervals, numHoldingIntervals,
@@ -545,7 +552,6 @@ func (r *ArbitrageRound) MinHoldingIntervals(currentTime time.Time, spotPrice, f
 			r.syncState.MinHoldingIntervals,
 		)
 	}
-	return r.syncState.MinHoldingIntervals
 }
 
 func (r *ArbitrageRound) FundingRecordsDescending(limit int) []FundingFee {
@@ -1055,6 +1061,10 @@ func (r *ArbitrageRound) AvgFundingIncome() fixedpoint.Value {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	return r.avgFundingIncome()
+}
+
+func (r *ArbitrageRound) avgFundingIncome() fixedpoint.Value {
 	if len(r.syncState.FundingFeeRecords) == 0 {
 		return fixedpoint.Zero
 	}
@@ -1701,7 +1711,15 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 		})
 	}
 
-	if r.syncState.State == RoundClosed || r.syncState.State == RoundReady {
+	if r.syncState.State == RoundClosed {
+		return
+	}
+	// get mid price
+	spotMidPrice := getMidPrice(spotOrderBook)
+	futuresMidPrice := getMidPrice(futuresOrderBook)
+
+	if r.syncState.State == RoundReady {
+		r.updateMinHoldingIntervals(currentTime, spotMidPrice, futuresMidPrice)
 		return
 	}
 
@@ -1750,10 +1768,6 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 	if err := r.rebalance(ctx, currentTime, futuresOrderBook); err != nil {
 		r.logger.WithError(err).Errorf("failed to rebalance round: %s", r.String())
 	}
-
-	// get mid price
-	spotMidPrice := getMidPrice(spotOrderBook)
-	futuresMidPrice := getMidPrice(futuresOrderBook)
 
 	// the state is PositionOpening
 	// check if the spot and futures positions are fully filled -> PositionReady

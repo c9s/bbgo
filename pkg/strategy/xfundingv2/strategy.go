@@ -1152,14 +1152,18 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 
 		task.LastTriedTime = tickTime
 		task.RetryCnt++
+		spotPrice, futuresPrice, _ := s.getLastPrices(
+			round.SpotSymbol(),
+			round.FuturesSymbol(),
+		)
 		if err := s.handleClosedRound(closeRoundCtx, task, tickTime); err != nil {
-			s.logger.WithError(err).Errorf("failed to handle closed round: %s", task.Round)
+			bbgo.Notify(
+				"❌ Failed to handle closed round: %s",
+				err.Error(),
+				task.Round.NewCriticalNotification(spotPrice, futuresPrice),
+			)
 		} else {
 			s.closedRoundStats(task.Round, tickTime)
-			spotPrice, futuresPrice, _ := s.getLastPrices(
-				round.SpotSymbol(),
-				round.FuturesSymbol(),
-			)
 			bbgo.Notify("✅ Successfully handled closed round: %s", round.String(), round.NewNotification(spotPrice, futuresPrice))
 			delete(s.ClosedRoundTasks, task.Round.SpotSymbol())
 		}
@@ -1246,7 +1250,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		return
 	}
 
-	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals(currentTime, spotPrice, futuresPrice)
+	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals()
 	if round.TriggeredFundingRate().Sign()*index.LastFundingRate.Sign() <= 0 {
 		// the funding rate has flipped
 		rateDiffAbs := index.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
@@ -1283,12 +1287,6 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		}
 		// the round is already beyond the min holding time and the funding rate has flipped
 		// check if the unrealized PnL is positive
-		spotPrice, futuresPrice, ok := s.getLastPrices(round.SpotSymbol(), round.FuturesSymbol())
-		if !ok {
-			s.logger.Warnf("[transitOpeningOrReadyRound] order book not found for symbols: %s", round.SpotSymbol())
-			return
-		}
-
 		futuresPosition := round.FuturesWorker().FilledPosition()
 		futuresPositionNotional := futuresPosition.Abs().Mul(futuresPrice)
 		// short position -> last funding rate is negative due to the flipped rate
@@ -1822,9 +1820,10 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 			if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
 				return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
 			}
-			bbgo.Notify("⬅️ Transferred %s %s back to spot account",
+			bbgo.Notify("⬅️ Transferred %s %s back to spot account for closed round: %s",
 				residualAmount,
 				asset,
+				round.String(),
 			)
 		}
 	}
@@ -2234,6 +2233,11 @@ func (s *Strategy) removeRoundsOnStartup() {
 }
 
 func (s *Strategy) rebalance(currentTime time.Time) {
+	if bbgo.IsBackTesting {
+		// no need for rebalancing when backtesting
+		return
+	}
+
 	if !s.lastRebalanceTime.IsZero() && currentTime.Sub(s.lastRebalanceTime) < s.RebalanceInterval.Duration() {
 		return
 	}
@@ -2241,7 +2245,7 @@ func (s *Strategy) rebalance(currentTime time.Time) {
 
 	if s.MarketSelectionConfig.FuturesDirection == types.PositionShort {
 		// short futures
-		// check if there is quote asset on futures account
+		// 1. check if there is quote asset on futures account
 		// transfer them back to the spot account if any
 		futuresBalances := s.futuresSession.GetAccount().Balances()
 		quoteBalance := futuresBalances[s.QuoteCurrency]
@@ -2251,6 +2255,67 @@ func (s *Strategy) rebalance(currentTime time.Time) {
 				s.logger.WithError(err).Warnf("failed to transfer quote currency to the spot account: %s", quoteBalance.Available.String())
 			} else {
 				s.logger.Infof("transferred %s %s from futures account to spot account", quoteBalance.Available.String(), s.QuoteCurrency)
+			}
+		}
+		for _, symbol := range s.candidateSymbols {
+			// skip active round
+			if _, found := s.ActiveRounds[symbol]; found {
+				continue
+			}
+			// the symbol has no active round, check for the base assets on spot and futures accounts
+
+			// 2. check if there is base asset left on the futures account
+			// if there is base asset left on the futures account, transfer it back to the spot account
+			futuresMarket, ok := s.futuresSession.Market(symbol)
+			if !ok {
+				continue
+			}
+			baseBalanceFutures := futuresBalances[futuresMarket.BaseCurrency]
+			transferred := false
+			if baseBalanceFutures.Available.Sign() > 0 {
+				s.logger.Infof("detected positive base currency on futures account: %s %s", baseBalanceFutures.Available.String(), futuresMarket.BaseCurrency)
+				if err := s.futuresService.TransferFuturesAccountAsset(s.ctx, futuresMarket.BaseCurrency, baseBalanceFutures.Available, types.TransferOut); err != nil {
+					s.logger.WithError(err).Warnf("failed to transfer base currency to the spot account for symbol %s: %s", symbol, baseBalanceFutures.Available.String())
+				} else {
+					transferred = true
+					s.logger.Infof("transferred %s %s from futures account to spot account", baseBalanceFutures.Available.String(), futuresMarket.BaseCurrency)
+				}
+			}
+			if transferred {
+				// simple hack: sleep 5 seconds to wait for the balance update
+				time.Sleep(5 * time.Second)
+			}
+			// 3. check if there is base asset on the spot account
+			// if it's not dust, sell it by market order
+			spotMarket, _ := s.spotSession.Market(symbol)
+			spotPrice := s.spotLastPrices[symbol]
+			spotBalances := s.spotSession.GetAccount().Balances()
+			baseBalanceSpot := spotBalances[spotMarket.BaseCurrency]
+			if baseBalanceSpot.Available.Sign() > 0 && !spotMarket.IsDustQuantity(baseBalanceSpot.Available, spotPrice) {
+				s.logger.Infof("non-dust base asset detected on the spot account: %s %s", baseBalanceSpot.Available.String(), spotMarket.BaseCurrency)
+				// check if there is open order for this symbol
+				executor := s.spotGeneralOrderExecutors[symbol]
+				openOrderBook := executor.ActiveMakerOrders()
+				if openOrderBook.NumOfOrders() > 0 {
+					continue
+				}
+				orderForm := types.SubmitOrder{
+					Symbol:   symbol,
+					Market:   spotMarket,
+					Side:     types.SideTypeSell,
+					Type:     types.OrderTypeMarket,
+					Quantity: baseBalanceSpot.Available,
+				}
+				// place a market sell order for the base asset
+				createdOrders, err := executor.SubmitOrders(
+					s.ctx,
+					orderForm,
+				)
+				if err != nil || len(createdOrders) == 0 {
+					s.logger.WithError(err).Warnf("failed to submit market sell order: %v", orderForm)
+				} else {
+					s.logger.Infof("rebalancing market sell order submitted: %v", createdOrders[0].AsQuery())
+				}
 			}
 		}
 	}
