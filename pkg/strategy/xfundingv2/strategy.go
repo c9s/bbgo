@@ -195,6 +195,7 @@ type Strategy struct {
 
 	fundingIncomeC chan time.Time
 
+	TradesBufferSize          int `json:"tradesBufferSize"`
 	spotTradeC, futuresTradeC chan types.Trade
 
 	ctx    context.Context
@@ -316,6 +317,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.RebalanceInterval.Duration() == 0 {
 		s.RebalanceInterval = types.Duration(time.Hour)
+	}
+
+	if s.TradesBufferSize == 0 {
+		s.TradesBufferSize = 100
 	}
 
 	return nil
@@ -833,14 +838,14 @@ func (s *Strategy) CrossRun(
 
 	// trade update callbacks
 	// run trade buffer workers in case there are many trades in a short period of time
-	s.spotTradeC = s.runTradeBufferWorker(100, func(trade types.Trade) {
+	s.spotTradeC = s.runTradeBufferWorker(s.TradesBufferSize, func(trade types.Trade) {
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
 				round.HandleSpotTrade(trade, s.spotSession.GetAccount(), trade.Time.Time())
 			}
 		}
 	})
-	s.futuresTradeC = s.runTradeBufferWorker(100, func(trade types.Trade) {
+	s.futuresTradeC = s.runTradeBufferWorker(s.TradesBufferSize, func(trade types.Trade) {
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
 				round.HandleFuturesTrade(trade, s.futuresSession.GetAccount(), trade.Time.Time())
