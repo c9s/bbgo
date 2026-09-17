@@ -1250,7 +1250,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		return
 	}
 
-	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals(currentTime, spotPrice, futuresPrice)
+	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals()
 	if round.TriggeredFundingRate().Sign()*index.LastFundingRate.Sign() <= 0 {
 		// the funding rate has flipped
 		rateDiffAbs := index.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
@@ -1287,12 +1287,6 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		}
 		// the round is already beyond the min holding time and the funding rate has flipped
 		// check if the unrealized PnL is positive
-		spotPrice, futuresPrice, ok := s.getLastPrices(round.SpotSymbol(), round.FuturesSymbol())
-		if !ok {
-			s.logger.Warnf("[transitOpeningOrReadyRound] order book not found for symbols: %s", round.SpotSymbol())
-			return
-		}
-
 		futuresPosition := round.FuturesWorker().FilledPosition()
 		futuresPositionNotional := futuresPosition.Abs().Mul(futuresPrice)
 		// short position -> last funding rate is negative due to the flipped rate
