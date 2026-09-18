@@ -839,6 +839,9 @@ func (s *Strategy) CrossRun(
 	// trade update callbacks
 	// run trade buffer workers in case there are many trades in a short period of time
 	s.spotTradeC = s.runTradeBufferWorker(s.TradesBufferSize, func(trade types.Trade) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
 				round.HandleSpotTrade(trade, s.spotSession.GetAccount(), trade.Time.Time())
@@ -846,6 +849,9 @@ func (s *Strategy) CrossRun(
 		}
 	})
 	s.futuresTradeC = s.runTradeBufferWorker(s.TradesBufferSize, func(trade types.Trade) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
 				round.HandleFuturesTrade(trade, s.futuresSession.GetAccount(), trade.Time.Time())
