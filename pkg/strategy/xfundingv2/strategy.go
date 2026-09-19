@@ -1274,20 +1274,22 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		return
 	}
 
-	negFundingIncomeCnt := 0
-	for _, record := range round.FundingRecordsDescending(3) {
-		if record.Amount.Sign() < 0 {
-			negFundingIncomeCnt++
+	if s.ConsecutiveNegFundingIncomeLimit > 0 {
+		negFundingIncomeCnt := 0
+		for _, record := range round.FundingRecordsDescending(s.ConsecutiveNegFundingIncomeLimit) {
+			if record.Amount.Sign() < 0 {
+				negFundingIncomeCnt++
+			}
 		}
-	}
-	if negFundingIncomeCnt >= s.ConsecutiveNegFundingIncomeLimit {
-		bbgo.Notify(
-			"⚠️ Consecutive negative funding income detected (%d), transit state %s -> closing: %s",
-			negFundingIncomeCnt, round.State(), round.String(),
-			round.NewNotification(spotPrice, futuresPrice),
-		)
-		round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
-		return
+		if negFundingIncomeCnt == s.ConsecutiveNegFundingIncomeLimit {
+			bbgo.Notify(
+				"⚠️ Consecutive negative funding income detected (%d), transit state %s -> closing: %s",
+				negFundingIncomeCnt, round.State(), round.String(),
+				round.NewNotification(spotPrice, futuresPrice),
+			)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
+			return
+		}
 	}
 
 	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals()
