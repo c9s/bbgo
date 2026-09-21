@@ -52,7 +52,7 @@ func (c *MarketSelectionConfig) Defaults() {
 		c.FuturesDirection = types.PositionShort
 	}
 	if c.MaxHoldingDuration == 0 {
-		c.MaxHoldingDuration = types.Duration(time.Hour * 48)
+		c.MaxHoldingDuration = types.Duration(time.Hour * 24 * 20)
 	}
 	if c.MinAnnualizedRate.IsZero() {
 		c.MinAnnualizedRate = fixedpoint.NewFromFloat(0.05) // 5%

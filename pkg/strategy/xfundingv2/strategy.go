@@ -1274,6 +1274,24 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		return
 	}
 
+	if s.ConsecutiveNegFundingIncomeLimit > 0 {
+		negFundingIncomeCnt := 0
+		for _, record := range round.FundingRecordsDescending(s.ConsecutiveNegFundingIncomeLimit) {
+			if record.Amount.Sign() < 0 {
+				negFundingIncomeCnt++
+			}
+		}
+		if negFundingIncomeCnt == s.ConsecutiveNegFundingIncomeLimit {
+			bbgo.Notify(
+				"⚠️ Consecutive negative funding income detected (%d), transit state %s -> closing: %s",
+				negFundingIncomeCnt, round.State(), round.String(),
+				round.NewNotification(spotPrice, futuresPrice),
+			)
+			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
+			return
+		}
+	}
+
 	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals()
 	if round.TriggeredFundingRate().Sign()*index.LastFundingRate.Sign() <= 0 {
 		// the funding rate has flipped
@@ -1324,7 +1342,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		// That is, we will close the round either when there is profit or the estimated loss is too large
 		// NOTE: MaxClosingLossRatio is negative
 		if unrealizedTotalPnL.Sign() > 0 || unrealizedTotalPnL.Add(nextFundingIncome).Div(futuresPositionNotional).Compare(s.MaxClosingLossRatio) < 0 {
-			s.logger.Debugf(
+			s.logger.Infof(
 				"[transitOpeningOrReadyRound] unrealized total PnL: %s, next funding income: %s, futures position notional: %s, max closing loss ratio: %s",
 				unrealizedTotalPnL, nextFundingIncome, futuresPositionNotional, s.MaxClosingLossRatio,
 			)
@@ -1355,21 +1373,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 				bbgo.Notify(msg)
 			}
 		}
-	}
-
-	negFundingIncomeCnt := 0
-	for _, record := range round.FundingRecordsDescending(3) {
-		if record.Amount.Sign() < 0 {
-			negFundingIncomeCnt++
-		}
-	}
-	if negFundingIncomeCnt >= s.ConsecutiveNegFundingIncomeLimit {
-		bbgo.Notify(
-			"⚠️ Consecutive negative funding income detected (%d), transit state %s -> closing: %s",
-			negFundingIncomeCnt, round.State(), round.String(),
-			round.NewNotification(spotPrice, futuresPrice),
-		)
-		round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
+		// nothing critical happened when the funding rate flipped, return here
 		return
 	}
 
