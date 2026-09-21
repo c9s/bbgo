@@ -1342,7 +1342,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		// That is, we will close the round either when there is profit or the estimated loss is too large
 		// NOTE: MaxClosingLossRatio is negative
 		if unrealizedTotalPnL.Sign() > 0 || unrealizedTotalPnL.Add(nextFundingIncome).Div(futuresPositionNotional).Compare(s.MaxClosingLossRatio) < 0 {
-			s.logger.Debugf(
+			s.logger.Infof(
 				"[transitOpeningOrReadyRound] unrealized total PnL: %s, next funding income: %s, futures position notional: %s, max closing loss ratio: %s",
 				unrealizedTotalPnL, nextFundingIncome, futuresPositionNotional, s.MaxClosingLossRatio,
 			)
