@@ -186,6 +186,10 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		err := syn.Start(ctx)
 		assert.NoError(t, err)
 	}()
+	defer func() {
+		sourceHedgeMarket.Stop(context.Background())
+		fiatHedgeMarket.Stop(context.Background())
+	}()
 
 	sourceMarketDataStream.EmitConnect()
 	sourceUserDataStream.EmitConnect()
@@ -290,7 +294,6 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	assert.Equal(t, Number(0).Float64(), fiatHedgeMarket.Position.GetBase().Float64(), "fiat position should be closed to 0")
 	assert.Equal(t, Number(0).Float64(), makerPosition.GetBase().Float64(), "the maker position should be closed to 0")
 
-	cancel()
 }
 
 func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
@@ -397,6 +400,10 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 	go func() {
 		err := syn.Start(ctx)
 		assert.NoError(t, err)
+	}()
+	defer func() {
+		sourceHedgeMarket.Stop(context.Background())
+		fiatHedgeMarket.Stop(context.Background())
 	}()
 
 	sourceMarketDataStream.EmitConnect()
@@ -634,7 +641,6 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 
 	time.Sleep(stepTime)
 
-	cancel()
 	time.Sleep(stepTime)
 
 	assert.Equal(t, Number(0).Float64(), sourceHedgeMarket.Position.GetBase().Float64(), "source position should be closed to 0")
