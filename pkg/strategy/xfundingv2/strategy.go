@@ -2225,6 +2225,7 @@ func (s *Strategy) removeRoundsOnStartup() {
 	// round again (same or different symbol) the operator just edits RemoveOnStartupSymbols.
 	for symbol := range s.AppliedStartupRemovals {
 		if _, ok := configured[symbol]; !ok {
+			s.logger.Infof("resetting round removal for symbol %s", symbol)
 			delete(s.AppliedStartupRemovals, symbol)
 		}
 	}
