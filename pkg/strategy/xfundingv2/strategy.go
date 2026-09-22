@@ -526,6 +526,14 @@ func (s *Strategy) CrossRun(
 			mismatchSymbols = append(mismatchSymbols, risk.Symbol)
 		}
 	}
+	// on the other hand, if there is active round without a corresponding open position, it is also a mismatch.
+	for symbol := range s.ActiveRounds {
+		_, found := risksMap[symbol]
+		if !found {
+			mismatchSymbols = append(mismatchSymbols, symbol)
+		}
+	}
+
 	if len(mismatchSymbols) > 0 {
 		return fmt.Errorf("found open positions without active rounds: %v on %s", mismatchSymbols, s.futuresSession.Exchange.Name())
 	}
