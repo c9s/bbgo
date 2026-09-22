@@ -204,18 +204,48 @@ func removeBlockByID(oriBlocks []slack.Block, ids ...string) []slack.Block {
 // emitted by this instance carry that slackEvtID context block, so their clicks
 // route here. The clicked button's value is the round's spot symbol.
 func setupCloseRoundInteraction(s *Strategy, dispatcher *interact.InteractiveMessageDispatcher) {
-	dispatcher.Register(s.slackEvtID, newCloseRoundHandler(s))
+	dispatcher.Register(s.slackEvtID, newCloseRoundHandler(s, s.SlackAuthUsers))
 }
 
 // newCloseRoundHandler builds the interactive-message handler closure over the
 // strategy. It is split out from setupCloseRoundInteraction so it can be invoked
 // directly in tests without a dispatcher.
-func newCloseRoundHandler(s *Strategy) interact.InteractiveMessageHandler {
+func newCloseRoundHandler(s *Strategy, authUsers []string) interact.InteractiveMessageHandler {
+	authUsersMap := make(map[string]struct{})
+	for _, user := range authUsers {
+		authUsersMap[user] = struct{}{}
+	}
 	return func(
 		user slack.User, oriMessage slack.Message, actionID string, actionValue string,
 	) ([]interact.InteractionMessageUpdate, error) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
+
+		auth := true
+		if len(authUsers) > 0 {
+			_, foundName := authUsersMap[user.Name]
+			_, foundID := authUsersMap[user.ID]
+			auth = foundName || foundID
+		}
+
+		if !auth {
+			s.logger.Warn("slack interactive close round: user authorization failed")
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks:       oriMessage.Blocks.BlockSet,
+					PostInThread: false,
+				},
+				{
+					Blocks: []slack.Block{
+						buildTextBlock(
+							fmt.Sprintf("❌ %s (ID: %s) are not authorized to perform this action.", user.Name, user.ID),
+							"",
+						),
+					},
+					PostInThread: true,
+				},
+			}, nil
+		}
 
 		symbol, roundID := decodeCloseRoundValue(actionValue)
 		round, ok := s.ActiveRounds[symbol]
@@ -309,6 +339,10 @@ func newCloseRoundHandler(s *Strategy) interact.InteractiveMessageHandler {
 						buildTextBlock(
 							futuresOrdersList,
 							futuresOrderListBlockID,
+						),
+						buildTextBlock(
+							fmt.Sprintf("Listing time: %s", time.Now().Format(time.RFC3339)),
+							"",
 						),
 					},
 					PostInThread: true,
