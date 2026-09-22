@@ -833,6 +833,7 @@ func (s *Strategy) CrossRun(
 	s.spotSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		s.logger.Infof("received spot trade: %s", trade.String())
 
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
@@ -843,6 +844,7 @@ func (s *Strategy) CrossRun(
 	s.futuresSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		s.logger.Infof("received futures trade: %s", trade.String())
 
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
