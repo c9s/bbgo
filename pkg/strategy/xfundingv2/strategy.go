@@ -187,7 +187,8 @@ type Strategy struct {
 
 	// slackEvtID is the interactive-message dispatch key for this strategy
 	// instance. It's for the interactive close round feature.
-	slackEvtID string
+	slackEvtID     string
+	SlackAuthUsers []string `json:"slackAuthUsers"`
 
 	lastTickTime time.Time
 
