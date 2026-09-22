@@ -1516,7 +1516,7 @@ func (r *ArbitrageRound) prepareClosing(
 }
 
 func (r *ArbitrageRound) SetLogger(logger logrus.FieldLogger) {
-	r.logger = logger
+	r.logger = logger.WithField("round_id", r.ID())
 }
 
 func (r *ArbitrageRound) ID() string {

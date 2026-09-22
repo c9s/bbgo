@@ -55,6 +55,11 @@ func (c *CriticalErrorConfig) Defaults() {
 	}
 }
 
+// DepthQueryService queries an order book snapshot over REST.
+type DepthQueryService interface {
+	QueryDepth(ctx context.Context, symbol string) (types.SliceOrderBook, int64, error)
+}
+
 type Strategy struct {
 	Environment *bbgo.Environment
 
@@ -195,9 +200,6 @@ type Strategy struct {
 
 	fundingIncomeC chan time.Time
 
-	TradesBufferSize          int `json:"tradesBufferSize"`
-	spotTradeC, futuresTradeC chan types.Trade
-
 	ctx    context.Context
 	cancel context.CancelFunc
 }
@@ -317,10 +319,6 @@ func (s *Strategy) Defaults() error {
 
 	if s.RebalanceInterval.Duration() == 0 {
 		s.RebalanceInterval = types.Duration(time.Hour)
-	}
-
-	if s.TradesBufferSize == 0 {
-		s.TradesBufferSize = 100
 	}
 
 	return nil
@@ -513,28 +511,6 @@ func (s *Strategy) CrossRun(
 	}
 	if _, ok := s.futuresSession.Exchange.(types.ExchangeOrderQueryService); !ok {
 		return fmt.Errorf("futures session exchange does not support order query service: %s", s.futuresSession.ExchangeName)
-	}
-
-	// remaining open position check
-	risks, err := s.futuresService.QueryPositionRisk(s.ctx)
-	if err != nil {
-		return fmt.Errorf("failed to query position risk from futures session exchange: %w", err)
-	}
-	risksMap := make(map[string]types.PositionRisk)
-	for _, risk := range risks {
-		risksMap[risk.Symbol] = risk
-	}
-	// if there is any open position, it should have a corresponding active round which is loaded via LoadState.
-	// Otherwise, it is a mismatch and should raise an error to stop the strategy from running.
-	var mismatchSymbols []string
-	for _, risk := range risks {
-		_, found := s.ActiveRounds[risk.Symbol]
-		if !risk.PositionAmount.IsZero() && !found {
-			mismatchSymbols = append(mismatchSymbols, risk.Symbol)
-		}
-	}
-	if len(mismatchSymbols) > 0 {
-		return fmt.Errorf("found open positions without active rounds: %v on %s", mismatchSymbols, s.futuresSession.Exchange.Name())
 	}
 
 	// initialize cost estimator
@@ -746,6 +722,39 @@ func (s *Strategy) CrossRun(
 		round.SetSlackAlert(s.SlackAlert)
 	}
 
+	if !bbgo.IsBackTesting {
+		currentTime := time.Now()
+		// tick all active rounds using freshly queried order book snapshots.
+		// The stream books are not connected yet at this point, so we query the
+		// order book over REST to advance the round workers once at startup.
+		spotDepthService, ok := s.spotSession.Exchange.(DepthQueryService)
+		if !ok {
+			return fmt.Errorf("spot session exchange %s does not support depth query", s.spotSession.ExchangeName)
+		}
+		futuresDepthService, ok := s.futuresSession.Exchange.(DepthQueryService)
+		if !ok {
+			return fmt.Errorf("futures session exchange %s does not support depth query", s.futuresSession.ExchangeName)
+		}
+		for _, round := range s.ActiveRounds {
+			spotBook, _, err := spotDepthService.QueryDepth(s.ctx, round.SpotSymbol())
+			if err != nil {
+				s.logger.WithError(err).Warnf("failed to query spot depth for %s, skipping initial tick", round.SpotSymbol())
+				continue
+			}
+			futuresBook, _, err := futuresDepthService.QueryDepth(s.ctx, round.FuturesSymbol())
+			if err != nil {
+				s.logger.WithError(err).Warnf("failed to query futures depth for %s, skipping initial tick", round.FuturesSymbol())
+				continue
+			}
+			round.Tick(s.ctx, currentTime, &spotBook, &futuresBook)
+		}
+	}
+
+	// all round state restored, run remaining open position check
+	if err := s.positionMismatchCheck(); err != nil {
+		return err
+	}
+
 	for _, symbol := range s.candidateSymbols {
 		if breaker, found := s.CircuitBreakers[symbol]; !found {
 			s.CircuitBreakers[symbol] = s.defaultBreaker(symbol)
@@ -837,10 +846,10 @@ func (s *Strategy) CrossRun(
 	}))
 
 	// trade update callbacks
-	// run trade buffer workers in case there are many trades in a short period of time
-	s.spotTradeC = s.runTradeBufferWorker(s.TradesBufferSize, func(trade types.Trade) {
+	s.spotSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		s.logger.Infof("received spot trade: %s", trade.String())
 
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
@@ -848,23 +857,16 @@ func (s *Strategy) CrossRun(
 			}
 		}
 	})
-	s.futuresTradeC = s.runTradeBufferWorker(s.TradesBufferSize, func(trade types.Trade) {
+	s.futuresSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		s.logger.Infof("received futures trade: %s", trade.String())
 
 		for _, round := range s.allRounds() {
 			if round.HasOrder(trade.OrderID) {
 				round.HandleFuturesTrade(trade, s.futuresSession.GetAccount(), trade.Time.Time())
 			}
 		}
-	})
-	s.spotSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-		// queue the trade to be processed by the spot trade buffer worker
-		s.spotTradeC <- trade
-	})
-	s.futuresSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-		// queue the trade to be processed by the futures trade buffer worker
-		s.futuresTradeC <- trade
 	})
 
 	// order update callbacks
@@ -981,15 +983,6 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			tickDurationMetrics.With(prometheus.Labels{
 				"strategy_id": s.InstanceID(),
 			}).Set(duration.Seconds())
-
-			tradesBufferUntilizationMetrics.With(prometheus.Labels{
-				"strategy_id": s.InstanceID(),
-				"channel":     "spot",
-			}).Set(float64(len(s.spotTradeC)) / float64(s.TradesBufferSize))
-			tradesBufferUntilizationMetrics.With(prometheus.Labels{
-				"strategy_id": s.InstanceID(),
-				"channel":     "futures",
-			}).Set(float64(len(s.futuresTradeC)) / float64(s.TradesBufferSize))
 		}()
 	}
 	// lock the strategy to ensure all the updates to the active rounds are seen
@@ -2349,22 +2342,37 @@ func (s *Strategy) rebalance(currentTime time.Time) {
 	}
 }
 
-func (s *Strategy) runTradeBufferWorker(bufferSize int, handle func(types.Trade)) chan types.Trade {
-	tradeC := make(chan types.Trade, bufferSize)
-
-	go func() {
-		for {
-			select {
-			case <-s.ctx.Done():
-				return
-			case trade, ok := <-tradeC:
-				if !ok {
-					return
-				}
-				handle(trade)
-			}
+func (s *Strategy) positionMismatchCheck() error {
+	risks, err := s.futuresService.QueryPositionRisk(s.ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query position risk from futures session exchange: %w", err)
+	}
+	risksMap := make(map[string]types.PositionRisk)
+	for _, risk := range risks {
+		risksMap[risk.Symbol] = risk
+	}
+	// if there is any open position, it should have a corresponding active round which is loaded via LoadState.
+	// Otherwise, it is a mismatch and should raise an error to stop the strategy from running.
+	var mismatchSymbols []string
+	for _, risk := range risks {
+		_, found := s.ActiveRounds[risk.Symbol]
+		if !risk.PositionAmount.IsZero() && !found {
+			mismatchSymbols = append(mismatchSymbols, risk.Symbol)
 		}
-	}()
+	}
+	// on the other hand, if there is active round which is not closed without a corresponding open position, it is also a mismatch.
+	for symbol, round := range s.ActiveRounds {
+		if round.State() == RoundClosed {
+			continue
+		}
+		_, found := risksMap[symbol]
+		if !found {
+			mismatchSymbols = append(mismatchSymbols, symbol)
+		}
+	}
 
-	return tradeC
+	if len(mismatchSymbols) > 0 {
+		return fmt.Errorf("found open positions without active rounds: %v on %s", mismatchSymbols, s.futuresSession.Exchange.Name())
+	}
+	return nil
 }
