@@ -508,36 +508,6 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("futures session exchange does not support order query service: %s", s.futuresSession.ExchangeName)
 	}
 
-	// remaining open position check
-	risks, err := s.futuresService.QueryPositionRisk(s.ctx)
-	if err != nil {
-		return fmt.Errorf("failed to query position risk from futures session exchange: %w", err)
-	}
-	risksMap := make(map[string]types.PositionRisk)
-	for _, risk := range risks {
-		risksMap[risk.Symbol] = risk
-	}
-	// if there is any open position, it should have a corresponding active round which is loaded via LoadState.
-	// Otherwise, it is a mismatch and should raise an error to stop the strategy from running.
-	var mismatchSymbols []string
-	for _, risk := range risks {
-		_, found := s.ActiveRounds[risk.Symbol]
-		if !risk.PositionAmount.IsZero() && !found {
-			mismatchSymbols = append(mismatchSymbols, risk.Symbol)
-		}
-	}
-	// on the other hand, if there is active round without a corresponding open position, it is also a mismatch.
-	for symbol := range s.ActiveRounds {
-		_, found := risksMap[symbol]
-		if !found {
-			mismatchSymbols = append(mismatchSymbols, symbol)
-		}
-	}
-
-	if len(mismatchSymbols) > 0 {
-		return fmt.Errorf("found open positions without active rounds: %v on %s", mismatchSymbols, s.futuresSession.Exchange.Name())
-	}
-
 	// initialize cost estimator
 	futuresFeeRate := types.ExchangeFee{
 		MakerFeeRate: s.futuresSession.MakerFeeRate,
@@ -745,6 +715,11 @@ func (s *Strategy) CrossRun(
 			)
 		}
 		round.SetSlackAlert(s.SlackAlert)
+	}
+
+	// all round state restored, run remaining open position check
+	if err := s.positionMismatchCheck(); err != nil {
+		return err
 	}
 
 	for _, symbol := range s.candidateSymbols {
@@ -2332,4 +2307,39 @@ func (s *Strategy) rebalance(currentTime time.Time) {
 			}
 		}
 	}
+}
+
+func (s *Strategy) positionMismatchCheck() error {
+	risks, err := s.futuresService.QueryPositionRisk(s.ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query position risk from futures session exchange: %w", err)
+	}
+	risksMap := make(map[string]types.PositionRisk)
+	for _, risk := range risks {
+		risksMap[risk.Symbol] = risk
+	}
+	// if there is any open position, it should have a corresponding active round which is loaded via LoadState.
+	// Otherwise, it is a mismatch and should raise an error to stop the strategy from running.
+	var mismatchSymbols []string
+	for _, risk := range risks {
+		_, found := s.ActiveRounds[risk.Symbol]
+		if !risk.PositionAmount.IsZero() && !found {
+			mismatchSymbols = append(mismatchSymbols, risk.Symbol)
+		}
+	}
+	// on the other hand, if there is active round which is not closed without a corresponding open position, it is also a mismatch.
+	for symbol, round := range s.ActiveRounds {
+		if round.State() == RoundClosed {
+			continue
+		}
+		_, found := risksMap[symbol]
+		if !found {
+			mismatchSymbols = append(mismatchSymbols, symbol)
+		}
+	}
+
+	if len(mismatchSymbols) > 0 {
+		return fmt.Errorf("found open positions without active rounds: %v on %s", mismatchSymbols, s.futuresSession.Exchange.Name())
+	}
+	return nil
 }
