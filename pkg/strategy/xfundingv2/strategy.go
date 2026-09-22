@@ -195,9 +195,6 @@ type Strategy struct {
 
 	fundingIncomeC chan time.Time
 
-	TradesBufferSize          int `json:"tradesBufferSize"`
-	spotTradeC, futuresTradeC chan types.Trade
-
 	ctx    context.Context
 	cancel context.CancelFunc
 }
@@ -317,10 +314,6 @@ func (s *Strategy) Defaults() error {
 
 	if s.RebalanceInterval.Duration() == 0 {
 		s.RebalanceInterval = types.Duration(time.Hour)
-	}
-
-	if s.TradesBufferSize == 0 {
-		s.TradesBufferSize = 100
 	}
 
 	return nil
@@ -837,8 +830,7 @@ func (s *Strategy) CrossRun(
 	}))
 
 	// trade update callbacks
-	// run trade buffer workers in case there are many trades in a short period of time
-	s.spotTradeC = s.runTradeBufferWorker(s.TradesBufferSize, func(trade types.Trade) {
+	s.spotSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
@@ -848,7 +840,7 @@ func (s *Strategy) CrossRun(
 			}
 		}
 	})
-	s.futuresTradeC = s.runTradeBufferWorker(s.TradesBufferSize, func(trade types.Trade) {
+	s.futuresSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
@@ -857,14 +849,6 @@ func (s *Strategy) CrossRun(
 				round.HandleFuturesTrade(trade, s.futuresSession.GetAccount(), trade.Time.Time())
 			}
 		}
-	})
-	s.spotSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-		// queue the trade to be processed by the spot trade buffer worker
-		s.spotTradeC <- trade
-	})
-	s.futuresSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-		// queue the trade to be processed by the futures trade buffer worker
-		s.futuresTradeC <- trade
 	})
 
 	// order update callbacks
@@ -981,15 +965,6 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 			tickDurationMetrics.With(prometheus.Labels{
 				"strategy_id": s.InstanceID(),
 			}).Set(duration.Seconds())
-
-			tradesBufferUntilizationMetrics.With(prometheus.Labels{
-				"strategy_id": s.InstanceID(),
-				"channel":     "spot",
-			}).Set(float64(len(s.spotTradeC)) / float64(s.TradesBufferSize))
-			tradesBufferUntilizationMetrics.With(prometheus.Labels{
-				"strategy_id": s.InstanceID(),
-				"channel":     "futures",
-			}).Set(float64(len(s.futuresTradeC)) / float64(s.TradesBufferSize))
 		}()
 	}
 	// lock the strategy to ensure all the updates to the active rounds are seen
@@ -2347,24 +2322,4 @@ func (s *Strategy) rebalance(currentTime time.Time) {
 			}
 		}
 	}
-}
-
-func (s *Strategy) runTradeBufferWorker(bufferSize int, handle func(types.Trade)) chan types.Trade {
-	tradeC := make(chan types.Trade, bufferSize)
-
-	go func() {
-		for {
-			select {
-			case <-s.ctx.Done():
-				return
-			case trade, ok := <-tradeC:
-				if !ok {
-					return
-				}
-				handle(trade)
-			}
-		}
-	}()
-
-	return tradeC
 }
