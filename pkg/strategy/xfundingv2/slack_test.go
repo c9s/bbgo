@@ -90,6 +90,16 @@ func TestNotifyInteractiveCloseRound(t *testing.T) {
 
 	// build a live strategy fixture
 	s, round := newStrategyFixture(t, ctrl, "BTCUSDT", "test-slack-evt-id")
+	round.spotWorker.syncState.TWAPExecutor.syncState.Orders[1] = types.OrderQuery{
+		Symbol:    "BTCUSDT",
+		OrderID:   "1",
+		OrderUUID: "test-spot-uuid",
+	}
+	round.futuresWorker.syncState.TWAPExecutor.syncState.Orders[1] = types.OrderQuery{
+		Symbol:    "BTCUSDT",
+		OrderID:   "2",
+		OrderUUID: "test-futures-uuid",
+	}
 
 	// wire a real Slack notifier into bbgo's notification hub
 	client := slack.New(slackBotToken, slack.OptionAppLevelToken(slackAppToken))
@@ -126,7 +136,7 @@ func TestCloseRoundInteraction(t *testing.T) {
 		blocks := c.SlackBlocks()
 
 		assert.True(t, hasBlockID(blocks, slackEvtID), "must carry the slackEvtID context block")
-		assert.True(t, hasBlockID(blocks, buttonsBlockID), "must carry the buttons block")
+		assert.True(t, hasBlockID(blocks, closeRoundButtonsBlockID), "must carry the buttons block")
 	})
 
 	t.Run("Close reveals confirm/cancel without changing state", func(t *testing.T) {
@@ -139,7 +149,7 @@ func TestCloseRoundInteraction(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, updates, 1)
 		// buttons block is replaced (same block ID), and no state change yet
-		assert.True(t, hasBlockID(updates[0].Blocks, buttonsBlockID))
+		assert.True(t, hasBlockID(updates[0].Blocks, closeRoundButtonsBlockID))
 		assert.Equal(t, RoundReady, round.State(), "state must not change on first click")
 	})
 
@@ -154,7 +164,7 @@ func TestCloseRoundInteraction(t *testing.T) {
 		// confirm produces a single update replacing the message with the acknowledgement
 		assert.Len(t, updates, 1)
 		// the buttons block is stripped after confirm
-		assert.False(t, hasBlockID(updates[0].Blocks, buttonsBlockID))
+		assert.False(t, hasBlockID(updates[0].Blocks, closeRoundButtonsBlockID))
 		assert.Equal(t, RoundClosing, round.State(), "confirm must set the round to closing")
 	})
 
@@ -185,6 +195,6 @@ func TestCloseRoundInteraction(t *testing.T) {
 		// no-op still emits the main update plus a threaded "not closeable" reply
 		assert.Len(t, updates, 2)
 		assert.Equal(t, RoundReady, round.State(), "a stale round ID must not close the live round")
-		assert.False(t, hasBlockID(updates[0].Blocks, buttonsBlockID))
+		assert.False(t, hasBlockID(updates[0].Blocks, closeRoundButtonsBlockID))
 	})
 }
