@@ -193,6 +193,14 @@ func (o *TWAPExecutor) AllOrders() []types.Order {
 	return orders
 }
 
+func (o *TWAPExecutor) AllOrderQueries() []types.OrderQuery {
+	var queries []types.OrderQuery
+	for _, query := range o.syncState.Orders {
+		queries = append(queries, query)
+	}
+	return queries
+}
+
 func (o *TWAPExecutor) AllTrades() []types.Trade {
 	var trades []types.Trade
 	for _, trade := range o.syncState.Trades {
