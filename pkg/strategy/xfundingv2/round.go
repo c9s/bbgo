@@ -1921,12 +1921,12 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 		if err != nil {
 			return fmt.Errorf("failed to update futures account: %w", err)
 		}
-		// check the collateral on the futures account and the futures worker target position
+		// check the current spot filled position and the futures worker target position
 		currentFuturesTargetPosition := r.futuresWorker.TargetPosition()
-		futuresCollateral := futuresAccount.Balances()[baseAsset].Available
-		if futuresCollateral.Add(currentFuturesTargetPosition).Sign() > 0 {
-			bbgo.Notify("🔧 setting futures worker target position to %s when rebalancing", futuresCollateral.Neg())
-			r.futuresWorker.SetTargetPosition(futuresCollateral.Neg())
+		currentSpotFilledPosition := r.spotWorker.FilledPosition()
+		if !currentSpotFilledPosition.Add(currentFuturesTargetPosition).IsZero() {
+			bbgo.Notify("🔧 setting futures worker target position to %s when rebalancing", currentSpotFilledPosition.Neg())
+			r.futuresWorker.SetTargetPosition(currentSpotFilledPosition.Neg())
 		}
 		// check if there is sufficient margin on the futures account to open the position, if not, transfer from spot account
 		futuresRemaining := r.futuresWorker.RemainingQuantity().Abs()
@@ -1988,21 +1988,11 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to update futures account: %w", err)
 		}
-		baseAsset := r.CollateralAsset()
-		// check the target position of the spot worker
-		if spotCollateralBalance, ok := spotAccount.Balance(baseAsset); ok {
-			spotRemaining := r.spotWorker.RemainingQuantity()
-			if diff := spotCollateralBalance.Available.Sub(spotRemaining); diff.Sign() > 0 {
-				spotCurrentPosition := r.spotWorker.TargetPosition()
-				newTarget := spotCurrentPosition.Sub(diff)
-				bbgo.Notify("🔧 setting spot worker target position to %s when rebalancing", newTarget)
-				r.spotWorker.SetTargetPosition(newTarget)
-			}
-		}
 		// rebalance the short futures leg for negative unrealized PnL
 		// negative unrealized PnL will lock available collateral on futures account and prevent us to transfer out the asset back to spot account.
 		// Overtime, it may cause an unexpected position risk on overall positions, both spot and futures.
 		// We check the net balance of the quote asset on futures account and transfer from spot account to futures account if it's negative.
+		baseAsset := r.CollateralAsset()
 		futuresMarket := r.futuresWorker.Market()
 		quoteAsset := futuresMarket.QuoteCurrency
 		r.logger.Debugf("base asset: %s, quote asset: %s", baseAsset, quoteAsset)
@@ -2056,6 +2046,14 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 			return fmt.Errorf("failed to transfer %s %s from futures to spot: %w", transferDiff, baseAsset, err)
 		}
 		r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
+
+		// 4. check the target position of the spot worker
+		futuresFilledPosition := r.futuresWorker.FilledPosition()
+		currnetSpotTargetPosition := r.spotWorker.TargetPosition()
+		if !futuresFilledPosition.Add(currnetSpotTargetPosition).IsZero() {
+			bbgo.Notify("🔧 setting spot worker target position to %s when rebalancing", futuresFilledPosition.Neg())
+			r.spotWorker.SetTargetPosition(futuresFilledPosition.Neg())
+		}
 	} else {
 		// TODO: rebalance the long futures leg when closing
 	}
