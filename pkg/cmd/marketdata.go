@@ -4,15 +4,19 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/marketdata"
 	"github.com/c9s/bbgo/pkg/marketdata/sources/binancecsv"
+	"github.com/c9s/bbgo/pkg/marketdata/sources/replay"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -78,7 +82,7 @@ var marketDataDumpCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		src, req, err := marketDataSourceFromFlags(cmd)
+		sources, req, err := marketDataDumpSources(cmd)
 		if err != nil {
 			return err
 		}
@@ -91,8 +95,12 @@ var marketDataDumpCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		checkBook, err := cmd.Flags().GetBool("check-book")
+		if err != nil {
+			return err
+		}
 
-		merged, err := marketdata.MergeSources(ctx, []marketdata.Source{src}, req)
+		merged, err := marketdata.MergeSources(ctx, sources, req)
 		if err != nil {
 			return err
 		}
@@ -102,6 +110,7 @@ var marketDataDumpCmd = &cobra.Command{
 			count  int64
 			byType = map[marketdata.EventType]int64{}
 			prev   marketdata.OrderKey
+			books  = map[string]*marketdata.BookState{}
 		)
 
 		for merged.Next() {
@@ -117,6 +126,20 @@ var marketDataDumpCmd = &cobra.Command{
 
 			count++
 			byType[ev.Type]++
+
+			if checkBook {
+				book, ok := books[ev.Symbol]
+				if !ok {
+					book = marketdata.NewBookState(ev.Symbol, ev.Exchange)
+					book.Mode = marketdata.SequenceContiguous
+					book.CheckCrossed = true
+					books[ev.Symbol] = book
+				}
+				if err := book.Apply(ev); err != nil {
+					return fmt.Errorf("book check failed at event %d (%s): %w",
+						count, ev.Time().Format(time.RFC3339Nano), err)
+				}
+			}
 
 			if !countOnly && (limit <= 0 || count <= int64(limit)) {
 				fmt.Println(formatEvent(ev))
@@ -137,8 +160,235 @@ var marketDataDumpCmd = &cobra.Command{
 			log.Infof("  %s: %d", evType, n)
 		}
 
+		for symbol, book := range books {
+			bid, ask, ok := book.Book.BestBidAndAsk()
+			if !ok {
+				log.Warnf("  %s book is empty", symbol)
+				continue
+			}
+			log.Infof("  %s book replayed to sequence %d, best %s / %s",
+				symbol, book.LastSequence(), bid.Price.String(), ask.Price.String())
+
+			if n := book.Unverified(); n > 0 {
+				// Do not claim the book is intact when it cannot be proven:
+				// without the venue's previous-update id, a lost update is
+				// indistinguishable from a batched one.
+				log.Warnf("  %s: %d updates could not be verified as contiguous, "+
+					"because the source did not provide a previous-update id", symbol, n)
+			} else {
+				log.Infof("  %s: sequence verified contiguous", symbol)
+			}
+		}
+
 		return nil
 	},
+}
+
+var marketDataRecordCmd = &cobra.Command{
+	Use:   "record",
+	Short: "record a live market data stream for later replay",
+	Long: `Record a live market data stream to a replayable file.
+
+This exists because the public archives cannot supply L2: data.binance.vision
+publishes no depth diffs, and the vendor APIs that do require a paid key. A
+recording is therefore the only way to get real order book snapshots and updates
+into a backtest without buying data.
+
+Recordings rotate hourly and replay through the same marketdata.Source interface
+as any other provider, so they merge with archive data in time order.`,
+	PreRunE: cobraInitRequired([]string{"session", "symbol"}),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		environ := bbgo.NewEnvironment()
+		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
+			return err
+		}
+
+		sessionName, err := cmd.Flags().GetString("session")
+		if err != nil {
+			return err
+		}
+
+		session, ok := environ.Session(sessionName)
+		if !ok {
+			return fmt.Errorf("session %s not found", sessionName)
+		}
+
+		symbols, err := cmd.Flags().GetStringSlice("symbol")
+		if err != nil {
+			return err
+		}
+		if len(symbols) == 0 {
+			return fmt.Errorf("--symbol is required")
+		}
+
+		channelNames, err := cmd.Flags().GetStringSlice("channels")
+		if err != nil {
+			return err
+		}
+		depth, err := cmd.Flags().GetString("depth")
+		if err != nil {
+			return err
+		}
+		outDir, err := cmd.Flags().GetString("out")
+		if err != nil {
+			return err
+		}
+		duration, err := cmd.Flags().GetDuration("duration")
+		if err != nil {
+			return err
+		}
+		uncompressed, err := cmd.Flags().GetBool("uncompressed")
+		if err != nil {
+			return err
+		}
+
+		var channels []types.Channel
+		for _, name := range channelNames {
+			switch strings.TrimSpace(name) {
+			case "book":
+				channels = append(channels, types.BookChannel)
+			case "trade":
+				channels = append(channels, types.MarketTradeChannel)
+			case "aggTrade":
+				channels = append(channels, types.AggTradeChannel)
+			case "bookTicker":
+				channels = append(channels, types.BookTickerChannel)
+			default:
+				return fmt.Errorf("unknown channel %q, want book, trade, aggTrade or bookTicker", name)
+			}
+		}
+
+		writer, err := replay.NewWriter(replay.WriterConfig{
+			Dir:          outDir,
+			Exchange:     session.ExchangeName,
+			Symbols:      symbols,
+			Channels:     channels,
+			Uncompressed: uncompressed,
+			Note:         fmt.Sprintf("recorded by bbgo marketdata record, session %s", sessionName),
+		})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := writer.Close(); err != nil {
+				log.WithError(err).Error("closing the recording")
+			}
+		}()
+
+		stream := session.Exchange.NewStream()
+		stream.SetPublicOnly()
+
+		for _, symbol := range symbols {
+			for _, channel := range channels {
+				opts := types.SubscribeOptions{}
+				if channel == types.BookChannel {
+					opts.Depth = types.Depth(depth)
+				}
+				stream.Subscribe(channel, symbol, opts)
+			}
+		}
+
+		recorder := replay.NewRecorder(writer, session.ExchangeName)
+
+		// Bind before connecting: StandardStream does not lock its callback
+		// slices, so registration has to finish before emission starts.
+		recorder.BindStream(stream)
+
+		if err := stream.Connect(ctx); err != nil {
+			return err
+		}
+		defer stream.Close()
+
+		log.Infof("recording %v %v to %s", symbols, channelNames, outDir)
+
+		// Flush periodically so a kill does not cost the whole buffer.
+		flushTicker := time.NewTicker(10 * time.Second)
+		defer flushTicker.Stop()
+
+		var deadline <-chan time.Time
+		if duration > 0 {
+			timer := time.NewTimer(duration)
+			defer timer.Stop()
+			deadline = timer.C
+			log.Infof("will stop after %s", duration)
+		}
+
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+
+		for {
+			select {
+			case <-flushTicker.C:
+				if err := writer.Flush(); err != nil {
+					log.WithError(err).Warn("flushing the recording")
+				}
+				log.Infof("%d events recorded, current file %s",
+					writer.Count(), filepath.Base(writer.Filename()))
+
+			case <-deadline:
+				log.Infof("recorded %d events, %d dropped", writer.Count(), recorder.Dropped())
+				return nil
+
+			case sig := <-signals:
+				log.Infof("received %s, recorded %d events, %d dropped",
+					sig, writer.Count(), recorder.Dropped())
+				return nil
+
+			case <-ctx.Done():
+				return nil
+			}
+		}
+	},
+}
+
+// marketDataDumpSources builds the sources to dump. A recording replaces the
+// archive source when --replay is given, so a capture can be inspected with the
+// same command and the same ordering checks.
+func marketDataDumpSources(cmd *cobra.Command) ([]marketdata.Source, marketdata.Request, error) {
+	var empty marketdata.Request
+
+	replayPath, err := cmd.Flags().GetString("replay")
+	if err != nil {
+		return nil, empty, err
+	}
+
+	if replayPath == "" {
+		src, req, err := marketDataSourceFromFlags(cmd)
+		if err != nil {
+			return nil, empty, err
+		}
+		return []marketdata.Source{src}, req, nil
+	}
+
+	symbols, err := cmd.Flags().GetStringSlice("symbol")
+	if err != nil {
+		return nil, empty, err
+	}
+
+	src, err := replay.New(replay.Config{Path: replayPath, Symbols: symbols})
+	if err != nil {
+		return nil, empty, err
+	}
+
+	// a recording may have been made moments ago
+	since, until, err := marketDataRange(cmd, time.Now().UTC().Add(time.Minute))
+	if err != nil {
+		return nil, empty, err
+	}
+
+	var subs []types.Subscription
+	for _, symbol := range symbols {
+		for _, channel := range src.Capabilities().Channels {
+			subs = append(subs, types.Subscription{Symbol: symbol, Channel: channel})
+		}
+	}
+
+	return []marketdata.Source{src}, marketdata.Request{
+		Since: since, Until: until, Subscriptions: subs,
+	}, nil
 }
 
 // formatEvent renders one event as a single line, showing the fields that
@@ -218,7 +468,8 @@ func marketDataSourceFromFlags(cmd *cobra.Command) (*binancecsv.Source, marketda
 		return nil, empty, err
 	}
 
-	since, until, err := marketDataRange(cmd)
+	// archives exist only for completed UTC days
+	since, until, err := marketDataRange(cmd, time.Now().UTC().Truncate(24*time.Hour))
 	if err != nil {
 		return nil, empty, err
 	}
@@ -287,7 +538,13 @@ func marketDataSubscriptions(
 	return subs
 }
 
-func marketDataRange(cmd *cobra.Command) (since, until time.Time, err error) {
+// marketDataRange resolves --since and --until.
+//
+// The default end differs by source kind. Archives are published per completed
+// UTC day, so defaulting to today's midnight avoids requesting a file that does
+// not exist yet; a recording can have been made minutes ago, so there the
+// default is now.
+func marketDataRange(cmd *cobra.Command, defaultUntil time.Time) (since, until time.Time, err error) {
 	sinceStr, err := cmd.Flags().GetString("since")
 	if err != nil {
 		return since, until, err
@@ -297,14 +554,25 @@ func marketDataRange(cmd *cobra.Command) (since, until time.Time, err error) {
 		return since, until, err
 	}
 
-	if since, err = parseMarketDataTime(sinceStr); err != nil {
+	if sinceStr == "" {
+		// A recording carries its own time range, so replaying all of it is a
+		// sensible default; archives need an explicit start and mark --since
+		// required.
+		since = time.Unix(0, 0).UTC()
+	} else if since, err = parseMarketDataTime(sinceStr); err != nil {
 		return since, until, fmt.Errorf("bad --since: %w", err)
 	}
 
 	if untilStr == "" {
-		until = time.Now().UTC().Truncate(24 * time.Hour)
+		until = defaultUntil
 	} else if until, err = parseMarketDataTime(untilStr); err != nil {
 		return since, until, fmt.Errorf("bad --until: %w", err)
+	}
+
+	if !until.After(since) {
+		return since, until, fmt.Errorf(
+			"--until (%s) must be after --since (%s)",
+			until.Format(time.RFC3339), since.Format(time.RFC3339))
 	}
 
 	return since, until, nil
@@ -339,16 +607,31 @@ func init() {
 		if err := cmd.MarkFlagRequired("symbol"); err != nil {
 			panic(err)
 		}
-		if err := cmd.MarkFlagRequired("since"); err != nil {
-			panic(err)
-		}
+	}
+
+	if err := marketDataDownloadCmd.MarkFlagRequired("since"); err != nil {
+		panic(err)
 	}
 
 	marketDataDownloadCmd.Flags().Bool("dry-run", false, "print the archive URLs without downloading")
+	marketDataDumpCmd.Flags().String("replay", "",
+		"replay a recording directory or file instead of reading archives")
+	marketDataDumpCmd.Flags().Bool("check-book", false,
+		"apply book events to an order book and verify the sequence is contiguous")
 	marketDataDumpCmd.Flags().Int("limit", 20, "print at most this many events, 0 for all")
 	marketDataDumpCmd.Flags().Bool("count-only", false, "only count events, do not print them")
 
+	marketDataRecordCmd.Flags().String("session", "", "exchange session to record from")
+	marketDataRecordCmd.Flags().StringSlice("symbol", nil, "symbols to record, e.g. BTCUSDT")
+	marketDataRecordCmd.Flags().StringSlice("channels", []string{"book", "trade"},
+		"channels to record: book, trade, aggTrade, bookTicker")
+	marketDataRecordCmd.Flags().String("depth", "full", "order book depth: full, medium, 1, 5 or 20")
+	marketDataRecordCmd.Flags().String("out", "./recordings", "output directory")
+	marketDataRecordCmd.Flags().Duration("duration", 0, "stop after this long, 0 to run until interrupted")
+	marketDataRecordCmd.Flags().Bool("uncompressed", false, "write plain .jsonl instead of .jsonl.gz")
+
 	marketDataCmd.AddCommand(marketDataDownloadCmd)
+	marketDataCmd.AddCommand(marketDataRecordCmd)
 	marketDataCmd.AddCommand(marketDataDumpCmd)
 	RootCmd.AddCommand(marketDataCmd)
 }

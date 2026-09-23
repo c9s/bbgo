@@ -45,16 +45,18 @@ type BookState struct {
 	// Mode selects sequence validation strictness.
 	Mode SequenceMode
 
-	// OnGap, when set, is called for a tolerated gap under SequenceMonotonic.
-	// Under SequenceContiguous a gap is returned as an error instead.
-	OnGap func(expected, got uint64)
+	// OnGap, when set, is called just before a contiguity violation is
+	// returned, with the sequence the book is at and the one the update claimed
+	// to follow. It is a hook for metrics; Apply still returns the error.
+	OnGap func(have, claimed uint64)
 
 	// CheckCrossed makes Apply verify the book is still valid after each event.
 	// It costs a scan of both sides, so it is off by default.
 	CheckCrossed bool
 
-	lastSeq uint64
-	ready   bool
+	lastSeq    uint64
+	ready      bool
+	unverified int64
 }
 
 // NewBookState returns a BookState for symbol with the default mode.
@@ -71,6 +73,12 @@ func (s *BookState) Ready() bool { return s.ready }
 // LastSequence returns the sequence of the last applied event, or zero.
 func (s *BookState) LastSequence() uint64 { return s.lastSeq }
 
+// Unverified returns how many updates were accepted under SequenceContiguous
+// without their contiguity being provable, because the source did not supply
+// Event.PrevSeq. A non-zero count means the book may have holes that no check
+// can see, so it is worth surfacing rather than assuming success.
+func (s *BookState) Unverified() int64 { return s.unverified }
+
 // Reset drops the book contents and returns to the not-ready state.
 func (s *BookState) Reset() {
 	if s.Book != nil {
@@ -78,6 +86,7 @@ func (s *BookState) Reset() {
 	}
 	s.lastSeq = 0
 	s.ready = false
+	s.unverified = 0
 }
 
 // Apply applies a book event.
@@ -130,26 +139,33 @@ func (s *BookState) checkSequence(ev *Event) error {
 		return nil
 	}
 
+	// Going backwards is a gap under every mode that checks anything: the
+	// stream has been reordered or events have been replayed.
 	if ev.Key.Seq < s.lastSeq {
 		return fmt.Errorf("%w: %s sequence went backwards, have %d got %d",
 			ErrBookGap, ev.Symbol, s.lastSeq, ev.Key.Seq)
 	}
 
-	// A contiguous stream numbers updates consecutively; anything else is a
-	// hole. Sources whose sequences are not consecutive by construction should
-	// use SequenceMonotonic.
-	if ev.Key.Seq == s.lastSeq+1 {
+	if s.Mode != SequenceContiguous {
 		return nil
 	}
 
-	switch s.Mode {
-	case SequenceContiguous:
-		return fmt.Errorf("%w: %s expected %d got %d",
-			ErrBookGap, ev.Symbol, s.lastSeq+1, ev.Key.Seq)
-	default:
-		if s.OnGap != nil {
-			s.OnGap(s.lastSeq+1, ev.Key.Seq)
-		}
+	if ev.PrevSeq == 0 {
+		// The venue did not say what this event follows, so nothing stronger
+		// than monotonicity can be proven. Count it instead of inventing a
+		// rule: requiring Seq == lastSeq+1 would report a gap on every Binance
+		// diff, because "u" counts individual updates rather than events.
+		s.unverified++
 		return nil
 	}
+
+	if ev.PrevSeq != s.lastSeq {
+		if s.OnGap != nil {
+			s.OnGap(s.lastSeq, ev.PrevSeq)
+		}
+		return fmt.Errorf("%w: %s update claims to follow %d but the book is at %d",
+			ErrBookGap, ev.Symbol, ev.PrevSeq, s.lastSeq)
+	}
+
+	return nil
 }
