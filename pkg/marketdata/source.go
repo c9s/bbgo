@@ -85,8 +85,39 @@ func (c Capability) Supports(sub types.Subscription) bool {
 	return true
 }
 
+// Covered returns the subscriptions this capability can serve, and Uncovered
+// returns the rest.
+//
+// A source is not required to serve every subscription in a request: in a merge
+// each source contributes what it has. Whether the request as a whole is
+// covered is a question about the set of sources, so MergeSources answers it,
+// not the individual source.
+func (c Capability) Covered(req Request) []types.Subscription {
+	var out []types.Subscription
+	for _, sub := range req.Subscriptions {
+		if c.Supports(sub) {
+			out = append(out, sub)
+		}
+	}
+	return out
+}
+
+func (c Capability) Uncovered(req Request) []types.Subscription {
+	var out []types.Subscription
+	for _, sub := range req.Subscriptions {
+		if !c.Supports(sub) {
+			out = append(out, sub)
+		}
+	}
+	return out
+}
+
 // Validate checks a request against the capability and returns an
 // *UnsupportedError describing the first problem it finds.
+//
+// It rejects a request only when the source can contribute nothing to it, or
+// when the source cannot serve a bounded range at all. A source that covers
+// some of the subscriptions is opened and serves those.
 func (c Capability) Validate(sourceName string, req Request) error {
 	if !c.HasHistory {
 		return &UnsupportedError{
@@ -95,29 +126,11 @@ func (c Capability) Validate(sourceName string, req Request) error {
 		}
 	}
 
-	for _, sub := range req.Subscriptions {
-		if !slices.Contains(c.Channels, sub.Channel) {
-			return &UnsupportedError{
-				Source:  sourceName,
-				Channel: sub.Channel,
-				Reason:  fmt.Sprintf("supported channels are %v", c.Channels),
-			}
-		}
-		if c.Symbols != nil && !slices.Contains(c.Symbols, sub.Symbol) {
-			return &UnsupportedError{
-				Source: sourceName,
-				Symbol: sub.Symbol,
-				Reason: fmt.Sprintf("supported symbols are %v", c.Symbols),
-			}
-		}
-		if sub.Channel == types.KLineChannel && c.Intervals != nil &&
-			!slices.Contains(c.Intervals, sub.Options.Interval) {
-			return &UnsupportedError{
-				Source:   sourceName,
-				Channel:  sub.Channel,
-				Interval: sub.Options.Interval,
-				Reason:   fmt.Sprintf("supported intervals are %v", c.Intervals),
-			}
+	if len(c.Covered(req)) == 0 {
+		return &UnsupportedError{
+			Source: sourceName,
+			Reason: fmt.Sprintf("none of the requested subscriptions are served; this source serves channels %v",
+				c.Channels),
 		}
 	}
 
