@@ -3,13 +3,17 @@ package marketdata
 import (
 	"container/heap"
 	"context"
+	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"go.uber.org/multierr"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 // ErrorPolicy decides what a merge does when one of its inputs fails.
@@ -174,10 +178,20 @@ func Merge(cursors []NamedCursor, opts ...MergeOption) *MergeCursor {
 
 // MergeSources opens every source over the same request and merges the result.
 // If any Open fails it closes whatever it already opened and returns the error.
+//
+// It first checks that the sources together cover every subscription. An
+// individual source only serves what it has, so this is the only place with
+// enough information to notice that nobody serves, say, the order book — and
+// noticing matters, because the alternative is a backtest that silently runs
+// without the data a strategy asked for.
 func MergeSources(
 	ctx context.Context, sources []Source, req Request, opts ...MergeOption,
 ) (*MergeCursor, error) {
 	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := CheckCoverage(sources, req); err != nil {
 		return nil, err
 	}
 
@@ -360,4 +374,47 @@ func (m *MergeCursor) Close() error {
 	}
 
 	return err
+}
+
+// CheckCoverage reports whether the sources together serve every subscription
+// in req, naming what is missing and which source would have to provide it.
+func CheckCoverage(sources []Source, req Request) error {
+	var missing []types.Subscription
+
+	for _, sub := range req.Subscriptions {
+		served := false
+		for _, src := range sources {
+			if src.Capabilities().Supports(sub) {
+				served = true
+				break
+			}
+		}
+		if !served {
+			missing = append(missing, sub)
+		}
+	}
+
+	if len(missing) == 0 {
+		return nil
+	}
+
+	names := make([]string, len(sources))
+	for i, src := range sources {
+		names[i] = src.Name()
+	}
+
+	var sb strings.Builder
+	sb.WriteString("marketdata: no configured source serves ")
+	for i, sub := range missing {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		fmt.Fprintf(&sb, "%s %s", sub.Symbol, sub.Channel)
+		if len(sub.Options.Interval) > 0 {
+			fmt.Fprintf(&sb, " (%s)", sub.Options.Interval)
+		}
+	}
+	fmt.Fprintf(&sb, "; configured sources are %v", names)
+
+	return errors.New(sb.String())
 }
