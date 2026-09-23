@@ -108,4 +108,22 @@ func Test_CMF2(t *testing.T) {
 		assert.Equal(t, 1, len(callbacks))
 		assert.InDelta(t, 1.0, callbacks[0], 1e-9)
 	})
+
+	t.Run("truncate", func(t *testing.T) {
+		stream, _, cmf := newStream(1)
+		for i := 0; i < MaxSliceSize+10; i++ {
+			stream.EmitKLineClosed(buildCMFKLine(10, 5, 10, 100))
+		}
+		assert.Equal(t, MaxSliceSize+10, cmf.Length())
+		cmf.Truncate()
+		assert.Equal(t, TruncateSize, cmf.Length())
+	})
+
+	t.Run("invalid_window", func(t *testing.T) {
+		stream := &types.StandardStream{}
+		kLines := KLines(stream, "", "")
+		assert.Panics(t, func() {
+			CMF2(kLines, 0)
+		})
+	})
 }

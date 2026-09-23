@@ -41,7 +41,7 @@ func CMF2(source KLineSubscription, window int) *CMFStream {
 }
 
 func (s *CMFStream) Truncate() {
-	s.Slice = types.ShrinkSlice(s.Slice, MaxSliceSize, TruncateSize)
+	s.Slice = generalTruncate(s.Slice)
 }
 
 func (s *CMFStream) calculateAndPush(high, low, closePrice, volume float64) {
