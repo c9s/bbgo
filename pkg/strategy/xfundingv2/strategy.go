@@ -1230,7 +1230,7 @@ func (s *Strategy) transitRound(ctx context.Context, round *ArbitrageRound, curr
 	}
 
 	// update the funding rate
-	timedCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	timedCtx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
 	index, err := s.futuresService.QueryPremiumIndex(timedCtx, round.FuturesSymbol())

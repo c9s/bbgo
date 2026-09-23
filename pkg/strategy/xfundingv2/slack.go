@@ -285,9 +285,12 @@ func newCloseRoundHandler(s *Strategy, authUsers []string) interact.InteractiveM
 				instructionBlockID,
 				closeRoundButtonsBlockID,
 			)
-			blocks = append(blocks,
-				buildTextBlock("Press *Confirm Close* to confirm.", instructionBlockID),
-				buildConfirmButtonsBlock(symbol, roundID),
+			blocks = append(
+				[]slack.Block{
+					buildTextBlock("Press *Confirm Close* to confirm.", instructionBlockID),
+					buildConfirmButtonsBlock(symbol, roundID),
+				},
+				blocks...,
 			)
 			return []interact.InteractionMessageUpdate{
 				{
@@ -324,10 +327,7 @@ func newCloseRoundHandler(s *Strategy, authUsers []string) interact.InteractiveM
 			}
 			return []interact.InteractionMessageUpdate{
 				{
-					Blocks: removeBlockByID(
-						oriMessage.Blocks.BlockSet,
-						listOrderButtonsBlockID,
-					),
+					Blocks:       oriMessage.Blocks.BlockSet,
 					PostInThread: false,
 				},
 				{
@@ -351,9 +351,7 @@ func newCloseRoundHandler(s *Strategy, authUsers []string) interact.InteractiveM
 		default:
 			return []interact.InteractionMessageUpdate{
 				{
-					Blocks: removeBlockByID(oriMessage.Blocks.BlockSet,
-						closeRoundButtonsBlockID,
-					),
+					Blocks:       oriMessage.Blocks.BlockSet,
 					PostInThread: false,
 				},
 				{
