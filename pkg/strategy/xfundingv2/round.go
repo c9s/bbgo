@@ -1917,10 +1917,6 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 				)
 			}
 		}
-		futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
-		if err != nil {
-			return fmt.Errorf("failed to update futures account: %w", err)
-		}
 		// check the current spot filled position and the futures worker target position
 		currentFuturesTargetPosition := r.futuresWorker.TargetPosition()
 		currentSpotFilledPosition := r.spotWorker.FilledPosition()
@@ -1945,6 +1941,10 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 			return nil
 		}
 		price := bestBid.Price
+		futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
+		if err != nil {
+			return fmt.Errorf("failed to update futures account: %w", err)
+		}
 		requiredMargin := price.Mul(futuresRemaining).Div(r.syncState.Leverage)
 		futuresAvailable := futuresAccount.FuturesInfo.AvailableBalance
 		if futuresAvailable.Compare(requiredMargin) < 0 {
