@@ -181,6 +181,12 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 			Time:   e.EventBase.Time.Time(),
 			Bids:   e.Bids,
 			Asks:   e.Asks,
+			// The update ids live on depth.Update, but OnPush and OnReady emit
+			// only the inner SliceOrderBook, so without this every event
+			// reaching OnBookUpdate carried LastUpdateId 0 while snapshots from
+			// QueryDepth carried a real one. Any consumer validating book
+			// continuity — or recording the stream for replay — needs it.
+			LastUpdateId: e.FinalUpdateID,
 		}, e.FirstUpdateID, e.FinalUpdateID, e.PreviousUpdateID); err != nil {
 			log.WithError(err).Warnf("found missing %s update event", e.Symbol)
 		}
