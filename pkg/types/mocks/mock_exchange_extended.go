@@ -60,6 +60,21 @@ func (mr *MockExchangeExtendedMockRecorder) CancelOrders(ctx any, orders ...any)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelOrders", reflect.TypeOf((*MockExchangeExtended)(nil).CancelOrders), varargs...)
 }
 
+// CancelReplace mocks base method.
+func (m *MockExchangeExtended) CancelReplace(ctx context.Context, cancelReplaceMode types.CancelReplaceModeType, order types.Order) (*types.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CancelReplace", ctx, cancelReplaceMode, order)
+	ret0, _ := ret[0].(*types.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CancelReplace indicates an expected call of CancelReplace.
+func (mr *MockExchangeExtendedMockRecorder) CancelReplace(ctx, cancelReplaceMode, order any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelReplace", reflect.TypeOf((*MockExchangeExtended)(nil).CancelReplace), ctx, cancelReplaceMode, order)
+}
+
 // Name mocks base method.
 func (m *MockExchangeExtended) Name() types.ExchangeName {
 	m.ctrl.T.Helper()
