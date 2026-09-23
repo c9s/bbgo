@@ -1908,13 +1908,14 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 		if baseAvailable.Sign() > 0 {
 			// transfer the available collateral asset from spot to futures
 			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, baseAvailable, types.TransferIn); err != nil {
-				return fmt.Errorf("failed to transfer %s %s from spot to futures: %w", baseAvailable.String(), baseAsset, err)
+				r.logger.WithError(err).Warnf("failed to transfer %s %s from spot to futures when rebalancing", baseAvailable.String(), baseAsset)
+			} else {
+				r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(baseAvailable)
+				bbgo.Notify("➡️ Transfered %s %s from spot to futures to rebalance",
+					baseAvailable.String(),
+					baseAsset,
+				)
 			}
-			r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(baseAvailable)
-			bbgo.Notify("➡️ Transfered %s %s from spot to futures to rebalance",
-				baseAvailable.String(),
-				baseAsset,
-			)
 		}
 		futuresAccount, err := r.futuresSession.UpdateAccount(timedCtx)
 		if err != nil {
@@ -1924,7 +1925,7 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 		currentFuturesTargetPosition := r.futuresWorker.TargetPosition()
 		futuresCollateral := futuresAccount.Balances()[baseAsset].Available
 		if futuresCollateral.Add(currentFuturesTargetPosition).Sign() > 0 {
-			r.logger.Infof("setting futures worker target position to %s when rebalancing", futuresCollateral.Neg())
+			bbgo.Notify("🔧 setting futures worker target position to %s when rebalancing", futuresCollateral.Neg())
 			r.futuresWorker.SetTargetPosition(futuresCollateral.Neg())
 		}
 		// check if there is sufficient margin on the futures account to open the position, if not, transfer from spot account
@@ -1994,7 +1995,7 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 			if diff := spotCollateralBalance.Available.Sub(spotRemaining); diff.Sign() > 0 {
 				spotCurrentPosition := r.spotWorker.TargetPosition()
 				newTarget := spotCurrentPosition.Sub(diff)
-				r.logger.Infof("setting spot worker target position when rebalancing: %s -> %s", spotCurrentPosition, newTarget)
+				bbgo.Notify("🔧 setting spot worker target position to %s when rebalancing", newTarget)
 				r.spotWorker.SetTargetPosition(newTarget)
 			}
 		}
