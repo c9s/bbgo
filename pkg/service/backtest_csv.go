@@ -13,6 +13,14 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// BacktestServiceCSV serves klines aggregated from locally stored trade CSVs.
+//
+// Deprecated: superseded by pkg/marketdata. This implementation has known
+// limitations that are not being fixed: QueryKLinesCh emits only intervals[0],
+// ignores the since/until range and the symbol list, and returns a nil error
+// channel that backtest.Exchange.SubscribeMarketData then blocks a goroutine on
+// forever. It is kept compiling until the backtest engine is rewired onto
+// marketdata.Source.
 type BacktestServiceCSV struct {
 	kLines      map[types.Interval][]types.KLine
 	path        string
@@ -20,6 +28,9 @@ type BacktestServiceCSV struct {
 	granularity csvsource.DataType
 }
 
+// NewBacktestServiceCSV returns the legacy CSV backtest source.
+//
+// Deprecated: see BacktestServiceCSV.
 func NewBacktestServiceCSV(
 	path string,
 	market csvsource.MarketType,
