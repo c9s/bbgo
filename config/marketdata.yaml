@@ -1,0 +1,71 @@
+---
+# Market data sources for backtesting.
+#
+# Sources declared here are merged into a single stream ordered by event time.
+# Nothing reads this yet from the backtest engine itself; inspect it with
+#
+#   bbgo marketdata dump --config config/marketdata.yaml --from-config \
+#       --since 2026-09-15 --until 2026-09-16 --check-book
+#
+# and warm the archive cache with
+#
+#   bbgo marketdata download --market um --dataset aggTrades,klines \
+#       --interval 1h --symbol BTCUSDT --since 2026-09-15 --until 2026-09-16
+
+sessions:
+  binance:
+    exchange: binance
+    publicOnly: true
+
+backtest:
+  startTime: "2026-09-15"
+  endTime: "2026-09-16"
+  symbols:
+    - BTCUSDT
+
+  # Shared by every archive source, so each one does not repeat it.
+  cacheDir: ~/.bbgo/marketdata
+
+  dataSources:
+    # Binance's public archives. They serve trades and candles, and they cannot
+    # serve L2: there is no depth-diff dataset, bookTicker is L1 only and stopped
+    # in March 2024, and bookDepth is percentage-band notional with no prices.
+    - type: binanceCsv
+      name: binance-archives
+      params:
+        market: um            # spot | um (USDⓈ-M) | cm (COIN-M)
+        period: daily         # daily | monthly
+        datasets:
+          - aggTrades
+          - klines
+        symbols: [BTCUSDT]
+        intervals: ["1h"]
+        # Treat a day the publisher does not have as a warning rather than an
+        # error. Off by default, so a gap cannot pass for a complete dataset.
+        allowMissingDays: false
+
+    # A recording made with `bbgo marketdata record`. This is how to get real
+    # order book snapshots and updates without paying a vendor.
+    - type: replay
+      name: recorded-book
+      params:
+        path: ./recordings
+
+    # A vendor feed, for L2 over a historical range. Needs a paid key; the
+    # 403 an unauthenticated request returns is indistinguishable from an
+    # out-of-plan endpoint, so check the plan covers the exchange being asked for.
+    # - type: amberdata
+    #   name: amberdata-book
+    #   params:
+    #     apiKey: ${AMBERDATA_API_KEY}
+    #     exchange: binance
+    #     assetClass: futures
+    #     symbols: [BTCUSDT]
+    #     maxLevel: 20
+
+    # Another bbgo node replaying over gRPC. The server side is not implemented
+    # yet; see pkg/marketdata/pb.
+    # - type: grpc
+    #   name: replay-server
+    #   params:
+    #     address: "localhost:50052"
