@@ -65,6 +65,51 @@ func TestChanCursor_FailSurfacesViaErr(t *testing.T) {
 
 // TestChanCursor_BlocksWhenFull verifies that backpressure is real: with
 // OverflowBlock the producer stalls rather than dropping events.
+// TestChanCursor_DrainsBufferedEventsBeforeFailing is a regression test: Next
+// used to check the error before reading the channel, so events the producer had
+// already delivered were thrown away when a failure arrived. That silently
+// truncated the stream right before the error explaining it.
+func TestChanCursor_DrainsBufferedEventsBeforeFailing(t *testing.T) {
+	boom := errors.New("upstream died")
+	c := marketdata.NewChanCursor(context.Background(), 16)
+
+	// Deliver three events and then fail, with nothing consumed in between.
+	for i := int64(1); i <= 3; i++ {
+		require.True(t, c.Push(tradeEvent(i*1000)))
+	}
+	c.Fail(boom)
+
+	var times []int64
+	for c.Next() {
+		times = append(times, c.Event().Key.TimeNs/1e6)
+	}
+
+	assert.Equal(t, []int64{1000, 2000, 3000}, times,
+		"events that arrived successfully must still be delivered")
+	assert.ErrorIs(t, c.Err(), boom, "and the error must follow them")
+	require.NoError(t, c.Close())
+}
+
+// TestChanCursor_DrainsBufferedEventsBeforeCancel is the same property for
+// cancellation.
+func TestChanCursor_DrainsBufferedEventsBeforeCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	c := marketdata.NewChanCursor(ctx, 16)
+
+	require.True(t, c.Push(tradeEvent(1000)))
+	require.True(t, c.Push(tradeEvent(2000)))
+	cancel()
+
+	var count int
+	for c.Next() {
+		count++
+	}
+
+	assert.Equal(t, 2, count, "buffered events must survive a cancellation")
+	assert.ErrorIs(t, c.Err(), context.Canceled)
+	require.NoError(t, c.Close())
+}
+
 func TestChanCursor_BlocksWhenFull(t *testing.T) {
 	c := marketdata.NewChanCursor(context.Background(), 2)
 

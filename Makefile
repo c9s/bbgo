@@ -247,10 +247,15 @@ embed: pkg/server/assets.go pkg/backtest/assets.go
 static: apps/frontend/out/index.html pkg/server/assets.go pkg/backtest/assets.go
 
 PROTOS := \
-	$(wildcard pkg/pb/*.proto)
+	$(wildcard pkg/pb/*.proto) \
+	$(wildcard pkg/marketdata/pb/*.proto)
 
 GRPC_GO_DEPS := $(subst .proto,.pb.go,$(PROTOS))
 
+# Run `make install-grpc-tools` first: it pins protoc-gen-go v1.26 and
+# protoc-gen-go-grpc v1.1, which is what the committed generated files were
+# produced with. A newer protoc-gen-go rewrites every .pb.go in the repo, turning
+# a small proto change into an unreviewable diff.
 %.pb.go: %.proto .FORCE
 	protoc --go-grpc_out=. --go-grpc_opt=paths=source_relative --go_out=paths=source_relative:. --proto_path=. $<
 
@@ -272,6 +277,6 @@ grpc-py:
 		$(PWD)/pkg/pb/bbgo.proto
 
 clean:
-	rm -rf $(BUILD_DIR) $(DIST_DIR) $(FRONTEND_EXPORT_DIR) $(GRPC_GO_DEPS) pkg/pb/*.pb.go coverage.txt
+	rm -rf $(BUILD_DIR) $(DIST_DIR) $(FRONTEND_EXPORT_DIR) $(GRPC_GO_DEPS) pkg/pb/*.pb.go pkg/marketdata/pb/*.pb.go coverage.txt
 
 .PHONY: bbgo bbgo-slim-darwin bbgo-slim-darwin-amd64 bbgo-slim-darwin-arm64 bbgo-darwin version dist pack migrations static embed desktop grpc grpc-go grpc-py .FORCE
