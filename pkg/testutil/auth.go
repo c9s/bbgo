@@ -25,6 +25,25 @@ func IntegrationTestConfigured(t *testing.T, prefix string) (key, secret string,
 	return key, secret, ok
 }
 
+// APIKeyConfigured gates an integration test for a service that authenticates
+// with a key alone.
+//
+// IntegrationTestConfigured requires both <PREFIX>_API_KEY and
+// <PREFIX>_API_SECRET, which does not fit a service like AmberData whose
+// authentication is a single static header with no secret to pair with it.
+func APIKeyConfigured(t *testing.T, prefix string) (key string, ok bool) {
+	prefix = strings.ToUpper(prefix)
+
+	var hasKey bool
+	key, hasKey = os.LookupEnv(prefix + "_API_KEY")
+	ok = hasKey && os.Getenv("TEST_"+prefix) == "1"
+	if ok {
+		t.Logf("%s api integration test enabled, key = %s", prefix, maskSecret(key))
+	}
+
+	return key, ok
+}
+
 func IntegrationTestWithPassphraseConfigured(t *testing.T, prefix string) (key, secret, passphrase string, ok bool) {
 	var hasKey, hasSecret, hasPassphrase bool
 	prefix = strings.ToUpper(prefix)

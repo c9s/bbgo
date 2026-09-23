@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "title": "OK",
+  "description": "Successful request",
+  "payload": {
+    "metadata": {
+      "requestedStartDate": "2024-06-04 16:22:24 224",
+      "requestedEndDate": "2024-06-05 16:22:24 224",
+      "returnedStartDate": "2024-06-04 16:22:24 231",
+      "returnedEndDate": "2024-06-04 16:23:12 414",
+      "next": null,
+      "api-version": "2023-09-30"
+    },
+    "data": [
+      {
+        "instrument": "BTCUSD_PERP",
+        "exchange": "binance",
+        "exchangeTimestamp": "2024-06-04 16:23:12 414",
+        "exchangeTimestampNanoseconds": 0,
+        "sequence": "960251880359",
+        "ask": [{ "price": 70960.6, "volume": 75, "numOrders": null }],
+        "bid": [{ "price": 70907, "volume": 51, "numOrders": null }]
+      }
+    ]
+  }
+}
