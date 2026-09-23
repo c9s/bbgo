@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/marketdata"
+	"github.com/c9s/bbgo/pkg/marketdata/registry"
 	"github.com/c9s/bbgo/pkg/marketdata/sources/binancecsv"
 	"github.com/c9s/bbgo/pkg/marketdata/sources/replay"
 	"github.com/c9s/bbgo/pkg/types"
@@ -344,11 +346,22 @@ as any other provider, so they merge with archive data in time order.`,
 	},
 }
 
-// marketDataDumpSources builds the sources to dump. A recording replaces the
-// archive source when --replay is given, so a capture can be inspected with the
-// same command and the same ordering checks.
+// marketDataDumpSources builds the sources to dump.
+//
+// There are three ways in, in order of precedence: the sources declared in a
+// config file's backtest.dataSources, a recording given with --replay, and the
+// archive flags. The config path is the one that exercises what the backtest
+// engine will eventually use.
 func marketDataDumpSources(cmd *cobra.Command) ([]marketdata.Source, marketdata.Request, error) {
 	var empty marketdata.Request
+
+	useConfig, err := cmd.Flags().GetBool("from-config")
+	if err != nil {
+		return nil, empty, err
+	}
+	if useConfig {
+		return marketDataConfiguredSources(cmd)
+	}
 
 	replayPath, err := cmd.Flags().GetString("replay")
 	if err != nil {
@@ -389,6 +402,129 @@ func marketDataDumpSources(cmd *cobra.Command) ([]marketdata.Source, marketdata.
 	return []marketdata.Source{src}, marketdata.Request{
 		Since: since, Until: until, Subscriptions: subs,
 	}, nil
+}
+
+// marketDataConfiguredSources builds the sources declared in the config file's
+// backtest.dataSources, which is the shape the backtest engine will read.
+func marketDataConfiguredSources(cmd *cobra.Command) ([]marketdata.Source, marketdata.Request, error) {
+	var empty marketdata.Request
+
+	if userConfig == nil || userConfig.Backtest == nil {
+		return nil, empty, fmt.Errorf("the config file has no backtest section")
+	}
+
+	cfgs := userConfig.Backtest.DataSources
+	if len(cfgs) == 0 {
+		return nil, empty, fmt.Errorf(
+			"the config file declares no backtest.dataSources; known source types are %s",
+			strings.Join(registry.Types(), ", "))
+	}
+
+	cacheDir := userConfig.Backtest.CacheDir
+	if flagDir, err := cmd.Flags().GetString("cache-dir"); err == nil && flagDir != "" {
+		cacheDir = flagDir
+	}
+	if cacheDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, empty, err
+		}
+		cacheDir = filepath.Join(home, ".bbgo", "marketdata")
+	}
+
+	sources, err := registry.NewAll(cmd.Context(), cfgs, registry.Options{CacheDir: cacheDir})
+	if err != nil {
+		return nil, empty, err
+	}
+
+	symbols, err := cmd.Flags().GetStringSlice("symbol")
+	if err != nil {
+		return nil, empty, err
+	}
+	if len(symbols) == 0 {
+		symbols = userConfig.Backtest.Symbols
+	}
+	if len(symbols) == 0 {
+		return nil, empty, fmt.Errorf(
+			"no symbols: pass --symbol or set backtest.symbols in the config")
+	}
+
+	intervalNames, err := cmd.Flags().GetStringSlice("interval")
+	if err != nil {
+		return nil, empty, err
+	}
+
+	var intervals []types.Interval
+	for _, name := range intervalNames {
+		if name = strings.TrimSpace(name); name != "" {
+			intervals = append(intervals, types.Interval(name))
+		}
+	}
+
+	since, until, err := marketDataRange(cmd, time.Now().UTC().Truncate(24*time.Hour))
+	if err != nil {
+		return nil, empty, err
+	}
+
+	// Subscribe to the union of what the configured sources can serve, so the
+	// command shows everything the configuration makes available rather than
+	// requiring the channels to be listed again.
+	req := marketdata.Request{
+		Since:         since,
+		Until:         until,
+		Subscriptions: unionSubscriptions(sources, symbols, intervals),
+	}
+
+	return sources, req, nil
+}
+
+// unionSubscriptions builds one subscription per symbol for every channel any
+// configured source serves.
+//
+// When no interval is given, the intervals the sources declare are used. A kline
+// subscription with no interval matches no source that restricts its intervals,
+// so defaulting here is what makes `--from-config` work without repeating on the
+// command line what the config already says.
+func unionSubscriptions(
+	sources []marketdata.Source, symbols []string, intervals []types.Interval,
+) []types.Subscription {
+	var channels []types.Channel
+	for _, src := range sources {
+		capabilities := src.Capabilities()
+
+		for _, ch := range capabilities.Channels {
+			if !slices.Contains(channels, ch) {
+				channels = append(channels, ch)
+			}
+		}
+
+		if len(intervals) == 0 {
+			for _, interval := range capabilities.Intervals {
+				if !slices.Contains(intervals, interval) {
+					intervals = append(intervals, interval)
+				}
+			}
+		}
+	}
+
+	var subs []types.Subscription
+	for _, symbol := range symbols {
+		for _, channel := range channels {
+			if channel == types.KLineChannel && len(intervals) > 0 {
+				for _, interval := range intervals {
+					subs = append(subs, types.Subscription{
+						Symbol:  symbol,
+						Channel: channel,
+						Options: types.SubscribeOptions{Interval: interval},
+					})
+				}
+				continue
+			}
+			subs = append(subs, types.Subscription{Symbol: symbol, Channel: channel})
+		}
+	}
+
+	return subs
 }
 
 // formatEvent renders one event as a single line, showing the fields that
@@ -604,16 +740,19 @@ func init() {
 		cmd.Flags().Bool("allow-missing", false,
 			"treat an archive the publisher does not have as a warning instead of an error")
 
-		if err := cmd.MarkFlagRequired("symbol"); err != nil {
+	}
+
+	// Only the download command needs these: dump can take both from the config
+	// file, and a recording carries its own range.
+	for _, name := range []string{"symbol", "since"} {
+		if err := marketDataDownloadCmd.MarkFlagRequired(name); err != nil {
 			panic(err)
 		}
 	}
 
-	if err := marketDataDownloadCmd.MarkFlagRequired("since"); err != nil {
-		panic(err)
-	}
-
 	marketDataDownloadCmd.Flags().Bool("dry-run", false, "print the archive URLs without downloading")
+	marketDataDumpCmd.Flags().Bool("from-config", false,
+		"build the sources from the config file's backtest.dataSources")
 	marketDataDumpCmd.Flags().String("replay", "",
 		"replay a recording directory or file instead of reading archives")
 	marketDataDumpCmd.Flags().Bool("check-book", false,
