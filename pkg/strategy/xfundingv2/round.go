@@ -1908,13 +1908,25 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 		if baseAvailable.Sign() > 0 {
 			// transfer the available collateral asset from spot to futures
 			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, baseAvailable, types.TransferIn); err != nil {
-				return fmt.Errorf("failed to transfer %s %s from spot to futures: %w", baseAvailable.String(), baseAsset, err)
+				r.logger.WithError(err).Warnf("failed to transfer %s %s from spot to futures when rebalancing", baseAvailable.String(), baseAsset)
+			} else {
+				r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(baseAvailable)
+				bbgo.Notify("➡️ Transfered %s %s from spot to futures to rebalance",
+					baseAvailable.String(),
+					baseAsset,
+				)
 			}
-			r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(baseAvailable)
-			bbgo.Notify("➡️ Transfered %s %s from spot to futures to rebalance",
-				baseAvailable.String(),
-				baseAsset,
-			)
+		}
+		// check the current spot filled position and the futures worker target position
+		currentFuturesTargetPosition := r.futuresWorker.TargetPosition()
+		currentSpotFilledPosition := r.spotWorker.FilledPosition()
+		if !currentSpotFilledPosition.Add(currentFuturesTargetPosition).IsZero() {
+			bbgo.Notify("🔧 setting futures worker target position to %s when rebalancing", currentSpotFilledPosition.Neg())
+			r.futuresWorker.SetTargetPosition(currentSpotFilledPosition.Neg())
+		}
+		if currentSpotFilledPosition.Compare(r.spotWorker.TargetPosition()) > 0 {
+			// overshot the target
+			r.spotWorker.SetTargetPosition(currentSpotFilledPosition)
 		}
 		// check if there is sufficient margin on the futures account to open the position, if not, transfer from spot account
 		futuresRemaining := r.futuresWorker.RemainingQuantity().Abs()
@@ -2038,6 +2050,20 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 			return fmt.Errorf("failed to transfer %s %s from futures to spot: %w", transferDiff, baseAsset, err)
 		}
 		r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
+
+		// 4. check the target position of the spot worker
+		futuresFilledPosition := r.futuresWorker.FilledPosition()
+		currnetSpotTargetPosition := r.spotWorker.TargetPosition()
+		if !futuresFilledPosition.Add(currnetSpotTargetPosition).IsZero() {
+			newTarget := futuresFilledPosition.Neg()
+			// futuresFilledPosition should be negative, so newTarget should be positive
+			// however, if the futures position overshoots, the new target may be negative.
+			if newTarget.Sign() < 0 {
+				newTarget = fixedpoint.Zero
+			}
+			bbgo.Notify("🔧 setting spot worker target position to %s when rebalancing", newTarget)
+			r.spotWorker.SetTargetPosition(newTarget)
+		}
 	} else {
 		// TODO: rebalance the long futures leg when closing
 	}
