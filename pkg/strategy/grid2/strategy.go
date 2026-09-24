@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"sync"
@@ -593,8 +594,8 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(
 
 	// when we need to place a buy-to-sell conversion order, we need to mark the price
 	si := -1
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
+	for i, pin := range slices.Backward(pins) {
+
 		price := fixedpoint.Value(pin)
 
 		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
@@ -654,8 +655,8 @@ func (s *Strategy) checkRequiredInvestmentByAmount(
 
 	// when we need to place a buy-to-sell conversion order, we need to mark the price
 	si := -1
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
+	for i, pin := range slices.Backward(pins) {
+
 		price := fixedpoint.Value(pin)
 
 		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
@@ -717,8 +718,8 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(
 	totalQuotePrice := fixedpoint.Zero
 	si := len(pins)
 	cntOrder := 0
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
+	for i, pin := range slices.Backward(pins) {
+
 		price := fixedpoint.Value(pin)
 
 		if price.Compare(lastPrice) >= 0 {
@@ -779,8 +780,8 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(
 
 	// if it's not configured, calculate the number of sell orders
 	if numberOfSellOrders == 0 {
-		for i := len(pins) - 1; i >= 0; i-- {
-			pin := pins[i]
+		for _, pin := range slices.Backward(pins) {
+
 			price := fixedpoint.Value(pin)
 			sellPrice := price
 			if s.ProfitSpread.Sign() > 0 {
@@ -1230,8 +1231,8 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 
 	// si is for sell order price index
 	var si = len(pins)
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
+	for i, pin := range slices.Backward(pins) {
+
 		price := fixedpoint.Value(pin)
 		sellPrice := price
 
