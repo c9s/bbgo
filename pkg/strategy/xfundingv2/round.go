@@ -1924,6 +1924,10 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 			bbgo.Notify("🔧 setting futures worker target position to %s when rebalancing", currentSpotFilledPosition.Neg())
 			r.futuresWorker.SetTargetPosition(currentSpotFilledPosition.Neg())
 		}
+		if currentSpotFilledPosition.Compare(r.spotWorker.TargetPosition()) > 0 {
+			// overshot the target
+			r.spotWorker.SetTargetPosition(currentSpotFilledPosition)
+		}
 		// check if there is sufficient margin on the futures account to open the position, if not, transfer from spot account
 		futuresRemaining := r.futuresWorker.RemainingQuantity().Abs()
 		if activeOrder := r.futuresWorker.ActiveOrder(); activeOrder != nil {
@@ -2051,8 +2055,14 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		futuresFilledPosition := r.futuresWorker.FilledPosition()
 		currnetSpotTargetPosition := r.spotWorker.TargetPosition()
 		if !futuresFilledPosition.Add(currnetSpotTargetPosition).IsZero() {
-			bbgo.Notify("🔧 setting spot worker target position to %s when rebalancing", futuresFilledPosition.Neg())
-			r.spotWorker.SetTargetPosition(futuresFilledPosition.Neg())
+			newTarget := futuresFilledPosition.Neg()
+			// futuresFilledPosition should be negative, so newTarget should be positive
+			// however, if the futures position overshoots, the new target may be negative.
+			if newTarget.Sign() < 0 {
+				newTarget = fixedpoint.Zero
+			}
+			bbgo.Notify("🔧 setting spot worker target position to %s when rebalancing", newTarget)
+			r.spotWorker.SetTargetPosition(newTarget)
 		}
 	} else {
 		// TODO: rebalance the long futures leg when closing
