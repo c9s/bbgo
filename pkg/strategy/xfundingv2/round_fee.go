@@ -120,7 +120,10 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 	}
 	spotAccount := s.spotSession.GetAccount()
 	futuresAccount := s.futuresSession.GetAccount()
-	market, _ := s.spotSession.Market(s.FeeSymbol)
+	market, ok := s.spotSession.Market(s.FeeSymbol)
+	if !ok {
+		return fmt.Errorf("[acquireFeeAssetAndTransfer] failed to get market for fee symbol %s", s.FeeSymbol)
+	}
 	spotFeeBalance, _ := spotAccount.Balance(market.BaseCurrency)
 	futuresFeeBalance, _ := futuresAccount.Balance(market.BaseCurrency)
 	spotDeficit := requiredSpotFeeAmount.Sub(spotFeeBalance.Available)
@@ -149,52 +152,10 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 		}
 	}
 	if !buyQuantity.IsZero() {
-		orderBook := s.spotOrderBooks[s.FeeSymbol]
-		bestAsk, ok := orderBook.BestAsk()
-		if !ok {
-			return fmt.Errorf("no ask price available for %s", s.FeeSymbol)
-		}
-		bestAskPrice := bestAsk.Price
-		buyQuantity = fixedpoint.Max(buyQuantity, market.MinNotional.Div(bestAskPrice))
-		buyQuantity = market.TruncateQuantity(buyQuantity)
-		orderForm := types.SubmitOrder{
-			Symbol:   s.FeeSymbol,
-			Side:     types.SideTypeBuy,
-			Type:     types.OrderTypeMarket,
-			Quantity: buyQuantity,
-		}
-		if market.IsDustQuantity(buyQuantity, bestAskPrice) {
-			orderForm.Quantity = market.TruncateQuantity(
-				fixedpoint.Max(
-					market.MinNotional.Mul(s.MinNotionalMultiplier).Div(bestAskPrice),
-					market.MinQuantity,
-				),
-			)
-		}
-		orderExecutor, found := s.spotGeneralOrderExecutors[s.FeeSymbol]
-		if !found {
-			return fmt.Errorf("no order executor found for fee symbol %s", s.FeeSymbol)
-		}
-		s.logger.Debugf("fee order form: %+v", orderForm)
-		if createdOrders, err := orderExecutor.SubmitOrders(ctx, orderForm); err != nil {
-			return fmt.Errorf("failed to submit fee asset order %v for pending rounds: %w", orderForm, err)
-		} else {
-			timedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-			defer cancel()
-
-			createdOrder := createdOrders[0]
-			s.logger.Debugf("fee order created: %+v", createdOrder)
-			if service, ok := s.spotSession.Exchange.(types.ExchangeOrderQueryService); ok {
-				_, err := retry.QueryOrderUntilFilled(timedCtx, service, createdOrder.AsQuery())
-				if err != nil {
-					return fmt.Errorf("failed to wait for fee order to be filled: %w", err)
-				}
-			} else {
-				// simple hack to wait for the market order to be filled
-				if !bbgo.IsBackTesting {
-					time.Sleep(5 * time.Second)
-				}
-			}
+		timedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+		if err := s.submitFeeAssetOrder(timedCtx, buyQuantity); err != nil {
+			return err
 		}
 	}
 	if !transferAmount.IsZero() {
@@ -206,10 +167,6 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 }
 
 func (s *Strategy) calculateRoundFeeAsset(round *ArbitrageRound) error {
-	if !round.SpotFeeAssetAmount().IsZero() || !round.FuturesFeeAssetAmount().IsZero() {
-		// already calculated, no need to calculate again
-		return nil
-	}
 	feeOrderBook, ok := s.spotOrderBooks[s.FeeSymbol]
 	if !ok {
 		return nil
@@ -261,6 +218,140 @@ func (s *Strategy) calculateRoundFeeAsset(round *ArbitrageRound) error {
 
 	round.SetSpotFeeAssetAmount(spotFeeAmount)
 	round.SetFuturesFeeAssetAmount(futuresFeeAmount)
+
+	return nil
+}
+
+func (s *Strategy) submitFeeAssetOrder(ctx context.Context, buyQuantity fixedpoint.Value) error {
+	if buyQuantity.IsZero() {
+		return nil
+	}
+	market, _ := s.spotSession.Market(s.FeeSymbol)
+	orderBook := s.spotOrderBooks[s.FeeSymbol]
+	bestAsk, ok := orderBook.BestAsk()
+	if !ok {
+		return fmt.Errorf("no ask price available for %s", s.FeeSymbol)
+	}
+	bestAskPrice := bestAsk.Price
+	buyQuantity = fixedpoint.Max(buyQuantity, market.MinNotional.Div(bestAskPrice))
+	buyQuantity = market.TruncateQuantity(buyQuantity)
+	orderForm := types.SubmitOrder{
+		Symbol:   s.FeeSymbol,
+		Side:     types.SideTypeBuy,
+		Type:     types.OrderTypeMarket,
+		Quantity: buyQuantity,
+	}
+	if market.IsDustQuantity(buyQuantity, bestAskPrice) {
+		orderForm.Quantity = market.TruncateQuantity(
+			fixedpoint.Max(
+				market.MinNotional.Mul(s.MinNotionalMultiplier).Div(bestAskPrice),
+				market.MinQuantity,
+			),
+		)
+	}
+	orderExecutor, found := s.spotGeneralOrderExecutors[s.FeeSymbol]
+	if !found {
+		return fmt.Errorf("no order executor found for fee symbol %s", s.FeeSymbol)
+	}
+	s.logger.Debugf("fee order form: %+v", orderForm)
+
+	createdOrders, err := orderExecutor.SubmitOrders(ctx, orderForm)
+	if err != nil {
+		return fmt.Errorf("failed to submit fee asset order %v for pending rounds: %w", orderForm, err)
+	}
+
+	createdOrder := createdOrders[0]
+	s.logger.Debugf("fee order created: %+v", createdOrder)
+	if service, ok := s.spotSession.Exchange.(types.ExchangeOrderQueryService); ok {
+		_, err := retry.QueryOrderUntilFilled(ctx, service, createdOrder.AsQuery())
+		if err != nil {
+			return fmt.Errorf("failed to wait for fee order to be filled: %w", err)
+		}
+	} else {
+		// simple hack to wait for the market order to be filled
+		if !bbgo.IsBackTesting {
+			ticker := time.After(5 * time.Second)
+			select {
+			case <-ctx.Done():
+			case <-ticker:
+			}
+		}
+	}
+	return nil
+}
+
+// checkSufficientFeeAssetBalance checks if the fee asset is sufficient for the spot and futures account.
+func (s *Strategy) checkSufficientFeeAssetBalance(ctx context.Context, currentTime time.Time, rounds []*ArbitrageRound) error {
+	if !s.lastFeeCheckTime.IsZero() && currentTime.Sub(s.lastFeeCheckTime) < s.FeeAssetCheckInterval.Duration() {
+		// skip the check if it was checked within the cooldown interval
+		return nil
+	}
+	s.lastFeeCheckTime = currentTime
+
+	if len(rounds) == 0 {
+		return nil
+	}
+
+	spotFeeRate := s.costEstimator.GetSpotFeeRate()
+	futuresFeeRate := s.costEstimator.GetFuturesFeeRate()
+
+	totalFeeRequired := fixedpoint.Zero
+	futuresFeeRequired := fixedpoint.Zero
+	for _, round := range rounds {
+		spotPrice, futuresPrice, ok := s.getLastPrices(
+			round.SpotSymbol(),
+			round.FuturesSymbol(),
+		)
+		if !ok {
+			s.logger.Infof("[checkSufficientFeeAssetBalance] failed to get last prices: %s", round.SpotSymbol())
+			continue
+		}
+		// get remaining positions
+		spotRemaining := round.SpotWorker().RemainingQuantity()
+		futuresRemaining := round.FuturesWorker().RemainingQuantity()
+
+		// calculate fee required
+		spotFeeRequired := spotRemaining.Abs().Mul(spotPrice).Mul(spotFeeRate.TakerFeeRate)
+		futuresFeeRequired := futuresRemaining.Abs().Mul(futuresPrice).Mul(futuresFeeRate.TakerFeeRate)
+		feeRequired := spotFeeRequired.Add(futuresFeeRequired)
+		totalFeeRequired = totalFeeRequired.Add(feeRequired)
+		futuresFeeRequired = futuresFeeRequired.Add(futuresFeeRequired)
+	}
+
+	spotAccount := s.spotSession.GetAccount()
+	futuresAccount := s.futuresSession.GetAccount()
+	market, ok := s.spotSession.Market(s.FeeSymbol)
+	if !ok {
+		return fmt.Errorf("[checkSufficientFeeAssetBalance] failed to get market for fee symbol %s", s.FeeSymbol)
+	}
+
+	spotFeeBalance, spotOk := spotAccount.Balance(market.BaseCurrency)
+	futuresFeeBalance, futuresOk := futuresAccount.Balance(market.BaseCurrency)
+	if !spotOk || !futuresOk {
+		return fmt.Errorf("[checkSufficientFeeAssetBalance] failed to get fee asset balance for %s", market.BaseCurrency)
+	}
+
+	totalFeeAvailable := spotFeeBalance.Available.Add(futuresFeeBalance.Available)
+
+	futuresFeeDeficit := fixedpoint.Zero
+	if futuresFeeBalance.Available.Compare(futuresFeeRequired) < 0 {
+		futuresFeeDeficit = futuresFeeRequired.Sub(futuresFeeBalance.Available)
+	}
+
+	if totalFeeRequired.Compare(totalFeeAvailable) > 0 {
+		// buy fee asset
+		deficit := totalFeeRequired.Sub(totalFeeAvailable)
+		if err := s.submitFeeAssetOrder(ctx, deficit); err != nil {
+			return err
+		}
+	}
+
+	if futuresFeeDeficit.Sign() > 0 {
+		// transfer fee asset to futures account
+		if err := s.futuresService.TransferFuturesAccountAsset(ctx, market.BaseCurrency, futuresFeeDeficit, types.TransferIn); err != nil {
+			return fmt.Errorf("failed to transfer %s %s for round fee check: %w", futuresFeeDeficit, market.BaseCurrency, err)
+		}
+	}
 
 	return nil
 }
