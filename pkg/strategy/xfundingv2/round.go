@@ -604,11 +604,13 @@ func (r *ArbitrageRound) SetUpdateTime(t time.Time) {
 func (r *ArbitrageRound) String() string {
 	if r.syncState.State != RoundClosing {
 		return fmt.Sprintf(
-			"ArbitrageRound(symbol=%s, state=%s, spot=%s, futures=%s, startTime=%s)",
+			"ArbitrageRound(symbol=%s, state=%s, spot=%s(%s), futures=%s(%s), startTime=%s)",
 			r.spotWorker.Symbol(),
 			r.syncState.State,
 			r.spotWorker.FilledPosition(),
+			r.spotWorker.TargetPosition(),
 			r.futuresWorker.FilledPosition(),
+			r.futuresWorker.TargetPosition(),
 			r.syncState.StartAt.Format(time.RFC3339),
 		)
 	}
