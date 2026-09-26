@@ -95,8 +95,6 @@ type ArbitrageRoundSyncState struct {
 
 	RetryDuration       time.Duration             `json:"retryDuration"`
 	RetryTransfers      map[uint64]*transferRetry `json:"retryTransfers"`
-	SyncedSpotTrades    map[uint64]struct{}       `json:"syncedSpotTrades"`
-	SyncedFuturesTrades map[uint64]struct{}       `json:"syncedFuturesTrades"`
 
 	State RoundState `json:"state"`
 
