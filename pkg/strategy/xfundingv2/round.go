@@ -1428,8 +1428,8 @@ func (r *ArbitrageRound) prepareOpening(
 		r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(transferDiff)
 	}
 	// transfer succeeded, need to sync the futures position to keep delta-neutral
-	targetPosition := r.spotWorker.FilledPosition().Neg()
-	r.futuresWorker.SetTargetPosition(targetPosition)
+	r.syncFuturesPosition()
+
 	// don't place order but reset the time to let the TWAP worker to sync the position
 	// For example, considering the case where:
 	// 1. the futures worker's active order is not filled but the target position is high
@@ -1487,8 +1487,8 @@ func (r *ArbitrageRound) prepareClosing(
 		r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
 	}
 	// transfer succeeded, need to sync the spot position to keep delta-neutral
-	targetPosition := r.futuresWorker.FilledPosition().Neg()
-	r.spotWorker.SetTargetPosition(targetPosition)
+	r.syncSpotPosition()
+
 	// don't place order but reset the time to let the TWAP worker to sync the position
 	// For example, considering the case where:
 	// 1. the spot worker's active order is not filled and the target position is high.
@@ -1895,17 +1895,20 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 				)
 			}
 		}
-		// check the current spot filled position and the futures worker target position
+		// check the current spot filled position and sync futures worker
 		currentFuturesTargetPosition := r.futuresWorker.TargetPosition()
 		currentSpotFilledPosition := r.spotWorker.FilledPosition()
-		if !currentSpotFilledPosition.Add(currentFuturesTargetPosition).IsZero() {
-			bbgo.Notify("🔧 setting futures worker target position to %s when rebalancing", currentSpotFilledPosition.Neg())
-			r.futuresWorker.SetTargetPosition(currentSpotFilledPosition.Neg())
-		}
 		if currentSpotFilledPosition.Compare(r.spotWorker.TargetPosition()) > 0 {
 			// overshot the target
 			r.spotWorker.SetTargetPosition(currentSpotFilledPosition)
 		}
+		if !currentSpotFilledPosition.Add(currentFuturesTargetPosition).IsZero() {
+			r.syncFuturesPosition()
+			bbgo.Notify("🔧 setting futures worker target position to %s when rebalancing",
+				r.futuresWorker.TargetPosition(),
+			)
+		}
+
 		// check if there is sufficient margin on the futures account to open the position, if not, transfer from spot account
 		futuresRemaining := r.futuresWorker.RemainingQuantity().Abs()
 		if activeOrder := r.futuresWorker.ActiveOrder(); activeOrder != nil {
