@@ -2268,18 +2268,22 @@ func (s *Strategy) rebalance(currentTime time.Time) {
 
 	if s.MarketSelectionConfig.FuturesDirection == types.PositionShort {
 		// short futures
-		// 1. check if there is quote asset on futures account
-		// transfer them back to the spot account if any
 		futuresBalances := s.futuresSession.GetAccount().Balances()
-		quoteBalance := futuresBalances[s.QuoteCurrency]
-		if quoteBalance.Available.Sign() > 0 {
-			s.logger.Infof("detected positive quote currency on futures account: %s", quoteBalance.Available.String())
-			if err := s.futuresService.TransferFuturesAccountAsset(s.ctx, s.QuoteCurrency, quoteBalance.Available, types.TransferOut); err != nil {
-				s.logger.WithError(err).Warnf("failed to transfer quote currency to the spot account: %s", quoteBalance.Available.String())
-			} else {
-				s.logger.Infof("transferred %s %s from futures account to spot account", quoteBalance.Available.String(), s.QuoteCurrency)
+
+		if len(s.ActiveRounds) == 0 {
+			// 1. check if there is quote asset on futures account when there are no active rounds
+			// transfer them back to the spot account if any
+			quoteBalance := futuresBalances[s.QuoteCurrency]
+			if quoteBalance.Available.Sign() > 0 {
+				s.logger.Infof("detected positive quote currency on futures account: %s", quoteBalance.Available.String())
+				if err := s.futuresService.TransferFuturesAccountAsset(s.ctx, s.QuoteCurrency, quoteBalance.Available, types.TransferOut); err != nil {
+					s.logger.WithError(err).Warnf("failed to transfer quote currency to the spot account: %s", quoteBalance.Available.String())
+				} else {
+					s.logger.Infof("transferred %s %s from futures account to spot account", quoteBalance.Available.String(), s.QuoteCurrency)
+				}
 			}
 		}
+
 		for _, symbol := range s.candidateSymbols {
 			// skip active round
 			if _, found := s.ActiveRounds[symbol]; found {
