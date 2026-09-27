@@ -97,7 +97,7 @@ func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Ti
 			round.FuturesSymbol(),
 		)
 		bbgo.Notify("🚀 Round started: %s", round.SpotSymbol(),
-			round.NewNotification(spotPrice, futuresPrice),
+			round.NewNotification(currentTime, spotPrice, futuresPrice),
 		)
 	}
 }

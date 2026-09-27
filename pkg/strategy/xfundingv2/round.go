@@ -627,21 +627,23 @@ func (r *ArbitrageRound) SetSlackAlert(alert slackalert.SlackAlert) {
 	r.slackAlert = alert
 }
 
-func (r *ArbitrageRound) NewCriticalNotification(spotPrice, futuresPrice fixedpoint.Value) *roundNotification {
+func (r *ArbitrageRound) NewCriticalNotification(currentTime time.Time, spotPrice, futuresPrice fixedpoint.Value) *roundNotification {
 	return &roundNotification{
 		ArbitrageRound: r,
 		IsCritical:     true,
 
+		currentTime:  currentTime,
 		spotPrice:    spotPrice,
 		futuresPrice: futuresPrice,
 	}
 }
 
-func (r *ArbitrageRound) NewNotification(spotPrice, futuresPrice fixedpoint.Value) *roundNotification {
+func (r *ArbitrageRound) NewNotification(currentTime time.Time, spotPrice, futuresPrice fixedpoint.Value) *roundNotification {
 	return &roundNotification{
 		ArbitrageRound: r,
 		IsCritical:     false,
 
+		currentTime:  currentTime,
 		spotPrice:    spotPrice,
 		futuresPrice: futuresPrice,
 	}
@@ -651,6 +653,7 @@ type roundNotification struct {
 	*ArbitrageRound
 	IsCritical bool
 
+	currentTime             time.Time
 	spotPrice, futuresPrice fixedpoint.Value
 }
 
@@ -828,7 +831,9 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			},
 			slack.AttachmentField{
 				Title: "Min Holding Intervals",
-				Value: fmt.Sprintf("%d", n.syncState.MinHoldingIntervals),
+				Value: fmt.Sprintf("%d/%d",
+					n.NumHoldingIntervals(n.currentTime),
+					n.syncState.MinHoldingIntervals),
 				Short: true,
 			},
 		)
