@@ -37,6 +37,7 @@ func prepareTestDB(t *testing.T) *sqlx.DB {
 func TestTradeStore(t *testing.T) {
 	ctx := context.Background()
 	store := NewTradeStore(prepareTestDB(t))
+	require.NoError(t, store.Check(ctx))
 
 	last, ids, err := store.LastTrade(ctx, "fUST")
 	require.NoError(t, err)

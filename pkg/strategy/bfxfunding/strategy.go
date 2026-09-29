@@ -70,6 +70,9 @@ type Strategy struct {
 	// so the dry run works without the API credentials when the amount is set.
 	DryRun bool `json:"dryRun"`
 
+	// publicOnly is true when the session has no credentials
+	publicOnly bool
+
 	exchange *bitfinex.Exchange
 	stream   *bitfinex.Stream
 	client   *bfxapi.Client
@@ -259,12 +262,18 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	s.exchange = ex
+	s.publicOnly = session.PublicOnly
 	s.client = s.exchange.GetApiClient()
 	s.stream = session.UserDataStream.(*bitfinex.Stream)
 	s.syncer = NewTradeSyncer(s.client, s.Currency, s.logger)
 
 	if s.Environment != nil && s.Environment.DatabaseService != nil && s.Environment.DatabaseService.DB != nil {
 		s.store = NewTradeStore(s.Environment.DatabaseService.DB)
+		if err := s.store.Check(ctx); err != nil {
+			s.logger.WithError(err).Warnf("funding trade table is not available, add %q to database.extraMigrationPackages "+
+				"to persist the history, the %s of history will be fetched on every start", ID, s.Lookback.Duration())
+			s.store = nil
+		}
 	} else {
 		s.logger.Warnf("database is not configured, the %s of funding trade history will be fetched on every start",
 			s.Lookback.Duration())
@@ -462,18 +471,7 @@ func (s *Strategy) rebalance(ctx context.Context) error {
 		return err
 	}
 
-	balance := wallet.Balance.Float64()
-	idle := wallet.AvailableBalance.Float64()
-	capital := balance
-	if s.Amount.Sign() > 0 {
-		capital = math.Min(balance, s.Amount.Float64())
-
-		// the lent capital and the active offers are already in use
-		used := balance - idle
-		idle = math.Min(idle, capital-used)
-	}
-
-	idle = math.Max(idle, 0)
+	capital, idle := s.capitalOf(wallet, 0)
 
 	highTarget := HighRateTarget(capital, zone, s.HighRate)
 	specs := s.planOffers(idle, math.Max(highTarget-keptHigh, 0), zone, channel)
@@ -494,21 +492,95 @@ func (s *Strategy) rebalance(ctx context.Context) error {
 }
 
 // dryRunPlan plans the offers as if the whole capital is idle and logs them without submitting
+// With the credentials, the capital and the idle amount are computed from the funding wallet like the live mode,
+// otherwise the configured amount is treated as idle capital.
 func (s *Strategy) dryRunPlan(ctx context.Context, zone HighRateZone, channel RateChannel) error {
-	capital := s.Amount.Float64()
-	if s.Amount.IsZero() {
-		wallet, err := s.queryFundingWallet(ctx)
-		if err != nil {
-			return fmt.Errorf("dry run needs the amount to be set when the funding wallet is not available: %w", err)
+	capital, idle := s.Amount.Float64(), s.Amount.Float64()
+	var keptHigh float64
+	if !s.publicOnly {
+		if wallet, freed, kept := s.logAccountState(ctx, zone, channel); wallet != nil {
+			capital, idle = s.capitalOf(wallet, freed)
+			keptHigh = kept
 		}
+	}
 
-		capital = wallet.Balance.Float64()
+	if capital <= 0 && s.Amount.IsZero() {
+		return fmt.Errorf("dry run needs the amount to be set when the funding wallet is not available")
 	}
 
 	highTarget := HighRateTarget(capital, zone, s.HighRate)
-	specs := s.planOffers(capital, highTarget, zone, channel)
-	s.logPlan(zone, allocation{Capital: capital, Idle: capital, HighTarget: highTarget}, specs)
+	specs := s.planOffers(idle, math.Max(highTarget-keptHigh, 0), zone, channel)
+	s.logPlan(zone, allocation{Capital: capital, Idle: idle, HighTarget: highTarget, KeptHigh: keptHigh}, specs)
 	return nil
+}
+
+// capitalOf returns the capital of the strategy and the idle amount to place from the funding wallet,
+// freed is the amount of the offers to be canceled that is not reflected in the wallet available balance yet.
+func (s *Strategy) capitalOf(wallet *bfxapi.Wallet, freed float64) (capital, idle float64) {
+	balance := wallet.Balance.Float64()
+	idle = wallet.AvailableBalance.Float64() + freed
+	capital = balance
+	if s.Amount.Sign() > 0 {
+		capital = math.Min(balance, s.Amount.Float64())
+
+		// the lent capital and the active offers are already in use
+		used := balance - idle
+		idle = math.Min(idle, capital-used)
+	}
+
+	return capital, math.Max(idle, 0)
+}
+
+// logAccountState logs the funding wallet and what the live mode would do to the active offers, read-only.
+// It returns the wallet, the amount of the offers that would be canceled and the amount of the high rate offers kept.
+func (s *Strategy) logAccountState(
+	ctx context.Context, zone HighRateZone, channel RateChannel,
+) (wallet *bfxapi.Wallet, freed, keptHigh float64) {
+	wallet, err := s.queryFundingWallet(ctx)
+	if err != nil {
+		s.logger.WithError(err).Warn("[DRY RUN] unable to query the funding wallet")
+		return nil, 0, 0
+	}
+
+	lent := wallet.Balance.Sub(wallet.AvailableBalance)
+	s.logger.Infof("[DRY RUN] funding wallet %s: balance %s, available %s, lent or offered %s, unsettled interest %s",
+		wallet.Currency, wallet.Balance, wallet.AvailableBalance, lent, wallet.UnsettledInterest)
+
+	offers, err := s.queryActiveOffers(ctx)
+	if err != nil {
+		s.logger.WithError(err).Warn("[DRY RUN] unable to query the active funding offers")
+		return wallet, 0, 0
+	}
+
+	s.logger.Infof("[DRY RUN] %d active %s funding offers", len(offers), s.Currency)
+	for _, o := range offers {
+		action := "cancel (on start)"
+		cancel := true
+		if s.KeepOffersOnStart {
+			cancel = false
+			tracked := trackedOffer{Tier: TierChannel}
+			if o.Rate.Float64() >= zone.Floor {
+				tracked = trackedOffer{Tier: TierHighRate, Floor: zone.Floor}
+			}
+
+			action = fmt.Sprintf("keep as %s tier", tracked.Tier)
+			if reason := s.driftReason(o, tracked, zone, channel); reason != "" {
+				action = fmt.Sprintf("cancel as %s tier: %s", tracked.Tier, reason)
+				cancel = true
+			} else if tracked.Tier == TierHighRate {
+				keptHigh += o.Amount.Float64()
+			}
+		}
+
+		if cancel {
+			freed += o.Amount.Float64()
+		}
+
+		s.logger.Infof("[DRY RUN]   offer %d: %s @ %s for %sd, status %s -> would %s",
+			o.ID, o.Amount, formatRate(o.Rate.Float64()), o.Period, o.OfferStatus, action)
+	}
+
+	return wallet, freed, keptHigh
 }
 
 // planOffers places the high rate tier up to highAmount first, and the rest of the idle capital to the channel tier

@@ -6,6 +6,11 @@
 #   DB_DSN=bbgo.sqlite3
 #
 # Without a database, the whole lookback of the history is fetched on every start (~10 minutes for 90 days of fUST).
+database:
+  # the strategy migrations are only applied when the package is listed here
+  extraMigrationPackages:
+  - bfxfunding
+
 sessions:
   bitfinex:
     exchange: bitfinex

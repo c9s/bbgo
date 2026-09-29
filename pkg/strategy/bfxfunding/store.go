@@ -45,6 +45,17 @@ func NewTradeStore(db *sqlx.DB) *TradeStore {
 	return &TradeStore{DB: db}
 }
 
+// Check verifies that the table exists, the strategy migrations are only applied when
+// bfxfunding is listed in database.extraMigrationPackages
+func (s *TradeStore) Check(ctx context.Context) error {
+	rows, err := s.DB.QueryContext(ctx, "SELECT 1 FROM bfxfunding_public_trades LIMIT 1")
+	if err != nil {
+		return err
+	}
+
+	return rows.Close()
+}
+
 // LastTrade returns the time of the latest stored trade and the IDs of the trades at that time.
 // It returns a zero time when there is no trade stored for the symbol.
 func (s *TradeStore) LastTrade(ctx context.Context, symbol string) (time.Time, []int64, error) {
@@ -60,7 +71,7 @@ func (s *TradeStore) LastTrade(ctx context.Context, symbol string) (time.Time, [
 		return time.Time{}, nil, err
 	}
 
-	last := lastTime.Time()
+	last := lastTime.Time().UTC()
 	var ids []int64
 	err := s.DB.SelectContext(ctx, &ids,
 		s.DB.Rebind("SELECT trade_id FROM bfxfunding_public_trades WHERE symbol = ? AND `time` = ?"),
@@ -129,7 +140,7 @@ func (s *TradeStore) Query(ctx context.Context, symbol string, since time.Time) 
 			return nil, err
 		}
 
-		trades = append(trades, FundingTrade{ID: r.ID, Time: r.Time.Time(), Amount: r.Amount, Rate: r.Rate, Period: r.Period})
+		trades = append(trades, FundingTrade{ID: r.ID, Time: r.Time.Time().UTC(), Amount: r.Amount, Rate: r.Rate, Period: r.Period})
 	}
 
 	return trades, rows.Err()
