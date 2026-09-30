@@ -457,34 +457,60 @@ func TestNewCoveredDepth(t *testing.T) {
 		{
 			name: "layer 0, depth 1",
 			i:    0,
-			want: Number(0), // according to implementation, initial is 0
+			want: Number(100.1), // the first layer is priced at the initial depth
 		},
 		{
 			name: "layer 1, depth 2",
 			i:    1,
-			want: Number(100.1),
+			want: Number(100.05), // (100.1*1 + 100.0*1)/2
 		},
 		{
 			name: "layer 2, depth 3",
 			i:    2,
-			want: Number(100.05), // (100.1*1 + 100.0*1)/2
+			want: Number(100.03333333333333), // (100.1*1 + 100.0*2)/3
 		},
 		{
 			name: "layer 3, depth 4",
 			i:    3,
-			want: Number(100.03333333333333), // (100.1*1 + 100.0*1 + 99.9*1)/3
+			want: Number(100.0), // (100.1*1 + 100.0*2 + 99.9*1)/4
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.i > 0 {
-				coveredDepth.Cover(layerQty)
-			}
 			got := pricer(tt.i, Number(0))
 			assert.InDeltaf(t, tt.want.Float64(), got.Float64(), 0.001, "NewCoveredDepth.Pricer(%d)", tt.i)
+
+			// the strategy covers the layer quantity after the layer is priced
+			coveredDepth.Cover(layerQty)
 		})
 	}
+}
+
+func TestNewCoveredDepth_QuoteQuantity(t *testing.T) {
+	book := types.NewStreamBook("BTCUSDT", "")
+	book.Load(types.SliceOrderBook{
+		Symbol: "BTCUSDT",
+		Bids: PriceVolumeSliceFromText(`
+			100.0, 1
+			99.0, 2
+		`),
+		Asks: PriceVolumeSliceFromText(`
+			101.0, 1
+			102.0, 1
+		`),
+		Time: time.Now(),
+	})
+
+	coveredDepth := NewCoveredDepth(types.NewDepthBook(book), types.SideTypeSell, Number(101), true)
+	pricer := coveredDepth.Pricer()
+
+	// the first layer is priced at the initial quote depth: 101 quote covers 1 base at 101.0
+	assert.InDelta(t, 101.0, pricer(0, Number(0)).Float64(), 0.001)
+
+	// cover another 102 quote: (101 + 102) / 2
+	coveredDepth.Cover(Number(102))
+	assert.InDelta(t, 101.5, pricer(1, Number(0)).Float64(), 0.001)
 }
 
 func TestFromBestPrice(t *testing.T) {
