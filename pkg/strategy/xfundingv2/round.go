@@ -126,8 +126,6 @@ func NewArbitrageRound(
 			DirectionPolicy:     policy,
 			State:               RoundPending,
 			RetryTransfers:      make(map[uint64]*transferRetry),
-			SyncedSpotTrades:    make(map[uint64]struct{}),
-			SyncedFuturesTrades: make(map[uint64]struct{}),
 		},
 
 		spotWorker:         spotTwap,
@@ -629,21 +627,23 @@ func (r *ArbitrageRound) SetSlackAlert(alert slackalert.SlackAlert) {
 	r.slackAlert = alert
 }
 
-func (r *ArbitrageRound) NewCriticalNotification(spotPrice, futuresPrice fixedpoint.Value) *roundNotification {
+func (r *ArbitrageRound) NewCriticalNotification(currentTime time.Time, spotPrice, futuresPrice fixedpoint.Value) *roundNotification {
 	return &roundNotification{
 		ArbitrageRound: r,
 		IsCritical:     true,
 
+		currentTime:  currentTime,
 		spotPrice:    spotPrice,
 		futuresPrice: futuresPrice,
 	}
 }
 
-func (r *ArbitrageRound) NewNotification(spotPrice, futuresPrice fixedpoint.Value) *roundNotification {
+func (r *ArbitrageRound) NewNotification(currentTime time.Time, spotPrice, futuresPrice fixedpoint.Value) *roundNotification {
 	return &roundNotification{
 		ArbitrageRound: r,
 		IsCritical:     false,
 
+		currentTime:  currentTime,
 		spotPrice:    spotPrice,
 		futuresPrice: futuresPrice,
 	}
@@ -653,6 +653,7 @@ type roundNotification struct {
 	*ArbitrageRound
 	IsCritical bool
 
+	currentTime             time.Time
 	spotPrice, futuresPrice fixedpoint.Value
 }
 
@@ -830,7 +831,9 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 			},
 			slack.AttachmentField{
 				Title: "Min Holding Intervals",
-				Value: fmt.Sprintf("%d", n.syncState.MinHoldingIntervals),
+				Value: fmt.Sprintf("%d/%d",
+					n.NumHoldingIntervals(n.currentTime),
+					n.syncState.MinHoldingIntervals),
 				Short: true,
 			},
 		)
@@ -1216,10 +1219,7 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotAccount *
 		r.logger.Warnf("no collateral asset available to transfer to futures: %s (available: %s %s)", trade.Symbol, available, asset)
 		// consider the transfer succeeded -> delete the retry task and sync the futures position
 		delete(r.syncState.RetryTransfers, trade.ID)
-		if _, found := r.syncState.SyncedSpotTrades[trade.ID]; !found {
-			r.syncFuturesPosition(trade)
-			r.syncState.SyncedSpotTrades[trade.ID] = struct{}{}
-		}
+		r.syncFuturesPosition()
 		return
 	}
 
@@ -1254,10 +1254,7 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotAccount *
 	)
 
 	// sync the futures position only after the transfer succeeds.
-	if _, found := r.syncState.SyncedSpotTrades[trade.ID]; !found {
-		r.syncFuturesPosition(trade)
-		r.syncState.SyncedSpotTrades[trade.ID] = struct{}{}
-	}
+	r.syncFuturesPosition()
 }
 
 // HandleFuturesTrade handles a futures trade, including update filled position, transfer collateral and sync spot position if the round is closing.
@@ -1339,10 +1336,7 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresAc
 		r.logger.Warnf("no collateral asset available to transfer back to spot: %s", asset)
 		delete(r.syncState.RetryTransfers, trade.ID)
 		// consider the transfer succeeded and sync the spot position
-		if _, found := r.syncState.SyncedFuturesTrades[trade.ID]; !found {
-			r.syncSpotPosition(trade)
-			r.syncState.SyncedFuturesTrades[trade.ID] = struct{}{}
-		}
+		r.syncSpotPosition()
 		return
 	}
 
@@ -1382,10 +1376,7 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresAc
 	)
 
 	// sync the spot position only after the transfer succeeds.
-	if _, found := r.syncState.SyncedFuturesTrades[trade.ID]; !found {
-		r.syncSpotPosition(trade)
-		r.syncState.SyncedFuturesTrades[trade.ID] = struct{}{}
-	}
+	r.syncSpotPosition()
 }
 
 // Prepare prepares the round to be ready for resume, such as doing neceessary transfers and syncing the positions.
@@ -1442,8 +1433,8 @@ func (r *ArbitrageRound) prepareOpening(
 		r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(transferDiff)
 	}
 	// transfer succeeded, need to sync the futures position to keep delta-neutral
-	targetPosition := r.spotWorker.FilledPosition().Neg()
-	r.futuresWorker.SetTargetPosition(targetPosition)
+	r.syncFuturesPosition()
+
 	// don't place order but reset the time to let the TWAP worker to sync the position
 	// For example, considering the case where:
 	// 1. the futures worker's active order is not filled but the target position is high
@@ -1501,8 +1492,8 @@ func (r *ArbitrageRound) prepareClosing(
 		r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
 	}
 	// transfer succeeded, need to sync the spot position to keep delta-neutral
-	targetPosition := r.futuresWorker.FilledPosition().Neg()
-	r.spotWorker.SetTargetPosition(targetPosition)
+	r.syncSpotPosition()
+
 	// don't place order but reset the time to let the TWAP worker to sync the position
 	// For example, considering the case where:
 	// 1. the spot worker's active order is not filled and the target position is high.
@@ -1846,36 +1837,26 @@ func (r *ArbitrageRound) CheckPositionDeviation(currentTime time.Time, maxMoqDev
 	}
 }
 
-func (r *ArbitrageRound) syncFuturesPosition(spotTrade types.Trade) {
-	// sanity check
-	if _, ok := r.spotWorker.Executor().GetOrder(spotTrade.OrderID); !ok {
-		return
-	}
+func (r *ArbitrageRound) syncFuturesPosition() {
 	// the filled spot position can be positive or negative
 	filledSpotPosition := r.spotWorker.FilledPosition()
 	// the futures target position should be always the negation of the spot filled position to maintain delta-neutral
 	oriFuturesTargetPosition := r.futuresWorker.TargetPosition()
 	futureTargetPosition := filledSpotPosition.Neg()
-	r.logger.Infof("syncing futures position %s -> %s: %s",
+	r.logger.Infof("syncing futures position %s -> %s",
 		oriFuturesTargetPosition,
 		futureTargetPosition,
-		spotTrade,
 	)
 	r.futuresWorker.SetTargetPosition(futureTargetPosition)
 }
 
-func (r *ArbitrageRound) syncSpotPosition(futuresTrade types.Trade) {
-	// sanity check
-	if _, ok := r.futuresWorker.Executor().GetOrder(futuresTrade.OrderID); !ok {
-		return
-	}
-
+func (r *ArbitrageRound) syncSpotPosition() {
 	// advance the spot worker's target to mirror the futures filled position.
 	// This unblocks the spot leg to execute its offsetting slice on the next Tick.
 	futuresFilled := r.futuresWorker.FilledPosition()
 	spotTarget := futuresFilled.Neg()
 	oriSpotTarget := r.spotWorker.TargetPosition()
-	r.logger.Infof("syncing spot target on close %s -> %s: %s", oriSpotTarget, spotTarget, futuresTrade)
+	r.logger.Infof("syncing spot target on close %s -> %s", oriSpotTarget, spotTarget)
 	r.spotWorker.SetTargetPosition(spotTarget)
 }
 
@@ -1919,17 +1900,20 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 				)
 			}
 		}
-		// check the current spot filled position and the futures worker target position
+		// check the current spot filled position and sync futures worker
 		currentFuturesTargetPosition := r.futuresWorker.TargetPosition()
 		currentSpotFilledPosition := r.spotWorker.FilledPosition()
-		if !currentSpotFilledPosition.Add(currentFuturesTargetPosition).IsZero() {
-			bbgo.Notify("🔧 setting futures worker target position to %s when rebalancing", currentSpotFilledPosition.Neg())
-			r.futuresWorker.SetTargetPosition(currentSpotFilledPosition.Neg())
-		}
 		if currentSpotFilledPosition.Compare(r.spotWorker.TargetPosition()) > 0 {
 			// overshot the target
 			r.spotWorker.SetTargetPosition(currentSpotFilledPosition)
 		}
+		if !currentSpotFilledPosition.Add(currentFuturesTargetPosition).IsZero() {
+			r.syncFuturesPosition()
+			bbgo.Notify("🔧 setting futures worker target position to %s when rebalancing",
+				r.futuresWorker.TargetPosition(),
+			)
+		}
+
 		// check if there is sufficient margin on the futures account to open the position, if not, transfer from spot account
 		futuresRemaining := r.futuresWorker.RemainingQuantity().Abs()
 		if activeOrder := r.futuresWorker.ActiveOrder(); activeOrder != nil {
