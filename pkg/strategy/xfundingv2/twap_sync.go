@@ -31,6 +31,10 @@ func (w *TWAPWorker) Initialize(ctx context.Context, s *Strategy) error {
 type TWAPWorkerSyncState struct {
 	Config TWAPWorkerConfig `json:"config"`
 
+	// DisableTWAP, when true, bypasses slice-quantity calculation:
+	// PlaceOrder uses the full remaining quantity in a single order.
+	DisableTWAP bool `json:"disableTWAP,omitempty"`
+
 	// TargetPosition: positive = buy/long, negative = sell/short
 	TargetPosition       fixedpoint.Value `json:"targetPosition"`
 	State                TWAPWorkerState  `json:"state"`

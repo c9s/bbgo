@@ -148,6 +148,17 @@ func (w *TWAPWorker) SetTargetPosition(targetPosition fixedpoint.Value) {
 	w.syncState.TargetPosition = targetPosition
 }
 
+// EnableTWAP re-enables TWAP slicing (the default behavior).
+func (w *TWAPWorker) EnableTWAP() {
+	w.syncState.DisableTWAP = false
+}
+
+// DisableTWAP disables TWAP slicing: subsequent orders are placed for
+// the full remaining quantity instead of being sliced.
+func (w *TWAPWorker) DisableTWAP() {
+	w.syncState.DisableTWAP = true
+}
+
 // OrderType returns the worker's configured order type (maker or taker).
 func (w *TWAPWorker) OrderType() TWAPOrderType {
 	return w.syncState.Config.OrderType
@@ -540,6 +551,11 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fixedpoint.Value, deadlineExceeded bool, market types.Market, price fixedpoint.Value) fixedpoint.Value {
 	remaining = remaining.Abs()
 	w.logger.Debugf("remaining quantity: %s@%s", remaining, price)
+
+	if w.syncState.DisableTWAP {
+		w.logger.Debugf("TWAP disabled, placing full remaining quantity: %s@%s", remaining, price)
+		return remaining
+	}
 
 	if deadlineExceeded {
 		w.logger.Debugf("deadline exceeded, placing final order: %s@%s", remaining, price)
