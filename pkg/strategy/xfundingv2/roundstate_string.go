@@ -13,11 +13,12 @@ func _() {
 	_ = x[RoundReady-2]
 	_ = x[RoundClosing-3]
 	_ = x[RoundClosed-4]
+	_ = x[RoundStopped-5]
 }
 
-const _RoundState_name = "RoundPendingRoundOpeningRoundReadyRoundClosingRoundClosed"
+const _RoundState_name = "RoundPendingRoundOpeningRoundReadyRoundClosingRoundClosedRoundStopped"
 
-var _RoundState_index = [...]uint8{0, 12, 24, 34, 46, 57}
+var _RoundState_index = [...]uint8{0, 12, 24, 34, 46, 57, 69}
 
 func (i RoundState) String() string {
 	if i < 0 || i >= RoundState(len(_RoundState_index)-1) {

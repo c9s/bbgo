@@ -31,6 +31,7 @@ const (
 	RoundReady
 	RoundClosing
 	RoundClosed
+	RoundStopped
 )
 
 type FuturesService interface {
@@ -1123,6 +1124,7 @@ func (r *ArbitrageRound) Stop() {
 	r.spotWorker.Stop()
 	r.futuresWorker.Stop()
 	close(r.retryTransferTickC)
+	r.syncState.State = RoundStopped
 }
 
 func (r *ArbitrageRound) retryTransferWorker(ctx context.Context, tickC <-chan time.Time) {
@@ -1701,8 +1703,8 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.syncState.State == RoundPending {
-		// not started yet or halted, do nothing
+	if r.syncState.State == RoundPending || r.syncState.State == RoundStopped || r.syncState.State == RoundClosed {
+		// do nothing
 		return
 	}
 
@@ -1713,9 +1715,6 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 		})
 	}
 
-	if r.syncState.State == RoundClosed {
-		return
-	}
 	// get mid price
 	spotMidPrice := getMidPrice(spotOrderBook)
 	futuresMidPrice := getMidPrice(futuresOrderBook)
