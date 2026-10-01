@@ -1287,6 +1287,10 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 	}
 
 	withinMinHoldingTime := round.NumHoldingIntervals(currentTime) < round.MinHoldingIntervals()
+	unrealizedPnL := round.UnrealizedPnL(spotPrice, futuresPrice)
+	totalPnL := unrealizedPnL.TotalPnL()
+	spotNotional := unrealizedPnL.SpotNotional()
+	reachExitPnL := totalPnL.Sign() > 0 && totalPnL.Div(spotNotional).Compare(s.ExitPnLRatio) >= 0
 	if round.TriggeredFundingRate().Sign()*index.LastFundingRate.Sign() <= 0 {
 		// the funding rate has flipped
 		rateDiffAbs := index.LastFundingRate.Sub(round.TriggeredFundingRate()).Abs()
@@ -1321,6 +1325,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
 			return
 		}
+
 		// the round is already beyond the min holding time and the funding rate has flipped
 		// check if the unrealized PnL is positive
 		futuresPosition := round.FuturesWorker().FilledPosition()
@@ -1330,19 +1335,17 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 		// the product of the flipped rate and the position is positive
 		// we need to negate the product to get the next funding income, which should be negative -> expected loss
 		nextFundingIncome := index.LastFundingRate.Mul(futuresPosition).Neg()
-		unrealizedPnL := round.UnrealizedPnL(spotPrice, futuresPrice)
-		unrealizedTotalPnL := unrealizedPnL.TotalPnL()
-		// the unrealized PnL is positive or the expected unrealized net PnL is below the max closing loss ratio, transit to closing
+		// the unrealized PnL reaches the exit PnL ratio or the expected unrealized net PnL is below the max closing loss ratio, transit to closing
 		// That is, we will close the round either when there is profit or the estimated loss is too large
 		// NOTE: MaxClosingLossRatio is negative
-		if unrealizedTotalPnL.Sign() > 0 || unrealizedTotalPnL.Add(nextFundingIncome).Div(futuresPositionNotional).Compare(s.MaxClosingLossRatio) < 0 {
+		if reachExitPnL || totalPnL.Add(nextFundingIncome).Div(futuresPositionNotional).Compare(s.MaxClosingLossRatio) < 0 {
 			s.logger.Infof(
 				"[transitOpeningOrReadyRound] unrealized total PnL: %s, next funding income: %s, futures position notional: %s, max closing loss ratio: %s",
-				unrealizedTotalPnL, nextFundingIncome, futuresPositionNotional, s.MaxClosingLossRatio,
+				totalPnL, nextFundingIncome, futuresPositionNotional, s.MaxClosingLossRatio,
 			)
 			bbgo.Notify(
 				"⚠️ Unrealized total PnL too large (%s), transit state %s -> closing, current funding rate %s: %s",
-				unrealizedTotalPnL, round.State(), index.LastFundingRate, round.String(),
+				totalPnL, round.State(), index.LastFundingRate, round.String(),
 				round.NewNotification(currentTime, spotPrice, futuresPrice),
 			)
 			round.SetClosing(currentTime, s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
@@ -1387,10 +1390,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 			return
 		}
 		// check min exit rate and total PnL
-		unrealizedPnL := round.UnrealizedPnL(spotPrice, futuresPrice)
-		spotNotional := unrealizedPnL.SpotNotional()
-		totalPnL := unrealizedPnL.TotalPnL()
-		if totalPnL.Sign() > 0 && totalPnL.Div(spotNotional).Compare(s.ExitPnLRatio) >= 0 {
+		if reachExitPnL {
 			// the round is generating profit but the funding rate is below the soft min exit rate, transit to closing
 			bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the soft min exit rate %s with total PnL %s, transit state %s -> closing: %s",
 				index.LastFundingRate, lastAnnualizedFundingRate, s.MinExitRate, totalPnL, round.State(), round.String(),

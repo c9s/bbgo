@@ -31,6 +31,7 @@ const (
 	RoundReady
 	RoundClosing
 	RoundClosed
+	RoundStopped
 )
 
 type FuturesService interface {
@@ -1096,6 +1097,11 @@ func (r *ArbitrageRound) Start(ctx context.Context,
 				currentTime.Format(time.RFC3339),
 			)
 		}
+		// enable TWAP for the leader (spot) and disable TWAP for the follower (futures) during opening
+		// So that the follower always keeps up with the leader, no slicing
+		r.spotWorker.EnableTWAP()
+		r.futuresWorker.DisableTWAP()
+
 		if err := r.spotWorker.Start(ctx, currentTime); err != nil {
 			return fmt.Errorf("failed to start spot worker: %w", err)
 		}
@@ -1118,6 +1124,7 @@ func (r *ArbitrageRound) Stop() {
 	r.spotWorker.Stop()
 	r.futuresWorker.Stop()
 	close(r.retryTransferTickC)
+	r.syncState.State = RoundStopped
 }
 
 func (r *ArbitrageRound) retryTransferWorker(ctx context.Context, tickC <-chan time.Time) {
@@ -1571,6 +1578,10 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 	// spot now follows (taker orders to hedge reliably).
 	r.futuresWorker.SetConfig(r.leaderTWAPConfig)
 	r.spotWorker.SetConfig(r.followerTWAPConfig)
+	// the futures is the leader, enable its TWAP.
+	r.futuresWorker.EnableTWAP()
+	// the spot is the follower, disable its TWAP, no slicing.
+	r.spotWorker.DisableTWAP()
 
 	r.syncState.State = RoundClosing
 	r.syncState.ClosingAt = currentTime
@@ -1692,8 +1703,8 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.syncState.State == RoundPending {
-		// not started yet or halted, do nothing
+	if r.syncState.State == RoundPending || r.syncState.State == RoundStopped || r.syncState.State == RoundClosed {
+		// do nothing
 		return
 	}
 
@@ -1704,9 +1715,6 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 		})
 	}
 
-	if r.syncState.State == RoundClosed {
-		return
-	}
 	// get mid price
 	spotMidPrice := getMidPrice(spotOrderBook)
 	futuresMidPrice := getMidPrice(futuresOrderBook)
