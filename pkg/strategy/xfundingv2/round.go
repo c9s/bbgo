@@ -1096,6 +1096,11 @@ func (r *ArbitrageRound) Start(ctx context.Context,
 				currentTime.Format(time.RFC3339),
 			)
 		}
+		// enable TWAP for the leader (spot) and disable TWAP for the follower (futures) during opening
+		// So that the follower always keeps up with the leader, no slicing
+		r.spotWorker.EnableTWAP()
+		r.futuresWorker.DisableTWAP()
+
 		if err := r.spotWorker.Start(ctx, currentTime); err != nil {
 			return fmt.Errorf("failed to start spot worker: %w", err)
 		}
@@ -1571,6 +1576,10 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 	// spot now follows (taker orders to hedge reliably).
 	r.futuresWorker.SetConfig(r.leaderTWAPConfig)
 	r.spotWorker.SetConfig(r.followerTWAPConfig)
+	// the futures is the leader, enable its TWAP.
+	r.futuresWorker.EnableTWAP()
+	// the spot is the follower, disable its TWAP, no slicing.
+	r.spotWorker.DisableTWAP()
 
 	r.syncState.State = RoundClosing
 	r.syncState.ClosingAt = currentTime
