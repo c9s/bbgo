@@ -155,8 +155,15 @@ type Backtest struct {
 	Sessions []string                   `json:"sessions" yaml:"sessions"`
 
 	// sync 1 second interval KLines
-	SyncSecKLines bool                 `json:"syncSecKLines,omitempty" yaml:"syncSecKLines,omitempty"`
-	CsvSource     *csvsource.CsvConfig `json:"csvConfig,omitempty" yaml:"csvConfig,omitempty"`
+	SyncSecKLines bool `json:"syncSecKLines,omitempty" yaml:"syncSecKLines,omitempty"`
+
+	// CsvSource configures the legacy --csv backtest path.
+	//
+	// Deprecated: superseded by the market data layer in pkg/marketdata, which
+	// reads Binance's published archives directly instead of a normalized
+	// on-disk format. Kept for one release; no example config in this repo uses
+	// it. See `bbgo marketdata --help`.
+	CsvSource *csvsource.CsvConfig `json:"csvConfig,omitempty" yaml:"csvConfig,omitempty"`
 }
 
 func (b *Backtest) GetAccount(n string) BacktestAccount {
