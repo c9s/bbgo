@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -106,8 +107,7 @@ func (s *BacktestServiceCSV) QueryKLinesBackward(exchange types.Exchange, symbol
 	}
 
 	// Reverse iteration through klines and filter based on endTime and limit
-	for i := len(exchangeKLines) - 1; i >= 0; i-- {
-		kline := exchangeKLines[i]
+	for _, kline := range slices.Backward(exchangeKLines) {
 
 		if kline.StartTime.Before(endTime) {
 			result = append(result, kline)
