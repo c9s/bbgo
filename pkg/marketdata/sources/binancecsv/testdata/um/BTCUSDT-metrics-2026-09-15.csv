@@ -1,0 +1,3 @@
+create_time,symbol,sum_open_interest,sum_open_interest_value,count_toptrader_long_short_ratio,sum_toptrader_long_short_ratio,count_long_short_ratio,sum_taker_long_short_vol_ratio
+2026-09-15 00:00:00,BTCUSDT,103513.5610000000000000,8088539305.1839000000000000,1.21791190,2.06913400,1.17124703,1.12654900
+2026-09-15 00:25:00,BTCUSDT,103351.0790000000000000,8059947582.0019000000000000,1.22798130,2.08593800,1.18010094,0.73090000
