@@ -546,6 +546,8 @@ func (s *Strategy) CrossRun(
 	candidateSymbols = s.filterMarketCollateralRate(s.ctx, candidateSymbols)
 	// 3. filter by top N market cap
 	candidateSymbols = s.filterMarketByCapSize(s.ctx, candidateSymbols)
+	// 4. filter by legitimate assets (the asset can be transferred as collateral)
+	candidateSymbols = s.filterLegitimateAssets(s.ctx, candidateSymbols)
 
 	if len(candidateSymbols) == 0 {
 		return errors.New("no candidate symbols after filtering")
@@ -1599,6 +1601,36 @@ func (s *Strategy) filterMarketCollateralRate(ctx context.Context, symbols []str
 		}
 	}
 	return candidateSymbols
+}
+
+func (s *Strategy) filterLegitimateAssets(ctx context.Context, symbols []string) []string {
+	binanceEx, ok := s.futuresSession.Exchange.(*binance.Exchange)
+	if !ok {
+		// we now only check legitimate assets for binance futures
+		return symbols
+	}
+
+	exInfo, err := binanceEx.QueryFuturesExchangeInfo(ctx)
+	if err != nil {
+		s.logger.WithError(err).Warnf(
+			"[filterLegitimateAssets] failed to query futures exchange info for %s", s.futuresSession.Name,
+		)
+		return symbols
+	}
+
+	assetsMap := make(map[string]struct{})
+	for _, asset := range exInfo.Assets {
+		assetsMap[asset.Asset] = struct{}{}
+	}
+	var legitimateAssets []string
+	for _, candidate := range s.candidateSymbols {
+		if _, found := assetsMap[candidate]; !found {
+			s.logger.Warnf("[filterLegitimateAssets] candidate symbol %s is not a legitimate asset, removing from candidate symbols", candidate)
+			continue
+		}
+		legitimateAssets = append(legitimateAssets, candidate)
+	}
+	return legitimateAssets
 }
 
 // selectMostProfitableMarket selects the most profitable market among the candidates based on the estimated break-even holding intervals
