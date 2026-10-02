@@ -1,0 +1,94 @@
+---
+# The public funding trade history is persisted in the database so that it's only backfilled once,
+# configure the database with the DB_DRIVER and DB_DSN environment variables, e.g.
+#
+#   DB_DRIVER=sqlite3
+#   DB_DSN=bbgo.sqlite3
+#
+# Without a database, the whole lookback of the history is fetched on every start (~10 minutes for 90 days of fUST).
+database:
+  # the strategy migrations are only applied when the package is listed here
+  extraMigrationPackages:
+  - bfxfunding
+
+sessions:
+  bitfinex:
+    exchange: bitfinex
+    envVarPrefix: BITFINEX
+
+exchangeStrategies:
+
+- on: bitfinex
+  bfxfunding:
+    # currency is the funding symbol, USDT is fUST on Bitfinex
+    currency: fUST
+
+    # dryRun logs the analysis and the planned offers without canceling or submitting any offer.
+    # with the amount set, it works on a public only session (publicOnly: true) without the API credentials.
+    dryRun: false
+
+    # amount caps the capital used by the strategy, zero or omitted means the whole funding wallet
+    amount: 50000
+
+    # minRate is the min daily rate of every offer, 0.0001 = 0.01% per day (3.65% APR)
+    minRate: 0.0001
+
+    # lookback is the time range of the history used to find the high rate zone
+    lookback: 2160h # 90 days
+
+    # recomputeInterval is how often the history is synced and the offers are re-evaluated
+    recomputeInterval: 15m
+
+    # minOfferAmount defaults to 150 for the USD currencies, it's required for the other currencies
+    minOfferAmount: 150
+
+    # maxOfferAmount splits the tier amount into offers of at most this amount
+    maxOfferAmount: 10000
+
+    # keepOffersOnStart keeps the active offers on start instead of canceling them
+    keepOffersOnStart: false
+    cancelOffersOnShutdown: false
+
+    # highRate parks a part of the capital in the high rate zone
+    highRate:
+      # the volume-weighted rate percentiles of the lookback that define the zone
+      percentile: 0.95
+      ceilPercentile: 0.995
+
+      # the tier amount is min(capital * maxRatio, avgDailyHighRateVolume * volumeShare)
+      maxRatio: 0.4
+      volumeShare: 0.05
+
+      # the tier amount is spread across the rate levels by the volume filled at each level
+      levels: 3
+
+      # re-place the tier offers when the zone floor moves more than this ratio
+      rezoneTolerance: 0.1
+
+    # channel places the rest of the capital at the upper edge of the normal rate channel
+    channel:
+      window: 24h
+      lowerPercentile: 0.2
+      upperPercentile: 0.8
+
+      # re-place the offers when the channel edge drifts more than this ratio from their rates
+      repriceTolerance: 0.05
+
+      # the trades within this ratio of the channel edge decide the loan period
+      periodRateTolerance: 0.1
+
+- on: bitfinex
+  bfxfunding:
+    currency: fBTC
+    amount: 0.5
+    minRate: 0.00001
+    minOfferAmount: 0.002
+    maxOfferAmount: 0.1
+
+- on: bitfinex
+  bfxfunding:
+    currency: fETH
+    amount: 10
+    minRate: 0.00001
+    minOfferAmount: 0.05
+    maxOfferAmount: 2
