@@ -26,7 +26,8 @@ In `okex.Exchange.SubmitOrder` (pkg/exchange/okex/exchange.go):
 2. Margin **sell** market orders pass `order.Quantity` through unchanged
    (sz in base — matches bbgo's unit).
 3. Margin **buy** market orders convert the size to the quote notional at the
-   best ask (`QueryTicker` → `PriceTypeAsk` → `Market.FormatPriceCurrency`),
+   best ask (`QueryTicker` → `PriceTypeAsk`), formatted as a plain number at the
+   quote precision (`order.Quantity.Mul(ask).FormatString(market.QuotePrecision)`),
    because OKX expects sz in quote for that side.
 
 Spot (cash) market orders keep `tgtCcy=base_ccy`, unchanged.
