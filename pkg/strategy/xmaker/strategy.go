@@ -2830,6 +2830,21 @@ func (s *Strategy) CrossRun(
 
 	s.makerSession = makerSession
 
+	// when the hedge session runs in margin (cross) mode, verify the exchange
+	// account supports it before quoting. A misconfigured account (e.g. a spot
+	// account on a cross-margin-only exchange) would otherwise reject every
+	// hedge order after this instance has already started placing maker orders.
+	// Only this strategy instance is affected; other strategies keep running.
+	if s.hedgeSession.Margin {
+		if checker, ok := s.hedgeSession.Exchange.(interface {
+			CheckMarginAccount(ctx context.Context) error
+		}); ok {
+			if err := checker.CheckMarginAccount(ctx); err != nil {
+				return err
+			}
+		}
+	}
+
 	s.hedgeMarket, ok = s.hedgeSession.Market(s.SourceSymbol)
 	if !ok {
 		return fmt.Errorf("source session market %s is not defined", s.SourceSymbol)

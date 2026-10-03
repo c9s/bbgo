@@ -25,6 +25,14 @@ import (
 var (
 	defaultMaxMarginLevel = fixedpoint.NewFromFloat(999.99)
 
+	// marginQuoteCurrency is the quote currency of the cross-margin (hedge)
+	// session. OKX's one-click-repay requires repayCcy != debtCcy, and the
+	// margin max-loan query is keyed by the pair instId ("<base>-<quote>").
+	// The xmaker hedge session runs on a USDT-quoted pair; if a non-USDT
+	// hedge pair is ever supported, derive these from the market instead of
+	// this constant.
+	marginQuoteCurrency = "USDT"
+
 	// clientOrderIdRegex combine of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
 	clientOrderIdRegex = regexp.MustCompile("^[a-zA-Z0-9]{0,32}$")
 
@@ -241,6 +249,45 @@ func (e *Exchange) PlatformFeeCurrency() string {
 	return PlatformToken
 }
 
+// CheckMarginAccount verifies that the account mode supports a margin (cross)
+// hedge session. A margin session sells above the held balance in cross mode,
+// which OKX only accepts on a multi-currency margin account (acctLv >= 3) with
+// auto loan enabled. It is called by strategies that hedge in margin mode so
+// that a misconfigured account blocks only that strategy instance, not the
+// whole bbgo process.
+func (e *Exchange) CheckMarginAccount(ctx context.Context) error {
+	if !e.MarginSettings.IsMargin {
+		return nil
+	}
+
+	configs, err := e.client.NewGetAccountConfigRequest().Do(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to query the okex account config: %w", err)
+	}
+
+	if len(configs) == 0 {
+		return fmt.Errorf("okex account config is empty")
+	}
+
+	config := configs[0]
+	if config.AccountLevel < 3 {
+		return fmt.Errorf(
+			"okex margin session requires a multi-currency margin account (acctLv >= 3), got acctLv=%d: "+
+				"switch the account mode in the OKX UI, or set margin: false for a spot account",
+			int64(config.AccountLevel))
+	}
+
+	if !config.AutoLoan {
+		return fmt.Errorf(
+			"okex margin session requires auto loan to be enabled (acctLv=%d, autoLoan=%t): "+
+				"enable it in the OKX UI (account settings > auto loan) or call "+
+				"POST /api/v5/account/set-auto-loan with {\"autoLoan\": true}",
+			int64(config.AccountLevel), config.AutoLoan)
+	}
+
+	return nil
+}
+
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	if e.IsFutures {
 		return e.QueryFuturesAccount(ctx)
@@ -280,33 +327,58 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	// When the maintenance margin ratio is ≤ 300%, the system will send a warning to reduce the positions and the user should be aware of the liquidation risk. 300% is the warning parameter.
 	// OKX reserves the right to adjust this parameter according to the actual situation.
 	// When the maintenance margin ratio is ≤ 100%, the system will cancel orders according to the following rules, known as order cancellation by pre-liquidation:
-	account.BorrowEnabled = types.BoolPtr(accountConfigs[0].EnableSpotBorrow)
 	account.AccountType = types.AccountTypeSpot
 
-	// if spot borrow is enabled, we need to calculate margin level
-	if accountConfigs[0].EnableSpotBorrow {
-		// Spot mode could have margin ratio as well
-		account.MarginRatio = fixedpoint.NewFromFloat(1.0) // 100%
+	if e.MarginSettings.IsMargin {
+		// cross mode: borrowing is governed by the account auto loan switch,
+		// not the spot borrow flag.
+		account.BorrowEnabled = types.BoolPtr(accountConfigs[0].AutoLoan)
+	} else {
+		account.BorrowEnabled = types.BoolPtr(accountConfigs[0].EnableSpotBorrow)
+	}
 
-		if accounts[0].MarginRatio.Sign() > 0 {
-			account.MarginRatio = accounts[0].MarginRatio
+	if e.MarginSettings.IsMargin {
+		// Multi-currency margin: margin level = adjusted equity / total
+		// maintenance margin. OKX cancels orders when the maintenance margin
+		// ratio reaches 100%, so a level of 1.0 marks the pre-liquidation
+		// threshold, the same semantics as the binance margin level.
+		if accounts[0].TotalMaintMargin.Sign() > 0 {
+			account.MarginLevel = accounts[0].AdjustEquity.Div(accounts[0].TotalMaintMargin)
+		} else {
+			account.MarginLevel = defaultMaxMarginLevel
 		}
 
+		applyOkxMarginRatioAndTolerance(account, &accounts[0])
+	} else if accountConfigs[0].EnableSpotBorrow {
+		// Spot mode: margin level = total equity / borrow notional.
 		if accounts[0].NotionalUsdForBorrow.Sign() > 0 {
 			account.MarginLevel = accounts[0].TotalEquityInUSD.Div(accounts[0].NotionalUsdForBorrow)
 		} else {
 			account.MarginLevel = defaultMaxMarginLevel
 		}
 
-		if account.MarginLevel.Sign() > 0 {
-			account.MarginTolerance = util.CalculateMarginTolerance(account.MarginLevel)
-		}
-
+		applyOkxMarginRatioAndTolerance(account, &accounts[0])
 	} else {
 		log.Warnf("enableSpotBorrow field is false, if you need to auto-borrow, please turn on auto-borrow from the okx UI, this is the only way to enable spot margin auto-borrow")
 	}
 
 	return account, nil
+}
+
+// applyOkxMarginRatioAndTolerance sets the margin ratio (defaulting to 100%
+// until OKX reports a real one) and the derived tolerance from the
+// already-computed margin level. Shared by the margin and spot-borrow
+// branches of QueryAccount, which differ only in how they compute the level.
+func applyOkxMarginRatioAndTolerance(account *types.Account, okxAccount *okexapi.Account) {
+	account.MarginRatio = fixedpoint.NewFromFloat(1.0) // 100%
+
+	if okxAccount.MarginRatio.Sign() > 0 {
+		account.MarginRatio = okxAccount.MarginRatio
+	}
+
+	if account.MarginLevel.Sign() > 0 {
+		account.MarginTolerance = util.CalculateMarginTolerance(account.MarginLevel)
+	}
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
@@ -391,10 +463,38 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		req.Price(order.Market.FormatPrice(order.Price))
 	case types.OrderTypeMarket:
-		// target currency = Default is quote_ccy for buy, base_ccy for sell
-		// Because our order.Quantity unit is base coin, so we indicate the target currency to Base.
-		// Only applicable to SPOT Market Orders
-		if !e.IsFutures {
+		if e.IsFutures {
+			break
+		}
+
+		if e.MarginSettings.IsMargin {
+			// tgtCcy is "Only applicable to SPOT Market Orders": margin
+			// market orders reject it. Per the OKX docs, the sz unit of a
+			// margin market order is fixed by the side:
+			//   MARGIN Buy market  -> sz in QUOTE currency
+			//   MARGIN Sell market -> sz in BASE currency
+			// bbgo's order.Quantity is always base-denominated: the sell
+			// size needs no conversion, while the buy size must be
+			// converted into the quote notional at the best ask.
+			if order.Side == types.SideTypeBuy {
+				ticker, err := e.QueryTicker(ctx, order.Symbol)
+				if err != nil {
+					return nil, errors.Wrapf(err, "query ticker for margin market buy %s", order.Symbol)
+				}
+
+				ask := ticker.GetPrice(types.SideTypeBuy, types.PriceTypeAsk)
+				if ask.IsZero() {
+					return nil, errors.Errorf(
+						"cannot convert margin market buy size to quote: %s ask price is zero", order.Symbol)
+				}
+
+				// quote-denominated notional, formatted at the quote
+				// precision (no currency symbol — OKX sz is a plain number).
+				req.Size(order.Quantity.Mul(ask).FormatString(order.Market.QuotePrecision))
+			}
+		} else {
+			// spot market order: order.Quantity unit is base coin, so
+			// indicate the target currency to Base.
 			req.TargetCurrency(okexapi.TargetCurrencyBase)
 		}
 	}
@@ -711,6 +811,32 @@ func (e *Exchange) QueryClosedOrders(
 }
 
 func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+	if e.MarginSettings.IsMargin {
+		// Multi-currency margin (cross) debt: the spot-manual-borrow-repay
+		// endpoint is "Only applicable to Spot mode", so use one-click-repay
+		// instead. It repays the full debt up to the repay currency's available
+		// balance (no amount parameter). The debt currency is the asset that
+		// was borrowed; repay in the hedge session's quote currency.
+		if strings.ToUpper(asset) == marginQuoteCurrency {
+			log.Warnf(
+				"okex margin repay: debt currency is %s (quote); "+
+					"one-click-repay requires repayCcy != debtCcy. "+
+					"Debt will be offset by the next cross sell or requires manual handling.",
+				marginQuoteCurrency)
+			return nil
+		}
+
+		req := e.client.NewOneClickRepayRequest()
+		req.DebtCurrency(strings.ToUpper(asset))
+		req.RepayCurrency(marginQuoteCurrency)
+		resp, err := req.Do(ctx)
+		if err != nil {
+			return err
+		}
+		log.Infof("okex one-click-repay response: %+v", resp)
+		return nil
+	}
+
 	req := e.client.NewSpotManualBorrowRepayRequest()
 	req.Currency(strings.ToUpper(asset))
 	req.Amount(amount.String())
@@ -741,8 +867,14 @@ func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount f
 
 func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (fixedpoint.Value, error) {
 	req := e.client.NewGetAccountMaxLoanRequest()
-	req.Currency(asset).
-		MarginMode(okexapi.MarginModeCross)
+	if e.MarginSettings.IsMargin {
+		// multi-currency margin (cross) accounts reject the `ccy` parameter with
+		// "50014 Parameter instId can not be empty", so query with the pair instId.
+		req.InstrumentId(asset + "-" + marginQuoteCurrency)
+	} else {
+		req.Currency(asset)
+	}
+	req.MarginMode(okexapi.MarginModeCross)
 
 	resp, err := req.Do(ctx)
 	if err != nil {
