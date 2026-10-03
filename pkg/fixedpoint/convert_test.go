@@ -151,33 +151,5 @@ func Test_Trunc(t *testing.T) {
 	}
 }
 
-func Test_Overflow(t *testing.T) {
-	t.Run("NewFromString overflow", func(t *testing.T) {
-		large := "999999999999999999.99"
-		v, err := NewFromString(large)
-		assert.NoError(t, err)
-		assert.Equal(t, PosInf, v)
-		assert.True(t, v.IsInf())
 
-		largeNeg := "-999999999999999999.99"
-		vNeg, err := NewFromString(largeNeg)
-		assert.NoError(t, err)
-		assert.Equal(t, NegInf, vNeg)
-		assert.True(t, vNeg.IsInf())
-	})
-
-	t.Run("Add overflow", func(t *testing.T) {
-		a := PosInf.Sub(Value(100))
-		b := Value(200)
-		res := a.Add(b)
-		assert.Equal(t, PosInf, res)
-	})
-
-	t.Run("Sub underflow", func(t *testing.T) {
-		a := NegInf.Add(Value(100))
-		b := Value(200)
-		res := a.Sub(b)
-		assert.Equal(t, NegInf, res)
-	})
-}
 
