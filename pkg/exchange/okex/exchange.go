@@ -25,6 +25,14 @@ import (
 var (
 	defaultMaxMarginLevel = fixedpoint.NewFromFloat(999.99)
 
+	// marginQuoteCurrency is the quote currency of the cross-margin (hedge)
+	// session. OKX's one-click-repay requires repayCcy != debtCcy, and the
+	// margin max-loan query is keyed by the pair instId ("<base>-<quote>").
+	// The xmaker hedge session runs on a USDT-quoted pair; if a non-USDT
+	// hedge pair is ever supported, derive these from the market instead of
+	// this constant.
+	marginQuoteCurrency = "USDT"
+
 	// clientOrderIdRegex combine of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
 	clientOrderIdRegex = regexp.MustCompile("^[a-zA-Z0-9]{0,32}$")
 
@@ -254,11 +262,11 @@ func (e *Exchange) CheckMarginAccount(ctx context.Context) error {
 
 	configs, err := e.client.NewGetAccountConfigRequest().Do(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to query the okx account config: %w", err)
+		return fmt.Errorf("unable to query the okex account config: %w", err)
 	}
 
 	if len(configs) == 0 {
-		return fmt.Errorf("okx account config is empty")
+		return fmt.Errorf("okex account config is empty")
 	}
 
 	config := configs[0]
@@ -340,37 +348,37 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 			account.MarginLevel = defaultMaxMarginLevel
 		}
 
-		account.MarginRatio = fixedpoint.NewFromFloat(1.0) // 100%
-
-		if accounts[0].MarginRatio.Sign() > 0 {
-			account.MarginRatio = accounts[0].MarginRatio
-		}
-
-		if account.MarginLevel.Sign() > 0 {
-			account.MarginTolerance = util.CalculateMarginTolerance(account.MarginLevel)
-		}
+		applyOkxMarginRatioAndTolerance(account, &accounts[0])
 	} else if accountConfigs[0].EnableSpotBorrow {
-		// Spot mode could have margin ratio as well
-		account.MarginRatio = fixedpoint.NewFromFloat(1.0) // 100%
-
-		if accounts[0].MarginRatio.Sign() > 0 {
-			account.MarginRatio = accounts[0].MarginRatio
-		}
-
+		// Spot mode: margin level = total equity / borrow notional.
 		if accounts[0].NotionalUsdForBorrow.Sign() > 0 {
 			account.MarginLevel = accounts[0].TotalEquityInUSD.Div(accounts[0].NotionalUsdForBorrow)
 		} else {
 			account.MarginLevel = defaultMaxMarginLevel
 		}
 
-		if account.MarginLevel.Sign() > 0 {
-			account.MarginTolerance = util.CalculateMarginTolerance(account.MarginLevel)
-		}
+		applyOkxMarginRatioAndTolerance(account, &accounts[0])
 	} else {
 		log.Warnf("enableSpotBorrow field is false, if you need to auto-borrow, please turn on auto-borrow from the okx UI, this is the only way to enable spot margin auto-borrow")
 	}
 
 	return account, nil
+}
+
+// applyOkxMarginRatioAndTolerance sets the margin ratio (defaulting to 100%
+// until OKX reports a real one) and the derived tolerance from the
+// already-computed margin level. Shared by the margin and spot-borrow
+// branches of QueryAccount, which differ only in how they compute the level.
+func applyOkxMarginRatioAndTolerance(account *types.Account, okxAccount *okexapi.Account) {
+	account.MarginRatio = fixedpoint.NewFromFloat(1.0) // 100%
+
+	if okxAccount.MarginRatio.Sign() > 0 {
+		account.MarginRatio = okxAccount.MarginRatio
+	}
+
+	if account.MarginLevel.Sign() > 0 {
+		account.MarginTolerance = util.CalculateMarginTolerance(account.MarginLevel)
+	}
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
@@ -808,18 +816,19 @@ func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fi
 		// endpoint is "Only applicable to Spot mode", so use one-click-repay
 		// instead. It repays the full debt up to the repay currency's available
 		// balance (no amount parameter). The debt currency is the asset that
-		// was borrowed; repay in USDT (the hedge session's quote currency).
-		if strings.ToUpper(asset) == "USDT" {
+		// was borrowed; repay in the hedge session's quote currency.
+		if strings.ToUpper(asset) == marginQuoteCurrency {
 			log.Warnf(
-				"okex margin repay: debt currency is USDT (quote); "+
+				"okex margin repay: debt currency is %s (quote); "+
 					"one-click-repay requires repayCcy != debtCcy. "+
-					"Debt will be offset by the next cross sell or requires manual handling.")
+					"Debt will be offset by the next cross sell or requires manual handling.",
+				marginQuoteCurrency)
 			return nil
 		}
 
 		req := e.client.NewOneClickRepayRequest()
 		req.DebtCurrency(strings.ToUpper(asset))
-		req.RepayCurrency("USDT")
+		req.RepayCurrency(marginQuoteCurrency)
 		resp, err := req.Do(ctx)
 		if err != nil {
 			return err
@@ -861,7 +870,7 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset stri
 	if e.MarginSettings.IsMargin {
 		// multi-currency margin (cross) accounts reject the `ccy` parameter with
 		// "50014 Parameter instId can not be empty", so query with the pair instId.
-		req.InstrumentId(asset + "-USDT")
+		req.InstrumentId(asset + "-" + marginQuoteCurrency)
 	} else {
 		req.Currency(asset)
 	}
