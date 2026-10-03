@@ -480,7 +480,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 						"cannot convert margin market buy size to quote: %s ask price is zero", order.Symbol)
 				}
 
-				req.Size(order.Market.FormatPriceCurrency(order.Quantity.Mul(ask)))
+				// quote-denominated notional, formatted at the quote
+				// precision (no currency symbol — OKX sz is a plain number).
+				req.Size(order.Quantity.Mul(ask).FormatString(order.Market.QuotePrecision))
 			}
 		} else {
 			// spot market order: order.Quantity unit is base coin, so
