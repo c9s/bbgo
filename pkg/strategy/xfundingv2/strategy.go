@@ -470,6 +470,12 @@ func (s *Strategy) CrossRun(
 	if s.spotSession == nil {
 		return fmt.Errorf("spot session %s not found", s.SpotSession)
 	}
+	// spot and futures exchanges should be of the same exchange
+	if s.spotSession.Exchange.Name() != s.futuresSession.Exchange.Name() {
+		return fmt.Errorf("spot and futures sessions must be on the same exchange: spot=%s, futures=%s",
+			s.spotSession.Exchange.Name(), s.futuresSession.Exchange.Name())
+	}
+
 	if futuresEx, ok := s.futuresSession.Exchange.(types.FuturesExchange); !ok {
 		return fmt.Errorf("session %s does not support futures", s.futuresSession.Name)
 	} else if !futuresEx.GetFuturesSettings().IsFutures {
