@@ -682,25 +682,31 @@ func (s *Strategy) CrossRun(
 	spotStream := s.spotSession.Exchange.NewStream()
 	spotStream.SetPublicOnly()
 	setupStreamBooksForSymbol := func(symbol string) {
-		futuresBook := types.NewStreamBook(symbol, s.futuresSession.ExchangeName)
-		futuresBook.BindStream(futureStream)
-		futureStream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
-		s.futuresOrderBooks[symbol] = futuresBook
+		if _, found := s.futuresOrderBooks[symbol]; !found {
+			futuresBook := types.NewStreamBook(symbol, s.futuresSession.ExchangeName)
+			futuresBook.BindStream(futureStream)
+			futureStream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
+			s.futuresOrderBooks[symbol] = futuresBook
+		}
 
-		spotBook := types.NewStreamBook(symbol, s.spotSession.ExchangeName)
-		spotBook.BindStream(spotStream)
-		spotStream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
-		s.spotOrderBooks[symbol] = spotBook
+		if _, found := s.spotOrderBooks[symbol]; !found {
+			spotBook := types.NewStreamBook(symbol, s.spotSession.ExchangeName)
+			spotBook.BindStream(spotStream)
+			spotStream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
+			s.spotOrderBooks[symbol] = spotBook
+		}
 	}
 	for _, symbol := range candidateSymbols {
 		setupStreamBooksForSymbol(symbol)
 	}
 	// subscribe fee symbol order book for trading fee estimation
 	if s.FeeSymbol != "" {
-		spotBook := types.NewStreamBook(s.FeeSymbol, s.spotSession.ExchangeName)
-		spotBook.BindStream(spotStream)
-		spotStream.Subscribe(types.BookChannel, s.FeeSymbol, types.SubscribeOptions{})
-		s.spotOrderBooks[s.FeeSymbol] = spotBook
+		if _, found := s.spotOrderBooks[s.FeeSymbol]; !found {
+			spotBook := types.NewStreamBook(s.FeeSymbol, s.spotSession.ExchangeName)
+			spotBook.BindStream(spotStream)
+			spotStream.Subscribe(types.BookChannel, s.FeeSymbol, types.SubscribeOptions{})
+			s.spotOrderBooks[s.FeeSymbol] = spotBook
+		}
 	}
 	// runtime init done, setup all rounds
 	for _, round := range s.allRounds() {
