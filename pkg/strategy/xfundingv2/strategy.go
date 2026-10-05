@@ -676,11 +676,7 @@ func (s *Strategy) CrossRun(
 		}
 	}
 
-	if futuresInfoService, ok := s.futuresSession.Exchange.(FuturesInfoService); !ok {
-		return fmt.Errorf("futures session exchange does not support futures info service: %s", s.futuresSession.ExchangeName)
-	} else {
-		s.preliminaryMarketSelector = NewMarketSelector(*s.MarketSelectionConfig, futuresInfoService, s.logger)
-	}
+	s.preliminaryMarketSelector = NewMarketSelector(*s.MarketSelectionConfig, s.futuresService, s.logger)
 
 	// initialize depth books for model selection
 	// we create new stream here to save the bandwidth of the market data stream of the sessions

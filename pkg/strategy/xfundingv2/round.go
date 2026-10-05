@@ -41,6 +41,13 @@ type FuturesService interface {
 	QueryPremiumIndex(ctx context.Context, symbol string) (*types.PremiumIndex, error)
 	QueryPositionRisk(ctx context.Context, symbol ...string) ([]types.PositionRisk, error)
 	SetLeverage(ctx context.Context, symbol string, leverage int) error
+
+	// market selection related queries
+	QueryTakerBuySellVolumes(context.Context, string, types.Interval, types.TradeQueryOptions) ([]binanceapi.FuturesTakerBuySellVolume, error)
+	QueryDepth(context.Context, string) (types.SliceOrderBook, int64, error)
+	QueryFuturesFundingInfo(context.Context) ([]binanceapi.FuturesFundingInfo, error)
+	QueryTicker(context.Context, string) (*types.Ticker, error)
+	QueryFuturesAdlRisk(ctx context.Context, symbol string) (map[string]*binanceapi.AdlRisk, error)
 }
 
 type transferRetry struct {
