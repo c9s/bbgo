@@ -594,38 +594,42 @@ func (s *Strategy) CrossRun(
 			s.FuturesPositions[symbol] = futuresPosition
 		}
 		futuresPosition.UseExcludeFeeFromCostMode()
-		spotExecutor := bbgo.NewGeneralOrderExecutor(
-			s.spotSession,
-			symbol,
-			s.ID(),
-			s.InstanceID(),
-			spotPosition,
-		)
-		spotExecutor.OrderStore().AddOrderUpdate = true
-		spotExecutor.DisableNotify()
-		spotExecutor.Bind()
-		if openOrders, err := s.spotSession.Exchange.QueryOpenOrders(s.ctx, symbol); err != nil {
-			return fmt.Errorf("failed to query open orders for spot symbol %s: %w", symbol, err)
-		} else if len(openOrders) > 0 {
-			spotExecutor.ActiveMakerOrders().Add(openOrders...)
+		if _, found := s.spotGeneralOrderExecutors[symbol]; !found {
+			spotExecutor := bbgo.NewGeneralOrderExecutor(
+				s.spotSession,
+				symbol,
+				s.ID(),
+				s.InstanceID(),
+				spotPosition,
+			)
+			spotExecutor.OrderStore().AddOrderUpdate = true
+			spotExecutor.DisableNotify()
+			spotExecutor.Bind()
+			if openOrders, err := s.spotSession.Exchange.QueryOpenOrders(s.ctx, symbol); err != nil {
+				return fmt.Errorf("failed to query open orders for spot symbol %s: %w", symbol, err)
+			} else if len(openOrders) > 0 {
+				spotExecutor.ActiveMakerOrders().Add(openOrders...)
+			}
+			s.spotGeneralOrderExecutors[symbol] = spotExecutor
 		}
-		s.spotGeneralOrderExecutors[symbol] = spotExecutor
-		futuresExecutor := bbgo.NewGeneralOrderExecutor(
-			s.futuresSession,
-			symbol,
-			s.ID(),
-			s.InstanceID(),
-			futuresPosition,
-		)
-		if openOrders, err := s.futuresSession.Exchange.QueryOpenOrders(s.ctx, symbol); err != nil {
-			return fmt.Errorf("failed to query open orders for futures symbol %s: %w", symbol, err)
-		} else if len(openOrders) > 0 {
-			futuresExecutor.ActiveMakerOrders().Add(openOrders...)
+		if _, found := s.futuresGeneralOrderExecutors[symbol]; !found {
+			futuresExecutor := bbgo.NewGeneralOrderExecutor(
+				s.futuresSession,
+				symbol,
+				s.ID(),
+				s.InstanceID(),
+				futuresPosition,
+			)
+			if openOrders, err := s.futuresSession.Exchange.QueryOpenOrders(s.ctx, symbol); err != nil {
+				return fmt.Errorf("failed to query open orders for futures symbol %s: %w", symbol, err)
+			} else if len(openOrders) > 0 {
+				futuresExecutor.ActiveMakerOrders().Add(openOrders...)
+			}
+			futuresExecutor.OrderStore().AddOrderUpdate = true
+			futuresExecutor.DisableNotify()
+			futuresExecutor.Bind()
+			s.futuresGeneralOrderExecutors[symbol] = futuresExecutor
 		}
-		futuresExecutor.OrderStore().AddOrderUpdate = true
-		futuresExecutor.DisableNotify()
-		futuresExecutor.Bind()
-		s.futuresGeneralOrderExecutors[symbol] = futuresExecutor
 		return nil
 	}
 	for _, symbol := range s.candidateSymbols {
@@ -650,17 +654,19 @@ func (s *Strategy) CrossRun(
 			spotPosition = types.NewPositionFromMarket(feeMarket)
 			s.SpotPositions[s.FeeSymbol] = spotPosition
 		}
-		spotExecutor := bbgo.NewGeneralOrderExecutor(
-			s.spotSession,
-			s.FeeSymbol,
-			s.ID(),
-			s.InstanceID(),
-			spotPosition,
-		)
-		spotExecutor.OrderStore().AddOrderUpdate = true
-		spotExecutor.DisableNotify()
-		spotExecutor.Bind()
-		s.spotGeneralOrderExecutors[s.FeeSymbol] = spotExecutor
+		if _, found := s.spotGeneralOrderExecutors[s.FeeSymbol]; !found {
+			spotExecutor := bbgo.NewGeneralOrderExecutor(
+				s.spotSession,
+				s.FeeSymbol,
+				s.ID(),
+				s.InstanceID(),
+				spotPosition,
+			)
+			spotExecutor.OrderStore().AddOrderUpdate = true
+			spotExecutor.DisableNotify()
+			spotExecutor.Bind()
+			s.spotGeneralOrderExecutors[s.FeeSymbol] = spotExecutor
+		}
 	}
 
 	if futuresInfoService, ok := s.futuresSession.Exchange.(FuturesInfoService); !ok {
