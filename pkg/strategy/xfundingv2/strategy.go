@@ -374,6 +374,7 @@ func (s *Strategy) Validate() error {
 	if len(s.CandidateSymbols) == 0 {
 		return errors.New("candidateSymbols is required")
 	}
+
 	for symbol, maxExposure := range s.MaxPositionExposure {
 		if maxExposure.Sign() < 0 {
 			return fmt.Errorf("maxPositionExposure should be positive: %s", symbol)
@@ -1636,6 +1637,10 @@ func (s *Strategy) filterLegitimateAssets(ctx context.Context, symbols []string)
 	}
 	var legitimateAssets []string
 	for _, candidate := range s.candidateSymbols {
+		if s.FeeSymbol != "" && candidate == s.FeeSymbol {
+			s.logger.Warnf("[filterLegitimateAssets] candidate symbol %s is the fee symbol, removing from candidate symbols", candidate)
+			continue
+		}
 		if _, found := assetsMap[candidate]; !found {
 			s.logger.Warnf("[filterLegitimateAssets] candidate symbol %s is not a legitimate asset, removing from candidate symbols", candidate)
 			continue
