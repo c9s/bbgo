@@ -91,10 +91,11 @@ type ArbitrageRoundSyncState struct {
 	SpotFeeAssetAmount    fixedpoint.Value `json:"spotFeeAssetAmount"`
 	FuturesFeeAssetAmount fixedpoint.Value `json:"futuresFeeAssetAmount"`
 	FeeSymbol             string           `json:"feeSymbol"`
+	FeeCurrency           string           `json:"feeCurrency"`
 	AvgFeeCost            fixedpoint.Value `json:"avgFeeCost"`
 
-	RetryDuration       time.Duration             `json:"retryDuration"`
-	RetryTransfers      map[uint64]*transferRetry `json:"retryTransfers"`
+	RetryDuration  time.Duration             `json:"retryDuration"`
+	RetryTransfers map[uint64]*transferRetry `json:"retryTransfers"`
 
 	State RoundState `json:"state"`
 

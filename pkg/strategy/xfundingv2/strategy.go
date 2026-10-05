@@ -67,6 +67,11 @@ type Strategy struct {
 	// lock before update the strategy state, such as current round, selected market, etc
 	mu sync.Mutex
 
+	// feeReserveMu guards feeReserveSnapshot, which is refreshed on tick and read by TWAP
+	// workers that may run while a round lock is held
+	feeReserveMu       sync.Mutex
+	feeReserveSnapshot fixedpoint.Value
+
 	DryRun                 bool     `json:"dryRun"`
 	ClosingAllOnStartup    bool     `json:"closingAllOnStartup"`
 	RemoveOnStartupSymbols []string `json:"removeOnStartupSymbols"`
@@ -891,8 +896,9 @@ func (s *Strategy) CrossRun(
 			return
 		}
 		s.logger.Debugf("spot order update: %s", update)
-		round.HandleSpotOrderUpdate(update)
-		bbgo.Notify("📝 Round spot order update: %s", round.String(), update)
+		if round.HandleSpotOrderUpdate(update) {
+			bbgo.Notify("📝 Round spot order update: %s", round.String(), update)
+		}
 	})
 	s.futuresSession.UserDataStream.OnOrderUpdate(func(update types.Order) {
 		round, found := s.ActiveRounds[update.Symbol]
@@ -900,8 +906,9 @@ func (s *Strategy) CrossRun(
 			return
 		}
 		s.logger.Debugf("futures order update: %s", update)
-		round.HandleFuturesOrderUpdate(update)
-		bbgo.Notify("📝 Round futures order update: %s", round.String(), update)
+		if round.HandleFuturesOrderUpdate(update) {
+			bbgo.Notify("📝 Round futures order update: %s", round.String(), update)
+		}
 	})
 
 	// strategy is ready for running
@@ -1003,6 +1010,8 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 	// lock the strategy to ensure all the updates to the active rounds are seen
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	s.refreshFeeReserveSnapshot()
 
 	// trigger the worker to sync the funding income for all active rounds
 	defer func() {
@@ -1207,6 +1216,7 @@ func (s *Strategy) tick(ctx context.Context, tickTime time.Time) {
 
 	// 4. process pending rounds that are waiting for fee asset preparation
 	s.processPendingRounds(ctx, tickTime)
+	s.refreshFeeReserveSnapshot()
 
 	// 5. log stats
 	var notifyStats bool
@@ -1484,6 +1494,7 @@ func (s *Strategy) checkOpenNewRound(ctx context.Context, currentTime time.Time)
 		spotExecutor := s.spotGeneralOrderExecutors[selectedCandidate.Symbol]
 		spotTwap, err := NewTWAPWorker(ctx, selectedCandidate.Symbol, s.spotSession, spotExecutor, s.TWAPWorkerConfig)
 		spotTwap.SetLogger(s.logger)
+		spotTwap.SetReservedBaseFn(s.reservedSpotBase)
 		spotTwap.Executor().SetDryRun(s.DryRun)
 		if err != nil || spotTwap == nil {
 			s.logger.WithError(err).Errorf("failed to create TWAP worker for spot %s", selectedCandidate.Symbol)
@@ -1708,7 +1719,10 @@ func (s *Strategy) selectMostProfitableMarket(candidates []MarketCandidate) *Mar
 			}
 			// totalQuoteAmount = price * totalBase and targetSize = totalQuoteAmount / (price * feeRateFactor)
 			// so targetSize = totalBase / feeRateFactor
-			totalBase := baseBalance.Available.Mul(s.TradeBalanceRatio)
+			totalBase := fixedpoint.Max(
+				baseBalance.Available.Sub(s.feeReserveOnSpot(spotMarket.BaseCurrency)),
+				fixedpoint.Zero,
+			).Mul(s.TradeBalanceRatio)
 			targetSize = totalBase.Div(feeRateFactor)
 			// long futures -> trade on the sell side of the order book
 			sellBook := s.futuresOrderBooks[candidate.Symbol].SideBook(types.SideTypeSell)
@@ -2339,6 +2353,10 @@ func (s *Strategy) rebalance(currentTime time.Time) {
 			// if there is base asset left on the futures account, transfer it back to the spot account
 			futuresMarket, ok := s.futuresSession.Market(symbol)
 			if !ok {
+				continue
+			}
+			// the fee asset balance is the fee reserve (plus possibly hedge dust), never sweep it
+			if s.isFeeCurrency(futuresMarket.BaseCurrency) {
 				continue
 			}
 			baseBalanceFutures := futuresBalances[futuresMarket.BaseCurrency]

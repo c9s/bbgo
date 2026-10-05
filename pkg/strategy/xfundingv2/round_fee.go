@@ -61,9 +61,10 @@ func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Ti
 		// We set fee average cost after acquiring fee asset and transferring.
 		// Because the fee average cost may change after the fee asset acquisition.
 		if feePosition, ok := s.SpotPositions[s.FeeSymbol]; ok {
+			feeCurrency := feePosition.BaseCurrency
 			for _, round := range allRounds {
 				feeAvgCost := feePosition.AverageCost
-				round.SetAvgFeeCost(s.FeeSymbol, feeAvgCost)
+				round.SetAvgFeeCost(s.FeeSymbol, feeCurrency, feeAvgCost)
 			}
 		}
 	} else {
@@ -102,6 +103,73 @@ func (s *Strategy) processPendingRounds(ctx context.Context, currentTime time.Ti
 	}
 }
 
+// feeAssetHeldByRounds sums the amount of feeCurrency the rounds hold as hedge in the spot
+// and futures wallets, which must not be treated as fee reserve.
+func (s *Strategy) feeAssetHeldByRounds(rounds []*ArbitrageRound, feeCurrency string) (spot, futures fixedpoint.Value) {
+	for _, round := range rounds {
+		roundSpot, roundFutures := round.HeldFeeAssetAmounts(feeCurrency)
+		spot = spot.Add(roundSpot)
+		futures = futures.Add(roundFutures)
+	}
+	return spot, futures
+}
+
+// isFeeCurrency reports whether asset is the currency held as fee reserve.
+func (s *Strategy) isFeeCurrency(asset string) bool {
+	if s.FeeSymbol == "" || s.spotSession == nil {
+		return false
+	}
+	market, ok := s.spotSession.Market(s.FeeSymbol)
+	return ok && market.BaseCurrency == asset
+}
+
+// feeReserveOnSpot returns the spot fee reserve that asset-selling logic must leave untouched.
+// It is zero unless asset is the fee currency itself.
+func (s *Strategy) feeReserveOnSpot(asset string) fixedpoint.Value {
+	if s.FeeSymbol == "" {
+		return fixedpoint.Zero
+	}
+	market, ok := s.spotSession.Market(s.FeeSymbol)
+	if !ok || market.BaseCurrency != asset {
+		return fixedpoint.Zero
+	}
+	var reserve fixedpoint.Value
+	for _, round := range s.allRounds() {
+		spotFee, _ := round.RequiredFeeAssetAmounts()
+		reserve = reserve.Add(spotFee)
+	}
+	return reserve
+}
+
+// refreshFeeReserveSnapshot recomputes the spot fee reserve for the TWAP workers.
+// It locks the rounds, so call it only when no round lock is held.
+func (s *Strategy) refreshFeeReserveSnapshot() {
+	var reserve fixedpoint.Value
+	if s.FeeSymbol != "" && s.spotSession != nil {
+		if market, ok := s.spotSession.Market(s.FeeSymbol); ok {
+			reserve = s.feeReserveOnSpot(market.BaseCurrency)
+		}
+	}
+	s.feeReserveMu.Lock()
+	s.feeReserveSnapshot = reserve
+	s.feeReserveMu.Unlock()
+}
+
+// reservedSpotBase returns the snapshot of the spot balance of asset that must not be sold.
+// It is safe to call while a round lock is held.
+func (s *Strategy) reservedSpotBase(asset string) fixedpoint.Value {
+	if s.FeeSymbol == "" || s.spotSession == nil {
+		return fixedpoint.Zero
+	}
+	market, ok := s.spotSession.Market(s.FeeSymbol)
+	if !ok || market.BaseCurrency != asset {
+		return fixedpoint.Zero
+	}
+	s.feeReserveMu.Lock()
+	defer s.feeReserveMu.Unlock()
+	return s.feeReserveSnapshot
+}
+
 func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*ArbitrageRound) error {
 	if s.DryRun {
 		if len(rounds) > 0 {
@@ -112,8 +180,21 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 		}
 		return nil
 	}
-	var requiredSpotFeeAmount, requiredFuturesFeeAmount fixedpoint.Value
+	// the wallet fee balance also backs the fee requirement of rounds that are already running,
+	// so count every known round once, not only the ones being started
+	included := make(map[*ArbitrageRound]struct{}, len(rounds))
+	allRounds := make([]*ArbitrageRound, 0, len(rounds))
 	for _, round := range rounds {
+		included[round] = struct{}{}
+		allRounds = append(allRounds, round)
+	}
+	for _, round := range s.allRounds() {
+		if _, ok := included[round]; !ok {
+			allRounds = append(allRounds, round)
+		}
+	}
+	var requiredSpotFeeAmount, requiredFuturesFeeAmount fixedpoint.Value
+	for _, round := range allRounds {
 		roundSpotFee, roundFuturesFee := round.RequiredFeeAssetAmounts()
 		requiredSpotFeeAmount = requiredSpotFeeAmount.Add(roundSpotFee)
 		requiredFuturesFeeAmount = requiredFuturesFeeAmount.Add(roundFuturesFee)
@@ -123,8 +204,10 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 	market, _ := s.spotSession.Market(s.FeeSymbol)
 	spotFeeBalance, _ := spotAccount.Balance(market.BaseCurrency)
 	futuresFeeBalance, _ := futuresAccount.Balance(market.BaseCurrency)
-	spotDeficit := requiredSpotFeeAmount.Sub(spotFeeBalance.Available)
-	futuresDeficit := requiredFuturesFeeAmount.Sub(futuresFeeBalance.Available)
+	// when the fee asset is also traded as a hedge, the hedge part of the wallet is not reserve
+	heldSpot, heldFutures := s.feeAssetHeldByRounds(allRounds, market.BaseCurrency)
+	spotDeficit := requiredSpotFeeAmount.Sub(spotFeeBalance.Available.Sub(heldSpot))
+	futuresDeficit := requiredFuturesFeeAmount.Sub(futuresFeeBalance.Available.Sub(heldFutures))
 	var buyQuantity, transferAmount fixedpoint.Value
 	var transferDirection types.TransferDirection
 	if spotDeficit.Add(futuresDeficit).Sign() >= 0 {

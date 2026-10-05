@@ -391,9 +391,22 @@ func (r *ArbitrageRound) SetFuturesExchangeFeeRates(fee types.ExchangeFee) {
 	}
 }
 
-func (r *ArbitrageRound) SetAvgFeeCost(feeSymbol string, cost fixedpoint.Value) {
+func (r *ArbitrageRound) SetAvgFeeCost(feeSymbol, feeCurrency string, cost fixedpoint.Value) {
 	r.syncState.FeeSymbol = feeSymbol
+	r.syncState.FeeCurrency = feeCurrency
 	r.syncState.AvgFeeCost = cost
+}
+
+// feeCurrency returns the currency used to pay trading fees (e.g. BNB). It falls back to
+// the fee symbol minus its quote currency for states persisted before FeeCurrency existed.
+func (r *ArbitrageRound) feeCurrency() string {
+	if r.syncState.FeeCurrency != "" {
+		return r.syncState.FeeCurrency
+	}
+	if r.syncState.FeeSymbol == "" {
+		return ""
+	}
+	return strings.TrimSuffix(r.syncState.FeeSymbol, r.spotWorker.Market().QuoteCurrency)
 }
 
 func (r *ArbitrageRound) SetSpotFeeAssetAmount(amount fixedpoint.Value) {
@@ -470,6 +483,30 @@ func (r *ArbitrageRound) RequiredFeeAssetAmounts() (fixedpoint.Value, fixedpoint
 	}
 	// the round is closed, no fee asset is required
 	return fixedpoint.Zero, fixedpoint.Zero
+}
+
+// HeldFeeAssetAmounts returns how much of feeCurrency the round currently holds as hedge
+// (not as fee reserve) in the spot wallet and the futures wallet. It locks the round, so it
+// must not be called from code that already holds r.mu.
+func (r *ArbitrageRound) HeldFeeAssetAmounts(feeCurrency string) (spot, futures fixedpoint.Value) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if feeCurrency == "" {
+		return fixedpoint.Zero, fixedpoint.Zero
+	}
+	policy := r.syncState.DirectionPolicy
+	if policy.CollateralAsset() == feeCurrency {
+		// short direction: the collateral parked on futures is the hedge
+		futures = fixedpoint.Max(r.syncState.TransferInAmount.Sub(r.syncState.TransferOutAmount), fixedpoint.Zero)
+	}
+	if policy.Direction == types.PositionLong && policy.Market.BaseCurrency == feeCurrency &&
+		(r.syncState.State == RoundPending || r.syncState.State == RoundOpening) {
+		// long direction: the unsold base inventory is earmarked for the spot short leg
+		unsold := r.spotWorker.TargetPosition().Abs().Sub(r.spotWorker.FilledPosition().Abs())
+		spot = fixedpoint.Max(unsold, fixedpoint.Zero)
+	}
+	return spot, futures
 }
 
 func (r *ArbitrageRound) StartedAt() time.Time {
@@ -1213,7 +1250,7 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotAccount *
 	)
 	defer cancel()
 	asset := r.syncState.DirectionPolicy.CollateralAsset()
-	if trade.FeeCurrency == asset {
+	if trade.FeeCurrency == asset && !r.reserveCoversFee(asset) {
 		transferAmount = transferAmount.Sub(trade.Fee)
 	}
 	available := spotAccount.Balances()[asset].Available
@@ -1283,26 +1320,30 @@ func (r *ArbitrageRound) HandleFuturesTrade(trade types.Trade, futuresAccount *t
 	}
 }
 
-func (r *ArbitrageRound) HandleSpotOrderUpdate(update types.Order) {
+// HandleSpotOrderUpdate applies the update and reports whether the order belongs to this round.
+func (r *ArbitrageRound) HandleSpotOrderUpdate(update types.Order) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if !r.hasOrder(update.OrderID) {
-		return
+		return false
 	}
 
 	handleOrderUpdate(r.spotWorker, update)
+	return true
 }
 
-func (r *ArbitrageRound) HandleFuturesOrderUpdate(update types.Order) {
+// HandleFuturesOrderUpdate applies the update and reports whether the order belongs to this round.
+func (r *ArbitrageRound) HandleFuturesOrderUpdate(update types.Order) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if !r.hasOrder(update.OrderID) {
-		return
+		return false
 	}
 
 	handleOrderUpdate(r.futuresWorker, update)
+	return true
 }
 
 func handleOrderUpdate(twapWorker *TWAPWorker, update types.Order) {
@@ -1328,7 +1369,7 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresAc
 	transferAmount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
 	asset := r.syncState.DirectionPolicy.CollateralAsset()
 
-	if asset == trade.FeeCurrency {
+	if asset == trade.FeeCurrency && !r.reserveCoversFee(asset) {
 		transferAmount = transferAmount.Sub(trade.Fee)
 	}
 	// read the balance after the delay above so the max withdraw amount reflects the trade fill.
@@ -1407,22 +1448,35 @@ func (r *ArbitrageRound) Prepare(
 	return nil
 }
 
+func (r *ArbitrageRound) expectedTransferIn() (fixedpoint.Value, error) {
+	var expected fixedpoint.Value
+	var spotSide types.SideType
+	for idx, trade := range r.spotWorker.Executor().AllTrades() {
+		if idx == 0 {
+			spotSide = trade.Side
+		} else if spotSide != trade.Side {
+			return fixedpoint.Zero, fmt.Errorf("all spot trades should have the same side when opening: %s vs %s", spotSide, trade.Side)
+		}
+		expected = expected.Add(r.syncState.DirectionPolicy.TransferAmountFromSpotTrade(trade))
+	}
+	return expected, nil
+}
+
+// reserveCoversFee reports whether trade fees on asset are paid out of the pre-bought fee
+// reserve (e.g. BNB) instead of the traded amount, so the collateral transfer is not reduced by the fee.
+func (r *ArbitrageRound) reserveCoversFee(asset string) bool {
+	feeCurrency := r.feeCurrency()
+	return feeCurrency != "" && feeCurrency == asset
+}
+
 func (r *ArbitrageRound) prepareOpening(
 	ctx context.Context,
 	spotSession *bbgo.ExchangeSession,
 ) error {
 	now := time.Now()
-	var expectedTransferIn fixedpoint.Value
-	trades := r.spotWorker.Executor().AllTrades()
-	var spotSide types.SideType
-	for idx, trade := range trades {
-		if idx == 0 {
-			spotSide = trade.Side
-		} else if spotSide != trade.Side {
-			return fmt.Errorf("all spot trades should have the same side when opening: %s vs %s", spotSide, trade.Side)
-		}
-		amount := r.syncState.DirectionPolicy.TransferAmountFromSpotTrade(trade)
-		expectedTransferIn = expectedTransferIn.Add(amount)
+	expectedTransferIn, err := r.expectedTransferIn()
+	if err != nil {
+		return err
 	}
 	transferDiff := expectedTransferIn.Sub(r.syncState.TransferInAmount)
 	asset := r.syncState.DirectionPolicy.CollateralAsset()
@@ -1896,6 +1950,16 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 		}
 		baseAsset := r.CollateralAsset()
 		baseAvailable := spotAccount.Balances()[baseAsset].Available
+		if r.reserveCoversFee(baseAsset) {
+			// the spot balance also holds the fee reserve; only move what the fills still owe the futures account
+			expected, err := r.expectedTransferIn()
+			if err != nil {
+				r.logger.WithError(err).Warnf("failed to compute expected transfer in amount, skip rebalancing %s", baseAsset)
+				baseAvailable = fixedpoint.Zero
+			} else {
+				baseAvailable = fixedpoint.Min(baseAvailable, expected.Sub(r.syncState.TransferInAmount))
+			}
+		}
 		if baseAvailable.Sign() > 0 {
 			// transfer the available collateral asset from spot to futures
 			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, baseAvailable, types.TransferIn); err != nil {

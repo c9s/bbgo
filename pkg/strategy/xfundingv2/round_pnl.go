@@ -75,12 +75,12 @@ func (r *ArbitrageRound) realizedPnL() *RoundRealizedPnL {
 	if r.futuresExchangeFeeRates != nil {
 		futuresPosition.ExchangeFeeRates = r.futuresExchangeFeeRates
 	}
-	if !r.syncState.AvgFeeCost.IsZero() {
+	if feeCurrency := r.feeCurrency(); feeCurrency != "" && !r.syncState.AvgFeeCost.IsZero() {
 		spotPosition.FeeAverageCosts = map[string]fixedpoint.Value{
-			spotMarket.BaseCurrency: r.syncState.AvgFeeCost,
+			feeCurrency: r.syncState.AvgFeeCost,
 		}
 		futuresPosition.FeeAverageCosts = map[string]fixedpoint.Value{
-			futuresMarket.BaseCurrency: r.syncState.AvgFeeCost,
+			feeCurrency: r.syncState.AvgFeeCost,
 		}
 	}
 

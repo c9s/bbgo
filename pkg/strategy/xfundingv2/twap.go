@@ -103,8 +103,15 @@ type TWAPWorker struct {
 	activeOrder *types.Order
 
 	getAccount func() *types.Account
-	ctx        context.Context
-	logger     logrus.FieldLogger
+	// reservedBase returns the part of the given spot asset balance that is reserved
+	// (e.g. fee asset) and must not be sold by this worker.
+	reservedBase func(asset string) fixedpoint.Value
+	ctx          context.Context
+	logger       logrus.FieldLogger
+}
+
+func (w *TWAPWorker) SetReservedBaseFn(fn func(asset string) fixedpoint.Value) {
+	w.reservedBase = fn
 }
 
 func NewTWAPWorker(
@@ -549,6 +556,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 }
 
 func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fixedpoint.Value, deadlineExceeded bool, market types.Market, price fixedpoint.Value) fixedpoint.Value {
+	side := orderSide(remaining)
 	remaining = remaining.Abs()
 	w.logger.Debugf("remaining quantity: %s@%s", remaining, price)
 
@@ -612,13 +620,17 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 	}
 	// cap at available balance for spot orders
 	if !w.Executor().IsFutures() {
-		switch orderSide(remaining) {
+		switch side {
 		case types.SideTypeSell:
 			// check available base for sell
 			base := w.Market().BaseCurrency
 			if baseBalance, ok := w.getAccount().Balance(base); ok {
 				w.logger.Debugf("available balance on spot: %s %s", baseBalance.Available, base)
-				sliceQty = fixedpoint.Min(sliceQty, baseBalance.Available)
+				available := baseBalance.Available
+				if w.reservedBase != nil {
+					available = fixedpoint.Max(available.Sub(w.reservedBase(base)), fixedpoint.Zero)
+				}
+				sliceQty = fixedpoint.Min(sliceQty, available)
 			}
 		case types.SideTypeBuy:
 			// check available quote for buy

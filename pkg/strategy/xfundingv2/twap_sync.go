@@ -22,6 +22,9 @@ func (w *TWAPWorker) Initialize(ctx context.Context, s *Strategy) error {
 		w.getAccount = s.spotSession.GetAccount
 	}
 	w.SetLogger(s.logger)
+	if !w.syncState.TWAPExecutor.IsFutures() {
+		w.SetReservedBaseFn(s.reservedSpotBase)
+	}
 	if err := w.syncState.TWAPExecutor.Initialize(ctx, s); err != nil {
 		return fmt.Errorf("[TWAPWorker] failed to load TWAPExecutor: %w", err)
 	}
