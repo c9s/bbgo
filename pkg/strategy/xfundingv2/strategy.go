@@ -740,34 +740,6 @@ func (s *Strategy) CrossRun(
 		round.SetSlackAlert(s.SlackAlert)
 	}
 
-	if !bbgo.IsBackTesting {
-		currentTime := time.Now()
-		// tick all active rounds using freshly queried order book snapshots.
-		// The stream books are not connected yet at this point, so we query the
-		// order book over REST to advance the round workers once at startup.
-		spotDepthService, ok := s.spotSession.Exchange.(DepthQueryService)
-		if !ok {
-			return fmt.Errorf("spot session exchange %s does not support depth query", s.spotSession.ExchangeName)
-		}
-		futuresDepthService, ok := s.futuresSession.Exchange.(DepthQueryService)
-		if !ok {
-			return fmt.Errorf("futures session exchange %s does not support depth query", s.futuresSession.ExchangeName)
-		}
-		for _, round := range s.ActiveRounds {
-			spotBook, _, err := spotDepthService.QueryDepth(s.ctx, round.SpotSymbol())
-			if err != nil {
-				s.logger.WithError(err).Warnf("failed to query spot depth for %s, skipping initial tick", round.SpotSymbol())
-				continue
-			}
-			futuresBook, _, err := futuresDepthService.QueryDepth(s.ctx, round.FuturesSymbol())
-			if err != nil {
-				s.logger.WithError(err).Warnf("failed to query futures depth for %s, skipping initial tick", round.FuturesSymbol())
-				continue
-			}
-			round.Tick(s.ctx, currentTime, &spotBook, &futuresBook)
-		}
-	}
-
 	// all round state restored, run remaining open position check
 	if err := s.positionMismatchCheck(); err != nil {
 		return err
@@ -927,12 +899,43 @@ func (s *Strategy) CrossRun(
 			)
 		}
 		s.mu.Unlock()
+		// sync the strategy state after closing all active rounds on startup
+		bbgo.Sync(s.ctx, s)
 	}
+
 	bbgo.Notify("✅ Strategy %s is up and running with %d candidate symbols: %v",
 		s.InstanceID(),
 		len(s.candidateSymbols),
 		s.candidateSymbols,
 	)
+
+	if !bbgo.IsBackTesting {
+		currentTime := time.Now()
+		// tick all active rounds using freshly queried order book snapshots.
+		// The stream books are not connected yet at this point, so we query the
+		// order book over REST to advance the round workers once at startup.
+		spotDepthService, ok := s.spotSession.Exchange.(DepthQueryService)
+		if !ok {
+			return fmt.Errorf("spot session exchange %s does not support depth query", s.spotSession.ExchangeName)
+		}
+		futuresDepthService, ok := s.futuresSession.Exchange.(DepthQueryService)
+		if !ok {
+			return fmt.Errorf("futures session exchange %s does not support depth query", s.futuresSession.ExchangeName)
+		}
+		for _, round := range s.ActiveRounds {
+			spotBook, _, err := spotDepthService.QueryDepth(s.ctx, round.SpotSymbol())
+			if err != nil {
+				s.logger.WithError(err).Warnf("failed to query spot depth for %s, skipping initial tick", round.SpotSymbol())
+				continue
+			}
+			futuresBook, _, err := futuresDepthService.QueryDepth(s.ctx, round.FuturesSymbol())
+			if err != nil {
+				s.logger.WithError(err).Warnf("failed to query futures depth for %s, skipping initial tick", round.FuturesSymbol())
+				continue
+			}
+			round.Tick(s.ctx, currentTime, &spotBook, &futuresBook)
+		}
+	}
 
 	// wire the interactive "Close Round" button. It's always on when a Slack
 	// interaction dispatcher is available; silently skipped otherwise.
@@ -2310,6 +2313,9 @@ func (s *Strategy) removeRoundsOnStartup() {
 		delete(s.SpotPositions, round.SpotSymbol())
 		delete(s.FuturesPositions, round.FuturesSymbol())
 	}
+
+	// synchronize the strategy state after removing rounds on startup
+	bbgo.Sync(s.ctx, s)
 }
 
 func (s *Strategy) rebalance(currentTime time.Time) {
@@ -2435,7 +2441,7 @@ func (s *Strategy) positionMismatchCheck() error {
 	}
 
 	if len(mismatchSymbols) > 0 {
-		return fmt.Errorf("found open positions without active rounds: %v on %s", mismatchSymbols, s.futuresSession.Exchange.Name())
+		return fmt.Errorf("found position mismatch symbols %v on %s", mismatchSymbols, s.futuresSession.Exchange.Name())
 	}
 	return nil
 }
