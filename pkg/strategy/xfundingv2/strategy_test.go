@@ -457,6 +457,7 @@ func TestRemoveRoundsOnStartup(t *testing.T) {
 	// helper to build a strategy with the given active-round symbols populated.
 	newStrategyWithRounds := func(t *testing.T, ctrl *gomock.Controller, symbols ...string) *Strategy {
 		s := newDefaultTestStrategy()
+		s.ctx = context.Background()
 		s.ActiveRounds = make(map[string]*ArbitrageRound)
 		s.SpotPositions = make(map[string]*types.Position)
 		s.FuturesPositions = make(map[string]*types.Position)
