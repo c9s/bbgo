@@ -147,6 +147,54 @@ func (o *TWAPExecutor) SyncOrder(order types.Order) error {
 	return nil
 }
 
+// SyncTrades queries the order and trades of every order placed by this executor whose
+// locally known trades don't already add up to the order's quantity, and adds the trades
+// that are not recorded yet (e.g. missed from the user data stream).
+// It returns the number of newly added trades. it's not thread-safe
+func (o *TWAPExecutor) SyncTrades(ctx context.Context) (int, error) {
+	tradeCollector := o.executor.TradeCollector()
+	orderStore := o.executor.OrderStore()
+	tradesMap := o.getTradesMap()
+	added := 0
+	var errs []error
+	for orderID, query := range o.syncState.Orders {
+		if storeOrder, exists := orderStore.Get(orderID); exists {
+			quantities := make([]fixedpoint.Value, 0, len(tradesMap[orderID]))
+			for _, trade := range tradesMap[orderID] {
+				quantities = append(quantities, trade.Quantity)
+			}
+			if fixedpoint.Sum(quantities).Eq(storeOrder.Quantity) {
+				continue
+			}
+		}
+
+		updatedOrder, err := o.exchange.QueryOrder(ctx, query)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to query order: %v, %w", query, err))
+			continue
+		}
+		orderStore.Add(*updatedOrder)
+
+		trades, err := o.exchange.QueryOrderTrades(ctx, query)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to query order trades: %v, %w", query, err))
+			continue
+		}
+
+		for _, trade := range trades {
+			if _, exists := o.syncState.Trades[trade.ID]; exists {
+				continue
+			}
+			tradeCollector.ProcessTrade(trade)
+			if o.AddTrade(trade) {
+				added++
+			}
+		}
+	}
+	tradeCollector.Process()
+	return added, errors.Join(errs...)
+}
+
 func (o *TWAPExecutor) GetOrder(orderID uint64) (types.Order, bool) {
 	if _, exists := o.syncState.Orders[orderID]; !exists {
 		o.logger.Debugf("[GetOrder] order not exists: %d", orderID)
@@ -207,6 +255,15 @@ func (o *TWAPExecutor) AllTrades() []types.Trade {
 		trades = append(trades, trade)
 	}
 	return trades
+}
+
+// getTradesMap groups the executor's known trades by order ID.
+func (o *TWAPExecutor) getTradesMap() map[uint64][]types.Trade {
+	tradesMap := make(map[uint64][]types.Trade)
+	for _, trade := range o.syncState.Trades {
+		tradesMap[trade.OrderID] = append(tradesMap[trade.OrderID], trade)
+	}
+	return tradesMap
 }
 
 // place order

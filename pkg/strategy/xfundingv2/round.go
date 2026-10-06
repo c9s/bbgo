@@ -41,6 +41,13 @@ type FuturesService interface {
 	QueryPremiumIndex(ctx context.Context, symbol string) (*types.PremiumIndex, error)
 	QueryPositionRisk(ctx context.Context, symbol ...string) ([]types.PositionRisk, error)
 	SetLeverage(ctx context.Context, symbol string, leverage int) error
+
+	// market selection related queries
+	QueryTakerBuySellVolumes(context.Context, string, types.Interval, types.TradeQueryOptions) ([]binanceapi.FuturesTakerBuySellVolume, error)
+	QueryDepth(context.Context, string) (types.SliceOrderBook, int64, error)
+	QueryFuturesFundingInfo(context.Context) ([]binanceapi.FuturesFundingInfo, error)
+	QueryTicker(context.Context, string) (*types.Ticker, error)
+	QueryFuturesAdlRisk(ctx context.Context, symbol string) (map[string]*binanceapi.AdlRisk, error)
 }
 
 type transferRetry struct {
@@ -1886,6 +1893,9 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 	timedCtx, cancel := context.WithTimeout(ctx, time.Second*20)
 	defer cancel()
 
+	// sync trades
+	r.syncTrades(timedCtx)
+
 	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
 	if shortFutures {
 		// rebalance the short futures leg when opening
@@ -1976,6 +1986,9 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 
 	r.logger.Debugf("rebalance closing round: %s", r.SpotSymbol())
 
+	// sync trades
+	r.syncTrades(timedCtx)
+
 	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
 	if shortFutures {
 		spotAccount, err := r.spotSession.UpdateAccount(timedCtx)
@@ -2062,4 +2075,20 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		// TODO: rebalance the long futures leg when closing
 	}
 	return nil
+}
+
+func (r *ArbitrageRound) syncTrades(ctx context.Context) {
+	workers := map[string]*TWAPWorker{
+		"spot":    r.spotWorker,
+		"futures": r.futuresWorker,
+	}
+	for name, w := range workers {
+		added, err := w.Executor().SyncTrades(ctx)
+		if err != nil {
+			r.logger.WithError(err).Warnf("failed to sync %s trades: %s", name, r)
+		}
+		if added > 0 {
+			r.logger.Infof("synced %d missing %s trades: %s", added, name, r)
+		}
+	}
 }

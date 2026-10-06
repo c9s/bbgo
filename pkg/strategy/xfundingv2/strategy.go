@@ -374,6 +374,7 @@ func (s *Strategy) Validate() error {
 	if len(s.CandidateSymbols) == 0 {
 		return errors.New("candidateSymbols is required")
 	}
+
 	for symbol, maxExposure := range s.MaxPositionExposure {
 		if maxExposure.Sign() < 0 {
 			return fmt.Errorf("maxPositionExposure should be positive: %s", symbol)
@@ -469,6 +470,12 @@ func (s *Strategy) CrossRun(
 	if s.spotSession == nil {
 		return fmt.Errorf("spot session %s not found", s.SpotSession)
 	}
+	// spot and futures exchanges should be of the same exchange
+	if s.spotSession.Exchange.Name() != s.futuresSession.Exchange.Name() {
+		return fmt.Errorf("spot and futures sessions must be on the same exchange: spot=%s, futures=%s",
+			s.spotSession.Exchange.Name(), s.futuresSession.Exchange.Name())
+	}
+
 	if futuresEx, ok := s.futuresSession.Exchange.(types.FuturesExchange); !ok {
 		return fmt.Errorf("session %s does not support futures", s.futuresSession.Name)
 	} else if !futuresEx.GetFuturesSettings().IsFutures {
@@ -669,11 +676,7 @@ func (s *Strategy) CrossRun(
 		}
 	}
 
-	if futuresInfoService, ok := s.futuresSession.Exchange.(FuturesInfoService); !ok {
-		return fmt.Errorf("futures session exchange does not support futures info service: %s", s.futuresSession.ExchangeName)
-	} else {
-		s.preliminaryMarketSelector = NewMarketSelector(*s.MarketSelectionConfig, futuresInfoService, s.logger)
-	}
+	s.preliminaryMarketSelector = NewMarketSelector(*s.MarketSelectionConfig, s.futuresService, s.logger)
 
 	// initialize depth books for model selection
 	// we create new stream here to save the bandwidth of the market data stream of the sessions
@@ -1636,6 +1639,10 @@ func (s *Strategy) filterLegitimateAssets(ctx context.Context, symbols []string)
 	}
 	var legitimateAssets []string
 	for _, candidate := range s.candidateSymbols {
+		if s.FeeSymbol != "" && candidate == s.FeeSymbol {
+			s.logger.Warnf("[filterLegitimateAssets] candidate symbol %s is the fee symbol, removing from candidate symbols", candidate)
+			continue
+		}
 		if _, found := assetsMap[candidate]; !found {
 			s.logger.Warnf("[filterLegitimateAssets] candidate symbol %s is not a legitimate asset, removing from candidate symbols", candidate)
 			continue
