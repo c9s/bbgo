@@ -899,6 +899,8 @@ func (s *Strategy) CrossRun(
 			)
 		}
 		s.mu.Unlock()
+		// sync the strategy state after closing all active rounds on startup
+		bbgo.Sync(s.ctx, s)
 	}
 
 	bbgo.Notify("✅ Strategy %s is up and running with %d candidate symbols: %v",
