@@ -2435,7 +2435,7 @@ func (s *Strategy) positionMismatchCheck() error {
 	}
 
 	if len(mismatchSymbols) > 0 {
-		return fmt.Errorf("found open positions without active rounds: %v on %s", mismatchSymbols, s.futuresSession.Exchange.Name())
+		return fmt.Errorf("found position mismatch symbols %v on %s", mismatchSymbols, s.futuresSession.Exchange.Name())
 	}
 	return nil
 }
