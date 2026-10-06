@@ -1647,8 +1647,8 @@ func (r *ArbitrageRound) CollateralAsset() string {
 }
 
 func (r *ArbitrageRound) Cleanup(ctx context.Context, orderBook types.OrderBook) error {
-	if r.syncState.State != RoundClosed {
-		return fmt.Errorf("round is not closed yet: %s", r)
+	if r.syncState.State != RoundClosed && r.syncState.State != RoundStopped {
+		return fmt.Errorf("round is not closed/stopped yet: %s", r)
 	}
 	w := r.futuresWorker
 	remaining := w.RemainingQuantity()
