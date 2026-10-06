@@ -2049,14 +2049,15 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		if maxWithdraw != nil && maxWithdraw.Sign() > 0 {
 			transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
 		}
-		if transferDiff.Sign() <= 0 {
-			return nil
-		}
+
 		// 3. transfer the base asset from futures to spot
-		if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, transferDiff, types.TransferOut); err != nil {
-			return fmt.Errorf("failed to transfer %s %s from futures to spot: %w", transferDiff, baseAsset, err)
+		if transferDiff.Sign() > 0 {
+			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, transferDiff, types.TransferOut); err != nil {
+				r.logger.WithError(err).Warnf("failed to transfer %s %s from futures to spot", transferDiff, baseAsset)
+			} else {
+				r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
+			}
 		}
-		r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
 
 		// 4. check the target position of the spot worker
 		futuresFilledPosition := r.futuresWorker.FilledPosition()
