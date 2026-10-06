@@ -1638,7 +1638,7 @@ func (s *Strategy) filterLegitimateAssets(ctx context.Context, symbols []string)
 		assetsMap[asset.Asset] = struct{}{}
 	}
 	var legitimateAssets []string
-	for _, candidate := range s.candidateSymbols {
+	for _, candidate := range symbols {
 		if s.FeeSymbol != "" && candidate == s.FeeSymbol {
 			s.logger.Warnf("[filterLegitimateAssets] candidate symbol %s is the fee symbol, removing from candidate symbols", candidate)
 			continue
