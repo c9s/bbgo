@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -61,7 +60,9 @@ func (o *TWAPExecutor) Initialize(ctx context.Context, s *Strategy) error {
 
 		trades, err := o.exchange.QueryOrderTrades(o.ctx, query)
 		if err != nil {
-			return fmt.Errorf("[TWAPExecutor] failed to query trades for order %v: %w", query, err)
+			// just log and continue for the other orders and trades
+			s.logger.WithError(err).Warnf("[TWAPExecutor] failed to query trades for order %v", query)
+			continue
 		}
 		for _, trade := range trades {
 			o.syncState.Trades[trade.ID] = trade
