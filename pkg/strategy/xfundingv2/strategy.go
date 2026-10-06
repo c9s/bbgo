@@ -2310,6 +2310,9 @@ func (s *Strategy) removeRoundsOnStartup() {
 		delete(s.SpotPositions, round.SpotSymbol())
 		delete(s.FuturesPositions, round.FuturesSymbol())
 	}
+
+	// synchronize the strategy state after removing rounds on startup
+	bbgo.Sync(s.ctx, s)
 }
 
 func (s *Strategy) rebalance(currentTime time.Time) {
