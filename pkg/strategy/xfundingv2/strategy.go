@@ -1643,7 +1643,13 @@ func (s *Strategy) filterLegitimateAssets(ctx context.Context, symbols []string)
 			s.logger.Warnf("[filterLegitimateAssets] candidate symbol %s is the fee symbol, removing from candidate symbols", candidate)
 			continue
 		}
-		if _, found := assetsMap[candidate]; !found {
+		market, ok := s.spotSession.Market(candidate)
+		if !ok {
+			s.logger.Infof("[filterLegitimateAssets] failed to get market for candidate %s, removing from candidate symbols", candidate)
+			continue
+		}
+		baseAsset := market.BaseCurrency
+		if _, found := assetsMap[baseAsset]; !found {
 			s.logger.Warnf("[filterLegitimateAssets] candidate symbol %s is not a legitimate asset, removing from candidate symbols", candidate)
 			continue
 		}
