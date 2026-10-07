@@ -1307,7 +1307,7 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresAc
 	r.syncSpotPosition()
 }
 
-// Prepare prepares the round to be ready for resume, such as doing neceessary transfers and syncing the positions.
+// Prepare prepares the round to be ready for resume, such as resetting the workers' time and syncing positions.
 func (r *ArbitrageRound) Prepare(
 	ctx context.Context,
 	spotSession, futuresSession *bbgo.ExchangeSession,
@@ -1332,36 +1332,9 @@ func (r *ArbitrageRound) prepareOpening(
 	ctx context.Context,
 	spotSession *bbgo.ExchangeSession,
 ) error {
+	// no need to check the spot base asset for transfer.
+	// we leave the transfer to be handled by the rebalance process.
 	now := time.Now()
-	var expectedTransferIn fixedpoint.Value
-	trades := r.spotWorker.Executor().AllTrades()
-	var spotSide types.SideType
-	for idx, trade := range trades {
-		if idx == 0 {
-			spotSide = trade.Side
-		} else if spotSide != trade.Side {
-			return fmt.Errorf("all spot trades should have the same side when opening: %s vs %s", spotSide, trade.Side)
-		}
-		amount := r.syncState.DirectionPolicy.TransferAmountFromSpotTrade(trade)
-		expectedTransferIn = expectedTransferIn.Add(amount)
-	}
-	transferDiff := expectedTransferIn.Sub(r.syncState.TransferInAmount)
-	asset := r.syncState.DirectionPolicy.CollateralAsset()
-	balance := spotSession.GetAccount().Balances()[asset]
-	if transferDiff.Sign() > 0 && balance.Available.Compare(transferDiff) > 0 {
-		r.logger.Infof("expected transfer in amount: %s, actual transfer in amount: %s, diff: %s, available: %s",
-			expectedTransferIn,
-			r.syncState.TransferInAmount,
-			transferDiff,
-			balance.Available,
-		)
-		if err := r.futuresService.TransferFuturesAccountAsset(ctx, asset, transferDiff, types.TransferIn); err != nil {
-			return fmt.Errorf("failed to transfer in %s %s: %w", transferDiff.String(), asset, err)
-		}
-		r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(transferDiff)
-	}
-	// transfer succeeded, need to sync the futures position to keep delta-neutral
-	r.syncFuturesPosition()
 
 	// don't place order but reset the time to let the TWAP worker to sync the position
 	// For example, considering the case where:
@@ -1381,46 +1354,9 @@ func (r *ArbitrageRound) prepareClosing(
 	ctx context.Context,
 	futuresSession *bbgo.ExchangeSession,
 ) error {
+	// no need to check the futures collateral for transfer.
+	// we leave the transfer to be handled by the rebalance process.
 	now := time.Now()
-	var expectedTransferOut fixedpoint.Value
-	trades := r.futuresWorker.Executor().AllTrades()
-	// if we are short futures -> closing trades are buy trades
-	// if we are long futures -> closing trades are sell trades
-	var closingTradeSide types.SideType
-	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
-	if shortFutures {
-		closingTradeSide = types.SideTypeBuy
-	} else {
-		closingTradeSide = types.SideTypeSell
-	}
-	for _, trade := range trades {
-		if trade.Side != closingTradeSide {
-			continue
-		}
-		amount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
-		expectedTransferOut = expectedTransferOut.Add(amount)
-	}
-	transferDiff := expectedTransferOut.Sub(r.syncState.TransferOutAmount)
-	asset := r.syncState.DirectionPolicy.CollateralAsset()
-	balance := futuresSession.GetAccount().Balances()[asset]
-	maxWithdraw := balance.MaxWithdrawAmount
-	if maxWithdraw != nil {
-		transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
-	}
-	if transferDiff.Sign() > 0 {
-		r.logger.Infof("expected transfer out amount: %s, actual transfer out amount: %s, diff: %s, max withdraw: %s",
-			expectedTransferOut,
-			r.syncState.TransferOutAmount,
-			transferDiff,
-			maxWithdraw,
-		)
-		if err := r.futuresService.TransferFuturesAccountAsset(ctx, asset, transferDiff, types.TransferOut); err != nil {
-			return fmt.Errorf("failed to transfer out %s %s: %w", transferDiff.String(), asset, err)
-		}
-		r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
-	}
-	// transfer succeeded, need to sync the spot position to keep delta-neutral
-	r.syncSpotPosition()
 
 	// don't place order but reset the time to let the TWAP worker to sync the position
 	// For example, considering the case where:
@@ -1930,27 +1866,14 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 			}
 		}
 		// 2. transfer the base asset from futures to spot
-		// check the accumulated transfer out amount and the expected one
-		// if the expected transfer amount is larger than the accumulated one, transfer the difference back to spot
+		// check the difference between the filled position and the collateral on the future balance
+		// if the difference is positive, transfer the difference back to spot
 		// NOTE: need to check the max withdraw
 		// update futures account info for the latest max withdraw amount
-		accTransferOut := r.syncState.TransferOutAmount
-		expectedTransferOut := fixedpoint.Zero
-		for _, trade := range r.futuresWorker.Executor().AllTrades() {
-			// consider only the closing trades, which are buy trades for short futures leg
-			if trade.Side != types.SideTypeBuy {
-				continue
-			}
-			amount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
-			expectedTransferOut = expectedTransferOut.Add(amount)
-		}
-		transferDiff := expectedTransferOut.Sub(accTransferOut)
-		r.logger.Debugf("rebalance closing: expected transfer out amount: %s, actual transfer out amount: %s, diff: %s",
-			expectedTransferOut,
-			accTransferOut,
-			transferDiff,
-		)
 		futuresBalance := futuresAccount.Balances()[baseAsset]
+		futuresFilledPosition := r.futuresWorker.FilledPosition()
+		transferDiff := futuresBalance.Available.Sub(futuresFilledPosition.Abs())
+
 		maxWithdraw := futuresBalance.MaxWithdrawAmount
 		if maxWithdraw != nil && maxWithdraw.Sign() > 0 {
 			transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
@@ -1966,7 +1889,6 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		}
 
 		// 4. check the target position of the spot worker
-		futuresFilledPosition := r.futuresWorker.FilledPosition()
 		currnetSpotTargetPosition := r.spotWorker.TargetPosition()
 		if !futuresFilledPosition.Add(currnetSpotTargetPosition).IsZero() {
 			newTarget := futuresFilledPosition.Neg()
