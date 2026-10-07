@@ -1894,8 +1894,9 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 		// the exchange may skip the asset with 0 balance, so we assume the balance is 0 if it's not found
 		s.logger.Warnf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round.String())
 	} else {
-		// compute the amount to transfer back to spot account
-		residualAmount := s.computeResidualCollateral(task, balance)
+		// the net balance of the collateral asset on the futures account should be zero
+		// if it's not zero, transfer the residual amount back to the spot account
+		residualAmount := balance.Net()
 
 		// transfer the collateral back to spot account when the available balance is sufficient
 		if residualAmount.Sign() > 0 {
@@ -1936,29 +1937,6 @@ func (s *Strategy) closedRoundStats(round *ArbitrageRound, tickTime time.Time) {
 			s.logger.Warnf("insert service channel is full, skipping closed round insert: %s", round)
 		}
 	}
-}
-
-func (s *Strategy) computeResidualCollateral(task *CloseRoundTask, balance types.Balance) fixedpoint.Value {
-	amount := fixedpoint.Zero
-	var closingSide types.SideType
-	if task.Round.TriggeredTargetPosition().Sign() > 0 {
-		// short futures
-		// closing trade side is buy
-		closingSide = types.SideTypeBuy
-	} else {
-		// long futures
-		// closing trade side is sell
-		closingSide = types.SideTypeSell
-	}
-
-	for _, trade := range task.Round.FuturesWorker().Executor().AllTrades() {
-		if trade.Side != closingSide {
-			continue
-		}
-		amount = amount.Add(task.Round.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade))
-	}
-	diffAmount := amount.Sub(task.Round.syncState.TransferOutAmount)
-	return fixedpoint.Min(diffAmount, balance.Net())
 }
 
 func (s *Strategy) canOpenRound(symbol string, currentTime time.Time) bool {
