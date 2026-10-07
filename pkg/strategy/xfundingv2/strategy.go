@@ -1884,31 +1884,33 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 
 	// transfer any residual collateral back to the spot account.
 	asset := round.CollateralAsset()
-	account, err := s.futuresSession.UpdateAccount(ctx)
-	if err != nil {
-		return fmt.Errorf("[handleClosedRound] failed to update futures account when handling round exit: %w", err)
-	}
-	// get balance
-	balance, ok := account.Balance(asset)
-	if !ok {
-		// the exchange may skip the asset with 0 balance, so we assume the balance is 0 if it's not found
-		s.logger.Warnf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round.String())
-	} else {
-		// the net balance of the collateral asset on the futures account should be zero
-		// if it's not zero, transfer the residual amount back to the spot account
-		residualAmount := balance.Net()
-
-		// transfer the collateral back to spot account when the available balance is sufficient
-		if residualAmount.Sign() > 0 {
-			if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
-				return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
-			}
-			bbgo.Notify("⬅️ Transferred %s %s back to spot account for closed round: %s",
-				residualAmount,
-				asset,
-				round.String(),
-			)
+	if round.TriggeredTargetPosition().Sign() > 0 {
+		// short futures: the net balance of the collateral asset on the futures account should be zero
+		account, err := s.futuresSession.UpdateAccount(ctx)
+		if err != nil {
+			return fmt.Errorf("[handleClosedRound] failed to update futures account when handling round exit: %w", err)
 		}
+		// get balance
+		balance, ok := account.Balance(asset)
+		if !ok {
+			// the exchange may skip the asset with 0 balance, so we assume the balance is 0 if it's not found
+			s.logger.Warnf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round.String())
+		} else {
+			// if it's not zero, transfer the residual amount back to the spot account
+			residualAmount := balance.Net()
+			if residualAmount.Sign() > 0 {
+				if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
+					return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
+				}
+				bbgo.Notify("⬅️ Transferred %s %s back to spot account for closed round: %s",
+					residualAmount,
+					asset,
+					round.String(),
+				)
+			}
+		}
+	} else {
+		// TODO: handle closed round in long futures mode
 	}
 
 	// sync funding fee records for the round
