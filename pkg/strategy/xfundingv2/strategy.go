@@ -1974,6 +1974,47 @@ func (s *Strategy) newDebugLogger() *logrus.Entry {
 }
 
 func (s *Strategy) notifyStats(currentTime time.Time) {
+	bbgo.Notify("📊 Round stats: %d active rounds, %d pending rounds, %d closed rounds",
+		len(s.ActiveRounds),
+		len(s.PendingRounds),
+		len(s.ClosedRoundTasks),
+	)
+	activeRounds := s.sortedActiveRounds()
+	if len(activeRounds) > 0 {
+		bbgo.Notify("Active Rounds")
+		for _, round := range activeRounds {
+			spotPrice, futuresPrice, ok := s.getLastPrices(
+				round.SpotSymbol(),
+				round.FuturesSymbol(),
+			)
+			if !ok {
+				s.logger.Warnf(
+					"failed to get last prices, skipping notification: %s",
+					round.String(),
+				)
+				continue
+			}
+
+			// additionally emit an interactive "Close Round" message for Ready rounds
+			// so an operator can close them on demand. The plain attachment above is
+			// left unchanged, so the round still appears in the "Active Rounds" batch.
+			if round.State() == RoundReady && s.slackEvtID != "" {
+				bbgo.Notify(
+					round.NewNotification(currentTime, spotPrice, futuresPrice),
+					newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice),
+				)
+			} else {
+				bbgo.Notify(round.NewNotification(currentTime, spotPrice, futuresPrice))
+			}
+
+			if s.roundInsertService != nil {
+				if err := s.roundInsertService.InsertActiveRound(round, spotPrice, futuresPrice); err != nil {
+					s.logger.WithError(err).Warnf("failed to insert active round to database: %s", round)
+				}
+			}
+		}
+	}
+
 	var pendingRoundNotifications []any
 	for _, pendingRound := range s.PendingRounds {
 		spotPrice, futuresPrice, _ := s.getLastPrices(
@@ -1982,46 +2023,21 @@ func (s *Strategy) notifyStats(currentTime time.Time) {
 		)
 		pendingRoundNotifications = append(pendingRoundNotifications, pendingRound.Round.NewNotification(currentTime, spotPrice, futuresPrice))
 	}
-
-	bbgo.Notify("📊 Round stats: %d active rounds, %d pending rounds",
-		len(s.ActiveRounds),
-		len(s.PendingRounds),
-	)
-	for _, round := range s.sortedActiveRounds() {
-		spotPrice, futuresPrice, ok := s.getLastPrices(
-			round.SpotSymbol(),
-			round.FuturesSymbol(),
-		)
-		if !ok {
-			s.logger.Warnf(
-				"failed to get last prices, skipping notification: %s",
-				round.String(),
-			)
-			continue
-		}
-
-		// additionally emit an interactive "Close Round" message for Ready rounds
-		// so an operator can close them on demand. The plain attachment above is
-		// left unchanged, so the round still appears in the "Active Rounds" batch.
-		if round.State() == RoundReady && s.slackEvtID != "" {
-			bbgo.Notify(
-				round.NewNotification(currentTime, spotPrice, futuresPrice),
-				newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice),
-			)
-		} else {
-			bbgo.Notify(round.NewNotification(currentTime, spotPrice, futuresPrice))
-		}
-
-		if s.roundInsertService != nil {
-			if err := s.roundInsertService.InsertActiveRound(round, spotPrice, futuresPrice); err != nil {
-				s.logger.WithError(err).Warnf("failed to insert active round to database: %s", round)
-			}
-		}
-	}
 	if len(pendingRoundNotifications) > 0 {
 		bbgo.Notify("Pending Rounds", pendingRoundNotifications...)
 	}
 
+	var closedRoundNotifications []any
+	for _, closedRoundTask := range s.ClosedRoundTasks {
+		spotPrice, futuresPrice, _ := s.getLastPrices(
+			closedRoundTask.Round.SpotSymbol(),
+			closedRoundTask.Round.FuturesSymbol(),
+		)
+		closedRoundNotifications = append(closedRoundNotifications, closedRoundTask.Round.NewNotification(currentTime, spotPrice, futuresPrice))
+	}
+	if len(closedRoundNotifications) > 0 {
+		bbgo.Notify("Closed Rounds", closedRoundNotifications...)
+	}
 }
 
 func (s *Strategy) sortedActiveRounds() []*ArbitrageRound {
