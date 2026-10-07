@@ -73,6 +73,10 @@ func newStrategyFixture(
 // TestNotifyInteractiveCloseRound builds an interactive close-round notification
 // and sends it through bbgo.Notify.
 func TestNotifyInteractiveCloseRound(t *testing.T) {
+	if os.Getenv("TEST_XFUNDINGV2_SLACK") == "" {
+		t.Skip("TEST_XFUNDINGV2_SLACK is not set")
+	}
+
 	slackBotToken := os.Getenv("SLACK_BOT_TOKEN")
 	slackAppToken := os.Getenv("SLACK_APP_TOKEN")
 	channel := os.Getenv("SLACK_CHANNEL")
