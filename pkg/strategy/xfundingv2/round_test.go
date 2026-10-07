@@ -787,3 +787,15 @@ func TestArbitrageRound_FollowerUsesTakerOrders(t *testing.T) {
 	assert.Equal(t, TWAPOrderTypeTaker, round.SpotWorker().Executor().syncState.Config.OrderType)
 	assert.Equal(t, TWAPOrderTypeMaker, round.FuturesWorker().Executor().syncState.Config.OrderType)
 }
+
+func TestArbitrageRound_Cleanup(t *testing.T) {
+	for _, state := range []RoundState{RoundPending, RoundOpening, RoundReady, RoundClosing} {
+		t.Run("Cleanup_Should_Error_"+state.String(), func(t *testing.T) {
+			round := &ArbitrageRound{}
+			ctx := context.Background()
+			round.syncState.State = state
+			err := round.Cleanup(ctx, nil)
+			assert.Error(t, err)
+		})
+	}
+}
