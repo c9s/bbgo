@@ -610,6 +610,13 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 	if sliceQty.Compare(remaining) > 0 {
 		sliceQty = remaining
 	}
+
+	// if the residual quantity is dust, add it to the slice quantity
+	residualQty := remaining.Sub(sliceQty)
+	if residualQty.Sign() > 0 && w.Market().IsDustQuantity(residualQty, price) {
+		sliceQty = sliceQty.Add(residualQty)
+	}
+
 	// cap at available balance for spot orders
 	if !w.Executor().IsFutures() {
 		switch orderSide(remaining) {
