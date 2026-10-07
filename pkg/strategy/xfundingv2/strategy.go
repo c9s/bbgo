@@ -165,6 +165,7 @@ type Strategy struct {
 	// 1. ensure that the positions will restore to zero
 	// 2. all open orders are canceled.
 	// 3. collaterals are transferred back to the spot account.
+	// NOTE: the round in the ClosedRoundTasks queue should be of state RoundClosed or RoundStopped
 	MaxClosedRetryCnt int                        `json:"maxClosedRetryCnt"`
 	ClosedRoundTasks  map[string]*CloseRoundTask `persistence:"closedRounds"`
 

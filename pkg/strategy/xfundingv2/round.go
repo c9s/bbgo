@@ -1492,6 +1492,8 @@ func (r *ArbitrageRound) CollateralAsset() string {
 	return r.syncState.DirectionPolicy.CollateralAsset()
 }
 
+// Cleanup attempts to close any remaining futures positions for the round.
+// It should be called after the round has been closed or stopped.
 func (r *ArbitrageRound) Cleanup(ctx context.Context, orderBook types.OrderBook) error {
 	if r.syncState.State != RoundClosed && r.syncState.State != RoundStopped {
 		return fmt.Errorf("round is not closed/stopped yet: %s", r)
