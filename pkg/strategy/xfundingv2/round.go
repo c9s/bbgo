@@ -1751,7 +1751,8 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, baseAvailable, types.TransferIn); err != nil {
 				r.logger.WithError(err).Warnf("failed to transfer %s %s from spot to futures when rebalancing", baseAvailable.String(), baseAsset)
 			} else {
-				bbgo.Notify("➡️ Transfered %s %s from spot to futures to rebalance",
+				bbgo.Notify(
+					"➡️ Transfered %s %s from spot to futures to rebalance",
 					baseAvailable.String(),
 					baseAsset,
 				)
@@ -1880,6 +1881,12 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 		if transferDiff.Sign() > 0 {
 			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, transferDiff, types.TransferOut); err != nil {
 				r.logger.WithError(err).Warnf("failed to transfer %s %s from futures to spot", transferDiff, baseAsset)
+			} else {
+				bbgo.Notify(
+					"⬅️ Transfered %s %s from futures to spot to rebalance",
+					transferDiff,
+					baseAsset,
+				)
 			}
 		}
 
