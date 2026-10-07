@@ -1899,6 +1899,9 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 		} else {
 			// if it's not zero, transfer the residual amount back to the spot account
 			residualAmount := balance.Net()
+			if balance.MaxWithdrawAmount != nil {
+				residualAmount = fixedpoint.Min(residualAmount, *balance.MaxWithdrawAmount)
+			}
 			if residualAmount.Sign() > 0 {
 				if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
 					return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
