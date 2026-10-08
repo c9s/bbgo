@@ -33,6 +33,11 @@ func init() {
 
     # minMarginLevel for triggering auto borrow
     minMarginLevel: 1.5
+
+    # stop borrowing when the projected monthly interest exceeds the budget
+    interestBudget:
+      monthlyBudget: 100.0 # in quoteCurrency
+      quoteCurrency: USDT
     assets:
 
   - asset: ETH
@@ -81,9 +86,14 @@ type Strategy struct {
 
 	MarginHighInterestRateAlertConfig *MarginHighInterestRateAlertConfig `json:"marginHighInterestRateAlert"`
 
+	// InterestBudget stops borrowing when the projected monthly interest exceeds the budget
+	InterestBudget *InterestBudgetConfig `json:"interestBudget"`
+
 	Assets []MarginAssetConfig `json:"assets"`
 
 	ExchangeSession *bbgo.ExchangeSession
+
+	interestBudgetExceeded bool
 
 	marginBorrowRepay types.MarginBorrowRepayService
 	logger            logrus.FieldLogger
@@ -346,6 +356,34 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 		return
 	}
 
+	var budgetGuard *interestBudgetGuard
+	if s.InterestBudget != nil {
+		budgetGuard, err = s.newInterestBudgetGuard(ctx, balances)
+		if err != nil {
+			log.WithError(err).Errorf("unable to estimate interest, skip autoborrow")
+			return
+		}
+
+		if budgetGuard.Exceeded() {
+			if !s.interestBudgetExceeded {
+				bbgo.Notify(&InterestBudgetAlert{
+					SessionName: s.ExchangeSession.Name,
+					Budget:      s.InterestBudget.MonthlyBudget,
+					Estimation:  budgetGuard.estimation,
+					Message:     "projected monthly interest exceeds the budget, autoborrow is stopped",
+				})
+			}
+
+			s.interestBudgetExceeded = true
+			log.Warnf("projected monthly interest %s exceeds the budget %s, skip autoborrow",
+				budgetGuard.estimation.TotalMonthlyInterest.String(),
+				s.InterestBudget.MonthlyBudget.String())
+			return
+		}
+
+		s.interestBudgetExceeded = false
+	}
+
 	for _, marginAsset := range s.Assets {
 		changed := false
 
@@ -397,6 +435,10 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 				toBorrow = fixedpoint.Min(maxBorrowable, toBorrow)
 			}
 
+			if budgetGuard != nil {
+				toBorrow = s.limitBorrowByInterestBudget(budgetGuard, marginAsset.Asset, toBorrow)
+			}
+
 			if toBorrow.IsZero() {
 				continue
 			}
@@ -414,6 +456,11 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 				log.WithError(err).Errorf("borrow error")
 				continue
 			}
+
+			if budgetGuard != nil {
+				budgetGuard.AddBorrow(marginAsset.Asset, toBorrow)
+			}
+
 			changed = true
 		} else {
 			// available balance is less than marginAsset.Low, we should trigger borrow
@@ -421,6 +468,10 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 
 			if !marginAsset.MaxQuantityPerBorrow.IsZero() {
 				toBorrow = fixedpoint.Min(toBorrow, marginAsset.MaxQuantityPerBorrow)
+			}
+
+			if budgetGuard != nil {
+				toBorrow = s.limitBorrowByInterestBudget(budgetGuard, marginAsset.Asset, toBorrow)
 			}
 
 			if toBorrow.IsZero() {
@@ -442,6 +493,10 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 				continue
 			}
 
+			if budgetGuard != nil {
+				budgetGuard.AddBorrow(marginAsset.Asset, toBorrow)
+			}
+
 			changed = true
 		}
 
@@ -454,6 +509,72 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// newInterestBudgetGuard queries the latest hourly interest rates and prices of the debts and the
+// configured assets, then estimates the interest of the current debts.
+func (s *Strategy) newInterestBudgetGuard(ctx context.Context, balances types.BalanceMap) (*interestBudgetGuard, error) {
+	service, ok := s.ExchangeSession.Exchange.(marginFutureInterestQueryService)
+	if !ok {
+		return nil, fmt.Errorf("exchange %T does not support margin future interest rate query", s.ExchangeSession.Exchange)
+	}
+
+	quoteCurrency := s.InterestBudget.quoteCurrency()
+	debts := balances.Debts()
+
+	assetSet := make(map[string]struct{})
+	for _, a := range s.Assets {
+		assetSet[a.Asset] = struct{}{}
+	}
+	for asset := range debts {
+		assetSet[asset] = struct{}{}
+	}
+
+	assets := make([]string, 0, len(assetSet))
+	for asset := range assetSet {
+		assets = append(assets, asset)
+	}
+
+	rates, err := service.QueryMarginFutureHourlyInterestRate(ctx, assets)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query the next hourly interest rate: %w", err)
+	}
+
+	priceSolver := s.ExchangeSession.GetPriceSolver()
+	prices := make(map[string]fixedpoint.Value, len(assets))
+	for _, asset := range assets {
+		if price, ok := priceSolver.ResolvePrice(asset, quoteCurrency); ok {
+			prices[asset] = price
+		}
+	}
+
+	estimation := estimateInterest(time.Now().UTC(), quoteCurrency, debts, rates, prices)
+	log.Infof("%s interest estimation: %s", s.ExchangeSession.Name, estimation.String())
+
+	return newInterestBudgetGuard(s.InterestBudget.MonthlyBudget, estimation, rates, prices), nil
+}
+
+// limitBorrowByInterestBudget reduces the borrow quantity so that the projected monthly interest stays within the budget.
+func (s *Strategy) limitBorrowByInterestBudget(
+	guard *interestBudgetGuard, asset string, toBorrow fixedpoint.Value,
+) fixedpoint.Value {
+	limited, err := guard.Limit(asset, toBorrow)
+	if err != nil {
+		log.WithError(err).Warnf("unable to check interest budget for %s, skip borrow", asset)
+		return fixedpoint.Zero
+	}
+
+	if limited.Compare(toBorrow) < 0 {
+		bbgo.Notify(&InterestBudgetAlert{
+			SessionName: s.ExchangeSession.Name,
+			Budget:      s.InterestBudget.MonthlyBudget,
+			Estimation:  guard.estimation,
+			Message: fmt.Sprintf("borrow %s %s is reduced to %s by the monthly interest budget",
+				toBorrow.String(), asset, limited.String()),
+		})
+	}
+
+	return limited
 }
 
 func (s *Strategy) run(ctx context.Context, interval time.Duration) {
