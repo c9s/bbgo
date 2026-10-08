@@ -2,8 +2,8 @@ package indicatorv2
 
 import (
 	"math"
+	"slices"
 
-	"golang.org/x/exp/slices"
 	"gonum.org/v1/gonum/floats"
 	"gonum.org/v1/gonum/stat"
 
