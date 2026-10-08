@@ -108,6 +108,9 @@ type Stream struct {
 	algoOrderUpdateEventCallbacks     []func(e *AlgoOrderUpdateEvent)
 	serverShutdownEventCallbacks      []func(e *ServerShutdownEvent)
 
+	// futures websocket api (ws-fapi) event callbacks
+	futuresAccountStatusEventCallbacks []func(e *FuturesAccountStatusEvent)
+
 	errorCallbacks []func(e *ErrorEvent)
 
 	// depthBuffers is used for storing the depth info
@@ -128,6 +131,12 @@ type Stream struct {
 	futuresAuxStream  *types.StandardStream
 	futuresPublicSubs []types.Subscription // cached /public subscriptions
 	futuresMarketSubs []types.Subscription // cached /market subscriptions
+
+	// futuresAccountStatusStream polls v2/account.status over the futures WebSocket API.
+	// Only created for futures user data streams when EnableFuturesAccountStatusUpdate is called.
+	futuresAccountStatusStream   *types.StandardStream
+	futuresAccountStatusInterval time.Duration
+	futuresWsApiRequestID        uint64
 }
 
 func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Client) *Stream {
@@ -264,18 +273,38 @@ func (s *Stream) handleBeforeConnect(ctx context.Context) error {
 		}
 	}
 
+	// handleBeforeConnect is only called once by Connect with the base context,
+	// so the account status stream is started once and then reconnects on its own.
+	if s.shouldUseFuturesAccountStatusStream() {
+		s.ConnLock.Lock()
+		if s.futuresAccountStatusStream == nil {
+			aux := s.initFuturesAccountStatusStream()
+			s.futuresAccountStatusStream = aux
+			go s.connectFuturesAccountStatusStream(ctx, aux)
+		}
+		s.ConnLock.Unlock()
+	}
+
 	return nil
 }
 
-// Close closes the stream and, if present, the auxiliary futures /public stream.
+// Close closes the stream and, if present, the auxiliary futures /public stream
+// and the futures account status stream.
 func (s *Stream) Close() error {
 	s.ConnLock.Lock()
 	auxStream := s.futuresAuxStream
+	accountStatusStream := s.futuresAccountStatusStream
 	s.ConnLock.Unlock()
 
 	if auxStream != nil {
 		if err := auxStream.Close(); err != nil {
 			log.WithError(err).Warn("futures aux stream close error")
+		}
+	}
+
+	if accountStatusStream != nil {
+		if err := accountStatusStream.Close(); err != nil {
+			log.WithError(err).Warn("futures account status stream close error")
 		}
 	}
 	return s.StandardStream.Close()
