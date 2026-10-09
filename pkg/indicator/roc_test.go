@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -44,9 +45,9 @@ func Test_ROC_PushK(t *testing.T) {
 	})
 
 	now := time.Now()
-	roc.PushK(types.KLine{Close: 100.0, EndTime: types.Time(now)})
-	roc.PushK(types.KLine{Close: 105.0, EndTime: types.Time(now.Add(time.Minute))})
-	roc.PushK(types.KLine{Close: 110.0, EndTime: types.Time(now.Add(2 * time.Minute))})
+	roc.PushK(types.KLine{Close: fixedpoint.NewFromFloat(100.0), EndTime: types.Time(now)})
+	roc.PushK(types.KLine{Close: fixedpoint.NewFromFloat(105.0), EndTime: types.Time(now.Add(time.Minute))})
+	roc.PushK(types.KLine{Close: fixedpoint.NewFromFloat(110.0), EndTime: types.Time(now.Add(2 * time.Minute))})
 
 	// (110 - 100) / 100 * 100 = 10.0%
 	assert.Equal(t, 1, roc.Length())
