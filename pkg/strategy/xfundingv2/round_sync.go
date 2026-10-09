@@ -28,10 +28,8 @@ func (r *ArbitrageRound) Initialize(ctx context.Context, s *Strategy) error {
 	r.SetSpotExchangeFeeRates(
 		s.costEstimator.GetFuturesFeeRate(),
 	)
-	r.retryTransferTickC = make(chan time.Time, 100)
 	if r.hasStarted() {
-		// the round has been started before, we need to start the retry worker
-		go r.retryTransferWorker(ctx, r.retryTransferTickC)
+		// the round has been started before, restore the sessions used by rebalancing
 		r.spotSession = s.spotSession
 		r.futuresSession = s.futuresSession
 	}
@@ -74,8 +72,6 @@ type ArbitrageRoundSyncState struct {
 
 	TriggeredFundingRate        fixedpoint.Value     `json:"triggeredFundingRate"`
 	TriggeredSpotTargetPosition fixedpoint.Value     `json:"triggeredSpotTargetPosition"`
-	TransferInAmount            fixedpoint.Value     `json:"transferInAmount"`
-	TransferOutAmount           fixedpoint.Value     `json:"transferOutAmount"`
 	MinHoldingIntervals         int                  `json:"minHoldingIntervals"`
 	FundingIntervalHours        int                  `json:"fundingIntervalHours"`
 	Leverage                    fixedpoint.Value     `json:"leverage"`
@@ -92,9 +88,6 @@ type ArbitrageRoundSyncState struct {
 	FuturesFeeAssetAmount fixedpoint.Value `json:"futuresFeeAssetAmount"`
 	FeeSymbol             string           `json:"feeSymbol"`
 	AvgFeeCost            fixedpoint.Value `json:"avgFeeCost"`
-
-	RetryDuration       time.Duration             `json:"retryDuration"`
-	RetryTransfers      map[uint64]*transferRetry `json:"retryTransfers"`
 
 	State RoundState `json:"state"`
 

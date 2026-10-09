@@ -165,6 +165,7 @@ type Strategy struct {
 	// 1. ensure that the positions will restore to zero
 	// 2. all open orders are canceled.
 	// 3. collaterals are transferred back to the spot account.
+	// NOTE: the round in the ClosedRoundTasks queue should be of state RoundClosed or RoundStopped
 	MaxClosedRetryCnt int                        `json:"maxClosedRetryCnt"`
 	ClosedRoundTasks  map[string]*CloseRoundTask `persistence:"closedRounds"`
 
@@ -1884,30 +1885,36 @@ func (s *Strategy) handleClosedRound(ctx context.Context, task *CloseRoundTask, 
 
 	// transfer any residual collateral back to the spot account.
 	asset := round.CollateralAsset()
-	account, err := s.futuresSession.UpdateAccount(ctx)
-	if err != nil {
-		return fmt.Errorf("[handleClosedRound] failed to update futures account when handling round exit: %w", err)
-	}
-	// get balance
-	balance, ok := account.Balance(asset)
-	if !ok {
-		// the exchange may skip the asset with 0 balance, so we assume the balance is 0 if it's not found
-		s.logger.Warnf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round.String())
-	} else {
-		// compute the amount to transfer back to spot account
-		residualAmount := s.computeResidualCollateral(task, balance)
-
-		// transfer the collateral back to spot account when the available balance is sufficient
-		if residualAmount.Sign() > 0 {
-			if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
-				return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
-			}
-			bbgo.Notify("⬅️ Transferred %s %s back to spot account for closed round: %s",
-				residualAmount,
-				asset,
-				round.String(),
-			)
+	if round.TriggeredTargetPosition().Sign() > 0 {
+		// short futures: the net balance of the collateral asset on the futures account should be zero
+		account, err := s.futuresSession.UpdateAccount(ctx)
+		if err != nil {
+			return fmt.Errorf("[handleClosedRound] failed to update futures account when handling round exit: %w", err)
 		}
+		// get balance
+		balance, ok := account.Balance(asset)
+		if !ok {
+			// the exchange may skip the asset with 0 balance, so we assume the balance is 0 if it's not found
+			s.logger.Warnf("[handleClosedRound] balance not found for asset %s when handling round exit: %s", asset, round.String())
+		} else {
+			// if it's not zero, transfer the residual amount back to the spot account
+			residualAmount := balance.Net()
+			if balance.MaxWithdrawAmount != nil {
+				residualAmount = fixedpoint.Min(residualAmount, *balance.MaxWithdrawAmount)
+			}
+			if residualAmount.Sign() > 0 {
+				if err := s.futuresService.TransferFuturesAccountAsset(ctx, asset, residualAmount, types.TransferOut); err != nil {
+					return fmt.Errorf("[handleClosedRound] failed to transfer %s %s during round exit: %w", balance.Available, asset, err)
+				}
+				bbgo.Notify("⬅️ Transferred %s %s back to spot account for closed round: %s",
+					residualAmount,
+					asset,
+					round.String(),
+				)
+			}
+		}
+	} else {
+		// TODO: handle closed round in long futures mode
 	}
 
 	// sync funding fee records for the round
@@ -1936,29 +1943,6 @@ func (s *Strategy) closedRoundStats(round *ArbitrageRound, tickTime time.Time) {
 			s.logger.Warnf("insert service channel is full, skipping closed round insert: %s", round)
 		}
 	}
-}
-
-func (s *Strategy) computeResidualCollateral(task *CloseRoundTask, balance types.Balance) fixedpoint.Value {
-	amount := fixedpoint.Zero
-	var closingSide types.SideType
-	if task.Round.TriggeredTargetPosition().Sign() > 0 {
-		// short futures
-		// closing trade side is buy
-		closingSide = types.SideTypeBuy
-	} else {
-		// long futures
-		// closing trade side is sell
-		closingSide = types.SideTypeSell
-	}
-
-	for _, trade := range task.Round.FuturesWorker().Executor().AllTrades() {
-		if trade.Side != closingSide {
-			continue
-		}
-		amount = amount.Add(task.Round.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade))
-	}
-	diffAmount := amount.Sub(task.Round.syncState.TransferOutAmount)
-	return fixedpoint.Min(diffAmount, balance.Net())
 }
 
 func (s *Strategy) canOpenRound(symbol string, currentTime time.Time) bool {
@@ -1990,6 +1974,47 @@ func (s *Strategy) newDebugLogger() *logrus.Entry {
 }
 
 func (s *Strategy) notifyStats(currentTime time.Time) {
+	bbgo.Notify("📊 Round stats: %d active rounds, %d pending rounds, %d closed rounds",
+		len(s.ActiveRounds),
+		len(s.PendingRounds),
+		len(s.ClosedRoundTasks),
+	)
+	activeRounds := s.sortedActiveRounds()
+	if len(activeRounds) > 0 {
+		bbgo.Notify("Active Rounds")
+		for _, round := range activeRounds {
+			spotPrice, futuresPrice, ok := s.getLastPrices(
+				round.SpotSymbol(),
+				round.FuturesSymbol(),
+			)
+			if !ok {
+				s.logger.Warnf(
+					"failed to get last prices, skipping notification: %s",
+					round.String(),
+				)
+				continue
+			}
+
+			// additionally emit an interactive "Close Round" message for Ready rounds
+			// so an operator can close them on demand. The plain attachment above is
+			// left unchanged, so the round still appears in the "Active Rounds" batch.
+			if round.State() == RoundReady && s.slackEvtID != "" {
+				bbgo.Notify(
+					round.NewNotification(currentTime, spotPrice, futuresPrice),
+					newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice),
+				)
+			} else {
+				bbgo.Notify(round.NewNotification(currentTime, spotPrice, futuresPrice))
+			}
+
+			if s.roundInsertService != nil {
+				if err := s.roundInsertService.InsertActiveRound(round, spotPrice, futuresPrice); err != nil {
+					s.logger.WithError(err).Warnf("failed to insert active round to database: %s", round)
+				}
+			}
+		}
+	}
+
 	var pendingRoundNotifications []any
 	for _, pendingRound := range s.PendingRounds {
 		spotPrice, futuresPrice, _ := s.getLastPrices(
@@ -1998,46 +2023,21 @@ func (s *Strategy) notifyStats(currentTime time.Time) {
 		)
 		pendingRoundNotifications = append(pendingRoundNotifications, pendingRound.Round.NewNotification(currentTime, spotPrice, futuresPrice))
 	}
-
-	bbgo.Notify("📊 Round stats: %d active rounds, %d pending rounds",
-		len(s.ActiveRounds),
-		len(s.PendingRounds),
-	)
-	for _, round := range s.sortedActiveRounds() {
-		spotPrice, futuresPrice, ok := s.getLastPrices(
-			round.SpotSymbol(),
-			round.FuturesSymbol(),
-		)
-		if !ok {
-			s.logger.Warnf(
-				"failed to get last prices, skipping notification: %s",
-				round.String(),
-			)
-			continue
-		}
-
-		// additionally emit an interactive "Close Round" message for Ready rounds
-		// so an operator can close them on demand. The plain attachment above is
-		// left unchanged, so the round still appears in the "Active Rounds" batch.
-		if round.State() == RoundReady && s.slackEvtID != "" {
-			bbgo.Notify(
-				round.NewNotification(currentTime, spotPrice, futuresPrice),
-				newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice),
-			)
-		} else {
-			bbgo.Notify(round.NewNotification(currentTime, spotPrice, futuresPrice))
-		}
-
-		if s.roundInsertService != nil {
-			if err := s.roundInsertService.InsertActiveRound(round, spotPrice, futuresPrice); err != nil {
-				s.logger.WithError(err).Warnf("failed to insert active round to database: %s", round)
-			}
-		}
-	}
 	if len(pendingRoundNotifications) > 0 {
 		bbgo.Notify("Pending Rounds", pendingRoundNotifications...)
 	}
 
+	var closedRoundNotifications []any
+	for _, closedRoundTask := range s.ClosedRoundTasks {
+		spotPrice, futuresPrice, _ := s.getLastPrices(
+			closedRoundTask.Round.SpotSymbol(),
+			closedRoundTask.Round.FuturesSymbol(),
+		)
+		closedRoundNotifications = append(closedRoundNotifications, closedRoundTask.Round.NewNotification(currentTime, spotPrice, futuresPrice))
+	}
+	if len(closedRoundNotifications) > 0 {
+		bbgo.Notify("Closed Rounds", closedRoundNotifications...)
+	}
 }
 
 func (s *Strategy) sortedActiveRounds() []*ArbitrageRound {

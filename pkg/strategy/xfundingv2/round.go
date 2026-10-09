@@ -50,12 +50,6 @@ type FuturesService interface {
 	QueryFuturesAdlRisk(ctx context.Context, symbol string) (map[string]*binanceapi.AdlRisk, error)
 }
 
-type transferRetry struct {
-	Trade     types.Trade             `json:"trade"`
-	LastTried time.Time               `json:"lastTried"`
-	Direction types.TransferDirection `json:"direction"`
-}
-
 type ArbitrageRound struct {
 	mu sync.Mutex
 
@@ -79,7 +73,6 @@ type ArbitrageRound struct {
 	spotExchangeFeeRates, futuresExchangeFeeRates map[types.ExchangeName]types.ExchangeFee
 
 	spotSession, futuresSession *bbgo.ExchangeSession
-	retryTransferTickC          chan time.Time
 
 	// metrics
 	fundingRateMetric                               prometheus.Gauge
@@ -133,14 +126,12 @@ func NewArbitrageRound(
 			FuturesExchangeName: futuresExchangeName,
 			DirectionPolicy:     policy,
 			State:               RoundPending,
-			RetryTransfers:      make(map[uint64]*transferRetry),
 		},
 
-		spotWorker:         spotTwap,
-		futuresWorker:      futuresTwap,
-		rebalanceInterval:  rebalanceInterval,
-		futuresService:     futuresService,
-		retryTransferTickC: make(chan time.Time, 100),
+		spotWorker:        spotTwap,
+		futuresWorker:     futuresTwap,
+		rebalanceInterval: rebalanceInterval,
+		futuresService:    futuresService,
 	}
 }
 
@@ -1119,8 +1110,6 @@ func (r *ArbitrageRound) Start(ctx context.Context,
 		r.spotSession = spotSession
 		r.futuresSession = futuresSession
 
-		go r.retryTransferWorker(ctx, r.retryTransferTickC)
-
 		r.syncState.StartAt = currentTime
 		r.syncState.State = RoundOpening
 	}
@@ -1130,59 +1119,7 @@ func (r *ArbitrageRound) Start(ctx context.Context,
 func (r *ArbitrageRound) Stop() {
 	r.spotWorker.Stop()
 	r.futuresWorker.Stop()
-	close(r.retryTransferTickC)
 	r.syncState.State = RoundStopped
-}
-
-func (r *ArbitrageRound) retryTransferWorker(ctx context.Context, tickC <-chan time.Time) {
-	defer r.logger.Infof("retry transfer worker stopped: %s", r.SpotSymbol())
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case currentTime, ok := <-tickC:
-			if !ok {
-				return
-			}
-			r.doRetryTransfers(currentTime)
-		}
-	}
-}
-
-func (r *ArbitrageRound) doRetryTransfers(currentTime time.Time) {
-	// retry failed transfers if any
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if !r.hasStarted() {
-		return
-	}
-
-	for _, transfer := range r.syncState.RetryTransfers {
-		if r.syncState.RetryDuration == 0 {
-			// default retry duration is 10 minutes
-			r.syncState.RetryDuration = 10 * time.Minute
-		}
-		if currentTime.Sub(transfer.LastTried) < r.syncState.RetryDuration {
-			continue
-		}
-		r.logger.Infof("retry transfer (last tried: %s): %s", transfer.LastTried.Format(time.RFC3339), transfer.Trade)
-		switch transfer.Direction {
-		case types.TransferOut:
-			// the round should be in closing state
-			r.handleFuturesTradeForClose(transfer.Trade, r.futuresSession.GetAccount(), currentTime)
-		case types.TransferIn:
-			// the round should be in opening state
-			r.handleSpotTradeForOpen(transfer.Trade, r.spotSession.GetAccount(), currentTime)
-		default:
-			r.logger.Warnf("unknown transfer direction for retry: %s", transfer.Direction)
-		}
-	}
-}
-
-func (r *ArbitrageRound) SetRetryDuration(d time.Duration) {
-	r.syncState.RetryDuration = d
 }
 
 // HandleSpotTrade handles a spot trade, including update filled position, transfer collateral and sync futures position if the round is opening.
@@ -1231,8 +1168,7 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotAccount *
 	if transferAmount.Sign() <= 0 {
 		// nothing left to transfer (may have been transferred by rebalancing)
 		r.logger.Warnf("no collateral asset available to transfer to futures: %s (available: %s %s)", trade.Symbol, available, asset)
-		// consider the transfer succeeded -> delete the retry task and sync the futures position
-		delete(r.syncState.RetryTransfers, trade.ID)
+		// consider the transfer succeeded and sync the futures position
 		r.syncFuturesPosition()
 		return
 	}
@@ -1240,27 +1176,16 @@ func (r *ArbitrageRound) handleSpotTradeForOpen(trade types.Trade, spotAccount *
 	if err := r.futuresService.TransferFuturesAccountAsset(
 		timedCtx, asset, transferAmount, types.TransferIn,
 	); err != nil {
-		if transfer, found := r.syncState.RetryTransfers[trade.ID]; !found {
-			bbgo.Notify("🚨 Round spot transfer %s %s failed (%s), retrying: %s",
-				transferAmount.String(),
-				asset,
-				currentTime.Format(time.RFC3339),
-				err.Error(),
-				trade,
-			)
-			r.syncState.RetryTransfers[trade.ID] = &transferRetry{
-				Trade:     trade,
-				LastTried: currentTime,
-				Direction: types.TransferIn,
-			}
-		} else {
-			transfer.LastTried = currentTime
-		}
+		// the next rebalance will transfer the remaining collateral and sync the futures position
+		bbgo.Notify("🚨 Round spot transfer %s %s failed (%s), leaving it to rebalance: %s",
+			transferAmount.String(),
+			asset,
+			currentTime.Format(time.RFC3339),
+			err.Error(),
+			trade,
+		)
 		return
 	}
-	// transfer succeeded, remove from retry list if exists
-	r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(transferAmount)
-	delete(r.syncState.RetryTransfers, trade.ID)
 	bbgo.Notify("➡️ Transfered %s %s from spot to futures",
 		transferAmount.String(),
 		asset,
@@ -1346,9 +1271,7 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresAc
 
 	if transferAmount.Sign() <= 0 {
 		// nothing left to transfer
-		// remove from retry list if exists
 		r.logger.Warnf("no collateral asset available to transfer back to spot: %s", asset)
-		delete(r.syncState.RetryTransfers, trade.ID)
 		// consider the transfer succeeded and sync the spot position
 		r.syncSpotPosition()
 		return
@@ -1362,27 +1285,16 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresAc
 	if err := r.futuresService.TransferFuturesAccountAsset(
 		timedCtx, asset, transferAmount, types.TransferOut,
 	); err != nil {
-		if transfer, found := r.syncState.RetryTransfers[trade.ID]; !found {
-			bbgo.Notify("🚨 Round futures transfer %s %s failed (%s), retrying: %s",
-				transferAmount.String(),
-				asset,
-				currentTime.Format(time.RFC3339),
-				err.Error(),
-				trade,
-			)
-			r.syncState.RetryTransfers[trade.ID] = &transferRetry{
-				Trade:     trade,
-				LastTried: currentTime,
-				Direction: types.TransferOut,
-			}
-		} else {
-			transfer.LastTried = currentTime
-		}
+		// the next rebalance will transfer the outstanding amount back and sync the spot position
+		bbgo.Notify("🚨 Round futures transfer %s %s failed (%s), leaving it to rebalance: %s",
+			transferAmount.String(),
+			asset,
+			currentTime.Format(time.RFC3339),
+			err.Error(),
+			trade,
+		)
 		return
 	}
-	// transfer succeeded, remove from retry list if exists
-	r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferAmount)
-	delete(r.syncState.RetryTransfers, trade.ID)
 	bbgo.Notify("⬅️ Transfered %s %s from futures to spot",
 		transferAmount.String(),
 		asset,
@@ -1393,7 +1305,7 @@ func (r *ArbitrageRound) handleFuturesTradeForClose(trade types.Trade, futuresAc
 	r.syncSpotPosition()
 }
 
-// Prepare prepares the round to be ready for resume, such as doing neceessary transfers and syncing the positions.
+// Prepare prepares the round to be ready for resume, such as resetting the workers' time and syncing positions.
 func (r *ArbitrageRound) Prepare(
 	ctx context.Context,
 	spotSession, futuresSession *bbgo.ExchangeSession,
@@ -1418,36 +1330,9 @@ func (r *ArbitrageRound) prepareOpening(
 	ctx context.Context,
 	spotSession *bbgo.ExchangeSession,
 ) error {
+	// no need to check the spot base asset for transfer.
+	// we leave the transfer to be handled by the rebalance process.
 	now := time.Now()
-	var expectedTransferIn fixedpoint.Value
-	trades := r.spotWorker.Executor().AllTrades()
-	var spotSide types.SideType
-	for idx, trade := range trades {
-		if idx == 0 {
-			spotSide = trade.Side
-		} else if spotSide != trade.Side {
-			return fmt.Errorf("all spot trades should have the same side when opening: %s vs %s", spotSide, trade.Side)
-		}
-		amount := r.syncState.DirectionPolicy.TransferAmountFromSpotTrade(trade)
-		expectedTransferIn = expectedTransferIn.Add(amount)
-	}
-	transferDiff := expectedTransferIn.Sub(r.syncState.TransferInAmount)
-	asset := r.syncState.DirectionPolicy.CollateralAsset()
-	balance := spotSession.GetAccount().Balances()[asset]
-	if transferDiff.Sign() > 0 && balance.Available.Compare(transferDiff) > 0 {
-		r.logger.Infof("expected transfer in amount: %s, actual transfer in amount: %s, diff: %s, available: %s",
-			expectedTransferIn,
-			r.syncState.TransferInAmount,
-			transferDiff,
-			balance.Available,
-		)
-		if err := r.futuresService.TransferFuturesAccountAsset(ctx, asset, transferDiff, types.TransferIn); err != nil {
-			return fmt.Errorf("failed to transfer in %s %s: %w", transferDiff.String(), asset, err)
-		}
-		r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(transferDiff)
-	}
-	// transfer succeeded, need to sync the futures position to keep delta-neutral
-	r.syncFuturesPosition()
 
 	// don't place order but reset the time to let the TWAP worker to sync the position
 	// For example, considering the case where:
@@ -1467,46 +1352,9 @@ func (r *ArbitrageRound) prepareClosing(
 	ctx context.Context,
 	futuresSession *bbgo.ExchangeSession,
 ) error {
+	// no need to check the futures collateral for transfer.
+	// we leave the transfer to be handled by the rebalance process.
 	now := time.Now()
-	var expectedTransferOut fixedpoint.Value
-	trades := r.futuresWorker.Executor().AllTrades()
-	// if we are short futures -> closing trades are buy trades
-	// if we are long futures -> closing trades are sell trades
-	var closingTradeSide types.SideType
-	shortFutures := r.syncState.TriggeredSpotTargetPosition.Sign() > 0
-	if shortFutures {
-		closingTradeSide = types.SideTypeBuy
-	} else {
-		closingTradeSide = types.SideTypeSell
-	}
-	for _, trade := range trades {
-		if trade.Side != closingTradeSide {
-			continue
-		}
-		amount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
-		expectedTransferOut = expectedTransferOut.Add(amount)
-	}
-	transferDiff := expectedTransferOut.Sub(r.syncState.TransferOutAmount)
-	asset := r.syncState.DirectionPolicy.CollateralAsset()
-	balance := futuresSession.GetAccount().Balances()[asset]
-	maxWithdraw := balance.MaxWithdrawAmount
-	if maxWithdraw != nil {
-		transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
-	}
-	if transferDiff.Sign() > 0 {
-		r.logger.Infof("expected transfer out amount: %s, actual transfer out amount: %s, diff: %s, max withdraw: %s",
-			expectedTransferOut,
-			r.syncState.TransferOutAmount,
-			transferDiff,
-			maxWithdraw,
-		)
-		if err := r.futuresService.TransferFuturesAccountAsset(ctx, asset, transferDiff, types.TransferOut); err != nil {
-			return fmt.Errorf("failed to transfer out %s %s: %w", transferDiff.String(), asset, err)
-		}
-		r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
-	}
-	// transfer succeeded, need to sync the spot position to keep delta-neutral
-	r.syncSpotPosition()
 
 	// don't place order but reset the time to let the TWAP worker to sync the position
 	// For example, considering the case where:
@@ -1593,8 +1441,6 @@ func (r *ArbitrageRound) SetClosing(currentTime time.Time, duration types.Durati
 	r.syncState.State = RoundClosing
 	r.syncState.ClosingAt = currentTime
 	r.syncState.ClosingDuration = duration
-	// empty the retry transfer tasks to avoid retrying old opening trades when closing
-	r.syncState.RetryTransfers = make(map[uint64]*transferRetry)
 }
 
 // setReady updates the round state to ready without locking. The caller must
@@ -1646,6 +1492,8 @@ func (r *ArbitrageRound) CollateralAsset() string {
 	return r.syncState.DirectionPolicy.CollateralAsset()
 }
 
+// Cleanup attempts to close any remaining futures positions for the round.
+// It should be called after the round has been closed or stopped.
 func (r *ArbitrageRound) Cleanup(ctx context.Context, orderBook types.OrderBook) error {
 	if r.syncState.State != RoundClosed && r.syncState.State != RoundStopped {
 		return fmt.Errorf("round is not closed/stopped yet: %s", r)
@@ -1729,12 +1577,6 @@ func (r *ArbitrageRound) Tick(ctx context.Context, currentTime time.Time, spotOr
 	if r.syncState.State == RoundReady {
 		r.updateMinHoldingIntervals(currentTime, spotMidPrice, futuresMidPrice)
 		return
-	}
-
-	select {
-	case r.retryTransferTickC <- currentTime:
-	default:
-		r.logger.Warnf("retry transfer tick channel is full, skipping retry tick at %s", currentTime.Format(time.RFC3339))
 	}
 
 	// it's opening or closing, tick the workers
@@ -1911,8 +1753,8 @@ func (r *ArbitrageRound) rebalanceOpening(ctx context.Context, futuresOrderBook 
 			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, baseAvailable, types.TransferIn); err != nil {
 				r.logger.WithError(err).Warnf("failed to transfer %s %s from spot to futures when rebalancing", baseAvailable.String(), baseAsset)
 			} else {
-				r.syncState.TransferInAmount = r.syncState.TransferInAmount.Add(baseAvailable)
-				bbgo.Notify("➡️ Transfered %s %s from spot to futures to rebalance",
+				bbgo.Notify(
+					"➡️ Transfered %s %s from spot to futures to rebalance",
 					baseAvailable.String(),
 					baseAsset,
 				)
@@ -2024,27 +1866,14 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 			}
 		}
 		// 2. transfer the base asset from futures to spot
-		// check the accumulated transfer out amount and the expected one
-		// if the expected transfer amount is larger than the accumulated one, transfer the difference back to spot
+		// check the difference between the filled position and the collateral on the future balance
+		// if the difference is positive, transfer the difference back to spot
 		// NOTE: need to check the max withdraw
 		// update futures account info for the latest max withdraw amount
-		accTransferOut := r.syncState.TransferOutAmount
-		expectedTransferOut := fixedpoint.Zero
-		for _, trade := range r.futuresWorker.Executor().AllTrades() {
-			// consider only the closing trades, which are buy trades for short futures leg
-			if trade.Side != types.SideTypeBuy {
-				continue
-			}
-			amount := r.syncState.DirectionPolicy.TransferAmountFromFuturesTrade(trade)
-			expectedTransferOut = expectedTransferOut.Add(amount)
-		}
-		transferDiff := expectedTransferOut.Sub(accTransferOut)
-		r.logger.Debugf("rebalance closing: expected transfer out amount: %s, actual transfer out amount: %s, diff: %s",
-			expectedTransferOut,
-			accTransferOut,
-			transferDiff,
-		)
 		futuresBalance := futuresAccount.Balances()[baseAsset]
+		futuresFilledPosition := r.futuresWorker.FilledPosition()
+		transferDiff := futuresBalance.Available.Sub(futuresFilledPosition.Abs())
+
 		maxWithdraw := futuresBalance.MaxWithdrawAmount
 		if maxWithdraw != nil && maxWithdraw.Sign() > 0 {
 			transferDiff = fixedpoint.Min(transferDiff, *maxWithdraw)
@@ -2055,12 +1884,15 @@ func (r *ArbitrageRound) rebalanceClosing(ctx context.Context) error {
 			if err := r.futuresService.TransferFuturesAccountAsset(timedCtx, baseAsset, transferDiff, types.TransferOut); err != nil {
 				r.logger.WithError(err).Warnf("failed to transfer %s %s from futures to spot", transferDiff, baseAsset)
 			} else {
-				r.syncState.TransferOutAmount = r.syncState.TransferOutAmount.Add(transferDiff)
+				bbgo.Notify(
+					"⬅️ Transfered %s %s from futures to spot to rebalance",
+					transferDiff,
+					baseAsset,
+				)
 			}
 		}
 
 		// 4. check the target position of the spot worker
-		futuresFilledPosition := r.futuresWorker.FilledPosition()
 		currnetSpotTargetPosition := r.spotWorker.TargetPosition()
 		if !futuresFilledPosition.Add(currnetSpotTargetPosition).IsZero() {
 			newTarget := futuresFilledPosition.Neg()

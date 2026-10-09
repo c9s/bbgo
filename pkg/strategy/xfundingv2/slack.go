@@ -132,12 +132,13 @@ func (c *interactiveCloseRound) SlackBlocks() []slack.Block {
 // The button value carries the round's spot symbol and round ID so the handler
 // can re-locate the exact live round on confirm.
 func buildCloseRoundButtonsBlock(symbol, roundID string) slack.Block {
+	text := fmt.Sprintf("Close Round %s", symbol)
 	return slack.NewActionBlock(
 		closeRoundButtonsBlockID,
 		slack.NewButtonBlockElement(
 			closeRoundActionID,
 			encodeCloseRoundValue(symbol, roundID),
-			slack.NewTextBlockObject(slack.PlainTextType, "Close Round", false, false),
+			slack.NewTextBlockObject(slack.PlainTextType, text, false, false),
 		).WithStyle(slack.StyleDefault),
 	)
 }
@@ -145,13 +146,13 @@ func buildCloseRoundButtonsBlock(symbol, roundID string) slack.Block {
 // buildConfirmButtonsBlock builds the two-step confirmation buttons that
 // replace the initial "Close Round" button after the first click.
 func buildConfirmButtonsBlock(symbol, roundID string) slack.Block {
-	value := encodeCloseRoundValue(symbol, roundID)
+	text := fmt.Sprintf("Confirm Close Round %s", symbol)
 	return slack.NewActionBlock(
 		closeRoundButtonsBlockID,
 		slack.NewButtonBlockElement(
 			confirmCloseActionID,
-			value,
-			slack.NewTextBlockObject(slack.PlainTextType, "Confirm Close", false, false),
+			encodeCloseRoundValue(symbol, roundID),
+			slack.NewTextBlockObject(slack.PlainTextType, text, false, false),
 		).WithStyle(slack.StyleDanger),
 	)
 }

@@ -57,9 +57,6 @@ func (c *MarketSelectionConfig) Defaults() {
 	if c.MinAnnualizedRate.IsZero() {
 		c.MinAnnualizedRate = fixedpoint.NewFromFloat(0.05) // 5%
 	}
-	if c.MinAnnualizedRate.IsZero() {
-		c.MinAnnualizedRate = fixedpoint.NewFromFloat(0.02) // 2%
-	}
 	if c.MinCollateralRate.IsZero() {
 		c.MinCollateralRate = fixedpoint.NewFromFloat(0.95)
 	}

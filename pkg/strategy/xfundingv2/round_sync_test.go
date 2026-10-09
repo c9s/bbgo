@@ -51,18 +51,6 @@ func TestArbitrageRound_MarshalUnmarshalJSON(t *testing.T) {
 				FeeSymbol:             "BNB",
 				AvgFeeCost:            fixedpoint.NewFromFloat(600.0),
 
-				RetryDuration: 5 * time.Minute,
-				RetryTransfers: map[uint64]*transferRetry{
-					1: {
-						Trade: types.Trade{
-							ID:       1,
-							Exchange: types.ExchangeBinance,
-							Side:     types.SideTypeBuy,
-						},
-						LastTried: startTime,
-					},
-				},
-
 				State:           RoundReady,
 				StartAt:         startTime,
 				ClosingAt:       closingTime,
