@@ -471,6 +471,12 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 		return nil
 	}
 
+	// Average cost is the reference price for the min-notional check. The short
+	// spot path overwrites it with the ticker price it already queries. A zero
+	// price makes notional zero and would block every close, so only the
+	// quantity check applies in that case.
+	referencePrice := e.position.AverageCost
+
 	if e.session.Futures { // Futures: Use base qty in e.position
 		submitOrder.Quantity = e.position.GetBase().Abs()
 		submitOrder.ReduceOnly = true
@@ -499,12 +505,26 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 					return err
 				}
 				currentPrice := ticker.Sell
+				referencePrice = currentPrice
 				submitOrder.Quantity = AdjustQuantityByMaxAmount(submitOrder.Quantity, currentPrice, quoteBalance.Available)
 				if submitOrder.Quantity.IsZero() {
 					return fmt.Errorf("insufficient quote balance, can not buy: %+v", submitOrder)
 				}
 			}
 		}
+	}
+
+	submitOrder.Quantity = e.position.Market.TruncateQuantity(submitOrder.Quantity)
+	minQuantity := e.position.Market.MinQuantity
+	minNotional := e.position.Market.MinNotional
+	notionalTooSmall := referencePrice.Sign() > 0 && !minNotional.IsZero() &&
+		submitOrder.Quantity.Mul(referencePrice).Compare(minNotional) <= 0
+	if submitOrder.Quantity.Sign() <= 0 ||
+		(!minQuantity.IsZero() && submitOrder.Quantity.Compare(minQuantity) <= 0) ||
+		notionalTooSmall {
+		log.Warnf("skip closing %s position: quantity %v, min quantity %v, min notional %v",
+			e.symbol, submitOrder.Quantity, minQuantity, minNotional)
+		return nil
 	}
 
 	tagStr := strings.Join(tags, ",")
