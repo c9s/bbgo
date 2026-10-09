@@ -253,11 +253,38 @@ func (v Value) Ceil() Value {
 }
 
 func (v Value) Sub(v2 Value) Value {
-	return Value(int64(v) - int64(v2))
+	if v.IsInf() {
+		return v
+	}
+	if v2.IsInf() {
+		if v2 == PosInf {
+			return NegInf
+		}
+		return PosInf
+	}
+	res := int64(v) - int64(v2)
+	if int64(v) > 0 && int64(v2) < 0 && res < 0 {
+		return PosInf
+	} else if int64(v) < 0 && int64(v2) > 0 && res > 0 {
+		return NegInf
+	}
+	return Value(res)
 }
 
 func (v Value) Add(v2 Value) Value {
-	return Value(int64(v) + int64(v2))
+	if v.IsInf() {
+		return v
+	}
+	if v2.IsInf() {
+		return v2
+	}
+	res := int64(v) + int64(v2)
+	if int64(v) > 0 && int64(v2) > 0 && res < 0 {
+		return PosInf
+	} else if int64(v) < 0 && int64(v2) < 0 && res > 0 {
+		return NegInf
+	}
+	return Value(res)
 }
 
 func (v *Value) AtomicAdd(v2 Value) {
@@ -433,7 +460,13 @@ func NewFromString(input string) (Value, error) {
 			v = v * 0.01
 		}
 
-		return Value(int64(math.Trunc(v))), nil
+		trunc := math.Trunc(v)
+		if trunc >= math.MaxInt64 {
+			return PosInf, nil
+		} else if trunc <= math.MinInt64 {
+			return NegInf, nil
+		}
+		return Value(int64(trunc)), nil
 
 	} else if hasScientificNotion {
 		exp, err := strconv.ParseInt(input[scIndex+1:], 10, 32)
@@ -444,7 +477,13 @@ func NewFromString(input string) (Value, error) {
 		if err != nil {
 			return 0, err
 		}
-		return Value(int64(math.Trunc(v))), nil
+		trunc := math.Trunc(v)
+		if trunc >= math.MaxInt64 {
+			return PosInf, nil
+		} else if trunc <= math.MinInt64 {
+			return NegInf, nil
+		}
+		return Value(int64(trunc)), nil
 	} else if hasIChar {
 		if floatV, err := strconv.ParseFloat(input, 64); nil != err {
 			return 0, err
@@ -458,11 +497,22 @@ func NewFromString(input string) (Value, error) {
 	} else {
 		v, err := strconv.ParseInt(input, 10, 64)
 		if err != nil {
+			if numErr, ok := err.(*strconv.NumError); ok && errors.Is(numErr.Err, strconv.ErrRange) {
+				if strings.HasPrefix(input, "-") {
+					return NegInf, nil
+				}
+				return PosInf, nil
+			}
 			return 0, err
 		}
 		if isPercentage {
 			v = v * DefaultPow / 100
 		} else {
+			if v > math.MaxInt64/int64(DefaultPow) {
+				return PosInf, nil
+			} else if v < math.MinInt64/int64(DefaultPow) {
+				return NegInf, nil
+			}
 			v = v * DefaultPow
 		}
 		return Value(v), nil
@@ -502,10 +552,21 @@ func NewFromFloat(val float64) Value {
 	} else if math.IsInf(val, -1) {
 		return NegInf
 	}
-	return Value(int64(math.Trunc(val * DefaultPow)))
+	scaled := val * DefaultPow
+	if scaled >= math.MaxInt64 {
+		return PosInf
+	} else if scaled <= math.MinInt64 {
+		return NegInf
+	}
+	return Value(int64(math.Trunc(scaled)))
 }
 
 func NewFromInt(val int64) Value {
+	if val > math.MaxInt64/int64(DefaultPow) {
+		return PosInf
+	} else if val < math.MinInt64/int64(DefaultPow) {
+		return NegInf
+	}
 	return Value(val * DefaultPow)
 }
 
