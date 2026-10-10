@@ -48,28 +48,35 @@ func (o *TWAPExecutor) Initialize(ctx context.Context, s *Strategy) error {
 		return errors.New("[TWAPExecutor] session exchange does not implement ExchangeOrderQueryService")
 	}
 	// sync orders/trades
-	var missingOrders []types.OrderQuery
 	orderStore := executor.OrderStore()
 	for _, query := range o.syncState.Orders {
 		order, err := o.exchange.QueryOrder(o.ctx, query)
 		if err != nil || order == nil {
-			missingOrders = append(missingOrders, query)
+			s.logger.WithError(err).Warnf("[TWAPExecutor] failed to query order via RESTful API: %v", query)
+			order, err = s.Environment.TradeService.QueryOrderFromDB(query)
+		}
+		if err != nil || order == nil {
+			s.logger.WithError(err).Errorf("[TWAPExecutor] missing order detected on %s: %v", session.Name, query)
 			continue
 		}
 		orderStore.Add(*order)
 
-		trades, err := o.exchange.QueryOrderTrades(o.ctx, query)
-		if err != nil {
-			// just log and continue for the other orders and trades
-			s.logger.WithError(err).Warnf("[TWAPExecutor] failed to query trades for order %v", query)
-			continue
+		if trades, err := s.Environment.TradeService.QueryOrderTradesFromDB(query); err == nil {
+			s.logger.Infof("[TWAPExecutor] found %d trades for order from DB: %v", len(trades), query)
+			for _, trade := range trades {
+				o.syncState.Trades[trade.ID] = trade
+			}
+		} else {
+			s.logger.WithError(err).Warnf("[TWAPExecutor] failed to query trades for order from DB: %v", query)
 		}
-		for _, trade := range trades {
-			o.syncState.Trades[trade.ID] = trade
+		if trades, err := o.exchange.QueryOrderTrades(o.ctx, query); err == nil {
+			s.logger.Infof("[TWAPExecutor] found %d trades for order via RESTful API: %v", len(trades), query)
+			for _, trade := range trades {
+				o.syncState.Trades[trade.ID] = trade
+			}
+		} else {
+			s.logger.WithError(err).Warnf("[TWAPExecutor] failed to query trades for order via RESTful API: %v", query)
 		}
-	}
-	for _, query := range missingOrders {
-		s.logger.Errorf("[TWAPExecutor] missing order detected on %s: %v", session.Name, query)
 	}
 	return nil
 }
