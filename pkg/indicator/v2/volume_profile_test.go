@@ -1,26 +1,18 @@
 package indicatorv2
 
 import (
-	"encoding/csv"
-	"os"
 	"path"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/datasource/csvsource"
+	"github.com/c9s/bbgo/pkg/marketdata/sources/binancecsv"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 func TestVolumeProfile(t *testing.T) {
-	file, _ := os.Open(path.Join("testdata", "BTCUSDT-1m-2022-05-06.csv"))
-	defer func() {
-		assert.NoError(t, file.Close())
-	}()
-
-	reader := csv.NewReader(file)
-
-	candles, err := csvsource.NewCSVKLineReader(reader, "BTCUSDT", types.Interval1m).ReadAll()
+	candles, err := binancecsv.ReadKLineFile(
+		path.Join("testdata", "BTCUSDT-1m-2022-05-06.csv"), "BTCUSDT", types.Interval1m)
 	assert.NoError(t, err)
 	assert.NotEmptyf(t, candles, "candles should not be empty")
 
