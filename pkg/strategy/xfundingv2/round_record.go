@@ -329,7 +329,7 @@ func (s *RoundInsertService) InsertActiveRound(
 	round *ArbitrageRound,
 	spotPrice, futuresPrice fixedpoint.Value,
 ) error {
-	if round.State() == RoundClosed {
+	if round.State() == RoundClosed || round.State() == RoundStopped {
 		return fmt.Errorf("given round is not active but closed: %s", round)
 	}
 
