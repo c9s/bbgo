@@ -107,11 +107,8 @@ func (s *RoundInsertService) run() {
 			if !ok {
 				return
 			}
-			switch round.State() {
-			case RoundClosed:
-				if err := s.InsertClosedRound(round); err != nil {
-					s.logger.WithError(err).Errorf("failed to insert closed round record: %s", round)
-				}
+			if err := s.InsertClosedRound(round); err != nil {
+				s.logger.WithError(err).Errorf("failed to insert closed round record: %s", round)
 			}
 		}
 	}
@@ -182,14 +179,15 @@ func newFundingFeeRecords(round *ArbitrageRound) []FundingFee {
 // a single transaction. The funding-fee rows are linked to the round via the round's
 // own id (round_id).
 func (s *RoundInsertService) InsertClosedRound(round *ArbitrageRound) error {
-	if round.State() != RoundClosed {
-		return fmt.Errorf("inserted round is not closed: %s", round.State())
+	if round.State() != RoundClosed && round.State() != RoundStopped {
+		return fmt.Errorf("inserted round is not closed or stopped: %s", round.State())
 	}
 	record, fees := s.newClosedRoundRecord(round)
 
 	if err := s.insertClosedRound(record, fees); err != nil {
 		return err
 	}
+	s.logger.Infof("inserted closed round record: %s", round)
 
 	return nil
 }

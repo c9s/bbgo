@@ -836,7 +836,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 		)
-	case RoundClosed:
+	case RoundClosed, RoundStopped:
 		fields = append(fields,
 			slack.AttachmentField{
 				Title: "Closed Time",
