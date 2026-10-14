@@ -1,12 +1,10 @@
 package okex
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,20 +12,6 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testing/httptesting"
 )
-
-// withCapturedLogs runs fn with the package logger's output redirected to a
-// buffer and returns the captured log text. The original output is restored
-// afterwards. It lets a test assert a log line was actually emitted (not just
-// that the call didn't error).
-func withCapturedLogs(t *testing.T, fn func()) string {
-	t.Helper()
-	buf := &bytes.Buffer{}
-	prev := log.Logger.Out
-	log.Logger.SetOutput(buf)
-	t.Cleanup(func() { log.Logger.SetOutput(prev) })
-	fn()
-	return buf.String()
-}
 
 type repayBody struct {
 	Ccy        string `json:"ccy"`
@@ -48,8 +32,9 @@ func readRepayBody(t *testing.T, req *http.Request) repayBody {
 
 // Ticket 05: repayment routes per account mode. A margin account settles a
 // non-quote debt via one-click-repay (debtCcy + repayCcy=USDT); a USDT debt is
-// skipped with no call; a spot account uses the existing spot borrow/repay
-// endpoint unchanged.
+// reported as an unsupported-repayment error (one-click-repay requires
+// repayCcy != debtCcy) with no call; a spot account uses the existing spot
+// borrow/repay endpoint unchanged.
 func TestExchange_RepayMarginAsset_Routing(t *testing.T) {
 	amount := fixedpoint.MustNewFromString("0.5")
 
@@ -82,7 +67,7 @@ func TestExchange_RepayMarginAsset_Routing(t *testing.T) {
 		assert.True(t, oneClickCalled)
 	})
 
-	t.Run("margin: USDT debt -> skip with a warning, no repayment call", func(t *testing.T) {
+	t.Run("margin: USDT debt -> unsupported-repayment error, no call", func(t *testing.T) {
 		ex := New("key", "secret", "passphrase")
 		ex.MarginSettings.IsMargin = true
 
@@ -90,16 +75,11 @@ func TestExchange_RepayMarginAsset_Routing(t *testing.T) {
 		ex.client.HttpClient.Transport = transport
 		// no handlers registered: any repayment call would fail the test
 
-		captured := withCapturedLogs(t, func() {
-			err := ex.RepayMarginAsset(context.Background(), "USDT", amount)
-			assert.NoError(t, err, "a USDT debt is a documented skip, not an error")
-		})
-
-		// the skip must be surfaced as a warning, not just a silent nil
-		// (logrus text formatter emits "level=warning" in lowercase)
-		assert.True(t,
-			strings.Contains(captured, "level=warning") && strings.Contains(captured, "USDT"),
-			"a USDT debt skip must emit a warning log, got: %q", captured)
+		err := ex.RepayMarginAsset(context.Background(), "USDT", amount)
+		// an error (not nil) so callers do not treat this as a successful
+		// repayment; the debt is offset by the next cross sell or manually
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot one-click-repay debt denominated in USDT")
 	})
 
 	t.Run("spot: existing spot borrow/repay endpoint, unchanged", func(t *testing.T) {

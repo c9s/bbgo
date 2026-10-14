@@ -104,6 +104,14 @@ func WithBrokerId(id string) Option {
 	}
 }
 
+// WithClient overrides the REST client. It exists so that tests can point the
+// exchange at a mock transport; production code uses the client built by New.
+func WithClient(c *okexapi.RestClient) Option {
+	return func(exchange *Exchange) {
+		exchange.client = c
+	}
+}
+
 func New(key, secret, passphrase string, opts ...Option) *Exchange {
 	client := okexapi.NewClient()
 
@@ -249,43 +257,47 @@ func (e *Exchange) PlatformFeeCurrency() string {
 	return PlatformToken
 }
 
-// CheckMarginAccount verifies that the account mode supports a margin (cross)
-// hedge session. A margin session sells above the held balance in cross mode,
-// which OKX only accepts on a multi-currency margin account (acctLv >= 3) with
-// auto loan enabled. It is called by strategies that hedge in margin mode so
-// that a misconfigured account blocks only that strategy instance, not the
-// whole bbgo process.
-func (e *Exchange) CheckMarginAccount(ctx context.Context) error {
+// EnsureAutoLoanEnabled verifies that this session is a loan-enabled margin
+// session: a multi-currency margin account (acctLv >= 3) with auto loan
+// enabled, which OKX requires for a margin (cross) hedge session that sells
+// above the held balance. It is called by strategies that hedge in margin
+// mode so that a misconfigured account blocks only that strategy instance,
+// not the whole bbgo process.
+//
+// It reports (true, nil) when the session is a verified loan-enabled margin
+// session, (false, nil) when the session is not a margin session (nothing to
+// check), and an error when the account cannot be queried or fails the check.
+func (e *Exchange) EnsureAutoLoanEnabled(ctx context.Context) (bool, error) {
 	if !e.MarginSettings.IsMargin {
-		return nil
+		return false, nil
 	}
 
 	configs, err := e.client.NewGetAccountConfigRequest().Do(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to query the okex account config: %w", err)
+		return false, fmt.Errorf("unable to query the okex account config: %w", err)
 	}
 
 	if len(configs) == 0 {
-		return fmt.Errorf("okex account config is empty")
+		return false, fmt.Errorf("okex account config is empty")
 	}
 
 	config := configs[0]
 	if config.AccountLevel < 3 {
-		return fmt.Errorf(
+		return false, fmt.Errorf(
 			"okex margin session requires a multi-currency margin account (acctLv >= 3), got acctLv=%d: "+
 				"switch the account mode in the OKX UI, or set margin: false for a spot account",
 			int64(config.AccountLevel))
 	}
 
 	if !config.AutoLoan {
-		return fmt.Errorf(
+		return false, fmt.Errorf(
 			"okex margin session requires auto loan to be enabled (acctLv=%d, autoLoan=%t): "+
 				"enable it in the OKX UI (account settings > auto loan) or call "+
 				"POST /api/v5/account/set-auto-loan with {\"autoLoan\": true}",
 			int64(config.AccountLevel), config.AutoLoan)
 	}
 
-	return nil
+	return true, nil
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
@@ -488,9 +500,13 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 						"cannot convert margin market buy size to quote: %s ask price is zero", order.Symbol)
 				}
 
-				// quote-denominated notional, formatted at the quote
-				// precision (no currency symbol — OKX sz is a plain number).
-				req.Size(order.Quantity.Mul(ask).FormatString(order.Market.QuotePrecision))
+				// quote-denominated notional as the exact fixed-point decimal
+				// (no currency symbol — OKX sz is a plain number). The
+				// adapter does not populate market.QuotePrecision (OKX's
+				// instrument API exposes no quote-currency precision), so the
+				// notional must not be formatted with it: truncating to an
+				// integer would zero out small orders.
+				req.Size(order.Quantity.Mul(ask).String())
 			}
 		} else {
 			// spot market order: order.Quantity unit is base coin, so
@@ -818,12 +834,16 @@ func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fi
 		// balance (no amount parameter). The debt currency is the asset that
 		// was borrowed; repay in the hedge session's quote currency.
 		if strings.ToUpper(asset) == marginQuoteCurrency {
-			log.Warnf(
-				"okex margin repay: debt currency is %s (quote); "+
-					"one-click-repay requires repayCcy != debtCcy. "+
-					"Debt will be offset by the next cross sell or requires manual handling.",
+			// one-click-repay requires repayCcy != debtCcy, so a debt
+			// denominated in the quote currency cannot be repaid through
+			// this endpoint. Report an error so callers do not treat this
+			// as a successful repayment (they log it; the debt is offset by
+			// the next cross sell, or needs manual handling).
+			return fmt.Errorf(
+				"okex: cannot one-click-repay debt denominated in %s (quote): "+
+					"one-click-repay requires repayCcy != debtCcy; "+
+					"the debt is offset by the next cross sell or requires manual handling",
 				marginQuoteCurrency)
-			return nil
 		}
 
 		req := e.client.NewOneClickRepayRequest()

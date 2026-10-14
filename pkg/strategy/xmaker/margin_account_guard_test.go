@@ -2,7 +2,8 @@ package xmaker
 
 import (
 	"context"
-	"errors"
+	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -10,53 +11,56 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/okex"
+	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
+	"github.com/c9s/bbgo/pkg/testing/httptesting"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
 )
 
-// guardExchange wraps a mock exchange and optionally implements the optional
-// CheckMarginAccount guard that the okex exchange provides. When checkErr is
-// nil the guard succeeds; the call count proves whether it was ever invoked.
-type guardExchange struct {
-	*mocks.MockExchange
-	checkErr  error
-	callCount int
+// okexHedgeSession builds a real *okex.Exchange (so the *okex.Exchange type
+// assertion in the guard matches) pointed at a mock transport, wired into an
+// okex session with margin enabled. The account-config response is what the
+// guard (okex.EnsureAutoLoanEnabled) will observe.
+func okexHedgeSession(t *testing.T, acctLv int, autoLoan bool) (*bbgo.ExchangeSession, *httptesting.MockTransport) {
+	t.Helper()
+	transport := &httptesting.MockTransport{}
+	client := okexapi.NewClient()
+	// dummy credentials so the signed account-config request passes the
+	// client's auth check and reaches the mock transport
+	client.Auth("key", "secret", "passphrase")
+	client.HttpClient.Transport = transport
+
+	ex := okex.New("key", "secret", "passphrase", okex.WithClient(client))
+	ex.MarginSettings.IsMargin = true
+
+	transport.GET("/api/v5/account/config", func(*http.Request) (*http.Response, error) {
+		return httptesting.BuildResponseString(http.StatusOK,
+			`{"code":"0","data":[{"acctLv":`+strconv.Itoa(acctLv)+
+				`,"autoLoan":`+strconv.FormatBool(autoLoan)+`,"enableSpotBorrow":false}]}`), nil
+	})
+
+	hedge := bbgo.NewExchangeSession("okex", ex)
+	hedge.Margin = true
+	return hedge, transport
 }
 
-func (g *guardExchange) CheckMarginAccount(_ context.Context) error {
-	g.callCount++
-	return g.checkErr
-}
-
-func newMockExchangeWithStream(t *testing.T) *mocks.MockExchange {
+// mockHedgeSession builds a hedge session whose exchange is NOT *okex.Exchange
+// (e.g. binance / max), so the guard's type assertion misses and the probe is
+// a no-op.
+func mockHedgeSession(t *testing.T) *bbgo.ExchangeSession {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 	ex := mocks.NewMockExchange(ctrl)
 	ex.EXPECT().NewStream().Return(&types.StandardStream{}).AnyTimes()
 	ex.EXPECT().Name().Return(types.ExchangeName("okex")).AnyTimes()
-	return ex
+
+	hedge := bbgo.NewExchangeSession("okex", ex)
+	hedge.Margin = true
+	return hedge
 }
 
-// newHedgeSessionWithGuard builds a hedge session whose exchange implements
-// CheckMarginAccount and returns (session, guard) so the test can inspect the
-// guard's call count.
-func newHedgeSessionWithGuard(t *testing.T, checkErr error) (*bbgo.ExchangeSession, *guardExchange) {
-	t.Helper()
-	inner := newMockExchangeWithStream(t)
-	guard := &guardExchange{MockExchange: inner, checkErr: checkErr}
-	return bbgo.NewExchangeSession("okex", guard), guard
-}
-
-// newHedgeSessionNoGuard builds a hedge session whose exchange does NOT
-// implement CheckMarginAccount (e.g. binance / max), so the probe is a no-op.
-func newHedgeSessionNoGuard(t *testing.T) *bbgo.ExchangeSession {
-	t.Helper()
-	return bbgo.NewExchangeSession("okex", newMockExchangeWithStream(t))
-}
-
-// crossRunSessions returns a sessions map wired for the cross-run setup: an
-// okex hedge session and a (bare) maker session.
 func crossRunSessions(hedge *bbgo.ExchangeSession) map[string]*bbgo.ExchangeSession {
 	return map[string]*bbgo.ExchangeSession{
 		"okex": hedge,
@@ -80,60 +84,62 @@ func crossRunStrategy(hedge *bbgo.ExchangeSession) *Strategy {
 // hedge market lookup.
 const marketNotDefined = "source session market BTCUSDT is not defined"
 
-// Ticket 06: a misconfigured OKX hedge account blocks only this strategy
-// instance (with a descriptive error), while a good account, an exchange
-// without the guard, and a margin-disabled session all proceed past the guard.
+// Ticket 06: a misconfigured OKX hedge account disables only this strategy
+// instance (no error propagates, so bbgo keeps running), while a good account,
+// an exchange without the guard, and a margin-disabled session all proceed
+// past the guard.
 func TestStrategy_CrossRun_MarginAccountGuard(t *testing.T) {
-	t.Run("guard fails: blocks only this instance with the guard's error", func(t *testing.T) {
-		guardErr := errors.New("okex margin session requires a multi-currency margin account (acctLv >= 3), got acctLv=1")
-		hedge, guard := newHedgeSessionWithGuard(t, guardErr)
-		hedge.Margin = true
+	t.Run("guard fails: this instance does not start, no error propagates", func(t *testing.T) {
+		// acctLv=1 -> EnsureAutoLoanEnabled errors -> the guard logs and
+		// returns nil (instance blocked) instead of an error that would take
+		// down the whole bbgo process.
+		hedge, _ := okexHedgeSession(t, 1, true)
 
 		s := crossRunStrategy(hedge)
 		err := s.CrossRun(context.Background(), nil, crossRunSessions(hedge))
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "acctLv", "the guard's descriptive error must surface")
-		assert.NotContains(t, err.Error(), "not defined", "must stop at the guard, not the market lookup")
-		assert.Equal(t, 1, guard.callCount, "the guard must be invoked exactly once")
+		assert.NoError(t, err, "a misconfigured okex account must not take down bbgo")
 	})
 
 	t.Run("guard succeeds: proceeds past the guard to the market lookup", func(t *testing.T) {
-		hedge, guard := newHedgeSessionWithGuard(t, nil)
-		hedge.Margin = true
+		// acctLv=3 + autoLoan -> guard passes; no market configured on the
+		// hedge session, so CrossRun advances to the first market lookup.
+		hedge, _ := okexHedgeSession(t, 3, true)
 
 		s := crossRunStrategy(hedge)
 		err := s.CrossRun(context.Background(), nil, crossRunSessions(hedge))
 
-		// no market configured on the hedge session, so a successful guard lets
-		// CrossRun advance to the first market lookup and fail there
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), marketNotDefined, "a good account must proceed past the guard")
 		assert.NotContains(t, err.Error(), "acctLv")
-		assert.Equal(t, 1, guard.callCount)
 	})
 
 	t.Run("exchange without the guard: probe is a no-op and proceeds", func(t *testing.T) {
-		hedge := newHedgeSessionNoGuard(t)
-		hedge.Margin = true
+		hedge := mockHedgeSession(t)
 
 		s := crossRunStrategy(hedge)
 		err := s.CrossRun(context.Background(), nil, crossRunSessions(hedge))
 
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), marketNotDefined, "a non-guarding exchange must proceed unchanged")
+		assert.Contains(t, err.Error(), marketNotDefined, "a non-okex exchange must proceed unchanged")
 	})
 
 	t.Run("margin disabled: guard is never invoked", func(t *testing.T) {
-		hedge, guard := newHedgeSessionWithGuard(t, errors.New("should not be reached"))
+		hedge, transport := okexHedgeSession(t, 1, true)
 		hedge.Margin = false
+
+		configQueries := 0
+		transport.GET("/api/v5/account/config", func(*http.Request) (*http.Response, error) {
+			configQueries++
+			return httptesting.BuildResponseString(http.StatusOK,
+				`{"code":"0","data":[{"acctLv":"1","autoLoan":true,"enableSpotBorrow":false}]}`), nil
+		})
 
 		s := crossRunStrategy(hedge)
 		err := s.CrossRun(context.Background(), nil, crossRunSessions(hedge))
 
-		// even a failing guard must not fire when margin is off
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), marketNotDefined)
-		assert.Equal(t, 0, guard.callCount, "the guard must not run when margin is disabled")
+		assert.Equal(t, 0, configQueries, "the guard must not run when margin is disabled")
 	})
 }

@@ -27,6 +27,9 @@ type orderBodyParams struct {
 }
 
 func testSizingMarket() types.Market {
+	// QuotePrecision is deliberately left zero: the adapter does not
+	// populate it (OKX's instrument API exposes no quote-currency
+	// precision), and the sizing decision must not depend on it.
 	return types.Market{
 		Symbol:          "BTCUSDT",
 		BaseCurrency:    "BTC",
@@ -35,7 +38,6 @@ func testSizingMarket() types.Market {
 		TickSize:        fixedpoint.MustNewFromString("0.01"),
 		PricePrecision:  2,
 		VolumePrecision: 8,
-		QuotePrecision:  2,
 	}
 }
 
@@ -127,9 +129,40 @@ func TestExchange_SubmitOrder_MarginMarketSizing(t *testing.T) {
 
 		assert.Equal(t, "cross", got.TdMode)
 		assert.Equal(t, "buy", got.Side)
-		// 0.01 BTC * 100000 USDT = 1000.00 USDT, at quote precision 2
-		assert.Equal(t, "1000.00", got.Sz)
+		// 0.01 BTC * 100000 USDT = 1000 USDT, as a plain number
+		// (independent of any quote precision; trailing zeros normalize away)
+		assert.Equal(t, "1000", got.Sz)
 		assert.Empty(t, got.TgtCcy, "margin market buy must not send tgtCcy")
+	})
+
+	t.Run("margin buy: fractional notional is not truncated", func(t *testing.T) {
+		ex := New("key", "secret", "passphrase")
+		ex.MarginSettings.IsMargin = true
+
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		transport.GET("/api/v5/market/ticker", func(req *http.Request) (*http.Response, error) {
+			return respondTicker("45.23"), nil
+		})
+
+		var got orderBodyParams
+		transport.POST("/api/v5/trade/order", func(req *http.Request) (*http.Response, error) {
+			got = readOrderBody(t, req)
+			return respondOrder(), nil
+		})
+
+		// 0.0001 BTC * 45.23 USDT = 0.004523 USDT; formatting at an
+		// unpopulated (zero) quote precision would have sent "0"
+		_, err := ex.SubmitOrder(context.Background(), types.SubmitOrder{
+			Symbol:   "BTCUSDT",
+			Side:     types.SideTypeBuy,
+			Type:     types.OrderTypeMarket,
+			Quantity: fixedpoint.MustNewFromString("0.0001"),
+			Market:   testSizingMarket(),
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, "0.004523", got.Sz)
 	})
 
 	t.Run("margin buy with zero ask: explicit error, no order sent", func(t *testing.T) {

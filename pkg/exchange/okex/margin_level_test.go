@@ -109,11 +109,12 @@ func TestExchange_QueryAccount_MarginLevel(t *testing.T) {
 	})
 }
 
-// Ticket 04 (guard): CheckMarginAccount fails fast with a descriptive error
-// when the account is below level 3 or auto loan is off; it is a no-op when
-// margin is not enabled and succeeds for a properly configured account.
-func TestExchange_CheckMarginAccount(t *testing.T) {
-	t.Run("margin off: no-op, no config query", func(t *testing.T) {
+// Ticket 04 (guard): EnsureAutoLoanEnabled reports (true, nil) for a verified
+// loan-enabled margin session, (false, nil) when margin is off (no config
+// query), and a descriptive error when the account is below level 3 or auto
+// loan is off.
+func TestExchange_EnsureAutoLoanEnabled(t *testing.T) {
+	t.Run("margin off: not applicable, no config query", func(t *testing.T) {
 		ex := New("key", "secret", "passphrase")
 		// IsMargin false
 
@@ -121,10 +122,12 @@ func TestExchange_CheckMarginAccount(t *testing.T) {
 		ex.client.HttpClient.Transport = transport
 		// no handlers registered: any config query would fail the test
 
-		assert.NoError(t, ex.CheckMarginAccount(context.Background()))
+		enabled, err := ex.EnsureAutoLoanEnabled(context.Background())
+		assert.NoError(t, err)
+		assert.False(t, enabled)
 	})
 
-	t.Run("level 3 + auto loan: succeeds", func(t *testing.T) {
+	t.Run("level 3 + auto loan: loan-enabled", func(t *testing.T) {
 		ex := New("key", "secret", "passphrase")
 		ex.MarginSettings.IsMargin = true
 
@@ -134,7 +137,9 @@ func TestExchange_CheckMarginAccount(t *testing.T) {
 			return accountConfigJSON(3, true, false), nil
 		})
 
-		assert.NoError(t, ex.CheckMarginAccount(context.Background()))
+		enabled, err := ex.EnsureAutoLoanEnabled(context.Background())
+		assert.NoError(t, err)
+		assert.True(t, enabled)
 	})
 
 	t.Run("level below 3: names the account-level problem", func(t *testing.T) {
@@ -147,8 +152,9 @@ func TestExchange_CheckMarginAccount(t *testing.T) {
 			return accountConfigJSON(1, true, false), nil
 		})
 
-		err := ex.CheckMarginAccount(context.Background())
+		enabled, err := ex.EnsureAutoLoanEnabled(context.Background())
 		assert.Error(t, err)
+		assert.False(t, enabled)
 		assert.Contains(t, err.Error(), "acctLv")
 		assert.Contains(t, err.Error(), "got acctLv=1")
 	})
@@ -163,8 +169,9 @@ func TestExchange_CheckMarginAccount(t *testing.T) {
 			return accountConfigJSON(3, false, false), nil
 		})
 
-		err := ex.CheckMarginAccount(context.Background())
+		enabled, err := ex.EnsureAutoLoanEnabled(context.Background())
 		assert.Error(t, err)
+		assert.False(t, enabled)
 		assert.Contains(t, err.Error(), "auto loan")
 	})
 }
