@@ -500,12 +500,12 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 						"cannot convert margin market buy size to quote: %s ask price is zero", order.Symbol)
 				}
 
-				// quote-denominated notional as the exact fixed-point decimal
-				// (no currency symbol — OKX sz is a plain number). The
-				// adapter does not populate market.QuotePrecision (OKX's
-				// instrument API exposes no quote-currency precision), so the
-				// notional must not be formatted with it: truncating to an
-				// integer would zero out small orders.
+				// quote-denominated notional as the 18-digit fixed-point
+				// decimal (no currency symbol — OKX sz is a plain number).
+				// The adapter does not populate market.QuotePrecision
+				// (OKX's instrument API exposes no quote-currency
+				// precision), so the notional must not be formatted with
+				// it: truncating to an integer would zero out small orders.
 				req.Size(order.Quantity.Mul(ask).String())
 			}
 		} else {

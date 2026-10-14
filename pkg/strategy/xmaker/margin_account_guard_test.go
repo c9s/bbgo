@@ -2,6 +2,7 @@ package xmaker
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"testing"
@@ -112,6 +113,25 @@ func TestStrategy_CrossRun_MarginAccountGuard(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), marketNotDefined, "a good account must proceed past the guard")
 		assert.NotContains(t, err.Error(), "acctLv")
+	})
+
+	t.Run("guard query fails: this instance does not start, no error propagates", func(t *testing.T) {
+		// A transient API failure while querying the account config must
+		// behave like any other guard failure: this instance is disabled
+		// (CrossRun returns nil) instead of aborting Trader.Run and stopping
+		// the whole bbgo process.
+		hedge, transport := okexHedgeSession(t, 3, true)
+		configQueries := 0
+		transport.GET("/api/v5/account/config", func(*http.Request) (*http.Response, error) {
+			configQueries++
+			return nil, errors.New("connection refused")
+		})
+
+		s := crossRunStrategy(hedge)
+		err := s.CrossRun(context.Background(), nil, crossRunSessions(hedge))
+
+		assert.Equal(t, 1, configQueries, "the guard must attempt the config query")
+		assert.NoError(t, err, "a config query failure must not take down bbgo")
 	})
 
 	t.Run("exchange without the guard: probe is a no-op and proceeds", func(t *testing.T) {

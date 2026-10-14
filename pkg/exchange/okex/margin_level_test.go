@@ -2,6 +2,7 @@ package okex
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"testing"
@@ -173,5 +174,21 @@ func TestExchange_EnsureAutoLoanEnabled(t *testing.T) {
 		assert.Error(t, err)
 		assert.False(t, enabled)
 		assert.Contains(t, err.Error(), "auto loan")
+	})
+
+	t.Run("config query fails: reports the query error", func(t *testing.T) {
+		ex := New("key", "secret", "passphrase")
+		ex.MarginSettings.IsMargin = true
+
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+		transport.GET("/api/v5/account/config", func(*http.Request) (*http.Response, error) {
+			return nil, errors.New("connection refused")
+		})
+
+		enabled, err := ex.EnsureAutoLoanEnabled(context.Background())
+		assert.Error(t, err)
+		assert.False(t, enabled)
+		assert.Contains(t, err.Error(), "unable to query the okex account config")
 	})
 }
