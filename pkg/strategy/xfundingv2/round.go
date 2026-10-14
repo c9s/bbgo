@@ -663,7 +663,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 	spotActiveOrder := n.spotWorker.activeOrder
 
 	if n.hasStarted() {
-		if n.State() == RoundClosed {
+		if n.State() == RoundClosed || n.State() == RoundStopped {
 			realizedPnL := n.RealizedPnL()
 			spotAvgCost = realizedPnL.SpotPosition.AverageCost
 			futuresAvgCost = realizedPnL.FuturesPosition.AverageCost
@@ -742,7 +742,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 	)
 
 	if n.hasStarted() {
-		if n.State() == RoundClosed {
+		if n.State() == RoundClosed || n.State() == RoundStopped {
 			realizedPnL := n.RealizedPnL()
 			fields = append(fields, realizedPnLFields(realizedPnL)...)
 		} else {
@@ -836,7 +836,7 @@ func (n *roundNotification) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 		)
-	case RoundClosed:
+	case RoundClosed, RoundStopped:
 		fields = append(fields,
 			slack.AttachmentField{
 				Title: "Closed Time",
@@ -937,7 +937,7 @@ func (r *ArbitrageRound) stateColor() string {
 		color = "#56CCF2"
 	case RoundClosing:
 		color = "#F2994A"
-	case RoundClosed:
+	case RoundClosed, RoundStopped:
 		color = "#B10202"
 	default:
 		color = "#9C9494"

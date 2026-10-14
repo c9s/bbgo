@@ -2251,7 +2251,7 @@ func (s *Strategy) closeDelistedRounds(currentTime time.Time) {
 
 	for _, round := range s.allRounds() {
 		state := round.State()
-		if state == RoundClosed {
+		if state == RoundClosed || state == RoundStopped {
 			continue
 		}
 		symbol := round.SpotSymbol()
@@ -2431,7 +2431,7 @@ func (s *Strategy) positionMismatchCheck() error {
 	}
 	// on the other hand, if there is active round which is not closed without a corresponding open position, it is also a mismatch.
 	for symbol, round := range s.ActiveRounds {
-		if round.State() == RoundClosed {
+		if round.State() == RoundClosed || round.State() == RoundStopped {
 			continue
 		}
 		_, found := risksMap[symbol]
