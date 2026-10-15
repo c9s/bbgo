@@ -146,12 +146,20 @@ func (c *ChanCursor) Finish() {
 }
 
 func (c *ChanCursor) Next() bool {
-	c.mu.Lock()
-	err := c.err
-	c.mu.Unlock()
-	if err != nil {
-		c.cur = nil
-		return false
+	// Hand out everything the producer already delivered before reporting a
+	// failure or a cancellation. Those events arrived successfully and are real
+	// data; discarding them would silently truncate the stream just before the
+	// error that explains it. A closed channel still yields its buffered values,
+	// so Fail and Finish both come out in the right order.
+	select {
+	case ev, ok := <-c.ch:
+		if !ok {
+			c.cur = nil
+			return false
+		}
+		c.cur = ev
+		return true
+	default:
 	}
 
 	select {
