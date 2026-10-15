@@ -1400,3 +1400,13 @@ func convertCancelOrderResponses(resps []v3.OrderCancelResponse, err error) ([]t
 
 	return toGlobalOrders(maxOrders)
 }
+
+func (e *Exchange) QuerySubaccounts(ctx context.Context) ([]v3.SubAccount, error) {
+	req := e.v3client.SubAccountService.NewGetSubAccountsRequest()
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
