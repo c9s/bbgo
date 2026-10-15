@@ -73,6 +73,9 @@ type HedgeMarketConfig struct {
 	QuotingDepthInQuote fixedpoint.Value `json:"quotingDepthInQuote"`
 
 	SyncOrder *bool `json:"syncOrder,omitempty"`
+
+	// Verbose, when true, logs the order form before submitting it in submitOrder.
+	Verbose bool `json:"verbose,omitempty"`
 }
 
 func (c *HedgeMarketConfig) Defaults() error {
@@ -437,6 +440,10 @@ func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitO
 	if m.dryRun {
 		m.logger.Infof("[dryRun] hedge order: %+v", submitOrder)
 		return nil, nil
+	}
+
+	if m.Verbose {
+		m.logger.Infof("submitting hedge order: %+v", submitOrder)
 	}
 
 	submitOrders := []types.SubmitOrder{
