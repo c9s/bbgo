@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/datasource/csvsource"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/marketdata/sources/binancecsv"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -62,7 +62,7 @@ func (s *HedgeSimulator) SetSlippage(slippage fixedpoint.Value) {
 }
 
 func (s *HedgeSimulator) LoadKLines(dir string) error {
-	klines, err := csvsource.ReadAllKLineCsv(dir, s.Symbol, types.Interval1m)
+	klines, err := binancecsv.ReadKLineDir(dir, s.Symbol, types.Interval1m)
 	if err != nil {
 		return err
 	}
