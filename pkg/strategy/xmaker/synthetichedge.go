@@ -24,6 +24,7 @@ const TradeTagMock = "mock"
 //
 // SplitSource can be used instead of Source to split the source hedge across multiple source markets,
 // e.g., binance.BTCUSDT and okex.BTCUSDT, while the fiat position is still hedged on the single fiat market.
+// SplitSource takes priority over Source: if SplitSource is enabled, Source is ignored.
 type SyntheticHedge struct {
 	// SyntheticHedge is a strategy that uses synthetic hedging to manage risk
 	Enabled bool `json:"enabled"`
@@ -32,7 +33,7 @@ type SyntheticHedge struct {
 	Fiat   *HedgeMarketConfig `json:"fiat"`
 
 	// SplitSource splits the source hedge across multiple source markets.
-	// It's mutually exclusive with Source.
+	// It takes priority over Source: if enabled, Source is ignored.
 	SplitSource *SplitHedge `json:"splitSource,omitempty"`
 
 	// sourcePosition is the aggregated source position of all the split source markets.
@@ -106,12 +107,9 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 		return fmt.Errorf("fiat must be set")
 	}
 
-	// exclusive check for source and splitSource
-	if s.isSplitSource() {
-		if s.Source != nil {
-			return fmt.Errorf("source and splitSource are mutually exclusive")
-		}
-	} else if s.Source == nil {
+	// splitSource takes priority over source: if splitSource is enabled, source is ignored
+	isSplitSource := s.isSplitSource()
+	if !isSplitSource && s.Source == nil {
 		return fmt.Errorf("source or splitSource must be set")
 	}
 
@@ -126,9 +124,14 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 		})
 	}
 
+	if isSplitSource && s.Source != nil {
+		// log a warning that the Source is ignored because SplitSource is enabled
+		s.logger.Warn("Source is ignored because SplitSource is enabled")
+	}
+
 	var err error
 
-	if !s.isSplitSource() {
+	if !isSplitSource {
 		// the ordinary source market initialization for synthetic hedge
 		s.sourceMarket, err = InitializeHedgeMarketFromConfig(s.Source, sessions)
 		if err != nil {

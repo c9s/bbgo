@@ -106,17 +106,6 @@ func TestSyntheticHedge_GetQuotePrices_SplitSource(t *testing.T) {
 }
 
 func TestSyntheticHedge_SplitSource_Validation(t *testing.T) {
-	t.Run("source and splitSource are mutually exclusive", func(t *testing.T) {
-		syn := &SyntheticHedge{
-			Enabled:     true,
-			Source:      &HedgeMarketConfig{SymbolSelector: "binance.BTCUSDT"},
-			SplitSource: &SplitHedge{Enabled: true},
-			Fiat:        &HedgeMarketConfig{SymbolSelector: "max.USDTTWD"},
-		}
-		err := syn.InitializeAndBind(nil, &Strategy{})
-		assert.ErrorContains(t, err, "mutually exclusive")
-	})
-
 	t.Run("source or splitSource is required", func(t *testing.T) {
 		syn := &SyntheticHedge{
 			Enabled: true,
