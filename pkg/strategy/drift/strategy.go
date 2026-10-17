@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -353,8 +354,8 @@ func (s *Strategy) trailingCheck(price float64, direction string) bool {
 	if isShort && s.sellPrice == 0 || !isShort && s.buyPrice == 0 {
 		return false
 	}
-	for i := len(s.TrailingCallbackRate) - 1; i >= 0; i-- {
-		trailingCallbackRate := s.TrailingCallbackRate[i]
+	for i, trailingCallbackRate := range slices.Backward(s.TrailingCallbackRate) {
+
 		trailingActivationRatio := s.TrailingActivationRatio[i]
 		if isShort {
 			if (s.sellPrice-s.lowestPrice)/s.lowestPrice > trailingActivationRatio {

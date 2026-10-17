@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -72,6 +73,10 @@ func newStrategyFixture(
 // TestNotifyInteractiveCloseRound builds an interactive close-round notification
 // and sends it through bbgo.Notify.
 func TestNotifyInteractiveCloseRound(t *testing.T) {
+	if os.Getenv("TEST_XFUNDINGV2_SLACK") == "" {
+		t.Skip("TEST_XFUNDINGV2_SLACK is not set")
+	}
+
 	slackBotToken := os.Getenv("SLACK_BOT_TOKEN")
 	slackAppToken := os.Getenv("SLACK_APP_TOKEN")
 	channel := os.Getenv("SLACK_CHANNEL")
@@ -90,6 +95,17 @@ func TestNotifyInteractiveCloseRound(t *testing.T) {
 
 	// build a live strategy fixture
 	s, round := newStrategyFixture(t, ctrl, "BTCUSDT", "test-slack-evt-id")
+	s.logger = logrus.New()
+	round.spotWorker.syncState.TWAPExecutor.syncState.Orders[1] = types.OrderQuery{
+		Symbol:    "BTCUSDT",
+		OrderID:   "1",
+		OrderUUID: "test-spot-uuid",
+	}
+	round.futuresWorker.syncState.TWAPExecutor.syncState.Orders[1] = types.OrderQuery{
+		Symbol:    "BTCUSDT",
+		OrderID:   "2",
+		OrderUUID: "test-futures-uuid",
+	}
 
 	// wire a real Slack notifier into bbgo's notification hub
 	client := slack.New(slackBotToken, slack.OptionAppLevelToken(slackAppToken))
@@ -104,7 +120,7 @@ func TestNotifyInteractiveCloseRound(t *testing.T) {
 
 	spotPrice, futuresPrice, _ := s.getLastPrices("BTCUSDT", "BTCUSDT")
 	c := newInteractiveCloseRound(round, s.slackEvtID, spotPrice, futuresPrice)
-	bbgo.Notify(c, round.NewNotification(spotPrice, futuresPrice))
+	bbgo.Notify(c, round.NewNotification(time.Now(), spotPrice, futuresPrice))
 
 	// the Slack notifier posts asynchronously and socket mode delivers clicks on
 	// its own goroutine; keep the process alive so the handler can run.
@@ -126,27 +142,27 @@ func TestCloseRoundInteraction(t *testing.T) {
 		blocks := c.SlackBlocks()
 
 		assert.True(t, hasBlockID(blocks, slackEvtID), "must carry the slackEvtID context block")
-		assert.True(t, hasBlockID(blocks, buttonsBlockID), "must carry the buttons block")
+		assert.True(t, hasBlockID(blocks, closeRoundButtonsBlockID), "must carry the buttons block")
 	})
 
 	t.Run("Close reveals confirm/cancel without changing state", func(t *testing.T) {
 		s, round := newStrategyFixture(t, ctrl, symbol, slackEvtID)
 		c := newInteractiveCloseRound(round, s.slackEvtID, Number(50000.0), Number(50010.0))
-		handler := newCloseRoundHandler(s)
+		handler := newCloseRoundHandler(s, s.SlackAuthUsers)
 
 		value := encodeCloseRoundValue(symbol, round.ID())
 		updates, err := handler(slack.User{Name: "alice"}, closeRoundMessage(c), closeRoundActionID, value)
 		assert.NoError(t, err)
 		assert.Len(t, updates, 1)
 		// buttons block is replaced (same block ID), and no state change yet
-		assert.True(t, hasBlockID(updates[0].Blocks, buttonsBlockID))
+		assert.True(t, hasBlockID(updates[0].Blocks, closeRoundButtonsBlockID))
 		assert.Equal(t, RoundReady, round.State(), "state must not change on first click")
 	})
 
 	t.Run("Confirm drives the round to closing", func(t *testing.T) {
 		s, round := newStrategyFixture(t, ctrl, symbol, slackEvtID)
 		c := newInteractiveCloseRound(round, s.slackEvtID, Number(50000.0), Number(50010.0))
-		handler := newCloseRoundHandler(s)
+		handler := newCloseRoundHandler(s, s.SlackAuthUsers)
 
 		value := encodeCloseRoundValue(symbol, round.ID())
 		updates, err := handler(slack.User{Name: "alice"}, closeRoundMessage(c), confirmCloseActionID, value)
@@ -154,14 +170,14 @@ func TestCloseRoundInteraction(t *testing.T) {
 		// confirm produces a single update replacing the message with the acknowledgement
 		assert.Len(t, updates, 1)
 		// the buttons block is stripped after confirm
-		assert.False(t, hasBlockID(updates[0].Blocks, buttonsBlockID))
+		assert.False(t, hasBlockID(updates[0].Blocks, closeRoundButtonsBlockID))
 		assert.Equal(t, RoundClosing, round.State(), "confirm must set the round to closing")
 	})
 
 	t.Run("Confirm on unknown symbol is a no-op", func(t *testing.T) {
 		s, round := newStrategyFixture(t, ctrl, symbol, slackEvtID)
 		c := newInteractiveCloseRound(round, s.slackEvtID, Number(50000.0), Number(50010.0))
-		handler := newCloseRoundHandler(s)
+		handler := newCloseRoundHandler(s, s.SlackAuthUsers)
 
 		value := encodeCloseRoundValue("DOGEUSDT", round.ID())
 		updates, err := handler(slack.User{Name: "alice"}, closeRoundMessage(c), confirmCloseActionID, value)
@@ -175,7 +191,7 @@ func TestCloseRoundInteraction(t *testing.T) {
 	t.Run("Confirm with a stale round ID is a no-op", func(t *testing.T) {
 		s, round := newStrategyFixture(t, ctrl, symbol, slackEvtID)
 		c := newInteractiveCloseRound(round, s.slackEvtID, Number(50000.0), Number(50010.0))
-		handler := newCloseRoundHandler(s)
+		handler := newCloseRoundHandler(s, s.SlackAuthUsers)
 
 		// same symbol, but the notification points at a round ID that is no longer
 		// the live round under this symbol — the click must not close it.
@@ -185,6 +201,6 @@ func TestCloseRoundInteraction(t *testing.T) {
 		// no-op still emits the main update plus a threaded "not closeable" reply
 		assert.Len(t, updates, 2)
 		assert.Equal(t, RoundReady, round.State(), "a stale round ID must not close the live round")
-		assert.False(t, hasBlockID(updates[0].Blocks, buttonsBlockID))
+		assert.False(t, hasBlockID(updates[0].Blocks, closeRoundButtonsBlockID))
 	})
 }

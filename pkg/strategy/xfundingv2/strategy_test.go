@@ -1,6 +1,8 @@
 package xfundingv2
 
 import (
+	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -9,7 +11,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/testing/httptesting"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -452,6 +457,7 @@ func TestRemoveRoundsOnStartup(t *testing.T) {
 	// helper to build a strategy with the given active-round symbols populated.
 	newStrategyWithRounds := func(t *testing.T, ctrl *gomock.Controller, symbols ...string) *Strategy {
 		s := newDefaultTestStrategy()
+		s.ctx = context.Background()
 		s.ActiveRounds = make(map[string]*ArbitrageRound)
 		s.SpotPositions = make(map[string]*types.Position)
 		s.FuturesPositions = make(map[string]*types.Position)
@@ -547,5 +553,114 @@ func TestRemoveRoundsOnStartup(t *testing.T) {
 		assert.False(t, ethActive, "ETHUSDT round should be removed after switching config")
 		assert.Contains(t, s.AppliedStartupRemovals, "ETHUSDT")
 		assert.NotContains(t, s.AppliedStartupRemovals, "BTCUSDT")
+	})
+}
+
+// newMockBinanceFuturesExchange builds a *binance.Exchange whose REST clients are
+// backed by a mock HTTP transport, so QueryFuturesExchangeInfo can be exercised
+// without hitting the network. exchangeInfoHandler serves /fapi/v1/exchangeInfo.
+func newMockBinanceFuturesExchange(t *testing.T, exchangeInfoHandler httptesting.RoundTripFunc) *binance.Exchange {
+	t.Helper()
+
+	transport := &httptesting.MockTransport{}
+	transport.GET("/fapi/v1/exchangeInfo", exchangeInfoHandler)
+
+	// keep the background server-time setter goroutine (started by binance.New) quiet
+	serverTime := httptesting.RoundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return httptesting.BuildResponseJson(http.StatusOK, map[string]any{"serverTime": time.Now().UnixMilli()}), nil
+	})
+	transport.GET("/api/v3/time", serverTime)
+	transport.GET("/fapi/v1/time", serverTime)
+
+	// binance.New captures binanceapi.DefaultHttpClient into its REST clients, so
+	// swap it in before constructing the exchange and restore it afterwards.
+	oldClient := binanceapi.DefaultHttpClient
+	binanceapi.DefaultHttpClient = &http.Client{Transport: transport}
+	t.Cleanup(func() {
+		binanceapi.DefaultHttpClient = oldClient
+	})
+
+	ex := binance.New("", "")
+	ex.IsFutures = true
+	return ex
+}
+
+func TestFilterLegitimateAssets(t *testing.T) {
+	// a futures exchange info response advertising BTC, ETH and USDT as assets.
+	okExchangeInfo := httptesting.RoundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return httptesting.BuildResponseJson(http.StatusOK, map[string]any{
+			"assets": []map[string]any{
+				{"asset": "BTC"},
+				{"asset": "ETH"},
+				{"asset": "USDT"},
+			},
+		}), nil
+	})
+
+	t.Run("non-binance futures exchange returns symbols unchanged", func(t *testing.T) {
+		s := newDefaultTestStrategy()
+		// newTestSession leaves Exchange nil, which is not a *binance.Exchange.
+		s.spotSession = newTestSession(types.MarketMap{}, types.BalanceMap{})
+		s.futuresSession = newTestSession(types.MarketMap{}, types.BalanceMap{})
+
+		symbols := []string{"BTCUSDT", "ETHUSDT"}
+		result := s.filterLegitimateAssets(context.Background(), symbols)
+		assert.Equal(t, symbols, result)
+	})
+
+	t.Run("returns symbols unchanged when exchange info query fails", func(t *testing.T) {
+		s := newDefaultTestStrategy()
+		s.spotSession = newTestSession(types.MarketMap{
+			"BTCUSDT": Market("BTCUSDT"),
+		}, types.BalanceMap{})
+		errExchangeInfo := httptesting.RoundTripFunc(func(_ *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusInternalServerError, `{"code":-1000,"msg":"internal error"}`), nil
+		})
+		s.futuresSession = &bbgo.ExchangeSession{
+			Exchange: newMockBinanceFuturesExchange(t, errExchangeInfo),
+		}
+
+		symbols := []string{"BTCUSDT", "ETHUSDT"}
+		result := s.filterLegitimateAssets(context.Background(), symbols)
+		assert.Equal(t, symbols, result)
+	})
+
+	t.Run("keeps legitimate assets and drops the rest", func(t *testing.T) {
+		s := newDefaultTestStrategy()
+		// BNBUSDT is the fee symbol (no market needed, filtered before the lookup).
+		s.FeeSymbol = "BNBUSDT"
+		s.spotSession = newTestSession(types.MarketMap{
+			"BTCUSDT":  Market("BTCUSDT"),  // base BTC   -> legitimate
+			"ETHUSDT":  Market("ETHUSDT"),  // base ETH   -> legitimate
+			"USDCUSDT": Market("USDCUSDT"), // base USDC  -> not a futures asset
+		}, types.BalanceMap{})
+		s.futuresSession = &bbgo.ExchangeSession{
+			Exchange: newMockBinanceFuturesExchange(t, okExchangeInfo),
+		}
+
+		symbols := []string{
+			"BTCUSDT",  // kept
+			"ETHUSDT",  // kept
+			"USDCUSDT", // dropped: USDC is not in the futures assets map
+			"BNBUSDT",  // dropped: it is the fee symbol
+			"DOGEUSDT", // dropped: no spot market
+		}
+		result := s.filterLegitimateAssets(context.Background(), symbols)
+		assert.Equal(t, []string{"BTCUSDT", "ETHUSDT"}, result)
+	})
+
+	t.Run("empty fee symbol does not filter any candidate", func(t *testing.T) {
+		s := newDefaultTestStrategy()
+		s.FeeSymbol = ""
+		s.spotSession = newTestSession(types.MarketMap{
+			"BTCUSDT": Market("BTCUSDT"),
+			"ETHUSDT": Market("ETHUSDT"),
+		}, types.BalanceMap{})
+		s.futuresSession = &bbgo.ExchangeSession{
+			Exchange: newMockBinanceFuturesExchange(t, okExchangeInfo),
+		}
+
+		result := s.filterLegitimateAssets(context.Background(), []string{"BTCUSDT", "ETHUSDT"})
+		assert.Equal(t, []string{"BTCUSDT", "ETHUSDT"}, result)
 	})
 }

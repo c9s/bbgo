@@ -56,8 +56,8 @@ func (d *CoveredDepth) Pricer() Pricer {
 			return depthFunc(d.side, d.initialDepth)
 		}
 
-		if d.lastIndex == 0 {
-			// If this is the first index, we set the initial depth.
+		if d.lastIndex < 0 {
+			// If this is the first call, we set the initial depth.
 			price = depthFunc(d.side, d.initialDepth)
 			d.accumulatedDepth = d.initialDepth
 		} else {

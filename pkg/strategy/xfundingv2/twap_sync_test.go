@@ -102,6 +102,7 @@ func TestTWAPWorker_UnmarshalJSON(t *testing.T) {
 					MaxSlippage:   fixedpoint.NewFromFloat(0.001),
 					CheckInterval: types.Duration(30 * time.Second),
 				},
+				DisableTWAP:          true,
 				TargetPosition:       fixedpoint.NewFromFloat(1.5),
 				State:                TWAPWorkerStateRunning,
 				StartAt:              now,
@@ -123,6 +124,7 @@ func TestTWAPWorker_UnmarshalJSON(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, original.syncState.Config, restored.syncState.Config)
+		assert.Equal(t, original.syncState.DisableTWAP, restored.syncState.DisableTWAP)
 		assert.Equal(t, original.syncState.TargetPosition, restored.syncState.TargetPosition)
 		assert.Equal(t, original.syncState.State, restored.syncState.State)
 		assert.Equal(t, original.syncState.Symbol, restored.syncState.Symbol)

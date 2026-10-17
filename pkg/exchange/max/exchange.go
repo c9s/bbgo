@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"time"
@@ -1013,8 +1014,8 @@ func (e *Exchange) QueryDepositHistory(
 			return nil, err
 		}
 
-		for i := len(deposits) - 1; i >= 0; i-- {
-			d := deposits[i]
+		for _, d := range slices.Backward(deposits) {
+
 			if _, ok := txIDs[d.TxID]; ok {
 				continue
 			}

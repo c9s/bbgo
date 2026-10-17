@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/cheggaaa/pb/v3"
@@ -245,8 +246,8 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 		return appCnt(configJson, nil)
 	}
 
-	for i := len(ops) - 1; i >= 0; i-- {
-		cur := ops[i]
+	for _, cur := range slices.Backward(ops) {
+
 		inner := wrapper
 		innerCnt := wrapperCnt
 		wrapper = func(configJson []byte) error {

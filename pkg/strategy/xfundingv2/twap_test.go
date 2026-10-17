@@ -771,6 +771,15 @@ func TestTWAPWorker_Misc(t *testing.T) {
 			assert.Equal(t, Number(3.0), sliceQty)
 		})
 
+		t.Run("DisableTWAP returns all remaining", func(t *testing.T) {
+			worker.DisableTWAP()
+			defer worker.EnableTWAP()
+
+			// remaining = 5.0, which would normally be capped at MaxSliceSize (0.5)
+			sliceQty := worker.calculateSliceQuantity(startTime, Number(5.0), false, market, fixedpoint.Zero)
+			assert.Equal(t, Number(5.0), sliceQty)
+		})
+
 		t.Run("dust slice re-sliced by minQty", func(t *testing.T) {
 			// BTCUSDT: MinNotional=10, MinQuantity=0.001
 			// Use 20 slices so slice=1.0/20=0.05, notional=5<=10 => dust

@@ -137,6 +137,16 @@ type ExchangeTradeService interface {
 	QueryOpenOrders(ctx context.Context, symbol string) (orders []Order, err error)
 
 	CancelOrders(ctx context.Context, orders ...Order) error
+
+	ExchangeCancelReplaceService
+}
+
+// ExchangeCancelReplaceService is the venue order-replacement capability.
+// Implementations may use a native atomic endpoint or the conservative
+// cancel-then-create fallback. They must return an error for partial or
+// ambiguous venue results.
+type ExchangeCancelReplaceService interface {
+	CancelReplace(ctx context.Context, cancelReplaceMode CancelReplaceModeType, order Order) (*Order, error)
 }
 
 type ExchangeDefaultFeeRates interface {

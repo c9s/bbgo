@@ -91,6 +91,28 @@ func (m *mockFuturesService) SetLeverage(ctx context.Context, symbol string, lev
 	return nil
 }
 
+func (m *mockFuturesService) QueryTakerBuySellVolumes(
+	ctx context.Context, symbol string, interval types.Interval, options types.TradeQueryOptions,
+) ([]binanceapi.FuturesTakerBuySellVolume, error) {
+	return nil, nil
+}
+
+func (m *mockFuturesService) QueryDepth(ctx context.Context, symbol string) (types.SliceOrderBook, int64, error) {
+	return types.SliceOrderBook{}, 0, nil
+}
+
+func (m *mockFuturesService) QueryFuturesFundingInfo(ctx context.Context) ([]binanceapi.FuturesFundingInfo, error) {
+	return nil, nil
+}
+
+func (m *mockFuturesService) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
+	return nil, nil
+}
+
+func (m *mockFuturesService) QueryFuturesAdlRisk(ctx context.Context, symbol string) (map[string]*binanceapi.AdlRisk, error) {
+	return nil, nil
+}
+
 func newTestArbitrageRound(t *testing.T, ctrl *gomock.Controller, fundingIntervalHours, minHoldingIntervals int, nextFundingTime time.Time) (*ArbitrageRound, *mockFuturesService) {
 	config := TWAPWorkerConfig{
 		Duration:  types.Duration(10 * time.Minute),
@@ -764,4 +786,16 @@ func TestArbitrageRound_FollowerUsesTakerOrders(t *testing.T) {
 	// executor configs stay in sync with their workers
 	assert.Equal(t, TWAPOrderTypeTaker, round.SpotWorker().Executor().syncState.Config.OrderType)
 	assert.Equal(t, TWAPOrderTypeMaker, round.FuturesWorker().Executor().syncState.Config.OrderType)
+}
+
+func TestArbitrageRound_Cleanup(t *testing.T) {
+	for _, state := range []RoundState{RoundPending, RoundOpening, RoundReady, RoundClosing} {
+		t.Run("Cleanup_Should_Error_"+state.String(), func(t *testing.T) {
+			round := &ArbitrageRound{}
+			ctx := context.Background()
+			round.syncState.State = state
+			err := round.Cleanup(ctx, nil)
+			assert.Error(t, err)
+		})
+	}
 }

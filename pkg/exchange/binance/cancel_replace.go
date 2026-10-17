@@ -9,25 +9,35 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+var _ types.ExchangeTradeService = (*Exchange)(nil)
+
 func (e *Exchange) CancelReplace(ctx context.Context, cancelReplaceMode types.CancelReplaceModeType, o types.Order) (*types.Order, error) {
+	if e.IsFutures || e.IsMargin {
+		_ = cancelReplaceMode
+		return types.CancelReplaceByCancelAndCreate(ctx, e, o)
+	}
+	if e.client2 == nil {
+		return nil, types.NewOrderError(fmt.Errorf("binance cancel-replace client is not initialized"), o)
+	}
 	if err := orderLimiter.Wait(ctx); err != nil {
 		log.WithError(err).Errorf("order rate limiter wait error")
 		return nil, err
 	}
 
-	if e.IsFutures || e.IsMargin {
-		// Not supported at the moment
-		return nil, nil
-	}
 	var req = e.client2.NewCancelReplaceSpotOrderRequest()
 	req.Symbol(o.Symbol)
 	req.Side(binance.SideType(o.Side))
 	if o.OrderID > 0 {
 		req.CancelOrderId(int(o.OrderID))
+	} else if o.ClientOrderID != "" {
+		req.CancelOrigClientOrderId(o.ClientOrderID)
 	} else {
-		return nil, types.NewOrderError(fmt.Errorf("cannot cancel %s order", o.Symbol), o)
+		return nil, types.NewOrderError(fmt.Errorf("cannot cancel %s order without order ID or client order ID", o.Symbol), o)
 	}
 	req.CancelReplaceMode(binanceapi.CancelReplaceModeType(cancelReplaceMode))
+	if o.ClientOrderID != "" {
+		req.NewClientOrderId(o.ClientOrderID)
+	}
 	if len(o.TimeInForce) > 0 {
 		// TODO: check the TimeInForce value
 		req.TimeInForce(string(binance.TimeInForceType(o.TimeInForce)))
@@ -64,8 +74,23 @@ func (e *Exchange) CancelReplace(ctx context.Context, cancelReplaceMode types.Ca
 	req.NewOrderRespType(binanceapi.Full)
 
 	resp, err := req.Do(ctx)
-	if resp != nil && resp.Data != nil && resp.Data.NewOrderResponse != nil {
-		return toGlobalOrder(resp.Data.NewOrderResponse, e.IsMargin)
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+	if resp == nil || resp.Data == nil {
+		return nil, types.NewOrderError(fmt.Errorf("binance cancel-replace returned no result data"), o)
+	}
+	if resp.Data.CancelResult != "SUCCESS" ||
+		resp.Data.NewOrderResult != "SUCCESS" ||
+		resp.Data.NewOrderResponse == nil {
+		return nil, types.NewOrderError(fmt.Errorf(
+			"binance cancel-replace partial result: cancelResult=%s newOrderResult=%s newOrderResponsePresent=%t",
+			resp.Data.CancelResult, resp.Data.NewOrderResult, resp.Data.NewOrderResponse != nil), o)
+	}
+
+	newOrder, err := toGlobalOrder(resp.Data.NewOrderResponse, e.IsMargin)
+	if err != nil {
+		return nil, err
+	}
+	return newOrder, nil
 }

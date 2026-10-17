@@ -148,6 +148,17 @@ func (w *TWAPWorker) SetTargetPosition(targetPosition fixedpoint.Value) {
 	w.syncState.TargetPosition = targetPosition
 }
 
+// EnableTWAP re-enables TWAP slicing (the default behavior).
+func (w *TWAPWorker) EnableTWAP() {
+	w.syncState.DisableTWAP = false
+}
+
+// DisableTWAP disables TWAP slicing: subsequent orders are placed for
+// the full remaining quantity instead of being sliced.
+func (w *TWAPWorker) DisableTWAP() {
+	w.syncState.DisableTWAP = true
+}
+
 // OrderType returns the worker's configured order type (maker or taker).
 func (w *TWAPWorker) OrderType() TWAPOrderType {
 	return w.syncState.Config.OrderType
@@ -386,7 +397,7 @@ func (w *TWAPWorker) Tick(currentTime time.Time, orderBook types.OrderBook) erro
 	}
 
 	// the existing active order is in the opposite direction of the remaining quantity
-	if w.activeOrder != nil && remaining.Sign()*orderSide(remaining).Int() < 0 {
+	if w.activeOrder != nil && w.activeOrder.Side.Int()*remaining.Sign() < 0 {
 		if !w.activeOrder.GetRemainingQuantity().IsZero() {
 			// cancel the active order
 			w.logger.Infof("[TWAP tick] active order of opposite direction detected, canceling: %s", w.activeOrder)
@@ -541,6 +552,11 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 	remaining = remaining.Abs()
 	w.logger.Debugf("remaining quantity: %s@%s", remaining, price)
 
+	if w.syncState.DisableTWAP {
+		w.logger.Debugf("TWAP disabled, placing full remaining quantity: %s@%s", remaining, price)
+		return remaining
+	}
+
 	if deadlineExceeded {
 		w.logger.Debugf("deadline exceeded, placing final order: %s@%s", remaining, price)
 		return remaining
@@ -594,6 +610,13 @@ func (w *TWAPWorker) calculateSliceQuantity(currentTime time.Time, remaining fix
 	if sliceQty.Compare(remaining) > 0 {
 		sliceQty = remaining
 	}
+
+	// if the residual quantity is dust, add it to the slice quantity
+	residualQty := remaining.Sub(sliceQty)
+	if !price.IsZero() && residualQty.Sign() > 0 && w.Market().IsDustQuantity(residualQty, price) {
+		sliceQty = sliceQty.Add(residualQty)
+	}
+
 	// cap at available balance for spot orders
 	if !w.Executor().IsFutures() {
 		switch orderSide(remaining) {

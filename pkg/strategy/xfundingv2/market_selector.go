@@ -52,13 +52,10 @@ func (c *MarketSelectionConfig) Defaults() {
 		c.FuturesDirection = types.PositionShort
 	}
 	if c.MaxHoldingDuration == 0 {
-		c.MaxHoldingDuration = types.Duration(time.Hour * 48)
+		c.MaxHoldingDuration = types.Duration(time.Hour * 24 * 20)
 	}
 	if c.MinAnnualizedRate.IsZero() {
 		c.MinAnnualizedRate = fixedpoint.NewFromFloat(0.05) // 5%
-	}
-	if c.MinAnnualizedRate.IsZero() {
-		c.MinAnnualizedRate = fixedpoint.NewFromFloat(0.02) // 2%
 	}
 	if c.MinCollateralRate.IsZero() {
 		c.MinCollateralRate = fixedpoint.NewFromFloat(0.95)
@@ -100,26 +97,17 @@ type MarketCandidate struct {
 	MinHoldingIntervals int
 }
 
-type FuturesInfoService interface {
-	QueryTakerBuySellVolumes(context.Context, string, types.Interval, types.TradeQueryOptions) ([]binanceapi.FuturesTakerBuySellVolume, error)
-	QueryPremiumIndex(context.Context, string) (*types.PremiumIndex, error)
-	QueryDepth(context.Context, string) (types.SliceOrderBook, int64, error)
-	QueryFuturesFundingInfo(context.Context) ([]binanceapi.FuturesFundingInfo, error)
-	QueryTicker(context.Context, string) (*types.Ticker, error)
-	QueryFuturesAdlRisk(ctx context.Context, symbol string) (map[string]*binanceapi.AdlRisk, error)
-}
-
 // MarketSelector selects the best market based on funding rate and liquidity
 type MarketSelector struct {
 	MarketSelectionConfig
 
 	activeRounds map[string]*ArbitrageRound
-	service      FuturesInfoService
+	service      FuturesService
 	logger       logrus.FieldLogger
 }
 
 // NewMarketSelector creates a new MarketSelector
-func NewMarketSelector(config MarketSelectionConfig, exchange FuturesInfoService, logger logrus.FieldLogger) *MarketSelector {
+func NewMarketSelector(config MarketSelectionConfig, exchange FuturesService, logger logrus.FieldLogger) *MarketSelector {
 	return &MarketSelector{
 		MarketSelectionConfig: config,
 		service:               exchange,
@@ -240,7 +228,7 @@ func (s *MarketSelector) SetActiveRounds(rounds map[string]*ArbitrageRound) *Mar
 }
 
 // queryFundingRates queries funding rates for the given symbols
-func queryFundingRates(ctx context.Context, service FuturesInfoService, logger logrus.FieldLogger, symbols []string) ([]*types.PremiumIndex, error) {
+func queryFundingRates(ctx context.Context, service FuturesService, logger logrus.FieldLogger, symbols []string) ([]*types.PremiumIndex, error) {
 	indices := make([]*types.PremiumIndex, 0, len(symbols))
 
 	for _, symbol := range symbols {
@@ -256,7 +244,7 @@ func queryFundingRates(ctx context.Context, service FuturesInfoService, logger l
 	return indices, nil
 }
 
-func queryFundingInfo(ctx context.Context, service FuturesInfoService) (map[string]*binanceapi.FuturesFundingInfo, error) {
+func queryFundingInfo(ctx context.Context, service FuturesService) (map[string]*binanceapi.FuturesFundingInfo, error) {
 	m := make(map[string]*binanceapi.FuturesFundingInfo)
 	fundingInfos, err := service.QueryFuturesFundingInfo(ctx)
 	if err != nil {

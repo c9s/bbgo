@@ -2,6 +2,7 @@ package grid2
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -21,8 +22,8 @@ func debugGrid(logger logrus.FieldLogger, grid *grid2types.Grid, book *bbgo.Acti
 	missingPins := scanMissingPinPrices(book, pins)
 	missing := len(missingPins)
 
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
+	for _, pin := range slices.Backward(pins) {
+
 		price := fixedpoint.Value(pin)
 
 		sb.WriteString(fmt.Sprintf("%s -> ", price.String()))

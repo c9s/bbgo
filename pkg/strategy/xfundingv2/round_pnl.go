@@ -77,10 +77,10 @@ func (r *ArbitrageRound) realizedPnL() *RoundRealizedPnL {
 	}
 	if !r.syncState.AvgFeeCost.IsZero() {
 		spotPosition.FeeAverageCosts = map[string]fixedpoint.Value{
-			r.syncState.FeeSymbol: r.syncState.AvgFeeCost,
+			spotMarket.BaseCurrency: r.syncState.AvgFeeCost,
 		}
 		futuresPosition.FeeAverageCosts = map[string]fixedpoint.Value{
-			r.syncState.FeeSymbol: r.syncState.AvgFeeCost,
+			futuresMarket.BaseCurrency: r.syncState.AvgFeeCost,
 		}
 	}
 
