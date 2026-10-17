@@ -21,6 +21,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo/sessionworker"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/dynamic"
+	"github.com/c9s/bbgo/pkg/exchange/okex"
 	"github.com/c9s/bbgo/pkg/exchange/sandbox"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
@@ -2849,6 +2850,24 @@ func (s *Strategy) CrossRun(
 	}
 
 	s.makerSession = makerSession
+
+	// when the hedge session runs in margin (cross) mode, verify the okex
+	// account is a loan-enabled margin account before quoting. This is an
+	// okex-specific check (see okex.Exchange.EnsureAutoLoanEnabled): a
+	// misconfigured account (e.g. a spot account on a cross-margin session)
+	// would otherwise reject every hedge order after this instance has
+	// already started placing maker orders. On failure only this strategy
+	// instance is disabled — bbgo keeps running the rest of the portfolio.
+	if s.hedgeSession.Margin {
+		if okexExchange, ok := s.hedgeSession.Exchange.(*okex.Exchange); ok {
+			if _, err := okexExchange.EnsureAutoLoanEnabled(ctx); err != nil {
+				s.logger.WithError(err).Errorf(
+					"xmaker: okex hedge account is not a loan-enabled margin account; " +
+						"this instance will not start (other strategies are unaffected)")
+				return nil
+			}
+		}
+	}
 
 	s.hedgeMarket, ok = s.hedgeSession.Market(s.SourceSymbol)
 	if !ok {
