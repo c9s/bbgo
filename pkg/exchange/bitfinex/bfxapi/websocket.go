@@ -1059,6 +1059,10 @@ func parseBalanceUpdateEvent(payload json.RawMessage) (interface{}, error) {
 	return &event, nil
 }
 
+type FundingOfferSnapshotEvent struct {
+	Offers []FundingOfferUpdateEvent
+}
+
 // FundingOfferUpdateEvent represents a Bitfinex funding offer update event.
 type FundingOfferUpdateEvent struct {
 	OfferID    int64                      // [0] OFFER_ID
@@ -1095,24 +1099,26 @@ func parseFundingOfferUpdate(arrJson json.RawMessage) (*FundingOfferUpdateEvent,
 }
 
 // parseFundingOfferSnapshot parses a funding offer snapshot array into []FundingOfferUpdateEvent.
-func parseFundingOfferSnapshot(arrJson json.RawMessage) ([]FundingOfferUpdateEvent, error) {
+func parseFundingOfferSnapshot(arrJson json.RawMessage) (*FundingOfferSnapshotEvent, error) {
 	var offerArrays []json.RawMessage
 	if err := json.Unmarshal(arrJson, &offerArrays); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal funding offer snapshot array: %w", err)
 	}
 
-	events := make([]FundingOfferUpdateEvent, 0, len(offerArrays))
+	snapshot := &FundingOfferSnapshotEvent{}
+
+	snapshot.Offers = make([]FundingOfferUpdateEvent, 0, len(offerArrays))
 	for _, jsonArr := range offerArrays {
 		event, err := parseFundingOfferUpdate(jsonArr)
 		if err != nil {
 			log.WithError(err).Warnf("failed to parse funding offer fields: %s", jsonArr)
 			continue
 		} else if event != nil {
-			events = append(events, *event)
+			snapshot.Offers = append(snapshot.Offers, *event)
 		}
 	}
 
-	return events, nil
+	return snapshot, nil
 }
 
 // FundingInfo represents the inner funding info array.
