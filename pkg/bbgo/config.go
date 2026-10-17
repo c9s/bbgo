@@ -17,6 +17,7 @@ import (
 	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/marketdata"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -159,11 +160,21 @@ type Backtest struct {
 
 	// CsvSource configures the legacy --csv backtest path.
 	//
-	// Deprecated: superseded by the market data layer in pkg/marketdata, which
-	// reads Binance's published archives directly instead of a normalized
-	// on-disk format. Kept for one release; no example config in this repo uses
-	// it. See `bbgo marketdata --help`.
+	// Deprecated: superseded by DataSources. Kept for one release; no example
+	// config in this repo uses it. See `bbgo marketdata --help`.
 	CsvSource *csvsource.CsvConfig `json:"csvConfig,omitempty" yaml:"csvConfig,omitempty"`
+
+	// DataSources declares the market data sources to replay, merged in
+	// timestamp order.
+	//
+	// It is not yet read by the backtest engine, which still consumes klines
+	// from service.BackTestable; `bbgo marketdata dump --config` exercises it in
+	// the meantime. See pkg/marketdata/registry for the available types.
+	DataSources []marketdata.SourceConfig `json:"dataSources,omitempty" yaml:"dataSources,omitempty"`
+
+	// CacheDir is where archive sources cache their downloads, so each source
+	// does not have to repeat it. Defaults to ~/.bbgo/marketdata.
+	CacheDir string `json:"cacheDir,omitempty" yaml:"cacheDir,omitempty"`
 }
 
 func (b *Backtest) GetAccount(n string) BacktestAccount {
