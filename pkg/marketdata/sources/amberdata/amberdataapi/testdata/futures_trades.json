@@ -1,0 +1,37 @@
+{
+  "status": 200,
+  "title": "OK",
+  "description": "Successful request",
+  "payload": {
+    "metadata": {
+      "next": "https://api.amberdata.com/markets/futures/trades/BTCUSD_PERP?cursor=N4IgpgHgxgFghgOwOZhALhAIwJYMVVAGhCgFcAnAZwHtz0FSAbR4ygFznLYBE43U0ARgDsIgKyCAHAE5hAZgBMwycTAIAJr37oRIgGwAGMUcEK5KkLiiNS6sAFUElUgAcXtfuoCi0eMjCU6ABmcIyUYMRs2AC2YABitNF86CDR2MzY4VDUGoHEQYnJGABWNAggrB4A0mAAnim6whIy8kqSAPoG7Th4CATtkoLSkpJGI%2B0AQgAqAML2AMrc7QAKXgBKyyAAvkA",
+      "api-version": "2023-09-30"
+    },
+    "data": [
+      {
+        "instrument": "BTCUSD_PERP",
+        "exchange": "binance",
+        "exchangeTimestamp": 1717518651671,
+        "exchangeTimestampNanoseconds": 0,
+        "isBuySide": false,
+        "price": 70845.5,
+        "volume": 21,
+        "tradeId": "819875589",
+        "quoteVolume": null,
+        "sequence": null
+      },
+      {
+        "instrument": "BTCUSD_PERP",
+        "exchange": "binance",
+        "exchangeTimestamp": 1717518651671,
+        "exchangeTimestampNanoseconds": 0,
+        "isBuySide": true,
+        "price": 70845.5,
+        "volume": 64,
+        "tradeId": "819875590",
+        "quoteVolume": null,
+        "sequence": null
+      }
+    ]
+  }
+}
