@@ -1,0 +1,20 @@
+{
+  "status": 200,
+  "title": "OK",
+  "description": "Successful request",
+  "payload": {
+    "metadata": { "next": null, "api-version": "2023-09-30" },
+    "data": [
+      {
+        "instrument": "1000BONKUSDC",
+        "exchange": "binance",
+        "exchangeTimestamp": 1714608000000,
+        "open": 0.023,
+        "high": 0.026,
+        "low": 0.022392,
+        "close": 0.02531,
+        "volume": 210710456
+      }
+    ]
+  }
+}
