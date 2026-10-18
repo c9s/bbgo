@@ -400,11 +400,9 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	subscribeFeeTokenMarkets(sourceSession)
 	subscribeFeeTokenMarkets(makerSession)
 
-	if s.SplitHedge != nil && s.SplitHedge.Enabled {
-		for sessionName := range s.SplitHedge.HedgeMarkets {
-			if ses, ok := sessions[sessionName]; ok {
-				subscribeFeeTokenMarkets(ses)
-			}
+	for _, sessionName := range s.splitHedgeSessionNames() {
+		if ses, ok := sessions[sessionName]; ok {
+			subscribeFeeTokenMarkets(ses)
 		}
 	}
 }
@@ -2787,6 +2785,28 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// splitHedgeSessionNames returns the session names of the split hedge markets,
+// from either the split hedge or the split source of the synthetic hedge.
+func (s *Strategy) splitHedgeSessionNames() []string {
+	var splitHedge *SplitHedge
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		splitHedge = s.SplitHedge
+	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled && s.SyntheticHedge.isSplitSource() {
+		splitHedge = s.SyntheticHedge.SplitSource
+	}
+
+	if splitHedge == nil {
+		return nil
+	}
+
+	names := make([]string, 0, len(splitHedge.HedgeMarkets))
+	for sessionName := range splitHedge.HedgeMarkets {
+		names = append(names, sessionName)
+	}
+
+	return names
 }
 
 func (s *Strategy) isSimpleHedgeMode() bool {

@@ -122,6 +122,18 @@ type Event struct {
 	// merge, not by decoders.
 	Source string
 
+	// PrevSeq is the sequence this event claims to follow, when the venue says
+	// so explicitly. It is Binance's "pu" on a futures diff-depth event, and the
+	// equivalent elsewhere. Zero means the venue did not provide one.
+	//
+	// It is not part of OrderKey because it does not order anything: it is how a
+	// consumer verifies that no update was lost. A venue sequence is generally
+	// not a counter — Binance's "u" is the id of the last individual update
+	// inside a batched event, so consecutive events differ by however many
+	// updates they contained — which is why contiguity cannot be checked by
+	// incrementing Seq.
+	PrevSeq uint64
+
 	KLine       *types.KLine
 	Trade       *types.Trade
 	Book        *types.SliceOrderBook // EventTypeBookSnapshot and EventTypeBookUpdate
