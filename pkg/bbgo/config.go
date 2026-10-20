@@ -637,7 +637,12 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 					return err
 				}
 
-				config.CrossExchangeStrategies = append(config.CrossExchangeStrategies, val.(CrossExchangeStrategy))
+				crossExchangeStrategyInstance := val.(CrossExchangeStrategy)
+				if crossExchangeStrategyInstance == nil {
+					return fmt.Errorf("loaded cross exchange strategy instance %s is nil", id)
+				}
+
+				config.CrossExchangeStrategies = append(config.CrossExchangeStrategies, crossExchangeStrategyInstance)
 			}
 		}
 	}
@@ -727,6 +732,10 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 			singleExchangeStrategyInstance, typeOk := strategyInstance.(SingleExchangeStrategy)
 			if !typeOk {
 				return fmt.Errorf("strategy %s is not a SingleExchangeStrategy", id)
+			}
+
+			if singleExchangeStrategyInstance == nil {
+				return fmt.Errorf("loaded exchange strategy instance %s is nil", id)
 			}
 
 			config.ExchangeStrategies = append(config.ExchangeStrategies, ExchangeStrategyMount{
