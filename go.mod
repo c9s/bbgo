@@ -14,7 +14,6 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cheggaaa/pb/v3 v3.2.1
 	github.com/codingconcepts/env v0.0.0-20240618133406-5b0845441187
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/fatih/camelcase v1.0.0
 	github.com/fatih/color v1.19.0
