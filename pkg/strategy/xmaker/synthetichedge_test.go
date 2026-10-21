@@ -555,6 +555,13 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		Status:           types.OrderStatusCanceled,
 	})
 
+	// the fiat hedge order is submitted asynchronously (triggered by the source trade via
+	// positionDeltaC on the fiat hedge worker goroutine), so wait for it to be registered in
+	// the fiat market's own order store before emitting its trade update.
+	assert.Eventually(t, func() bool {
+		return fiatHedgeMarket.orderStore.Exists(createdOrder4.OrderID)
+	}, time.Second, time.Millisecond)
+
 	fiatUserDataStream.EmitTradeUpdate(types.Trade{
 		ID:            createdOrder4.OrderID,
 		OrderID:       createdOrder4.OrderID,
@@ -628,6 +635,10 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		ExecutedQuantity: Number(0.6),
 		Status:           types.OrderStatusCanceled,
 	})
+
+	assert.Eventually(t, func() bool {
+		return fiatHedgeMarket.orderStore.Exists(createdOrder5.OrderID)
+	}, time.Second, time.Millisecond)
 
 	fiatUserDataStream.EmitTradeUpdate(types.Trade{
 		ID:            createdOrder5.OrderID,
