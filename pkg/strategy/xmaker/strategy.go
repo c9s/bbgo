@@ -269,6 +269,8 @@ type StrategyConfig struct {
 	CircuitBreaker *circuitbreaker.BasicCircuitBreaker `json:"circuitBreaker"`
 
 	NoBorrowableCooldown types.Duration `json:"noBorrowableCooldown,omitempty"`
+
+	ConnectionDelay types.Duration `json:"connectionDelay,omitempty"`
 }
 
 type Strategy struct {
@@ -3013,11 +3015,6 @@ func (s *Strategy) CrossRun(
 
 	s.hedgeSession.UserDataStream.OnTradeUpdate(s.priceSolver.UpdateFromTrade)
 
-	s.accountValueCalculator = s.hedgeSession.GetAccountValueCalculator()
-	if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
-		return err
-	}
-
 	updateFeeTokenPrice(s.makerSession, s.priceSolver, s.Position)
 	if s.SplitHedge != nil && s.SplitHedge.Enabled {
 		for sessionName := range s.SplitHedge.HedgeMarkets {
@@ -3306,6 +3303,17 @@ func (s *Strategy) CrossRun(
 			hedgeMarket.session,
 			market,
 		)
+	}
+	// setup done, start establishing connectivity and workers
+	delayDuration := s.ConnectionDelay.Duration()
+	if delayDuration > 0 {
+		s.logger.Infof("delaying for %s before establishing connectivity...", delayDuration)
+		time.Sleep(delayDuration)
+	}
+
+	s.accountValueCalculator = s.hedgeSession.GetAccountValueCalculator()
+	if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
+		return err
 	}
 
 	s.sourceUserDataConnectivity = s.hedgeSession.UserDataConnectivity
