@@ -255,13 +255,44 @@ func NewHedgeMarket(
 	position.Strategy = ID
 
 	orderStore := core.NewOrderStore(symbol)
-	orderStore.BindStream(session.UserDataStream)
 
 	tradeCollector := core.NewTradeCollector(symbol, position, orderStore)
-	tradeCollector.BindStream(session.UserDataStream)
+	session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+		if symbol != "" && trade.Symbol != symbol {
+			return
+		}
+
+		// orderStore only ever contains orders this HedgeMarket itself submitted
+		// (see submitOrder's orderCreateCallback). Multiple xmaker instances may share
+		// this fiat (or, under SplitSource, source) session+symbol and therefore this
+		// same UserDataStream, so checking existence here is what keeps a sibling
+		// instance's fills from being processed against this instance's position.
+		if !orderStore.Exists(trade.OrderID) {
+			log.Debugf("ignoring trade update for %s (orderID=%d), order not found in this instance's order store", symbol, trade.OrderID)
+			return
+		}
+
+		tradeCollector.ProcessTrade(trade)
+	})
 
 	activeMakerOrders := bbgo.NewActiveOrderBook(symbol)
-	activeMakerOrders.BindStream(session.UserDataStream)
+	session.UserDataStream.OnOrderUpdate(func(order types.Order) {
+		if symbol != "" && order.Symbol != symbol {
+			return
+		}
+
+		// same ownership rationale as the trade update handler above: orderStore only
+		// ever contains orders this HedgeMarket itself submitted, so an order update
+		// for an order we don't recognize belongs to a sibling instance sharing this
+		// session+symbol and must not be applied to our own orderStore/activeMakerOrders.
+		if !orderStore.Exists(order.OrderID) {
+			log.Debugf("ignoring order update for %s (orderID=%d), order not found in this instance's order store", symbol, order.OrderID)
+			return
+		}
+
+		orderStore.HandleOrderUpdate(order)
+		activeMakerOrders.OrderUpdateHandler(order)
+	})
 
 	// default logger
 	logFields := logrus.Fields{
