@@ -50,6 +50,29 @@ var log = logrus.WithField("strategy", ID)
 
 var raiseWarningLevelLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 
+// instanceRegistryMu and instanceRegistry enforce that only one xmaker
+// instance runs per Symbol within this process. See registerInstance.
+var (
+	instanceRegistryMu sync.Mutex
+	instanceRegistry   = make(map[string]*Strategy)
+)
+
+// registerInstance claims the given Symbol for s, returning an error if
+// another instance already claimed it. Re-registering the same instance
+// (same pointer) is a no-op so that Validate can be called more than once
+// on the same Strategy without false-positives.
+func registerInstance(s *Strategy) error {
+	instanceRegistryMu.Lock()
+	defer instanceRegistryMu.Unlock()
+
+	if existing, ok := instanceRegistry[s.Symbol]; ok && existing != s {
+		return fmt.Errorf("another xmaker instance is already running for symbol %s (only one xmaker instance per symbol is allowed)", s.Symbol)
+	}
+
+	instanceRegistry[s.Symbol] = s
+	return nil
+}
+
 func nopCover(v fixedpoint.Value) {}
 
 type cancelOrdersBySymbolSide interface {
@@ -2602,6 +2625,10 @@ func (s *Strategy) Validate() error {
 		if err := s.AdaptiveQuoteInterval.Validate(); err != nil {
 			return err
 		}
+	}
+
+	if err := registerInstance(s); err != nil {
+		return err
 	}
 
 	return nil
