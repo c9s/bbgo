@@ -259,10 +259,6 @@ func (s *Strategy) Defaults() error {
 		s.MarketSelectionConfig.MinAnnualizedRate,
 	)
 
-	if s.HardMinExitRate.IsZero() {
-		s.HardMinExitRate = s.MinExitRate.Div(fixedpoint.Two)
-	}
-
 	if s.ExitPnLRatio.IsZero() {
 		s.ExitPnLRatio = fixedpoint.NewFromFloat(0.0005) // 0.05%
 	}
@@ -1402,7 +1398,7 @@ func (s *Strategy) transitOpeningOrReadyRoundToClosing(round *ArbitrageRound, in
 
 	if lastAnnualizedFundingRate.Abs().Compare(s.MinExitRate) <= 0 && !withinMinHoldingTime {
 		// check hard min exit rate
-		if lastAnnualizedFundingRate.Abs().Compare(s.HardMinExitRate) <= 0 {
+		if !s.HardMinExitRate.IsZero() && lastAnnualizedFundingRate.Abs().Compare(s.HardMinExitRate) <= 0 {
 			bbgo.Notify("⚠️ Last funding rate %s(annualized %s) is below the hard min exit rate %s, transit state %s -> closing: %s",
 				index.LastFundingRate, lastAnnualizedFundingRate, s.HardMinExitRate, round.State(), round.String(),
 				round.NewNotification(currentTime, spotPrice, futuresPrice),
