@@ -53,8 +53,10 @@ func (inc *RSI) Update(price float64) {
 		currentGain := math.Max(difference, 0)
 		currentLoss := -math.Min(difference, 0)
 
-		avgGain = (inc.PreviousAvgGain*13 + currentGain) / float64(inc.Window)
-		avgLoss = (inc.PreviousAvgLoss*13 + currentLoss) / float64(inc.Window)
+		// Wilder's smoothing: the previous average keeps a weight of (window-1)/window
+		prevWeight := float64(inc.Window - 1)
+		avgGain = (inc.PreviousAvgGain*prevWeight + currentGain) / float64(inc.Window)
+		avgLoss = (inc.PreviousAvgLoss*prevWeight + currentLoss) / float64(inc.Window)
 	}
 
 	rs := avgGain / avgLoss
