@@ -56,12 +56,17 @@ func toGlobalBalance(account *okexapi.Account) types.BalanceMap {
 	var balanceMap = types.BalanceMap{}
 	for _, detail := range account.Details {
 
+		// Spot borrow (enabled spot borrow) reports the debt in `liab`,
+		// multi-currency margin (cross) reports it in `crossLiab`. An account
+		// only has one of the two at a time, so take the max to cover both.
+		borrowed := fixedpoint.Max(detail.Liability.Abs(), detail.CrossLiab.Abs())
+
 		balanceMap[detail.Currency] = types.Balance{
 			Currency:  detail.Currency,
 			Available: detail.Available,
 			Locked:    detail.FrozenBalance,
-			Interest:  detail.Interest,        // accrued interest
-			Borrowed:  detail.Liability.Abs(), // okx liability does not include the accrued interest
+			Interest:  detail.Interest, // accrued interest
+			Borrowed:  borrowed,
 			NetAsset:  detail.Equity,
 		}
 	}
