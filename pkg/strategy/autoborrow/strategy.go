@@ -290,6 +290,20 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 	}
 }
 
+// repayRetryDelay is how long checkAndBorrow waits after each repay attempt
+// before re-checking the margin level.
+var repayRetryDelay = 5 * time.Second
+
+// isMarginLevelTooLow reports whether the account has debt and its margin level is below minMarginLevel.
+// An account without debt is never too low: some exchanges report a zero margin level when there is no debt.
+func isMarginLevelTooLow(account *types.Account, minMarginLevel fixedpoint.Value) bool {
+	if len(account.Balances().Debts()) == 0 {
+		return false
+	}
+
+	return account.MarginLevel.Compare(minMarginLevel) < 0
+}
+
 func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	s.reBalanceDebt(ctx)
 
@@ -304,7 +318,6 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	}
 
 	minMarginLevel := s.MinMarginLevel
-	curMarginLevel := account.MarginLevel
 
 	log.Infof("%s: current margin level: %s, margin ratio: %s, margin tolerance: %s",
 		s.ExchangeSession.Name,
@@ -314,7 +327,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	)
 
 	// if margin ratio is too low, do not borrow
-	for maxTries := 5; account.MarginLevel.Compare(minMarginLevel) < 0 && maxTries > 0; maxTries-- {
+	for maxTries := 5; isMarginLevelTooLow(account, minMarginLevel) && maxTries > 0; maxTries-- {
 		log.Infof("current margin level %f < min margin level %f, skip autoborrow", account.MarginLevel.Float64(), minMarginLevel.Float64())
 
 		bbgo.Notify("Warning!!! %s Current Margin Level %f < Minimal Margin Level %f",
@@ -329,7 +342,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(time.Second * 5):
+		case <-time.After(repayRetryDelay):
 		}
 
 		// update account info after the repay
@@ -340,6 +353,15 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 		}
 	}
 
+	// the repays above may not be enough to recover the margin level
+	if isMarginLevelTooLow(account, minMarginLevel) {
+		log.Warnf("%s: margin level %f is still below min margin level %f after repaying, skip autoborrow",
+			s.ExchangeSession.Name,
+			account.MarginLevel.Float64(),
+			minMarginLevel.Float64())
+		return
+	}
+
 	balances := account.Balances()
 	if len(balances) == 0 {
 		log.Warn("balance is empty, skip autoborrow")
@@ -347,111 +369,81 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	}
 
 	for _, marginAsset := range s.Assets {
-		changed := false
-
 		if marginAsset.Low.IsZero() {
 			log.Warnf("margin asset low balance is not set: %+v", marginAsset)
 			continue
 		}
 
+		// an asset we have never held is a zero balance, so that every borrow limit below still applies to it
 		b, ok := balances[marginAsset.Asset]
-		if ok {
-			toBorrow := marginAsset.Low.Sub(b.Total())
-			if toBorrow.Sign() < 0 {
-				log.Infof("balance %f > low %f. no need to borrow asset %+v",
-					b.Total().Float64(),
-					marginAsset.Low.Float64(),
-					marginAsset)
-				continue
-			}
-
-			if !marginAsset.MaxQuantityPerBorrow.IsZero() {
-				toBorrow = fixedpoint.Min(toBorrow, marginAsset.MaxQuantityPerBorrow)
-			}
-
-			if !marginAsset.MaxTotalBorrow.IsZero() {
-				// check if we over borrow
-				newTotalBorrow := toBorrow.Add(b.Borrowed)
-				if newTotalBorrow.Compare(marginAsset.MaxTotalBorrow) > 0 {
-					toBorrow = toBorrow.Sub(newTotalBorrow.Sub(marginAsset.MaxTotalBorrow))
-					if toBorrow.Sign() < 0 {
-						log.Warnf("margin asset %s is over borrowed, skip", marginAsset.Asset)
-						continue
-					}
-				}
-			}
-
-			maxBorrowable, err2 := s.marginBorrowRepay.QueryMarginAssetMaxBorrowable(ctx, marginAsset.Asset)
-			if err2 != nil {
-				s.logger.WithError(err2).Warnf("max borrowable query error")
-				continue
-			}
-
-			if toBorrow.Compare(maxBorrowable) > 0 {
-				bbgo.Notify("Trying to borrow %f %s, which is greater than the max borrowable amount %f, will adjust borrow amount to %f",
-					toBorrow.Float64(),
-					marginAsset.Asset,
-					maxBorrowable.Float64(),
-					maxBorrowable.Float64())
-
-				toBorrow = fixedpoint.Min(maxBorrowable, toBorrow)
-			}
-
-			if toBorrow.IsZero() {
-				continue
-			}
-
-			bbgo.Notify(&MarginAction{
-				Exchange:       s.ExchangeSession.ExchangeName,
-				Action:         "Borrow",
-				Asset:          marginAsset.Asset,
-				Amount:         toBorrow,
-				MarginLevel:    account.MarginLevel,
-				MinMarginLevel: minMarginLevel,
-			})
-			log.Infof("sending borrow request %f %s", toBorrow.Float64(), marginAsset.Asset)
-			if err := s.marginBorrowRepay.BorrowMarginAsset(ctx, marginAsset.Asset, toBorrow); err != nil {
-				log.WithError(err).Errorf("borrow error")
-				continue
-			}
-			changed = true
-		} else {
-			// available balance is less than marginAsset.Low, we should trigger borrow
-			toBorrow := marginAsset.Low
-
-			if !marginAsset.MaxQuantityPerBorrow.IsZero() {
-				toBorrow = fixedpoint.Min(toBorrow, marginAsset.MaxQuantityPerBorrow)
-			}
-
-			if toBorrow.IsZero() {
-				continue
-			}
-
-			bbgo.Notify(&MarginAction{
-				Exchange:       s.ExchangeSession.ExchangeName,
-				Action:         "Borrow",
-				Asset:          marginAsset.Asset,
-				Amount:         toBorrow,
-				MarginLevel:    curMarginLevel,
-				MinMarginLevel: minMarginLevel,
-			})
-
-			log.Infof("sending borrow request %f %s", toBorrow.Float64(), marginAsset.Asset)
-			if err := s.marginBorrowRepay.BorrowMarginAsset(ctx, marginAsset.Asset, toBorrow); err != nil {
-				log.WithError(err).Errorf("borrow error")
-				continue
-			}
-
-			changed = true
+		if !ok {
+			b = types.NewZeroBalance(marginAsset.Asset)
 		}
 
-		// if debt is changed, we need to update account
-		if changed {
-			account, err = s.ExchangeSession.UpdateAccount(ctx)
-			if err != nil {
-				log.WithError(err).Errorf("can not update account")
-				return
+		toBorrow := marginAsset.Low.Sub(b.Total())
+		if toBorrow.Sign() < 0 {
+			log.Infof("balance %f > low %f. no need to borrow asset %+v",
+				b.Total().Float64(),
+				marginAsset.Low.Float64(),
+				marginAsset)
+			continue
+		}
+
+		if !marginAsset.MaxQuantityPerBorrow.IsZero() {
+			toBorrow = fixedpoint.Min(toBorrow, marginAsset.MaxQuantityPerBorrow)
+		}
+
+		if !marginAsset.MaxTotalBorrow.IsZero() {
+			// check if we over borrow
+			newTotalBorrow := toBorrow.Add(b.Borrowed)
+			if newTotalBorrow.Compare(marginAsset.MaxTotalBorrow) > 0 {
+				toBorrow = toBorrow.Sub(newTotalBorrow.Sub(marginAsset.MaxTotalBorrow))
+				if toBorrow.Sign() < 0 {
+					log.Warnf("margin asset %s is over borrowed, skip", marginAsset.Asset)
+					continue
+				}
 			}
+		}
+
+		maxBorrowable, err2 := s.marginBorrowRepay.QueryMarginAssetMaxBorrowable(ctx, marginAsset.Asset)
+		if err2 != nil {
+			s.logger.WithError(err2).Warnf("max borrowable query error")
+			continue
+		}
+
+		if toBorrow.Compare(maxBorrowable) > 0 {
+			bbgo.Notify("Trying to borrow %f %s, which is greater than the max borrowable amount %f, will adjust borrow amount to %f",
+				toBorrow.Float64(),
+				marginAsset.Asset,
+				maxBorrowable.Float64(),
+				maxBorrowable.Float64())
+
+			toBorrow = fixedpoint.Min(maxBorrowable, toBorrow)
+		}
+
+		if toBorrow.IsZero() {
+			continue
+		}
+
+		bbgo.Notify(&MarginAction{
+			Exchange:       s.ExchangeSession.ExchangeName,
+			Action:         "Borrow",
+			Asset:          marginAsset.Asset,
+			Amount:         toBorrow,
+			MarginLevel:    account.MarginLevel,
+			MinMarginLevel: minMarginLevel,
+		})
+		log.Infof("sending borrow request %f %s", toBorrow.Float64(), marginAsset.Asset)
+		if err := s.marginBorrowRepay.BorrowMarginAsset(ctx, marginAsset.Asset, toBorrow); err != nil {
+			log.WithError(err).Errorf("borrow error")
+			continue
+		}
+
+		// debt is changed, we need to update account
+		account, err = s.ExchangeSession.UpdateAccount(ctx)
+		if err != nil {
+			log.WithError(err).Errorf("can not update account")
+			return
 		}
 	}
 }
