@@ -7,3 +7,4 @@ package: main
 migrationsDirs:
 - migrations/sqlite3
 - pkg/strategy/xfundingv2/migrations/sqlite3
+- pkg/strategy/bfxfunding/migrations/sqlite3
