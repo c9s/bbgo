@@ -108,7 +108,6 @@ var halfpow10 = [...]uint64{
 	500000000000000000,
 	5000000000000000000}
 
-
 func (v Value) Value() (driver.Value, error) {
 	return v.Float64(), nil
 }
@@ -518,7 +517,10 @@ func NewFromString(s string) (Value, error) {
 	if r.matchStrIgnoreCase("inf") {
 		return Inf(sign), nil
 	}
-	coef, exp := r.getCoef()
+	coef, exp, err := r.getCoef()
+	if err != nil {
+		return Zero, err
+	}
 	exp += r.getExp()
 	if r.len() != 0 { // didn't consume entire string
 		return Zero, errors.New("invalid number")
@@ -568,7 +570,10 @@ func NewFromBytes(s []byte) (Value, error) {
 	if r.matchStrIgnoreCase("inf") {
 		return Inf(sign), nil
 	}
-	coef, exp := r.getCoef()
+	coef, exp, err := r.getCoef()
+	if err != nil {
+		return Zero, err
+	}
 	exp += r.getExp()
 	if r.len() != 0 { // didn't consume entire string
 		return Zero, errors.New("invalid number")
@@ -669,7 +674,7 @@ func (r *readerBytes) getSign() int {
 	return signPos
 }
 
-func (r *readerBytes) getCoef() (uint64, int) {
+func (r *readerBytes) getCoef() (uint64, int, error) {
 	digits := false
 	beforeDecimal := true
 	for r.match('0') {
@@ -708,9 +713,9 @@ func (r *readerBytes) getCoef() (uint64, int) {
 		}
 	}
 	if !digits {
-		panic("numbers require at least one digit")
+		return 0, 0, errors.New("numbers require at least one digit")
 	}
-	return n, exp
+	return n, exp, nil
 }
 
 func (r *readerBytes) getExp() int {
@@ -787,7 +792,7 @@ func (r *reader) getSign() int {
 	return signPos
 }
 
-func (r *reader) getCoef() (uint64, int) {
+func (r *reader) getCoef() (uint64, int, error) {
 	digits := false
 	beforeDecimal := true
 	for r.match('0') {
@@ -826,9 +831,9 @@ func (r *reader) getCoef() (uint64, int) {
 		}
 	}
 	if !digits {
-		panic("numbers require at least one digit")
+		return 0, 0, errors.New("numbers require at least one digit")
 	}
-	return n, exp
+	return n, exp, nil
 }
 
 func (r *reader) getExp() int {
@@ -1094,6 +1099,7 @@ func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
 			*v = nv
 			return
 		}
+		return err2
 	}
 	return err
 }
