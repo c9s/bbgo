@@ -332,3 +332,119 @@ func (b Book) EventTimeNano() int64 {
 	}
 	return b.Timestamp.UnixNano()
 }
+
+// FundingRate is one record of the funding-rates endpoints.
+type FundingRate struct {
+	Instrument string `json:"instrument"`
+	Exchange   string `json:"exchange"`
+
+	ExchangeTimestamp            Timestamp `json:"exchangeTimestamp"`
+	ExchangeTimestampNanoseconds int64     `json:"exchangeTimestampNanoseconds"`
+
+	FundingRate     Number `json:"fundingRate"`
+	NextFundingRate Number `json:"nextFundingRate"`
+
+	// FundingInterval is null on several venues including Binance.
+	FundingInterval Number    `json:"fundingInterval"`
+	NextFundingTime Timestamp `json:"nextFundingTime"`
+
+	// IsActualFundingRate distinguishes a settled rate from a predicted one.
+	// Only the settled ones describe what a position actually paid.
+	IsActualFundingRate bool `json:"isActualFundingRate"`
+}
+
+// OpenInterest is one record of the open-interest endpoints.
+type OpenInterest struct {
+	Instrument string `json:"instrument"`
+	Exchange   string `json:"exchange"`
+
+	ExchangeTimestamp            Timestamp `json:"exchangeTimestamp"`
+	ExchangeTimestampNanoseconds int64     `json:"exchangeTimestampNanoseconds"`
+
+	Value Number `json:"value"`
+
+	// Type is the contract kind, for example PERPETUAL.
+	Type string `json:"type"`
+}
+
+// Liquidation is one record of the liquidations endpoints.
+type Liquidation struct {
+	Instrument string `json:"instrument"`
+	Exchange   string `json:"exchange"`
+
+	ExchangeTimestamp            Timestamp `json:"exchangeTimestamp"`
+	ExchangeTimestampNanoseconds int64     `json:"exchangeTimestampNanoseconds"`
+
+	// Side is the side of the liquidating order, so a long being liquidated is
+	// closed by a SELL. PositionType reports which side was holding.
+	Side         string `json:"side"`
+	PositionType string `json:"positionType"`
+
+	Status      string `json:"status"`
+	TimeInForce string `json:"timeInForce"`
+	Type        string `json:"type"`
+
+	Price  Number `json:"price"`
+	Volume Number `json:"volume"`
+
+	// Unit says what Volume is denominated in, for example base_asset. It
+	// matters because some venues report contracts instead.
+	Unit string `json:"unit"`
+
+	// Action and OrderID are null on Binance.
+	Action  string `json:"action"`
+	OrderID string `json:"orderId"`
+}
+
+// LongShortRatio is one record of the long-short-ratio endpoints.
+type LongShortRatio struct {
+	Instrument string `json:"instrument"`
+	Exchange   string `json:"exchange"`
+
+	ExchangeTimestamp            Timestamp `json:"exchangeTimestamp"`
+	ExchangeTimestampNanoseconds int64     `json:"exchangeTimestampNanoseconds"`
+
+	// Period is the venue's sampling period identifier.
+	Period Number `json:"period"`
+
+	LongAccount  Number `json:"longAccount"`
+	ShortAccount Number `json:"shortAccount"`
+	Ratio        Number `json:"ratio"`
+}
+
+// Ticker is one record of the tickers endpoints: top of book plus a mid.
+type Ticker struct {
+	Instrument string `json:"instrument"`
+	Exchange   string `json:"exchange"`
+
+	ExchangeTimestamp            Timestamp `json:"exchangeTimestamp"`
+	ExchangeTimestampNanoseconds int64     `json:"exchangeTimestampNanoseconds"`
+
+	Bid       Number `json:"bid"`
+	Ask       Number `json:"ask"`
+	Mid       Number `json:"mid"`
+	Last      Number `json:"last"`
+	BidVolume Number `json:"bidVolume"`
+	AskVolume Number `json:"askVolume"`
+}
+
+// EventTimeNano returns the record's event time in nanoseconds.
+func (r FundingRate) EventTimeNano() int64 {
+	return r.ExchangeTimestamp.UnixNano() + r.ExchangeTimestampNanoseconds
+}
+
+func (r OpenInterest) EventTimeNano() int64 {
+	return r.ExchangeTimestamp.UnixNano() + r.ExchangeTimestampNanoseconds
+}
+
+func (r Liquidation) EventTimeNano() int64 {
+	return r.ExchangeTimestamp.UnixNano() + r.ExchangeTimestampNanoseconds
+}
+
+func (r LongShortRatio) EventTimeNano() int64 {
+	return r.ExchangeTimestamp.UnixNano() + r.ExchangeTimestampNanoseconds
+}
+
+func (r Ticker) EventTimeNano() int64 {
+	return r.ExchangeTimestamp.UnixNano() + r.ExchangeTimestampNanoseconds
+}
