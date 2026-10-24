@@ -46,7 +46,7 @@ every tick into memory and sorted it.
 |---|---|---|---|
 | `binanceCsv` | `sources/binancecsv` | trades, aggTrades, klines, bookTicker, bookDepth, metrics | data.binance.vision archives. **No L2.** |
 | `replay` | `sources/replay` | whatever was recorded, including L2 | records a live stream and plays it back |
-| `amberdata` | `sources/amberdata` | trades, L2 snapshots and events, OHLCV | needs a paid key; `cloudsync` reads the Parquet bulk files |
+| `amberdata` | `sources/amberdata` | trades, L2 snapshots and events, OHLCV, tickers, funding rates, liquidations, open interest, long/short ratio | needs a paid key; `cloudsync` reads the Parquet bulk files |
 | `grpc` | `sources/grpcsource` | whatever the server serves | client only; no server implementation yet |
 
 ### There is no L2 in the public Binance archives
@@ -115,6 +115,14 @@ bbgo marketdata dump --config config/marketdata.yaml --from-config \
     --since 2026-09-15 --until 2026-09-16 --check-book
 ```
 
+### The only source of liquidations
+
+No public archive publishes liquidations, so `amberdata`'s `liquidations` endpoint
+is the layer's only producer of `EventTypeLiquidation`. `types.LiquidationInfo`
+has no field for the venue's `positionType` or `unit` — and `unit` matters,
+because some venues report volume in contracts rather than base asset — so the
+raw record is carried on `Event.Raw` alongside it.
+
 ## Adding a provider
 
 1. Create `pkg/marketdata/sources/<name>/`, implement `marketdata.Source`, and
@@ -126,7 +134,12 @@ bbgo marketdata dump --config config/marketdata.yaml --from-config \
    backpressure once for everyone.
 4. Register it in `pkg/marketdata/registry` and add its type constant to
    `pkg/marketdata/config.go`.
-5. Test against real data from the venue, not fixtures written to match the
+5. If it is a REST API, follow `doc/development/exchange-api-layer-guide.md`:
+   one `//go:generate requestgen` request struct per endpoint, with the generated
+   `*_requestgen.go` committed. `amberdata` shows the pattern for an API that
+   wraps everything in an envelope and needs its own error classification — the
+   `RestClient` overrides `SendRequest` so every generated `Do` inherits it.
+6. Test against real data from the venue, not fixtures written to match the
    decoder. Every provider here does: `binancecsv` uses trimmed real archives,
    `replay` a real capture, `amberdata` the vendor's own published response
    examples plus a real Parquet sample.
