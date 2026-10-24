@@ -1,8 +1,10 @@
 package amberdata
 
 import (
+	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/marketdata"
 	"github.com/c9s/bbgo/pkg/marketdata/sources/amberdata/amberdataapi"
 	"github.com/c9s/bbgo/pkg/types"
@@ -180,3 +182,164 @@ func parseUint(s string) (uint64, bool) {
 	}
 	return v, true
 }
+
+// tickerToEvent converts a ticker record.
+//
+// The endpoint reports top of book plus a mid, which is exactly what
+// types.BookTicker holds. The API gives one timestamp rather than Binance's
+// transaction and event times, so both are set to it: inventing a latency would
+// be worse than recording none.
+func tickerToEvent(
+	in amberdataapi.Ticker, exchange types.ExchangeName, symbol string,
+) marketdata.Event {
+	timeNs := in.EventTimeNano()
+	ts := types.Time(nanoTime(timeNs))
+
+	return marketdata.Event{
+		Type:     marketdata.EventTypeBookTicker,
+		Exchange: exchange,
+		Symbol:   symbol,
+		Key: marketdata.OrderKey{
+			TimeNs: timeNs,
+			Rank:   marketdata.RankBookTicker,
+		},
+		BookTicker: &marketdata.BookTicker{
+			BookTicker: types.BookTicker{
+				Symbol:   symbol,
+				Buy:      in.Bid.Value,
+				BuySize:  in.BidVolume.Value,
+				Sell:     in.Ask.Value,
+				SellSize: in.AskVolume.Value,
+			},
+			TransactionTime: ts,
+			EventTime:       ts,
+		},
+	}
+}
+
+// fundingRateToEvent converts a funding rate record into a mark price event,
+// which is where bbgo's streams carry the funding rate.
+//
+// isActualFundingRate is preserved in the metrics map rather than dropped: a
+// predicted rate and a settled one are not interchangeable, and only the settled
+// one describes what a position actually paid.
+func fundingRateToEvent(
+	in amberdataapi.FundingRate, exchange types.ExchangeName, symbol string,
+) marketdata.Event {
+	timeNs := in.EventTimeNano()
+
+	markPrice := &marketdata.MarkPrice{
+		Symbol:          symbol,
+		LastFundingRate: in.FundingRate.Value,
+		Time:            types.Time(nanoTime(timeNs)),
+	}
+	if !in.NextFundingTime.IsZero() {
+		markPrice.NextFundingTime = types.Time(in.NextFundingTime.Time)
+	}
+
+	ev := marketdata.Event{
+		Type:      marketdata.EventTypeMarkPrice,
+		Exchange:  exchange,
+		Symbol:    symbol,
+		Key:       marketdata.OrderKey{TimeNs: timeNs, Rank: marketdata.RankMarkPrice},
+		MarkPrice: markPrice,
+	}
+
+	if !in.IsActualFundingRate {
+		// A predicted rate is derived, not observed.
+		ev.Flags |= marketdata.FlagSynthetic
+	}
+
+	return ev
+}
+
+// openInterestToEvent converts an open interest record. It is a periodic scalar
+// series, so it goes through Metrics rather than getting its own payload type.
+func openInterestToEvent(
+	in amberdataapi.OpenInterest, exchange types.ExchangeName, symbol string,
+) marketdata.Event {
+	timeNs := in.EventTimeNano()
+
+	return marketdata.Event{
+		Type:     marketdata.EventTypeMetrics,
+		Exchange: exchange,
+		Symbol:   symbol,
+		Key:      marketdata.OrderKey{TimeNs: timeNs, Rank: marketdata.RankMetrics},
+		Metrics: &marketdata.Metrics{
+			Symbol: symbol,
+			Time:   types.Time(nanoTime(timeNs)),
+			Values: map[string]fixedpoint.Value{
+				marketdata.MetricSumOpenInterest: in.Value.Value,
+			},
+		},
+	}
+}
+
+// liquidationToEvent converts a liquidation record.
+//
+// This is the first producer of EventTypeLiquidation anywhere in the layer: no
+// public archive publishes liquidations, so until now the event type had a
+// definition and no source.
+//
+// Side is the side of the liquidating order, so a long being closed out appears
+// as a SELL; positionType reports which side was holding. Both are kept, because
+// which one a strategy wants depends on what it is measuring.
+func liquidationToEvent(
+	in amberdataapi.Liquidation, exchange types.ExchangeName, symbol string,
+) marketdata.Event {
+	timeNs := in.EventTimeNano()
+
+	side := types.SideTypeSell
+	if strings.EqualFold(in.Side, "BUY") {
+		side = types.SideTypeBuy
+	}
+
+	return marketdata.Event{
+		Type:     marketdata.EventTypeLiquidation,
+		Exchange: exchange,
+		Symbol:   symbol,
+		Key:      marketdata.OrderKey{TimeNs: timeNs, Rank: marketdata.RankLiquidation},
+		Liquidation: &types.LiquidationInfo{
+			Symbol:      symbol,
+			Side:        side,
+			OrderType:   types.OrderType(strings.ToUpper(in.Type)),
+			TimeInForce: types.TimeInForce(strings.ToUpper(in.TimeInForce)),
+			Quantity:    in.Volume.Value,
+			Price:       in.Price.Value,
+			OrderStatus: types.OrderStatus(strings.ToUpper(in.Status)),
+			TradeTime:   types.Time(nanoTime(timeNs)),
+		},
+		// positionType and unit have no home on types.LiquidationInfo, and they
+		// matter: unit says whether volume is base asset or contracts.
+		Raw: in,
+	}
+}
+
+// longShortRatioToEvent converts a long/short ratio record.
+func longShortRatioToEvent(
+	in amberdataapi.LongShortRatio, exchange types.ExchangeName, symbol string,
+) marketdata.Event {
+	timeNs := in.EventTimeNano()
+
+	return marketdata.Event{
+		Type:     marketdata.EventTypeMetrics,
+		Exchange: exchange,
+		Symbol:   symbol,
+		Key:      marketdata.OrderKey{TimeNs: timeNs, Rank: marketdata.RankMetrics},
+		Metrics: &marketdata.Metrics{
+			Symbol: symbol,
+			Time:   types.Time(nanoTime(timeNs)),
+			Values: map[string]fixedpoint.Value{
+				marketdata.MetricCountLongShortRatio: in.Ratio.Value,
+				MetricLongAccount:                    in.LongAccount.Value,
+				MetricShortAccount:                   in.ShortAccount.Value,
+			},
+		},
+	}
+}
+
+// Metric keys this provider contributes beyond the shared ones.
+const (
+	MetricLongAccount  = "longAccount"
+	MetricShortAccount = "shortAccount"
+)

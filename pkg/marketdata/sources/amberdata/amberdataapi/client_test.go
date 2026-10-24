@@ -64,12 +64,12 @@ func TestGetTrades_SendsRequiredHeadersAndParams(t *testing.T) {
 	since := time.UnixMilli(1717518000000)
 	until := time.UnixMilli(1717519000000)
 
-	_, err := client.GetTrades(context.Background(), AssetClassFutures, Query{
-		Exchange:   "binance",
-		Instrument: "BTCUSD_PERP",
-		Since:      since,
-		Until:      until,
-	})
+	_, err := client.NewGetTradesRequest(AssetClassFutures).
+		Instrument("BTCUSD_PERP").
+		Exchange("binance").
+		StartDate(since).
+		EndDate(until).
+		Do(context.Background())
 	require.NoError(t, err)
 
 	req := *captured
@@ -94,10 +94,10 @@ func TestGetTrades_DecodesFixture(t *testing.T) {
 		serveFixture(t, transport, "/markets/futures/trades/BTCUSD_PERP", "futures_trades.json")
 	})
 
-	page, err := client.GetTrades(context.Background(), AssetClassFutures, Query{
-		Exchange: "binance", Instrument: "BTCUSD_PERP",
-	})
+	resp, err := client.NewGetTradesRequest(AssetClassFutures).
+		Instrument("BTCUSD_PERP").Exchange("binance").Do(context.Background())
 	require.NoError(t, err)
+	page := pageOf(resp)
 
 	require.Len(t, page.Data, 2)
 	assert.Contains(t, page.Next, "cursor=", "the cursor URL must be preserved verbatim")
@@ -125,10 +125,10 @@ func TestGetOrderBookEvents_DecodesFixture(t *testing.T) {
 			"/markets/futures/order-book-events/BTCUSD_PERP", "futures_order_book_events.json")
 	})
 
-	page, err := client.GetOrderBookEvents(context.Background(), AssetClassFutures, Query{
-		Exchange: "binance", Instrument: "BTCUSD_PERP",
-	})
+	resp, err := client.NewGetOrderBookEventsRequest(AssetClassFutures).
+		Instrument("BTCUSD_PERP").Exchange("binance").Do(context.Background())
 	require.NoError(t, err)
+	page := pageOf(resp)
 
 	require.Len(t, page.Data, 1)
 	book := page.Data[0]
@@ -156,10 +156,10 @@ func TestGetOrderBookEvents_HumanReadableTimestamps(t *testing.T) {
 			"/markets/futures/order-book-events/BTCUSD_PERP", "futures_order_book_events_hr.json")
 	})
 
-	page, err := client.GetOrderBookEvents(context.Background(), AssetClassFutures, Query{
-		Exchange: "binance", Instrument: "BTCUSD_PERP",
-	})
+	resp, err := client.NewGetOrderBookEventsRequest(AssetClassFutures).
+		Instrument("BTCUSD_PERP").Exchange("binance").Do(context.Background())
 	require.NoError(t, err)
+	page := pageOf(resp)
 
 	require.Len(t, page.Data, 1)
 	assert.Equal(t, "2024-06-04T16:23:12.414Z",
@@ -172,10 +172,10 @@ func TestGetOrderBookSnapshots_DecodesFixture(t *testing.T) {
 			"/markets/futures/order-book-snapshots/BTCUSD_PERP", "futures_order_book_snapshots.json")
 	})
 
-	page, err := client.GetOrderBookSnapshots(context.Background(), AssetClassFutures, Query{
-		Exchange: "binance", Instrument: "BTCUSD_PERP", MaxLevel: 20,
-	})
+	resp, err := client.NewGetOrderBookSnapshotsRequest(AssetClassFutures).
+		Instrument("BTCUSD_PERP").Exchange("binance").MaxLevel(20).Do(context.Background())
 	require.NoError(t, err)
+	page := pageOf(resp)
 
 	require.Len(t, page.Data, 1)
 	book := page.Data[0]
@@ -196,9 +196,8 @@ func TestGetOrderBookSnapshots_SendsMaxLevel(t *testing.T) {
 			"/markets/futures/order-book-snapshots/BTCUSD_PERP", "futures_order_book_snapshots.json")
 	})
 
-	_, err := client.GetOrderBookSnapshots(context.Background(), AssetClassFutures, Query{
-		Exchange: "binance", Instrument: "BTCUSD_PERP", MaxLevel: 20,
-	})
+	_, err := client.NewGetOrderBookSnapshotsRequest(AssetClassFutures).
+		Instrument("BTCUSD_PERP").Exchange("binance").MaxLevel(20).Do(context.Background())
 	require.NoError(t, err)
 
 	assert.Equal(t, "20", (*captured).URL.Query().Get("maxLevel"))
@@ -209,10 +208,11 @@ func TestGetOHLCV_DecodesFixture(t *testing.T) {
 		serveFixture(t, transport, "/markets/futures/ohlcv/1000BONKUSDC", "futures_ohlcv.json")
 	})
 
-	page, err := client.GetOHLCV(context.Background(), AssetClassFutures, Query{
-		Exchange: "binance", Instrument: "1000BONKUSDC", TimeInterval: "hours",
-	})
+	resp, err := client.NewGetOHLCVRequest(AssetClassFutures).
+		Instrument("1000BONKUSDC").Exchange("binance").TimeInterval("hours").
+		Do(context.Background())
 	require.NoError(t, err)
+	page := pageOf(resp)
 
 	assert.Equal(t, "hours", (*captured).URL.Query().Get("timeInterval"))
 
@@ -222,14 +222,47 @@ func TestGetOHLCV_DecodesFixture(t *testing.T) {
 	assert.Equal(t, int64(1714608000000), page.Data[0].ExchangeTimestamp.UnixMilli())
 }
 
-func TestQuery_RequiresExchange(t *testing.T) {
+// TestRequest_RequiresExchange checks that requestgen enforces the required
+// parameter, so a missing exchange fails before a request is sent rather than
+// coming back as an opaque 400.
+func TestRequest_RequiresExchange(t *testing.T) {
 	client, _ := newTestClient(t, func(transport *httptesting.MockTransport) {})
 
-	_, err := client.GetTrades(context.Background(), AssetClassFutures, Query{
-		Instrument: "BTCUSDT",
-	})
+	_, err := client.NewGetTradesRequest(AssetClassFutures).
+		Instrument("BTCUSDT").
+		Do(context.Background())
+
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "exchange is required")
+	assert.Contains(t, err.Error(), "exchange")
+}
+
+// TestRequest_TimeFormatIsAlwaysSent pins the one parameter a caller must not be
+// able to forget: the server's default emits a space-separated millisecond field
+// that is neither RFC3339 nor a number.
+func TestRequest_TimeFormatIsAlwaysSent(t *testing.T) {
+	client, captured := newTestClient(t, func(transport *httptesting.MockTransport) {
+		serveFixture(t, transport, "/markets/futures/trades/BTCUSD_PERP", "futures_trades.json")
+	})
+
+	_, err := client.NewGetTradesRequest(AssetClassFutures).
+		Instrument("BTCUSD_PERP").Exchange("binance").Do(context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t, TimeFormatMilliseconds, (*captured).URL.Query().Get("timeFormat"))
+}
+
+// TestRequest_SlugsBuildThePath checks the asset class and instrument slugs, which
+// is what lets one request type serve both the futures and spot families.
+func TestRequest_SlugsBuildThePath(t *testing.T) {
+	client, captured := newTestClient(t, func(transport *httptesting.MockTransport) {
+		serveFixture(t, transport, "/markets/spot/trades/btc_usd", "futures_trades.json")
+	})
+
+	_, err := client.NewGetTradesRequest(AssetClassSpot).
+		Instrument("btc_usd").Exchange("gdax").Do(context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t, "/markets/spot/trades/btc_usd", (*captured).URL.Path)
 }
 
 func TestGetCursor_ReissuesURLVerbatim(t *testing.T) {
