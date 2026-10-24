@@ -139,6 +139,9 @@ func (s *Source) Capabilities() marketdata.Capability {
 			types.MarketTradeChannel,
 			types.AggTradeChannel,
 			types.KLineChannel,
+			types.BookTickerChannel,
+			types.MarkPriceChannel,
+			types.LiquidationOrderChannel,
 		},
 		Symbols:    s.cfg.Symbols,
 		HasHistory: true,
@@ -181,6 +184,19 @@ func (s *Source) Open(ctx context.Context, req marketdata.Request) (marketdata.C
 	return marketdata.Merge(cursors), nil
 }
 
+// Endpoint identifiers. One AmberData endpoint becomes one paginated stream.
+const (
+	endpointTrades             = "trades"
+	endpointOrderBookSnapshots = "orderBookSnapshots"
+	endpointOrderBookEvents    = "orderBookEvents"
+	endpointOHLCV              = "ohlcv"
+	endpointTickers            = "tickers"
+	endpointFundingRates       = "fundingRates"
+	endpointOpenInterest       = "openInterest"
+	endpointLiquidations       = "liquidations"
+	endpointLongShortRatio     = "longShortRatio"
+)
+
 // streamKind is one AmberData endpoint applied to one instrument.
 type streamKind struct {
 	endpoint   string // trades, orderBookSnapshots, orderBookEvents, ohlcv
@@ -220,11 +236,25 @@ func (s *Source) plan(req marketdata.Request) ([]streamKind, error) {
 
 		switch sub.Channel {
 		case types.BookChannel:
-			add(streamKind{endpoint: "orderBookSnapshots", instrument: instrument, symbol: sub.Symbol})
-			add(streamKind{endpoint: "orderBookEvents", instrument: instrument, symbol: sub.Symbol})
+			// Two streams: the snapshots endpoint establishes the base state and
+			// the events endpoint supplies the diffs. There is no endpoint
+			// returning both, and events alone cannot initialize a book.
+			add(streamKind{endpoint: endpointOrderBookSnapshots, instrument: instrument, symbol: sub.Symbol})
+			add(streamKind{endpoint: endpointOrderBookEvents, instrument: instrument, symbol: sub.Symbol})
 
 		case types.MarketTradeChannel, types.AggTradeChannel:
-			add(streamKind{endpoint: "trades", instrument: instrument, symbol: sub.Symbol})
+			add(streamKind{endpoint: endpointTrades, instrument: instrument, symbol: sub.Symbol})
+
+		case types.BookTickerChannel:
+			add(streamKind{endpoint: endpointTickers, instrument: instrument, symbol: sub.Symbol})
+
+		case types.MarkPriceChannel:
+			// The funding-rates endpoint is the closest equivalent: bbgo's mark
+			// price stream is where a strategy reads the funding rate from.
+			add(streamKind{endpoint: endpointFundingRates, instrument: instrument, symbol: sub.Symbol})
+
+		case types.LiquidationOrderChannel, types.ForceOrderChannel:
+			add(streamKind{endpoint: endpointLiquidations, instrument: instrument, symbol: sub.Symbol})
 
 		case types.KLineChannel:
 			interval := sub.Options.Interval
@@ -238,7 +268,7 @@ func (s *Source) plan(req marketdata.Request) ([]streamKind, error) {
 				}
 			}
 			add(streamKind{
-				endpoint: "ohlcv", instrument: instrument, symbol: sub.Symbol, interval: interval,
+				endpoint: endpointOHLCV, instrument: instrument, symbol: sub.Symbol, interval: interval,
 			})
 		}
 	}
@@ -278,7 +308,7 @@ func (s *Source) runStream(
 	req marketdata.Request,
 	logger *log.Entry,
 ) error {
-	query := amberdataapi.Query{
+	query := Query{
 		Exchange:   s.cfg.Exchange,
 		Instrument: kind.instrument,
 		MaxLevel:   s.cfg.MaxLevel,
@@ -287,7 +317,7 @@ func (s *Source) runStream(
 	exchange := types.ExchangeName(s.cfg.Exchange)
 
 	switch kind.endpoint {
-	case "trades":
+	case endpointTrades:
 		w := &pageWalker[amberdataapi.Trade]{
 			fetch: func(ctx context.Context, since, until time.Time, next string) (amberdataapi.Page[amberdataapi.Trade], error) {
 				q := query
@@ -308,8 +338,8 @@ func (s *Source) runStream(
 			return cursor.Push(&ev)
 		})
 
-	case "orderBookSnapshots", "orderBookEvents":
-		snapshot := kind.endpoint == "orderBookSnapshots"
+	case endpointOrderBookSnapshots, endpointOrderBookEvents:
+		snapshot := kind.endpoint == endpointOrderBookSnapshots
 
 		w := &pageWalker[amberdataapi.Book]{
 			fetch: func(ctx context.Context, since, until time.Time, next string) (amberdataapi.Page[amberdataapi.Book], error) {
@@ -339,7 +369,7 @@ func (s *Source) runStream(
 			return cursor.Push(&ev)
 		})
 
-	case "ohlcv":
+	case endpointOHLCV:
 		bucket, ok := ohlcvInterval(kind.interval.Duration())
 		if !ok {
 			return fmt.Errorf("amberdata: interval %s has no ohlcv bucket", kind.interval)
@@ -365,7 +395,89 @@ func (s *Source) runStream(
 			return cursor.Push(&ev)
 		})
 
+	case endpointTickers:
+		return runWalker(ctx, s, cursor, logger, kind, req, query,
+			s.client.GetTickers,
+			func(t amberdataapi.Ticker) int64 { return t.EventTimeNano() },
+			func(amberdataapi.Ticker) string { return "" },
+			func(t amberdataapi.Ticker) marketdata.Event {
+				return tickerToEvent(t, exchange, kind.symbol)
+			})
+
+	case endpointFundingRates:
+		return runWalker(ctx, s, cursor, logger, kind, req, query,
+			s.client.GetFundingRates,
+			func(r amberdataapi.FundingRate) int64 { return r.EventTimeNano() },
+			func(amberdataapi.FundingRate) string { return "" },
+			func(r amberdataapi.FundingRate) marketdata.Event {
+				return fundingRateToEvent(r, exchange, kind.symbol)
+			})
+
+	case endpointOpenInterest:
+		return runWalker(ctx, s, cursor, logger, kind, req, query,
+			s.client.GetOpenInterest,
+			func(o amberdataapi.OpenInterest) int64 { return o.EventTimeNano() },
+			func(amberdataapi.OpenInterest) string { return "" },
+			func(o amberdataapi.OpenInterest) marketdata.Event {
+				return openInterestToEvent(o, exchange, kind.symbol)
+			})
+
+	case endpointLiquidations:
+		return runWalker(ctx, s, cursor, logger, kind, req, query,
+			s.client.GetLiquidations,
+			func(l amberdataapi.Liquidation) int64 { return l.EventTimeNano() },
+			func(l amberdataapi.Liquidation) string { return l.OrderID },
+			func(l amberdataapi.Liquidation) marketdata.Event {
+				return liquidationToEvent(l, exchange, kind.symbol)
+			})
+
+	case endpointLongShortRatio:
+		return runWalker(ctx, s, cursor, logger, kind, req, query,
+			s.client.GetLongShortRatio,
+			func(r amberdataapi.LongShortRatio) int64 { return r.EventTimeNano() },
+			func(amberdataapi.LongShortRatio) string { return "" },
+			func(r amberdataapi.LongShortRatio) marketdata.Event {
+				return longShortRatioToEvent(r, exchange, kind.symbol)
+			})
+
 	default:
 		return fmt.Errorf("amberdata: unknown endpoint %q", kind.endpoint)
 	}
+}
+
+// runWalker drives one endpoint's pagination and pushes the converted events.
+//
+// The five periodic endpoints differ only in their fetch function and converter,
+// so they share this rather than repeating the walker wiring five times.
+func runWalker[T any](
+	ctx context.Context,
+	s *Source,
+	cursor *marketdata.ChanCursor,
+	logger *log.Entry,
+	kind streamKind,
+	req marketdata.Request,
+	query Query,
+	fetch func(context.Context, Query, string) (amberdataapi.Page[T], error),
+	timeOf func(T) int64,
+	idOf func(T) string,
+	convert func(T) marketdata.Event,
+) error {
+	w := &pageWalker[T]{
+		fetch: func(ctx context.Context, since, until time.Time, next string) (amberdataapi.Page[T], error) {
+			q := query
+			q.Since, q.Until = since, until
+			return fetch(ctx, q, next)
+		},
+		timeOf:   timeOf,
+		idOf:     idOf,
+		limiter:  s.limiter,
+		chunk:    s.cfg.Chunk,
+		minChunk: s.cfg.MinChunk,
+		logger:   logger,
+	}
+
+	return w.walk(ctx, req.Since, req.Until, func(item T) bool {
+		ev := convert(item)
+		return cursor.Push(&ev)
+	})
 }

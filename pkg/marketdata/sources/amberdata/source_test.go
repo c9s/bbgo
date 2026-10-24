@@ -27,6 +27,12 @@ type fakeClient struct {
 	snapPages  [][]amberdataapi.Book
 	ohlcvPages [][]amberdataapi.OHLCV
 
+	fundingRates   []amberdataapi.FundingRate
+	openInterest   []amberdataapi.OpenInterest
+	liquidations   []amberdataapi.Liquidation
+	longShortRatio []amberdataapi.LongShortRatio
+	tickers        []amberdataapi.Ticker
+
 	// errOnWindow returns an error while the requested window is at least this
 	// long, so the shrinking path can be tested.
 	errOnWindow time.Duration
@@ -54,7 +60,7 @@ func (c *fakeClient) page(next string, pages [][]amberdataapi.Trade) amberdataap
 }
 
 func (c *fakeClient) GetTrades(
-	ctx context.Context, q amberdataapi.Query, next string,
+	ctx context.Context, q Query, next string,
 ) (amberdataapi.Page[amberdataapi.Trade], error) {
 	if next != "" {
 		c.cursorCalls.Add(1)
@@ -73,24 +79,54 @@ func (c *fakeClient) GetTrades(
 }
 
 func (c *fakeClient) GetOrderBookEvents(
-	ctx context.Context, q amberdataapi.Query, next string,
+	ctx context.Context, q Query, next string,
 ) (amberdataapi.Page[amberdataapi.Book], error) {
 	return bookPage(next, c.bookPages), nil
 }
 
 func (c *fakeClient) GetOrderBookSnapshots(
-	ctx context.Context, q amberdataapi.Query, next string,
+	ctx context.Context, q Query, next string,
 ) (amberdataapi.Page[amberdataapi.Book], error) {
 	return bookPage(next, c.snapPages), nil
 }
 
 func (c *fakeClient) GetOHLCV(
-	ctx context.Context, q amberdataapi.Query, next string,
+	ctx context.Context, q Query, next string,
 ) (amberdataapi.Page[amberdataapi.OHLCV], error) {
 	if len(c.ohlcvPages) == 0 {
 		return amberdataapi.Page[amberdataapi.OHLCV]{}, nil
 	}
 	return amberdataapi.Page[amberdataapi.OHLCV]{Data: c.ohlcvPages[0]}, nil
+}
+
+func (c *fakeClient) GetFundingRates(
+	ctx context.Context, q Query, next string,
+) (amberdataapi.Page[amberdataapi.FundingRate], error) {
+	return amberdataapi.Page[amberdataapi.FundingRate]{Data: c.fundingRates}, nil
+}
+
+func (c *fakeClient) GetOpenInterest(
+	ctx context.Context, q Query, next string,
+) (amberdataapi.Page[amberdataapi.OpenInterest], error) {
+	return amberdataapi.Page[amberdataapi.OpenInterest]{Data: c.openInterest}, nil
+}
+
+func (c *fakeClient) GetLiquidations(
+	ctx context.Context, q Query, next string,
+) (amberdataapi.Page[amberdataapi.Liquidation], error) {
+	return amberdataapi.Page[amberdataapi.Liquidation]{Data: c.liquidations}, nil
+}
+
+func (c *fakeClient) GetLongShortRatio(
+	ctx context.Context, q Query, next string,
+) (amberdataapi.Page[amberdataapi.LongShortRatio], error) {
+	return amberdataapi.Page[amberdataapi.LongShortRatio]{Data: c.longShortRatio}, nil
+}
+
+func (c *fakeClient) GetTickers(
+	ctx context.Context, q Query, next string,
+) (amberdataapi.Page[amberdataapi.Ticker], error) {
+	return amberdataapi.Page[amberdataapi.Ticker]{Data: c.tickers}, nil
 }
 
 func bookPage(next string, pages [][]amberdataapi.Book) amberdataapi.Page[amberdataapi.Book] {
