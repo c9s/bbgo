@@ -84,13 +84,14 @@ jobs:
         touch data/binance-markets.json
 
     - name: Test
-      env:
-        # Three runs on main to shake out flakiness in the concurrent trading
-        # code; one on a pull request, so a contributor is not waiting on two
-        # redundant repeats for feedback.
-        GO_TEST_COUNT: ${{ github.event_name == 'push' && '3' || '1' }}
+      # Kept at three runs on pull requests as well as on main. Dropping pull
+      # requests to one was measured and bought nothing: the Test step is
+      # dominated by compiling the test binaries under -race, not by executing
+      # them, so the two extra repeats are close to free. Measured on this
+      # repository, -count 1 took 4m12s against 3m57s for -count 3, the
+      # difference being cache warmth rather than the repeats.
       run: |
-        go test -count "${GO_TEST_COUNT}" -race -coverprofile coverage.txt -covermode atomic ./pkg/...
+        go test -count 3 -race -coverprofile coverage.txt -covermode atomic ./pkg/...
         sed -i -e '/_requestgen.go/d' coverage.txt
 
     - name: TestDnum
