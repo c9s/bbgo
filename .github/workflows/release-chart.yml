@@ -5,20 +5,18 @@ on:
   push:
     branches:
     - main
-  ## FOR debugging
-  #
-  # pull_request:
-  #   types: [synchronize, opened, reopened]
-  #   branches:
-  #     - "main"
-  #     - "v*"
-  #     - "c9s/helm-chart-release"
+
+# Publishing to the chart repository is not safe to interrupt part-way.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 jobs:
   releaseChart:
     permissions:
       contents: write
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v7
