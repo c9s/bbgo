@@ -2,8 +2,6 @@
 
 package indicatorv2
 
-import ()
-
 func (S *StochStream) OnUpdate(cb func(k float64, d float64)) {
 	S.updateCallbacks = append(S.updateCallbacks, cb)
 }
