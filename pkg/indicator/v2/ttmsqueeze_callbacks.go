@@ -2,8 +2,6 @@
 
 package indicatorv2
 
-import ()
-
 func (T *TTMSqueezeStream) OnUpdate(cb func(squeeze TTMSqueeze)) {
 	T.updateCallbacks = append(T.updateCallbacks, cb)
 }

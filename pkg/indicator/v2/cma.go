@@ -1,12 +1,15 @@
 package indicatorv2
 
 import (
-	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type CMAStream struct {
 	*types.Float64Series
+
+	// count is the number of values accumulated, tracked separately so that
+	// truncating the output slice does not affect the cumulative average.
+	count float64
 }
 
 func CMA2(source types.Float64Source) *CMAStream {
@@ -18,11 +21,11 @@ func CMA2(source types.Float64Source) *CMAStream {
 }
 
 func (s *CMAStream) Calculate(x float64) float64 {
-	l := float64(s.Slice.Length())
-	cma := (s.Slice.Last(0)*l + x) / (l + 1.)
+	cma := (s.Slice.Last(0)*s.count + x) / (s.count + 1.)
+	s.count++
 	return cma
 }
 
 func (s *CMAStream) Truncate() {
-	s.Slice.Truncate(indicator.MaxNumOfEWMA)
+	s.Slice = generalTruncate(s.Slice)
 }
