@@ -25,8 +25,10 @@ func PivotLow(source types.Float64Source, window int, args ...int) *PivotLowStre
 
 	s.Subscribe(source, func(x float64) {
 		s.rawValues.Push(x)
+		s.rawValues = generalTruncate(s.rawValues)
 		if low, ok := s.calculatePivotLow(s.rawValues, s.window, s.rightWindow); ok {
 			s.PushAndEmit(low)
+			s.Slice = generalTruncate(s.Slice)
 		}
 	})
 	return s

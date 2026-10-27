@@ -46,3 +46,7 @@ func (s *RSIStream) Calculate(_ float64) float64 {
 	rsi := 100.0 - (100.0 / (1.0 + rs))
 	return rsi
 }
+
+func (s *RSIStream) Truncate() {
+	s.Slice = generalTruncate(s.Slice)
+}
