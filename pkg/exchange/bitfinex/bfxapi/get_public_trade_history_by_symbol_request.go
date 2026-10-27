@@ -59,7 +59,7 @@ func (r *PublicTradeHistoryResponse) UnmarshalJSON(data []byte) error {
 // GetPublicTradeHistoryBySymbolRequest
 // API: https://docs.bitfinex.com/reference/rest-public-trades
 //
-//go:generate requestgen -type GetPublicTradeHistoryBySymbolRequest -method POST -url "/v2/trades/:symbol/hist" -responseType .PublicTradeHistoryResponse
+//go:generate requestgen -type GetPublicTradeHistoryBySymbolRequest -method GET -url "/v2/trades/:symbol/hist" -responseType .PublicTradeHistoryResponse
 type GetPublicTradeHistoryBySymbolRequest struct {
 	client requestgen.APIClient
 
