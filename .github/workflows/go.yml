@@ -5,10 +5,19 @@ on:
     branches:
     - "main"
   pull_request:
-    # types: [synchronize, opened, reopened, edited]
-    # branches:
-    # - "main"
-    # - "v*"
+
+# Cancel an in-progress run when the branch is pushed again. Without this every
+# push to a pull request starts another full ~8 minute run alongside the one it
+# supersedes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # The revive step reports through github-pr-review.
+  pull-requests: write
+  checks: write
 
 jobs:
   build:
@@ -30,18 +39,16 @@ jobs:
     steps:
 
     - uses: actions/checkout@v7
-      with:
-        # lfs: 'true'
-        ssh-key: ${{ secrets.git_ssh_key }}
 
-    - uses: actions/cache@v6
+    - name: Set up Go
+      uses: actions/setup-go@v7
       with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+        go-version: ${{ matrix.go-version }}
+        # setup-go caches the module and build caches itself, keyed on both the
+        # Go version and go.sum. The hand-rolled actions/cache step this
+        # replaces keyed on go.sum alone, so a Go version bump silently reused
+        # the previous version's build cache.
+        cache: true
 
     - name: Set up MySQL
       run: |
@@ -52,23 +59,20 @@ jobs:
       uses: shogo82148/actions-setup-redis@v1
       with:
         redis-version: ${{ matrix.redis-version }}
-        # auto-start: "false"
-
-    - name: Set up Go
-      uses: actions/setup-go@v7
-      with:
-        go-version: ${{ matrix.go-version }}
 
     - name: Install Migration Tool
-      run: go install github.com/c9s/rockhopper/v2/cmd/rockhopper@latest
+      # Pinned rather than @latest, so an upstream release cannot break this
+      # repository's CI without a commit here. Kept at the same version as the
+      # rockhopper/v2 require in go.mod, so the tool applying the migrations and
+      # the library reading them do not drift apart. Dependabot's gomod updates
+      # will not touch this line, so it needs bumping alongside go.mod.
+      run: go install github.com/c9s/rockhopper/v2/cmd/rockhopper@v2.5.1
 
     - name: Test Migration SQL Files For MySQL
-      run: |
-        rockhopper --config rockhopper_mysql.yaml up
+      run: rockhopper --config rockhopper_mysql.yaml up
 
     - name: Test Migration SQL Files For SQLite
-      run: |
-        rockhopper --config rockhopper_sqlite.yaml up
+      run: rockhopper --config rockhopper_sqlite.yaml up
 
     - name: Build
       run: go build -v ./cmd/bbgo
@@ -80,6 +84,12 @@ jobs:
         touch data/binance-markets.json
 
     - name: Test
+      # Kept at three runs on pull requests as well as on main. Dropping pull
+      # requests to one was measured and bought nothing: the Test step is
+      # dominated by compiling the test binaries under -race, not by executing
+      # them, so the two extra repeats are close to free. Measured on this
+      # repository, -count 1 took 4m12s against 3m57s for -count 3, the
+      # difference being cache warmth rather than the repeats.
       run: |
         go test -count 3 -race -coverprofile coverage.txt -covermode atomic ./pkg/...
         sed -i -e '/_requestgen.go/d' coverage.txt
@@ -100,8 +110,22 @@ jobs:
       with:
         files: ./coverage.txt,./coverage_dnum.txt
 
-    - name: Create dotenv file
-      run: |
-        echo "DB_DRIVER=mysql" >> .env.local
-        echo "DB_DSN=root:root@/bbgo" >> .env.local
-
+# NOTE: this workflow used to end with a "Create dotenv file" step that wrote
+# DB_DRIVER and DB_DSN into .env.local. It has been removed: it ran after the
+# test steps, so nothing ever read it.
+#
+# It also would not have worked if moved earlier. The database-backed tests —
+# pkg/strategy/xfundingv2/round_record_test.go, for one — skip themselves based
+# on os.LookupEnv("DB_DSN"), and never load .env.local, so a file on disk is
+# invisible to them. Writing to $GITHUB_ENV instead, before the test step, is
+# what would actually enable them:
+#
+#     - name: Configure database access for the DB-backed tests
+#       run: |
+#         echo "DB_DRIVER=mysql" >> "$GITHUB_ENV"
+#         echo "DB_DSN=root:root@/bbgo" >> "$GITHUB_ENV"
+#
+# That is left out on purpose. Those tests have never run in CI, so turning
+# them on here is a behaviour change with an unknown outcome rather than a fix,
+# even though the MySQL service above is already provisioned and migrated for
+# exactly this purpose.

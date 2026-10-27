@@ -1,40 +1,75 @@
 name: Node.js CI
 
 on:
+  # This workflow had never run once before the path filters below were fixed,
+  # so it is also dispatchable: trigger it by hand to confirm it passes before
+  # relying on it as a gate.
+  workflow_dispatch:
   push:
     branches: [ main ]
     paths:
-    - apps/backtest-report
-    - frontend
+    # These need the /** suffix. A bare "apps/backtest-report" is matched
+    # against the full path of each changed file, so it only matches a file of
+    # exactly that name and never anything inside the directory — which is why
+    # this workflow never triggered.
+    - apps/backtest-report/**
+    - apps/frontend/**
+    - .github/workflows/node.yml
   pull_request:
     branches: [ main ]
     paths:
-    - apps/backtest-report
-    - frontend
+    - apps/backtest-report/**
+    - apps/frontend/**
+    - .github/workflows/node.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     strategy:
+      # One job per app rather than one job building both in sequence, so a
+      # failure names the app that failed. The previous version ran the second
+      # app's export without ever installing its dependencies.
+      fail-fast: false
       matrix:
-        node-version: [ 16.x ]
+        app:
+        # The second entry used to read "frontend". That directory was moved in
+        # "move frontend to apps dir" and the workflow was never updated, so
+        # the final step pointed at a path that no longer exists.
+        - apps/backtest-report
+        - apps/frontend
 
     steps:
     - uses: actions/checkout@v7
-    - name: Use Node.js ${{ matrix.node-version }}
+
+    - name: Use Node.js
       uses: actions/setup-node@v7
       with:
-        node-version: ${{ matrix.node-version }}
+        # Was pinned to 16.x, end-of-life since September 2023. Both apps are
+        # on Next 12, which is why this is not newer still.
+        node-version: "20"
+        cache: yarn
+        cache-dependency-path: ${{ matrix.app }}/yarn.lock
+
     - run: npm install -g yarn
+
     - name: Install
-      run: yarn install
-      working-directory: "apps/backtest-report"
-    - name: Build
-      run: yarn run next build
-      working-directory: "apps/backtest-report"
+      # --frozen-lockfile so CI fails on a stale lockfile instead of silently
+      # resolving to something the committed lockfile does not describe.
+      run: yarn install --frozen-lockfile
+      working-directory: ${{ matrix.app }}
+
     - name: Export
-      run: yarn run next export
-      working-directory: "apps/backtest-report"
-    - run: yarn export
-      working-directory: "frontend"
+      # Each app's own package.json defines export as "next build && next
+      # export", so this covers the build too. Both are on Next 12, where
+      # `next export` is still a separate command.
+      run: yarn export
+      working-directory: ${{ matrix.app }}
