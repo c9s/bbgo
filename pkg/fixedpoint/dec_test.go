@@ -314,6 +314,20 @@ func TestYaml(t *testing.T) {
 	assert.Equal(t, p, q)
 }
 
+func TestYamlRejectsInvalidNumericString(t *testing.T) {
+	value := NewFromInt(5)
+	err := yaml.Unmarshal([]byte("not-a-number"), &value)
+	assert.Error(t, err)
+	assert.Equal(t, NewFromInt(5), value)
+}
+
+func TestInvalidNumericStringReturnsError(t *testing.T) {
+	_, err := NewFromString("not-a-number")
+	assert.Error(t, err)
+	_, err = NewFromBytes([]byte("not-a-number"))
+	assert.Error(t, err)
+}
+
 func TestNumFractionalDigits(t *testing.T) {
 	tests := []struct {
 		name string

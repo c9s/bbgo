@@ -304,6 +304,7 @@ func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
 			*v = nv
 			return
 		}
+		return err2
 	}
 
 	return err
