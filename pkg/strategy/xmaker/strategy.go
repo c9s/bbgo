@@ -1524,12 +1524,14 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 					makerBestBidPriceMetrics.With(s.metricsLabels).Set(bidPrice.Float64())
 				}
 
-				requiredQuote := fixedpoint.Min(
-					bidQuantity.Mul(bidPrice),
-					makerQuota.QuoteAsset.Available,
-				)
+				requiredQuote := s.makerMarket.TruncateQuoteQuantity(bidQuantity.Mul(bidPrice))
 
-				requiredQuote = s.makerMarket.TruncateQuoteQuantity(requiredQuote)
+				if requiredQuote.Compare(makerQuota.QuoteAsset.Available) > 0 {
+					s.logger.Infof("%s maker quote balance %s is not enough for bid layer %d (required %s), skip remaining bid layers",
+						s.Symbol, makerQuota.QuoteAsset.Available.String(), i, requiredQuote.String())
+					break
+				}
+
 				bidQuantity = s.makerMarket.TruncateQuantity(requiredQuote.Div(bidPrice))
 
 				if s.makerMarket.IsDustQuantity(bidQuantity, bidPrice) {
@@ -1590,8 +1592,15 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 					makerBestAskPriceMetrics.With(s.metricsLabels).Set(askPrice.Float64())
 				}
 
-				requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
-				askQuantity = s.makerMarket.TruncateQuantity(requiredBase)
+				requiredBase := s.makerMarket.TruncateQuantity(askQuantity)
+
+				if requiredBase.Compare(makerQuota.BaseAsset.Available) > 0 {
+					s.logger.Infof("%s maker base balance %s is not enough for ask layer %d (required %s), skip remaining ask layers",
+						s.Symbol, makerQuota.BaseAsset.Available.String(), i, requiredBase.String())
+					break
+				}
+
+				askQuantity = requiredBase
 
 				if s.makerMarket.IsDustQuantity(askQuantity, askPrice) {
 					continue
@@ -1679,12 +1688,14 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 					makerBestBidPriceMetrics.With(s.metricsLabels).Set(bidPrice.Float64())
 				}
 
-				requiredQuote := fixedpoint.Min(
-					bidQuantity.Mul(bidPrice),
-					makerQuota.QuoteAsset.Available,
-				)
+				requiredQuote := s.makerMarket.TruncateQuoteQuantity(bidQuantity.Mul(bidPrice))
 
-				requiredQuote = s.makerMarket.TruncateQuoteQuantity(requiredQuote)
+				if requiredQuote.Compare(makerQuota.QuoteAsset.Available) > 0 {
+					s.logger.Infof("%s maker quote balance %s is not enough for bid layer %d (required %s), skip remaining bid layers",
+						s.Symbol, makerQuota.QuoteAsset.Available.String(), i, requiredQuote.String())
+					break
+				}
+
 				bidQuantity = s.makerMarket.TruncateQuantity(requiredQuote.Div(bidPrice))
 
 				if s.makerMarket.IsDustQuantity(bidQuantity, bidPrice) {
@@ -1765,8 +1776,15 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 					makerBestAskPriceMetrics.With(s.metricsLabels).Set(askPrice.Float64())
 				}
 
-				requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
-				askQuantity = s.makerMarket.TruncateQuantity(requiredBase)
+				requiredBase := s.makerMarket.TruncateQuantity(askQuantity)
+
+				if requiredBase.Compare(makerQuota.BaseAsset.Available) > 0 {
+					s.logger.Infof("%s maker base balance %s is not enough for ask layer %d (required %s), skip remaining ask layers",
+						s.Symbol, makerQuota.BaseAsset.Available.String(), i, requiredBase.String())
+					break
+				}
+
+				askQuantity = requiredBase
 
 				if s.makerMarket.IsDustQuantity(askQuantity, askPrice) {
 					continue
