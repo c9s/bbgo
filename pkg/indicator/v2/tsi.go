@@ -19,10 +19,6 @@ import (
 //	TSI = PCDS / APCDS * 100
 //
 // The first input is only used as the previous value, so no value is emitted for it.
-//
-// Note: the inner moving averages are EWMA2 streams, which treat a last value of exactly 0 as "not initialized"
-// and re-seed with the next input. With a leading run of zero price changes this differs slightly from the legacy
-// implementation during warm-up; the difference decays geometrically.
 type TSIStream struct {
 	*types.Float64Series
 

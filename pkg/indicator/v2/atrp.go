@@ -18,6 +18,7 @@ func ATRP2(source KLineSubscription, window int) *ATRPStream {
 		cloze := k.Close.Float64()
 		atrp := x / cloze
 		s.PushAndEmit(atrp)
+		s.Slice = generalTruncate(s.Slice)
 	})
 	return s
 }

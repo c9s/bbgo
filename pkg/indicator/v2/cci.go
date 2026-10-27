@@ -63,3 +63,8 @@ func (s *CCIStream) Calculate(value float64) float64 {
 	cci := (value - ma) / (0.015 * md)
 	return cci
 }
+
+func (s *CCIStream) Truncate() {
+	s.Slice = generalTruncate(s.Slice)
+	s.TypicalPrice.Slice = generalTruncate(s.TypicalPrice.Slice)
+}

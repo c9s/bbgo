@@ -75,7 +75,9 @@ func (i *IndicatorSet) VOLUME(interval types.Interval) *indicatorv2.PriceStream 
 }
 
 func (i *IndicatorSet) RSI(iw types.IntervalWindow) *indicatorv2.RSIStream {
-	return indicatorv2.RSI2(i.CLOSE(iw.Interval), iw.Window)
+	return indicatorv2.WithHistory(i.KLines(iw.Interval), func(source *indicatorv2.KLineStream) *indicatorv2.RSIStream {
+		return indicatorv2.RSI2(indicatorv2.ClosePrices(source), iw.Window)
+	})
 }
 
 func (i *IndicatorSet) EMA(iw types.IntervalWindow) *indicatorv2.EWMAStream {
@@ -91,19 +93,27 @@ func (i *IndicatorSet) SMA(iw types.IntervalWindow) *indicatorv2.SMAStream {
 }
 
 func (i *IndicatorSet) STOCH(iw types.IntervalWindow, dPeriod int) *indicatorv2.StochStream {
-	return indicatorv2.Stoch(i.KLines(iw.Interval), iw.Window, dPeriod)
+	return indicatorv2.WithHistory(i.KLines(iw.Interval), func(source *indicatorv2.KLineStream) *indicatorv2.StochStream {
+		return indicatorv2.Stoch(source, iw.Window, dPeriod)
+	})
 }
 
 func (i *IndicatorSet) BOLL(iw types.IntervalWindow, k float64) *indicatorv2.BOLLStream {
-	return indicatorv2.BOLL(i.CLOSE(iw.Interval), iw.Window, k)
+	return indicatorv2.WithHistory(i.KLines(iw.Interval), func(source *indicatorv2.KLineStream) *indicatorv2.BOLLStream {
+		return indicatorv2.BOLL(indicatorv2.ClosePrices(source), iw.Window, k)
+	})
 }
 
 func (i *IndicatorSet) Keltner(iw types.IntervalWindow, atrLength int) *indicatorv2.KeltnerStream {
-	return indicatorv2.Keltner(i.KLines(iw.Interval), iw.Window, atrLength)
+	return indicatorv2.WithHistory(i.KLines(iw.Interval), func(source *indicatorv2.KLineStream) *indicatorv2.KeltnerStream {
+		return indicatorv2.Keltner(source, iw.Window, atrLength)
+	})
 }
 
 func (i *IndicatorSet) MACD(interval types.Interval, shortWindow, longWindow, signalWindow int) *indicatorv2.MACDStream {
-	return indicatorv2.MACD2(i.CLOSE(interval), shortWindow, longWindow, signalWindow)
+	return indicatorv2.WithHistory(i.KLines(interval), func(source *indicatorv2.KLineStream) *indicatorv2.MACDStream {
+		return indicatorv2.MACD2(indicatorv2.ClosePrices(source), shortWindow, longWindow, signalWindow)
+	})
 }
 
 func (i *IndicatorSet) ATR(interval types.Interval, window int) *indicatorv2.ATRStream {
@@ -111,20 +121,23 @@ func (i *IndicatorSet) ATR(interval types.Interval, window int) *indicatorv2.ATR
 }
 
 func (i *IndicatorSet) ATRP(interval types.Interval, window int) *indicatorv2.ATRPStream {
-	return indicatorv2.ATRP2(i.KLines(interval), window)
+	return indicatorv2.WithHistory(i.KLines(interval), func(source *indicatorv2.KLineStream) *indicatorv2.ATRPStream {
+		return indicatorv2.ATRP2(source, window)
+	})
 }
 
 func (i *IndicatorSet) ADX(interval types.Interval, window int) *indicatorv2.ADXStream {
-	return indicatorv2.ADX(i.KLines(interval), window)
+	return indicatorv2.WithHistory(i.KLines(interval), func(source *indicatorv2.KLineStream) *indicatorv2.ADXStream {
+		return indicatorv2.ADX(source, window)
+	})
 }
 
 func (i *IndicatorSet) LiquidityDemand(
 	iw types.IntervalWindow,
 ) *indicatorv2.LiquidityDemandStream {
-	return indicatorv2.LiquidityDemand(
-		i.KLines(iw.Interval),
-		iw,
-	)
+	return indicatorv2.WithHistory(i.KLines(iw.Interval), func(source *indicatorv2.KLineStream) *indicatorv2.LiquidityDemandStream {
+		return indicatorv2.LiquidityDemand(source, iw)
+	})
 }
 
 func (i *IndicatorSet) ChandelierStop(
@@ -133,13 +146,9 @@ func (i *IndicatorSet) ChandelierStop(
 	multiplier float64,
 	emitDirection bool,
 ) *indicatorv2.ChandelierStopStream {
-	return indicatorv2.ChandelierStop(
-		i.KLines(interval),
-		length,
-		atrPeriod,
-		multiplier,
-		emitDirection,
-	)
+	return indicatorv2.WithHistory(i.KLines(interval), func(source *indicatorv2.KLineStream) *indicatorv2.ChandelierStopStream {
+		return indicatorv2.ChandelierStop(source, length, atrPeriod, multiplier, emitDirection)
+	})
 }
 
 func (i *IndicatorSet) SuperTrend(
@@ -147,13 +156,13 @@ func (i *IndicatorSet) SuperTrend(
 	atrPeriod int,
 	multiplier float64,
 ) *indicatorv2.SuperTrendStream {
-	return indicatorv2.SuperTrend(
-		i.KLines(interval),
-		atrPeriod,
-		multiplier,
-	)
+	return indicatorv2.WithHistory(i.KLines(interval), func(source *indicatorv2.KLineStream) *indicatorv2.SuperTrendStream {
+		return indicatorv2.SuperTrend(source, atrPeriod, multiplier)
+	})
 }
 
 func (i *IndicatorSet) FixedWindowVP(interval types.Interval, window int, delta fixedpoint.Value) *indicatorv2.FixedWindowVolumeProfile {
-	return indicatorv2.NewFixedWindowVolumeProfile(i.KLines(interval), window, delta)
+	return indicatorv2.WithHistory(i.KLines(interval), func(source *indicatorv2.KLineStream) *indicatorv2.FixedWindowVolumeProfile {
+		return indicatorv2.NewFixedWindowVolumeProfile(source, window, delta)
+	})
 }

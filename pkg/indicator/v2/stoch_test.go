@@ -78,3 +78,13 @@ func TestSTOCH2_update(t *testing.T) {
 		})
 	}
 }
+
+func TestSTOCH2_Last(t *testing.T) {
+	stream := &KLineStream{}
+	stoch := Stoch(stream, 14, DPeriod)
+	stream.BackFill(randomWalkKLines(50, 1))
+
+	if stoch.Length() != 50 || stoch.Last(0) != stoch.K.Last(0) || stoch.Last(1) != stoch.K.Last(1) {
+		t.Errorf("stoch series should follow %%K: length %d, last %f, %%K last %f", stoch.Length(), stoch.Last(0), stoch.K.Last(0))
+	}
+}
