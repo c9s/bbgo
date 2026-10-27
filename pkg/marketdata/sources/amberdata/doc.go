@@ -5,6 +5,28 @@
 // backtest against a real book over a historical range rather than a range
 // someone recorded themselves.
 //
+// # Endpoints
+//
+// The REST layer follows the repository's convention: one requestgen request
+// struct per endpoint, with the generated builders committed. See
+// doc/development/exchange-api-layer-guide.md.
+//
+// The asset class is a slug on every request, so one request type serves both
+// the /futures and /spot families, and the information endpoints take the
+// feature as a slug too rather than having one request type per family.
+//
+//	trades                  -> EventTypeTrade
+//	order-book-snapshots    -> EventTypeBookSnapshot
+//	order-book-events       -> EventTypeBookUpdate
+//	ohlcv                   -> EventTypeKLine
+//	tickers                 -> EventTypeBookTicker
+//	funding-rates           -> EventTypeMarkPrice   (bbgo carries funding there)
+//	liquidations            -> EventTypeLiquidation (the layer's only producer)
+//	open-interest           -> EventTypeMetrics
+//	long-short-ratio        -> EventTypeMetrics
+//	{feature}/information    coverage windows, for planning a backfill
+//	exchanges/reference      contract metadata
+//
 // # Developing without a key
 //
 // AmberData has no free tier, no sandbox and no demo key, and every request
@@ -55,6 +77,14 @@
 //     stated either way. The exchanges/reference endpoint carries
 //     contractSize and underlyingToPositionMultiplier, which settles it once a
 //     key exists.
+//   - Whether a liquidation's `unit` is ever anything other than base_asset on
+//     Binance, and whether `orderId` and `action` are populated on any venue.
+//     Both are null in the published example, so the raw record is carried on
+//     Event.Raw rather than those fields being dropped.
+//   - Whether the funding-rates endpoint returns predicted rates interleaved
+//     with settled ones over a historical range, or only settled. The
+//     isActualFundingRate flag distinguishes them and a predicted rate is
+//     marked FlagSynthetic, but the mix is unverified.
 //
 // # Known documentation inconsistencies
 //

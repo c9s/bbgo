@@ -3,14 +3,14 @@ package amberdataapi
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/url"
-	"strconv"
+
 	"strings"
 	"time"
 )
 
-// AssetClass selects the /futures or /spot family of endpoints.
+// AssetClass selects the /futures or /spot family of endpoints. Both expose the
+// same features under a different prefix, so it is a slug on every request type
+// rather than a duplicated set of them.
 type AssetClass string
 
 const (
@@ -18,12 +18,46 @@ const (
 	AssetClassSpot    AssetClass = "spot"
 )
 
+// TimeFormatMilliseconds is the only time format this client sends.
+//
+// The server's default is `hr`, which emits "2024-06-04 16:23:12 414" — a
+// space-separated millisecond field that is neither RFC3339 nor a number. It is
+// set on every request builder by its constructor and is not exposed as an
+// option, because making it configurable would only create a way to get it
+// wrong.
+const TimeFormatMilliseconds = "milliseconds"
+
+// Feature names for GetCoverageRequest.
+const (
+	FeatureTrades             = "trades"
+	FeatureOrderBookSnapshots = "order-book-snapshots"
+	FeatureOHLCV              = "ohlcv"
+	FeatureFundingRates       = "funding-rates"
+	FeatureOpenInterest       = "open-interest"
+	FeatureLiquidations       = "liquidations"
+	FeatureLongShortRatio     = "long-short-ratio"
+	FeatureTickers            = "tickers"
+)
+
+// Maximum windows each family accepts. The paginator chunks against these rather
+// than discovering them from a 400.
+//
+// Note a contradiction in the published specifications: the trades page warns
+// that the maximum range is 731 days, while its own startDate parameter
+// description says the default window is one hour with a maximum of one hour.
+// The former is treated as the real limit.
+const (
+	MaxTradesWindow    = 731 * 24 * time.Hour
+	MaxOrderBookWindow = 18 * 30 * 24 * time.Hour
+)
+
 // Page is one page of results plus the cursor that continues it.
 type Page[T any] struct {
 	Data []T
 
-	// Next is metadata.next verbatim: a complete absolute URL. Empty when the
-	// result set is exhausted.
+	// Next is metadata.next verbatim: a complete absolute URL carrying an opaque
+	// compressed cursor. It must be re-issued as-is; it cannot be reconstructed.
+	// Empty when the result set is exhausted.
 	Next string
 
 	// ReturnedStart and ReturnedEnd are the range the server actually served,
@@ -32,102 +66,10 @@ type Page[T any] struct {
 	ReturnedEnd   time.Time
 }
 
-// Query is the set of parameters every historical endpoint shares.
-type Query struct {
-	// Exchange is required, and exactly one is allowed.
-	Exchange string
-
-	// Instrument is the venue's own symbol: BTCUSDT for Binance USDⓈ-M,
-	// BTCUSD_PERP for COIN-M, btc_usd for spot.
-	Instrument string
-
-	// Since is inclusive and Until exclusive. When both are zero the API
-	// returns the previous 24 hours.
-	Since time.Time
-	Until time.Time
-
-	// MaxLevel caps order book depth. Zero leaves it to the server.
-	MaxLevel int
-
-	// TimeInterval selects the OHLCV bucket: minutes, hours or days.
-	TimeInterval string
-}
-
-// values renders the query.
-//
-// timeFormat is always milliseconds and is deliberately not configurable: the
-// server's default is `hr`, which emits "2024-06-04 16:23:12 414" — a
-// space-separated millisecond field that is neither RFC3339 nor a number. Making
-// it a parameter would only create a way to get it wrong.
-//
-// sortDirection is never sent. The API accepts it only when the window lies
-// within the last 24 hours or no dates are given at all, and rejects it
-// outright on a historical range; ascending is both the default and what a
-// replay wants.
-func (q Query) values() (url.Values, error) {
-	if q.Exchange == "" {
-		return nil, fmt.Errorf("amberdata: exchange is required and only one is allowed")
-	}
-
-	v := url.Values{}
-	v.Set("exchange", q.Exchange)
-	v.Set("timeFormat", "milliseconds")
-
-	if !q.Since.IsZero() {
-		v.Set("startDate", strconv.FormatInt(q.Since.UnixMilli(), 10))
-	}
-	if !q.Until.IsZero() {
-		v.Set("endDate", strconv.FormatInt(q.Until.UnixMilli(), 10))
-	}
-	if q.MaxLevel > 0 {
-		v.Set("maxLevel", strconv.Itoa(q.MaxLevel))
-	}
-	if q.TimeInterval != "" {
-		v.Set("timeInterval", q.TimeInterval)
-	}
-
-	return v, nil
-}
-
-// MaxWindow is the largest span each endpoint family accepts. Exceeding it is a
-// client error, so the paginator chunks against these rather than discovering
-// them from a 400.
-const (
-	MaxTradesWindow    = 731 * 24 * time.Hour
-	MaxOrderBookWindow = 18 * 30 * 24 * time.Hour
-)
-
-// get issues one request against refURL and returns the decoded page.
-func get[T any](
-	ctx context.Context, c *RestClient, refURL string, q Query,
-) (Page[T], error) {
-	values, err := q.values()
-	if err != nil {
-		return Page[T]{}, err
-	}
-
-	req, err := c.NewAuthenticatedRequest(ctx, "GET", refURL, values, nil)
-	if err != nil {
-		return Page[T]{}, err
-	}
-
-	return doPage[T](c, req)
-}
-
-// GetCursor continues a paginated result by re-issuing metadata.next verbatim.
-func GetCursor[T any](ctx context.Context, c *RestClient, cursorURL string) (Page[T], error) {
-	req, err := c.NewCursorRequest(ctx, cursorURL)
-	if err != nil {
-		return Page[T]{}, err
-	}
-
-	return doPage[T](c, req)
-}
-
-func doPage[T any](c *RestClient, req *http.Request) (Page[T], error) {
-	var resp Response[T]
-	if err := c.Do(req, &resp); err != nil {
-		return Page[T]{}, err
+// pageOf converts a response envelope into a Page.
+func pageOf[T any](resp *Response[T]) Page[T] {
+	if resp == nil {
+		return Page[T]{}
 	}
 
 	return Page[T]{
@@ -135,74 +77,120 @@ func doPage[T any](c *RestClient, req *http.Request) (Page[T], error) {
 		Next:          resp.Payload.Metadata.Next,
 		ReturnedStart: resp.Payload.Metadata.ReturnedStartDate.Time,
 		ReturnedEnd:   resp.Payload.Metadata.ReturnedEndDate.Time,
-	}, nil
+	}
 }
 
-// instrumentPath builds "/markets/<class>/<endpoint>/<instrument>", escaping the
-// instrument since some venues use characters that need it.
-func instrumentPath(class AssetClass, endpoint, instrument string) string {
-	return fmt.Sprintf("/markets/%s/%s/%s", class, endpoint, url.PathEscape(instrument))
+// Request constructors. Each sets the asset class and the time format, so a
+// caller cannot forget either.
+
+func (c *RestClient) NewGetTradesRequest(class AssetClass) *GetTradesRequest {
+	return &GetTradesRequest{client: c, assetClass: class, timeFormat: TimeFormatMilliseconds}
 }
 
-// GetTrades fetches historical trades. The maximum window is 731 days.
-func (c *RestClient) GetTrades(
-	ctx context.Context, class AssetClass, q Query,
-) (Page[Trade], error) {
-	return get[Trade](ctx, c, instrumentPath(class, "trades", q.Instrument), q)
+func (c *RestClient) NewGetOrderBookSnapshotsRequest(class AssetClass) *GetOrderBookSnapshotsRequest {
+	return &GetOrderBookSnapshotsRequest{client: c, assetClass: class, timeFormat: TimeFormatMilliseconds}
 }
 
-// GetOrderBookSnapshots fetches full order book states. The maximum window is
-// 18 months.
-func (c *RestClient) GetOrderBookSnapshots(
-	ctx context.Context, class AssetClass, q Query,
-) (Page[Book], error) {
-	return get[Book](ctx, c, instrumentPath(class, "order-book-snapshots", q.Instrument), q)
+func (c *RestClient) NewGetOrderBookEventsRequest(class AssetClass) *GetOrderBookEventsRequest {
+	return &GetOrderBookEventsRequest{client: c, assetClass: class, timeFormat: TimeFormatMilliseconds}
 }
 
-// GetOrderBookEvents fetches incremental order book changes. Only changed levels
-// appear, and a level with volume zero means it was removed.
-func (c *RestClient) GetOrderBookEvents(
-	ctx context.Context, class AssetClass, q Query,
-) (Page[Book], error) {
-	return get[Book](ctx, c, instrumentPath(class, "order-book-events", q.Instrument), q)
+func (c *RestClient) NewGetOHLCVRequest(class AssetClass) *GetOHLCVRequest {
+	return &GetOHLCVRequest{client: c, assetClass: class, timeFormat: TimeFormatMilliseconds}
 }
 
-// GetOHLCV fetches candles. Set Query.TimeInterval to minutes, hours or days.
-func (c *RestClient) GetOHLCV(
-	ctx context.Context, class AssetClass, q Query,
-) (Page[OHLCV], error) {
-	return get[OHLCV](ctx, c, instrumentPath(class, "ohlcv", q.Instrument), q)
+func (c *RestClient) NewGetFundingRatesRequest(class AssetClass) *GetFundingRatesRequest {
+	return &GetFundingRatesRequest{client: c, assetClass: class, timeFormat: TimeFormatMilliseconds}
 }
 
-// GetTradesInformation reports the range each instrument has data for, which is
-// how a backfill avoids requesting years that do not exist.
-func (c *RestClient) GetTradesInformation(
-	ctx context.Context, class AssetClass, q Query,
-) (Page[InstrumentCoverage], error) {
-	return get[InstrumentCoverage](ctx, c,
-		fmt.Sprintf("/markets/%s/trades/information", class), q)
+func (c *RestClient) NewGetOpenInterestRequest(class AssetClass) *GetOpenInterestRequest {
+	return &GetOpenInterestRequest{client: c, assetClass: class, timeFormat: TimeFormatMilliseconds}
 }
 
-// GetExchangesReference reports contract metadata, including the contract size
-// and position multiplier needed to interpret futures volumes.
-func (c *RestClient) GetExchangesReference(
-	ctx context.Context, class AssetClass, q Query,
-) (Page[InstrumentReference], error) {
-	return get[InstrumentReference](ctx, c,
-		fmt.Sprintf("/markets/%s/exchanges/reference", class), q)
+func (c *RestClient) NewGetLiquidationsRequest(class AssetClass) *GetLiquidationsRequest {
+	return &GetLiquidationsRequest{client: c, assetClass: class, timeFormat: TimeFormatMilliseconds}
+}
+
+func (c *RestClient) NewGetLongShortRatioRequest(class AssetClass) *GetLongShortRatioRequest {
+	return &GetLongShortRatioRequest{client: c, assetClass: class, timeFormat: TimeFormatMilliseconds}
+}
+
+func (c *RestClient) NewGetTickersRequest(class AssetClass) *GetTickersRequest {
+	return &GetTickersRequest{client: c, assetClass: class, timeFormat: TimeFormatMilliseconds}
+}
+
+func (c *RestClient) NewGetCoverageRequest(class AssetClass, feature string) *GetCoverageRequest {
+	return &GetCoverageRequest{
+		client: c, assetClass: class, feature: feature, timeFormat: TimeFormatMilliseconds,
+	}
+}
+
+func (c *RestClient) NewGetExchangesReferenceRequest(class AssetClass) *GetExchangesReferenceRequest {
+	return &GetExchangesReferenceRequest{client: c, assetClass: class, timeFormat: TimeFormatMilliseconds}
+}
+
+// GetCursor continues a paginated result by re-issuing metadata.next verbatim.
+//
+// It is a free function rather than a request builder because the cursor is an
+// opaque URL: there are no parameters to set, and appending any would risk
+// invalidating it.
+func GetCursor[T any](ctx context.Context, c *RestClient, cursorURL string) (Page[T], error) {
+	if cursorURL == "" {
+		return Page[T]{}, fmt.Errorf("amberdata: empty cursor url")
+	}
+	if !strings.HasPrefix(cursorURL, "http://") && !strings.HasPrefix(cursorURL, "https://") {
+		// A relative cursor would silently resolve against the wrong host.
+		return Page[T]{}, fmt.Errorf("amberdata: cursor url %q is not absolute", cursorURL)
+	}
+
+	req, err := c.NewCursorRequest(ctx, cursorURL)
+	if err != nil {
+		return Page[T]{}, err
+	}
+
+	resp, err := c.SendRequest(req)
+	if err != nil {
+		return Page[T]{}, err
+	}
+
+	var envelope Response[T]
+	if err := resp.DecodeJSON(&envelope); err != nil {
+		return Page[T]{}, fmt.Errorf("amberdata: decoding cursor response: %w", err)
+	}
+
+	return pageOf(&envelope), nil
 }
 
 // NormalizeInstrument maps a bbgo symbol to the venue's instrument name.
 //
-// AmberData uses each venue's own naming, so a spot pair is lowercase with an
-// underscore while a futures contract is upper case. Only the spot case needs
-// transforming, and only when the caller passes a bbgo-style symbol.
+// AmberData uses each venue's own naming: a futures contract is upper case
+// (BTCUSDT, BTCUSD_PERP) while a spot pair is lower case with an underscore
+// (btc_usd).
 func NormalizeInstrument(class AssetClass, symbol string) string {
-	if class != AssetClassSpot {
-		return strings.ToUpper(symbol)
-	}
-	if strings.Contains(symbol, "_") {
+	if class == AssetClassSpot {
 		return strings.ToLower(symbol)
 	}
-	return strings.ToLower(symbol)
+	return strings.ToUpper(symbol)
+}
+
+// optionalTime is a helper for callers holding a possibly-zero time.
+func optionalTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
+}
+
+// DoPage runs a generated request builder's Do and converts its envelope into a
+// Page.
+//
+// It takes the method value rather than the request, because each builder is a
+// distinct generated type with its own Do signature; this is the one place that
+// has to know the envelope is wrapped.
+func DoPage[T any](ctx context.Context, do func(context.Context) (*Response[T], error)) (Page[T], error) {
+	resp, err := do(ctx)
+	if err != nil {
+		return Page[T]{}, err
+	}
+	return pageOf(resp), nil
 }

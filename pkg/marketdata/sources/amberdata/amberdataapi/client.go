@@ -2,9 +2,7 @@ package amberdataapi
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -135,29 +133,24 @@ func (c *RestClient) NewCursorRequest(ctx context.Context, cursorURL string) (*h
 	return req, nil
 }
 
-// Do sends a request and decodes the envelope into out, mapping a non-2xx
-// response to an *APIError.
-func (c *RestClient) Do(req *http.Request, out any) error {
-	resp, err := c.HttpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// Cap the read: a single response is capped at 10 MB server-side, so
-	// anything much larger means something is wrong.
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
-	if err != nil {
-		return err
+// SendRequest overrides requestgen.BaseAPIClient.SendRequest so that every
+// generated request builder inherits this package's error handling.
+//
+// The embedded implementation returns its own *requestgen.ErrResponse for a
+// non-2xx response, which would lose the classification the paginator depends
+// on: whether a failure means "halve the window" (the 10 MB cap, the 28 second
+// timeout) or "stop" (a 403). Translating here means the generated Do methods
+// need no special casing.
+func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error) {
+	resp, err := c.BaseAPIClient.SendRequest(req)
+	if err == nil {
+		return resp, nil
 	}
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return ParseAPIError(resp.StatusCode, body)
+	var errResponse *requestgen.ErrResponse
+	if errors.As(err, &errResponse) && errResponse.Response != nil {
+		return resp, ParseAPIError(errResponse.Response.StatusCode, errResponse.Body)
 	}
 
-	if err := json.Unmarshal(body, out); err != nil {
-		return fmt.Errorf("amberdata: decoding response: %w", err)
-	}
-
-	return nil
+	return resp, err
 }
