@@ -10,6 +10,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -144,7 +145,40 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	standardIndicatorSet := session.StandardIndicatorSet(s.Symbol)
+	// create the moving average indicators before registering the kline handler below,
+	// so that they are always updated before the handler reads them
+	indicators := session.Indicators(s.Symbol)
+
+	type movingAverage struct {
+		ma     types.Float64Indicator
+		kLines *indicatorv2.KLineStream
+
+		// minKLines is the number of k-lines required before the moving average is used
+		minKLines int
+	}
+
+	movingAverages := make([]movingAverage, len(s.SupportDetection))
+	for i, detection := range s.SupportDetection {
+		iw := types.IntervalWindow{
+			Interval: detection.MovingAverageInterval,
+			Window:   detection.MovingAverageWindow,
+		}
+
+		m := movingAverage{kLines: indicators.KLines(iw.Interval)}
+		switch strings.ToLower(detection.MovingAverageType) {
+		case "sma":
+			m.ma = indicators.SMA(iw)
+			// the legacy SMA did not emit any value before the window was full, so the last moving average was zero
+			// and the support was skipped. keep waiting for a full window.
+			m.minKLines = iw.Window
+		case "ema", "ewma":
+			m.ma = indicators.EWMA(iw)
+		default:
+			m.ma = indicators.EWMA(iw)
+		}
+
+		movingAverages[i] = m
+	}
 
 	if s.FundingRate != nil {
 		if binanceExchange, ok := session.Exchange.(*binance.Exchange); ok {
@@ -160,34 +194,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		for _, detection := range s.SupportDetection {
+		for i, detection := range s.SupportDetection {
 			if kline.Interval != detection.Interval {
 				continue
 			}
 
 			closePrice := kline.GetClose()
 
-			var ma types.Float64Indicator
+			m := movingAverages[i]
 
-			switch strings.ToLower(detection.MovingAverageType) {
-			case "sma":
-				ma = standardIndicatorSet.SMA(types.IntervalWindow{
-					Interval: detection.MovingAverageInterval,
-					Window:   detection.MovingAverageWindow,
-				})
-			case "ema", "ewma":
-				ma = standardIndicatorSet.EWMA(types.IntervalWindow{
-					Interval: detection.MovingAverageInterval,
-					Window:   detection.MovingAverageWindow,
-				})
-			default:
-				ma = standardIndicatorSet.EWMA(types.IntervalWindow{
-					Interval: detection.MovingAverageInterval,
-					Window:   detection.MovingAverageWindow,
-				})
+			var lastMA = 0.0
+			if m.kLines.Length() >= m.minKLines {
+				lastMA = m.ma.Last(0)
 			}
-
-			var lastMA = ma.Last(0)
 
 			// skip if the closed price is above the moving average
 			if closePrice.Float64() > lastMA {

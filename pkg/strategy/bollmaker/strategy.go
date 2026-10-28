@@ -56,9 +56,8 @@ type EMACrossSetting struct {
 }
 
 type Strategy struct {
-	Environment          *bbgo.Environment
-	StandardIndicatorSet *bbgo.StandardIndicatorSet
-	Market               types.Market
+	Environment *bbgo.Environment
+	Market      types.Market
 
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`

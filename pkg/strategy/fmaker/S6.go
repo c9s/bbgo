@@ -2,73 +2,23 @@ package fmaker
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/c9s/bbgo/pkg/datatype/floats"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-//go:generate callbackgen -type S6
+// S6 is a fmaker factor calculated from the last `window` klines of the source.
 type S6 struct {
-	types.IntervalWindow
-
-	// Values
-	Values floats.Slice
-
-	EndTime time.Time
-
-	UpdateCallbacks []func(val float64)
+	*kLineWindowFactor
 }
 
-func (inc *S6) Last(int) float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
+func NewS6(source indicatorv2.KLineSubscription, window int) *S6 {
+	return &S6{
+		kLineWindowFactor: newKLineWindowFactor("S6", source, window, func(kLines []types.KLine) (float64, error) {
+			return calculateS6(kLines, types.KLineHighPriceMapper, types.KLineLowPriceMapper, types.KLineClosePriceMapper, types.KLineVolumeMapper)
+		}),
 	}
-	return inc.Values[len(inc.Values)-1]
-}
-
-func (inc *S6) CalculateAndUpdate(klines []types.KLine) {
-	if len(klines) < inc.Window {
-		return
-	}
-
-	var end = len(klines) - 1
-	var lastKLine = klines[end]
-
-	if inc.EndTime != zeroTime && lastKLine.GetEndTime().Before(inc.EndTime) {
-		return
-	}
-
-	var recentT = klines[end-(inc.Window-1) : end+1]
-
-	val, err := calculateS6(recentT, types.KLineHighPriceMapper, types.KLineLowPriceMapper, types.KLineClosePriceMapper, types.KLineVolumeMapper)
-	if err != nil {
-		log.WithError(err).Error("can not calculate")
-		return
-	}
-	inc.Values.Push(val)
-
-	if len(inc.Values) > indicator.MaxNumOfVOL {
-		inc.Values = inc.Values[indicator.MaxNumOfVOLTruncateSize-1:]
-	}
-
-	inc.EndTime = klines[end].GetEndTime().Time()
-
-	inc.EmitUpdate(val)
-
-}
-
-func (inc *S6) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *S6) Bind(updater indicator.KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
 func calculateS6(klines []types.KLine, valHigh KLineValueMapper, valLow KLineValueMapper, valClose KLineValueMapper, valVolume KLineValueMapper) (float64, error) {

@@ -10,7 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/types"
 
@@ -96,7 +96,9 @@ type AccumulatedProfitReport struct {
 	previousAccumulatedProfit fixedpoint.Value
 
 	// Accumulated profit MA
-	accumulatedProfitMA       *indicator.SMA
+	accumulatedProfitMA       *indicatorv2.SMAStream
+	accumulatedProfitSource   *types.Float64Series
+	accumulatedProfitMACount  int
 	accumulatedProfitMAPerDay floats.Slice
 
 	// Daily profit
@@ -131,7 +133,8 @@ func (r *AccumulatedProfitReport) Initialize() {
 	if r.NumberOfInterval <= 0 {
 		r.NumberOfInterval = 1
 	}
-	r.accumulatedProfitMA = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: types.Interval1d, Window: r.AccumulatedProfitMAWindow}}
+	r.accumulatedProfitSource = types.NewFloat64Series()
+	r.accumulatedProfitMA = indicatorv2.SMA(r.accumulatedProfitSource, r.AccumulatedProfitMAWindow)
 }
 
 func (r *AccumulatedProfitReport) RecordProfit(profit fixedpoint.Value) {
@@ -152,8 +155,15 @@ func (r *AccumulatedProfitReport) DailyUpdate(tradeStats *types.TradeStats) {
 	r.accumulatedProfitPerDay.Update(r.accumulatedProfit.Float64())
 
 	// Accumulated profit MA
-	r.accumulatedProfitMA.Update(r.accumulatedProfit.Float64())
-	r.accumulatedProfitMAPerDay.Update(r.accumulatedProfitMA.Last(0))
+	r.accumulatedProfitSource.PushAndEmit(r.accumulatedProfit.Float64())
+	r.accumulatedProfitMACount++
+	// the MA is 0 until the window is filled
+	accumulatedProfitMA := 0.0
+	if r.accumulatedProfitMACount >= r.AccumulatedProfitMAWindow {
+		accumulatedProfitMA = r.accumulatedProfitMA.Last(0)
+	}
+	r.accumulatedProfitMAPerDay.Update(accumulatedProfitMA)
+	r.accumulatedProfitSource.Slice = types.ShrinkSlice(r.accumulatedProfitSource.Slice, indicatorv2.MaxSliceSize, indicatorv2.TruncateSize)
 
 	// Accumulated Fee
 	r.accumulatedFeePerDay.Update(r.accumulatedFee.Float64())
@@ -332,15 +342,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.Bind()
 	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
 
-	kLineStore, _ := s.session.MarketDataStore(s.Symbol)
 	// window = 2 means day-to-day return, previousClose/currentClose -1
 	// delay = false means use open/close-1 as D0 return (default)
 	// delay = true means use open/close-1 as 10 return
-	s.nrr = &NRR{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 2}, RankingWindow: s.Window, delay: true}
-	s.nrr.BindK(s.session.MarketDataStream, s.Symbol, s.nrr.Interval)
-	if klines, ok := kLineStore.KLinesOfInterval(s.nrr.Interval); ok {
-		s.nrr.LoadK((*klines)[0:])
-	}
+	//
+	// the NRR indicator must be created before registering the kline handler below,
+	// so that it is updated before the handler reads it. The kline history is loaded by the indicator set.
+	s.nrr = NewNRR(s.session.Indicators(s.Symbol).KLines(s.Interval), 2, s.Window, true)
 
 	s.session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		alphaNrr := fixedpoint.NewFromFloat(s.nrr.RankedValues.Index(1))

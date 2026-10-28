@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/c9s/bbgo/pkg/indicator"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -15,6 +13,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -29,9 +28,8 @@ func init() {
 }
 
 type Strategy struct {
-	Environment          *bbgo.Environment
-	StandardIndicatorSet *bbgo.StandardIndicatorSet
-	Market               types.Market
+	Environment *bbgo.Environment
+	Market      types.Market
 
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
@@ -128,10 +126,10 @@ type Strategy struct {
 	groupID uint32
 
 	// defaultBoll is the BOLLINGER indicator we used for predicting the price.
-	defaultBoll *indicator.BOLL
+	defaultBoll *indicatorv2.BOLLStream
 
 	// neutralBoll is the neutral price section
-	neutralBoll *indicator.BOLL
+	neutralBoll *indicatorv2.BOLLStream
 
 	// StrategyController
 	status types.StrategyStatus
@@ -420,8 +418,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 	s.orderExecutor.Bind()
 
-	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
-	s.defaultBoll = s.StandardIndicatorSet.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
+	// create the indicators before registering the kline handler,
+	// so that they are always updated before the handler reads them
+	indicators := session.Indicators(s.Symbol)
+	s.neutralBoll = indicators.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
+	s.defaultBoll = indicators.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
 
 	var klines []*types.KLine
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {

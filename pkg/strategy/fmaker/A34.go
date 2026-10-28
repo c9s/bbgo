@@ -2,73 +2,23 @@ package fmaker
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/c9s/bbgo/pkg/datatype/floats"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-//go:generate callbackgen -type A34
+// A34 is a fmaker factor calculated from the last `window` klines of the source.
 type A34 struct {
-	types.IntervalWindow
-
-	// Values
-	Values floats.Slice
-
-	EndTime time.Time
-
-	UpdateCallbacks []func(val float64)
+	*kLineWindowFactor
 }
 
-func (inc *A34) Last(int) float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
+func NewA34(source indicatorv2.KLineSubscription, window int) *A34 {
+	return &A34{
+		kLineWindowFactor: newKLineWindowFactor("A34", source, window, func(kLines []types.KLine) (float64, error) {
+			return calculateA34(kLines, types.KLineClosePriceMapper)
+		}),
 	}
-	return inc.Values[len(inc.Values)-1]
-}
-
-func (inc *A34) CalculateAndUpdate(klines []types.KLine) {
-	if len(klines) < inc.Window {
-		return
-	}
-
-	var end = len(klines) - 1
-	var lastKLine = klines[end]
-
-	if inc.EndTime != zeroTime && lastKLine.GetEndTime().Before(inc.EndTime) {
-		return
-	}
-
-	var recentT = klines[end-(inc.Window-1) : end+1]
-
-	val, err := calculateA34(recentT, types.KLineClosePriceMapper)
-	if err != nil {
-		log.WithError(err).Error("can not calculate pivots")
-		return
-	}
-	inc.Values.Push(val)
-
-	if len(inc.Values) > indicator.MaxNumOfVOL {
-		inc.Values = inc.Values[indicator.MaxNumOfVOLTruncateSize-1:]
-	}
-
-	inc.EndTime = klines[end].GetEndTime().Time()
-
-	inc.EmitUpdate(val)
-
-}
-
-func (inc *A34) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *A34) Bind(updater indicator.KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
 func calculateA34(klines []types.KLine, valClose KLineValueMapper) (float64, error) {
