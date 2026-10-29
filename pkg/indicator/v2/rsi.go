@@ -4,6 +4,14 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// RSIStream is the Relative Strength Index with Wilder's smoothing.
+//
+// Refer: https://school.stockcharts.com/doku.php?id=technical_indicators:relative_strength_index_rsi
+//
+// The first average gain and average loss are the simple means of the first `window` price changes,
+// and then they are smoothed with avg = (avg * (window - 1) + change) / window.
+//
+// The first RSI value is emitted once `window` price changes (window + 1 prices) have been received.
 type RSIStream struct {
 	// embedded structs
 	*types.Float64Series
@@ -12,39 +20,75 @@ type RSIStream struct {
 	window int
 
 	// private states
-	source types.Float64Source
+	started          bool
+	prev             float64
+	numChanges       int
+	avgGain, avgLoss float64
 }
 
 func RSI2(source types.Float64Source, window int) *RSIStream {
+	checkWindow(window)
+
 	s := &RSIStream{
-		source:        source,
 		Float64Series: types.NewFloat64Series(),
 		window:        window,
 	}
-	s.Bind(source, s)
+
+	if source != nil {
+		s.Subscribe(source, func(v float64) {
+			if rsi, ok := s.calculate(v); ok {
+				s.PushAndEmit(rsi)
+				s.Truncate()
+			}
+		})
+	}
+
 	return s
 }
 
-func (s *RSIStream) Calculate(_ float64) float64 {
-	var gainSum, lossSum float64
-	var sourceLen = s.source.Length()
-	var limit = min(s.window, sourceLen)
-	for i := 0; i < limit; i++ {
-		value := s.source.Last(i)
-		prev := s.source.Last(i + 1)
-		change := value - prev
-		if change >= 0 {
-			gainSum += change
-		} else {
-			lossSum += -change
-		}
+func (s *RSIStream) calculate(v float64) (float64, bool) {
+	if !s.started {
+		// the first price, no change yet
+		s.started = true
+		s.prev = v
+		return 0, false
 	}
 
-	avgGain := gainSum / float64(limit)
-	avgLoss := lossSum / float64(limit)
-	rs := avgGain / avgLoss
-	rsi := 100.0 - (100.0 / (1.0 + rs))
-	return rsi
+	change := v - s.prev
+	s.prev = v
+
+	gain, loss := 0.0, 0.0
+	if change > 0 {
+		gain = change
+	} else {
+		loss = -change
+	}
+
+	n := float64(s.window)
+	s.numChanges++
+
+	switch {
+	case s.numChanges < s.window:
+		// accumulate the sums for the first simple means
+		s.avgGain += gain
+		s.avgLoss += loss
+		return 0, false
+
+	case s.numChanges == s.window:
+		s.avgGain = (s.avgGain + gain) / n
+		s.avgLoss = (s.avgLoss + loss) / n
+
+	default:
+		s.avgGain = (s.avgGain*(n-1) + gain) / n
+		s.avgLoss = (s.avgLoss*(n-1) + loss) / n
+	}
+
+	if s.avgLoss == 0 {
+		return 100, true
+	}
+
+	rs := s.avgGain / s.avgLoss
+	return 100.0 - (100.0 / (1.0 + rs)), true
 }
 
 func (s *RSIStream) Truncate() {
