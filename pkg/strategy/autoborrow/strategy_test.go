@@ -107,24 +107,6 @@ func TestCheckAndBorrow_UnheldAssetRespectsBorrowLimits(t *testing.T) {
 	})
 }
 
-func TestCheckAndBorrow_NoDebtWithZeroMarginLevel(t *testing.T) {
-	// a repay retry would outlive the context, so a borrow proves the retry loop was skipped
-	defer func(d time.Duration) { repayRetryDelay = d }(repayRetryDelay)
-	repayRetryDelay = time.Hour
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	service := newFakeMarginBorrowRepayService(map[string]fixedpoint.Value{"USDT": Number(10000)})
-	account := newTestAccount(fixedpoint.Zero, Balance("USDT", Number(100)))
-	s := newTestStrategy(t, account, service,
-		MarginAssetConfig{Asset: "USDT", Low: Number(1000)})
-
-	s.checkAndBorrow(ctx)
-
-	assert.Equal(t, Number(900), service.borrowed["USDT"])
-}
-
 func TestCheckAndBorrow_MarginLevelBelowMin(t *testing.T) {
 	defer func(d time.Duration) { repayRetryDelay = d }(repayRetryDelay)
 	repayRetryDelay = 0

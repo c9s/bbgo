@@ -294,16 +294,6 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 // before re-checking the margin level.
 var repayRetryDelay = 5 * time.Second
 
-// isMarginLevelTooLow reports whether the account has debt and its margin level is below minMarginLevel.
-// An account without debt is never too low: some exchanges report a zero margin level when there is no debt.
-func isMarginLevelTooLow(account *types.Account, minMarginLevel fixedpoint.Value) bool {
-	if len(account.Balances().Debts()) == 0 {
-		return false
-	}
-
-	return account.MarginLevel.Compare(minMarginLevel) < 0
-}
-
 func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	s.reBalanceDebt(ctx)
 
@@ -327,7 +317,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	)
 
 	// if margin ratio is too low, do not borrow
-	for maxTries := 5; isMarginLevelTooLow(account, minMarginLevel) && maxTries > 0; maxTries-- {
+	for maxTries := 5; account.MarginLevel.Compare(minMarginLevel) < 0 && maxTries > 0; maxTries-- {
 		log.Infof("current margin level %f < min margin level %f, skip autoborrow", account.MarginLevel.Float64(), minMarginLevel.Float64())
 
 		bbgo.Notify("Warning!!! %s Current Margin Level %f < Minimal Margin Level %f",
@@ -354,7 +344,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	}
 
 	// the repays above may not be enough to recover the margin level
-	if isMarginLevelTooLow(account, minMarginLevel) {
+	if account.MarginLevel.Compare(minMarginLevel) < 0 {
 		log.Warnf("%s: margin level %f is still below min margin level %f after repaying, skip autoborrow",
 			s.ExchangeSession.Name,
 			account.MarginLevel.Float64(),
