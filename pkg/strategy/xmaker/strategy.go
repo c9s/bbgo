@@ -1054,13 +1054,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		s.cooldownAt = time.Time{}
 	}
 
-	if !s.hedgeSession.Connectivity.IsConnected() {
-		s.logger.Warnf("source session is disconnected, skipping update quote")
-		return nil
-	}
-
-	if s.hedgeSession.IsInMaintenance() {
-		s.logger.Warnf("source session is in maintenance, skipping update quote")
+	if !s.isHedgeAvailable() {
+		s.logger.Warnf("no hedge session/market is available, skipping update quote")
 		return nil
 	}
 
@@ -2294,6 +2289,14 @@ func (s *Strategy) hedge(ctx context.Context) {
 func (s *Strategy) directHedge(
 	ctx context.Context, uncoveredPosition, hedgeDelta fixedpoint.Value,
 ) (*types.Order, error) {
+	if s.hedgeSession.IsInMaintenance() {
+		return nil, fmt.Errorf("hedge session %s is in maintenance, skip direct hedge", s.hedgeSession.Name)
+	}
+
+	if s.hedgeSession.Connectivity != nil && !s.hedgeSession.Connectivity.IsConnected() {
+		return nil, fmt.Errorf("hedge session %s is disconnected, skip direct hedge", s.hedgeSession.Name)
+	}
+
 	quantity := hedgeDelta.Abs()
 	side := deltaToSide(hedgeDelta)
 	price := s.lastPrice.Get()
@@ -2862,6 +2865,19 @@ func (s *Strategy) isSimpleHedgeMode() bool {
 		(s.SplitHedge == nil || !s.SplitHedge.Enabled) &&
 		(s.SyntheticHedge == nil || !s.SyntheticHedge.Enabled) &&
 		(s.SpreadMaker == nil || !s.SpreadMaker.Enabled)
+}
+
+// isHedgeAvailable reports whether the strategy currently has at least one
+// usable hedge session/market for its active hedge mode.
+func (s *Strategy) isHedgeAvailable() bool {
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		return s.SplitHedge.HasAvailableMarket()
+	}
+	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		return s.SyntheticHedge.IsAvailable()
+	}
+	return !s.hedgeSession.IsInMaintenance() &&
+		(s.hedgeSession.Connectivity == nil || s.hedgeSession.Connectivity.IsConnected())
 }
 
 func (s *Strategy) CrossRun(
