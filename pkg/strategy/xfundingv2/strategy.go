@@ -2385,6 +2385,10 @@ func (s *Strategy) rebalance(currentTime time.Time) {
 				if openOrderBook.NumOfOrders() > 0 {
 					continue
 				}
+				if s.spotSession.Connectivity != nil && !s.spotSession.Connectivity.IsConnected() {
+					s.logger.Warnf("spot session is disconnected, skip rebalance sell for %s", symbol)
+					continue
+				}
 				orderForm := types.SubmitOrder{
 					Symbol:   symbol,
 					Market:   spotMarket,
