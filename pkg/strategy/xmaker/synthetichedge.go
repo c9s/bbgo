@@ -81,6 +81,22 @@ func (s *SyntheticHedge) sourceMarkets() []*HedgeMarket {
 	return markets
 }
 
+// IsAvailable reports whether synthetic hedging can currently proceed: the
+// source leg (any one source market, if split) AND the fiat leg must both
+// be usable.
+func (s *SyntheticHedge) IsAvailable() bool {
+	sourceAvailable := false
+	if s.isSplitSource() {
+		sourceAvailable = s.SplitSource.HasAvailableMarket()
+	} else if s.sourceMarket != nil {
+		sourceAvailable = s.sourceMarket.isAvailable()
+	}
+
+	fiatAvailable := s.fiatMarket == nil || s.fiatMarket.isAvailable()
+
+	return sourceAvailable && fiatAvailable
+}
+
 // getSourcePosition returns the position that is used for converting the fiat trades back to the source trades
 func (s *SyntheticHedge) getSourcePosition() *types.Position {
 	if s.isSplitSource() {
