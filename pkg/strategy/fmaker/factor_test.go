@@ -75,7 +75,7 @@ func TestFactors_LegacyGolden(t *testing.T) {
 
 	for name, expected := range golden {
 		values := fs[name].Slice
-		assert.Equal(t, expected, summarize(values[len(values)-200:]), name)
+		assertSummary(t, expected, summarize(values[len(values)-200:]), name)
 	}
 
 	// the history is processed too: one value per kline once the window is filled
@@ -97,6 +97,6 @@ func TestFactors_ColdStart(t *testing.T) {
 	source.BackFill(kLines[19:])
 
 	// captured from the legacy implementation fed by an empty market data store
-	assert.Equal(t, summary{Len: 31, First: 0.9667557510695416, Last: 0.8593215474458797, Sum: 30.51985001871105}, summarize(s0.Slice))
-	assert.Equal(t, summary{Len: 43, First: 12.155941509999977, Last: -16.594099160000013, Sum: 74.78138925999983}, summarize(a3.Slice))
+	assertSummary(t, summary{Len: 31, First: 0.9667557510695416, Last: 0.8593215474458797, Sum: 30.51985001871105}, summarize(s0.Slice))
+	assertSummary(t, summary{Len: 43, First: 12.155941509999977, Last: -16.594099160000013, Sum: 74.78138925999983}, summarize(a3.Slice))
 }

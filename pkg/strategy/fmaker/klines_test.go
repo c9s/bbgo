@@ -2,7 +2,10 @@ package fmaker
 
 import (
 	"math"
+	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -50,4 +53,21 @@ func summarize(vs []float64) summary {
 		sum += v
 	}
 	return summary{Len: len(vs), First: vs[0], Last: vs[len(vs)-1], Sum: sum}
+}
+
+// assertSummary compares the summaries within a tolerance, because the captured values are not reproducible to the
+// last digit: the float64 results depend on the architecture (arm64 fuses multiply-adds, amd64 does not) and on the
+// fixedpoint implementation (dnum).
+func assertSummary(t *testing.T, expected, actual summary, msgAndArgs ...any) {
+	t.Helper()
+
+	assert.Equal(t, expected.Len, actual.Len, msgAndArgs...)
+
+	for _, v := range [][2]float64{
+		{expected.First, actual.First},
+		{expected.Last, actual.Last},
+		{expected.Sum, actual.Sum},
+	} {
+		assert.InDelta(t, v[0], v[1], 1e-6*math.Max(1, math.Abs(v[0])), msgAndArgs...)
+	}
 }
