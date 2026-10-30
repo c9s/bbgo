@@ -50,6 +50,46 @@ func getBorrowableAssetResult(session *bbgo.ExchangeSession, market types.Market
 	}
 }
 
+// hedgeMarketLegAvailability reports whether a single hedge market can supply its base currency
+// and its quote currency, using the same "borrowable OR non-zero available balance" fallback, and
+// the same fail-open-when-unknown behavior, as simpleHedgeBorrowableCheck/splitHedgeBorrowableCheck.
+func hedgeMarketLegAvailability(hm *HedgeMarket, logger logrus.FieldLogger) (baseOK, quoteOK bool) {
+	if !hm.session.Margin {
+		return true, true
+	}
+
+	borrowable := getBorrowableAssetResult(hm.session, hm.market, logger)
+	if borrowable == nil {
+		return true, true
+	}
+
+	account := hm.session.Account
+	baseBalance, _ := account.Balance(hm.market.BaseCurrency)
+	quoteBalance, _ := account.Balance(hm.market.QuoteCurrency)
+
+	baseOK = borrowable.BaseBorrowable || baseBalance.Available.Sign() > 0
+	quoteOK = borrowable.QuoteBorrowable || quoteBalance.Available.Sign() > 0
+	return baseOK, quoteOK
+}
+
+// anyHedgeMarketLegAvailable reports whether at least one of the given hedge markets can supply
+// base currency (anyBaseOK) and/or quote currency (anyQuoteOK). This generalizes the "at least one
+// hedge session is available" aggregation already used by splitHedgeBorrowableCheck; a single-element
+// slice degenerates to a plain per-market check, so syntheticHedgeBorrowableCheck can use it uniformly
+// for both split-source and single-source synthetic hedge.
+func anyHedgeMarketLegAvailable(markets []*HedgeMarket, logger logrus.FieldLogger) (anyBaseOK, anyQuoteOK bool) {
+	for _, hm := range markets {
+		baseOK, quoteOK := hedgeMarketLegAvailability(hm, logger)
+		if baseOK {
+			anyBaseOK = true
+		}
+		if quoteOK {
+			anyQuoteOK = true
+		}
+	}
+	return anyBaseOK, anyQuoteOK
+}
+
 func (s *Strategy) simpleHedgeBorrowableCheck(oriDisableMakerBid, oriDisableMakerAsk bool) (bool, bool) {
 	// When hedging on a margin account, a maker bid hedge borrows the base
 	// currency and a maker ask hedge borrows the quote currency. If the hedge
@@ -167,6 +207,56 @@ func (s *Strategy) splitHedgeBorrowableCheck(oriDisableMakerBid, oriDisableMaker
 		}
 		if len(availableBidSessions) == 0 {
 			s.logger.Warn("split hedge has no available hedge markets to place maker bid orders, disable maker bid quoting")
+		}
+	}
+
+	return disableMakerBid, disableMakerAsk
+}
+
+// syntheticHedgeBorrowableCheck checks whether both legs of the synthetic hedge (the source
+// market(s) and the fiat market) can cover a maker bid / maker ask, disabling the affected maker
+// side if either leg cannot.
+//
+// Source leg: a maker bid hedges by selling base on the source market(s) (needs source BASE); a
+// maker ask hedges by buying base on the source market(s) (needs source QUOTE). This holds
+// regardless of forward/reverse, and regardless of split-source (see SyntheticHedge.sourceMarkets).
+//
+// Fiat leg: the conversion direction depends on SyntheticHedge.forward (see
+// convertSourceTrade in synthetichedge_handler.go): forward -> (bid needs fiat BASE, ask needs
+// fiat QUOTE); reverse -> (bid needs fiat QUOTE, ask needs fiat BASE).
+func (s *Strategy) syntheticHedgeBorrowableCheck(oriDisableMakerBid, oriDisableMakerAsk bool) (bool, bool) {
+	disableMakerBid := oriDisableMakerBid
+	disableMakerAsk := oriDisableMakerAsk
+	if disableMakerBid && disableMakerAsk {
+		return disableMakerBid, disableMakerAsk
+	}
+
+	syn := s.SyntheticHedge
+
+	sourceBaseOK, sourceQuoteOK := anyHedgeMarketLegAvailable(syn.sourceMarkets(), s.logger)
+
+	fiatBaseOK, fiatQuoteOK := hedgeMarketLegAvailability(syn.fiatMarket, s.logger)
+	fiatBidOK, fiatAskOK := fiatBaseOK, fiatQuoteOK
+	if !syn.forward {
+		fiatBidOK, fiatAskOK = fiatQuoteOK, fiatBaseOK
+	}
+
+	if !sourceBaseOK || !fiatBidOK {
+		disableMakerBid = true
+		if borrowEligibilityWarnLimiter.Allow() {
+			s.logger.Warnf(
+				"%s unable to hedge maker bid orders via synthetic hedge (source base available: %v, fiat bid-leg available: %v), disabling maker bid orders...",
+				s.Symbol, sourceBaseOK, fiatBidOK,
+			)
+		}
+	}
+	if !sourceQuoteOK || !fiatAskOK {
+		disableMakerAsk = true
+		if borrowEligibilityWarnLimiter.Allow() {
+			s.logger.Warnf(
+				"%s unable to hedge maker ask orders via synthetic hedge (source quote available: %v, fiat ask-leg available: %v), disabling maker ask orders...",
+				s.Symbol, sourceQuoteOK, fiatAskOK,
+			)
 		}
 	}
 

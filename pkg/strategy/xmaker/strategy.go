@@ -1628,11 +1628,12 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			}
 		}
-	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-		// TODO: borrowable check for synthetic hedge
-		s.logger.Debugf("no borrowable check for synthetic hedge...")
 	} else {
-		disableMakerBid, disableMakerAsk = s.simpleHedgeBorrowableCheck(disableMakerBid, disableMakerAsk)
+		if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+			disableMakerBid, disableMakerAsk = s.syntheticHedgeBorrowableCheck(disableMakerBid, disableMakerAsk)
+		} else {
+			disableMakerBid, disableMakerAsk = s.simpleHedgeBorrowableCheck(disableMakerBid, disableMakerAsk)
+		}
 
 		// default maker order generation
 		s.logger.Infof("%s source book ticker: ask/bid = %s/%s (%s)", s.Symbol, bestAskPrice.String(), bestBidPrice.String(), calculateSpread(bestAskPrice, bestBidPrice).Percentage())
@@ -3338,7 +3339,7 @@ func (s *Strategy) CrossRun(
 			borrowableMarkets = append(borrowableMarkets, hedgeMarket)
 		}
 	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-		for _, hedgeMarket := range []*HedgeMarket{s.SyntheticHedge.sourceMarket, s.SyntheticHedge.fiatMarket} {
+		for _, hedgeMarket := range append(s.SyntheticHedge.sourceMarkets(), s.SyntheticHedge.fiatMarket) {
 			if !hedgeMarket.session.Margin {
 				continue
 			}
