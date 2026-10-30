@@ -3563,6 +3563,11 @@ func (s *Strategy) fixProfit(ctx context.Context, sessions ...*bbgo.ExchangeSess
 		return nil
 	}
 
+	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		// need profit fixing and synthetic hedge is enabled
+		return fmt.Errorf("profit fixing is not supported in synthetic hedge mode for %s", s.Symbol)
+	}
+
 	s.logger.Infof("running profit fixing with config: %+v", s.ProfitFixerConfig)
 	bbgo.Notify("Fixing %s profitStats and position...", s.makerMarket.Symbol)
 	position, profitStats, err := s.StrategyProfitFixer.Fix(
