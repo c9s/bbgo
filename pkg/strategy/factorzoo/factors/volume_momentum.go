@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/datatype/floats"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -13,71 +12,36 @@ import (
 // assume that the quotient of volume SMA over latest volume will dynamically revert into one.
 // so this fraction value is our alpha, PMR
 
-//go:generate callbackgen -type VMOM
 type VMOM struct {
-	types.SeriesBase
-	types.IntervalWindow
+	*types.Float64Series
 
-	// Values
-	Values    floats.Slice
-	LastValue float64
-
+	window  int
 	volumes *types.Queue
 
 	EndTime time.Time
-
-	UpdateCallbacks []func(val float64)
-}
-
-func (inc *VMOM) Index(i int) float64 {
-	return inc.Last(i)
-}
-
-func (inc *VMOM) Last(i int) float64 {
-	return inc.Values.Last(i)
-}
-
-func (inc *VMOM) Length() int {
-	return inc.Values.Length()
 }
 
 var _ types.SeriesExtend = &VMOM{}
 
+// NewVMOM creates the volume momentum factor stream from the given kline source.
+// No value is emitted until window klines have been received.
+func NewVMOM(source indicatorv2.KLineSubscription, window int) *VMOM {
+	inc := &VMOM{
+		Float64Series: types.NewFloat64Series(),
+		window:        window,
+		volumes:       types.NewQueue(window),
+	}
+	source.AddSubscriber(inc.PushK)
+	return inc
+}
+
 func (inc *VMOM) Update(volume float64) {
-	if inc.SeriesBase.Series == nil {
-		inc.SeriesBase.Series = inc
-		inc.volumes = types.NewQueue(inc.Window)
-	}
 	inc.volumes.Update(volume)
-	if inc.volumes.Length() >= inc.Window {
+	if inc.volumes.Length() >= inc.window {
 		v := inc.volumes.Last(0) / inc.volumes.Mean()
-		inc.Values.Push(v)
+		inc.PushAndEmit(v)
+		inc.Slice = types.ShrinkSlice(inc.Slice, indicatorv2.MaxSliceSize, indicatorv2.TruncateSize)
 	}
-}
-
-func (inc *VMOM) CalculateAndUpdate(allKLines []types.KLine) {
-	if len(inc.Values) == 0 {
-		for _, k := range allKLines {
-			inc.PushK(k)
-		}
-		inc.EmitUpdate(inc.Last(0))
-	} else {
-		k := allKLines[len(allKLines)-1]
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last(0))
-	}
-}
-
-func (inc *VMOM) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *VMOM) Bind(updater indicator.KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
 func (inc *VMOM) PushK(k types.KLine) {
@@ -87,7 +51,6 @@ func (inc *VMOM) PushK(k types.KLine) {
 
 	inc.Update(k.Volume.Float64())
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last(0))
 }
 
 func calculateVolumeMomentum(klines []types.KLine, window int, valV KLineValueMapper, valP KLineValueMapper) (float64, error) {

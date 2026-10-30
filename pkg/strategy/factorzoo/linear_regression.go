@@ -6,7 +6,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/factorzoo/factors"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -24,11 +24,11 @@ type Linear struct {
 	StopEMA      *types.IntervalWindow `json:"stopEMA"`
 
 	// Xs (input), factors & indicators
-	divergence *factorzoo.PVD   // price volume divergence
-	reversion  *factorzoo.PMR   // price mean reversion
-	momentum   *factorzoo.MOM   // price momentum from paper, alpha 101
-	drift      *indicator.Drift // GBM
-	volume     *factorzoo.VMOM  // quarterly volume momentum
+	divergence *factorzoo.PVD           // price volume divergence
+	reversion  *factorzoo.PMR           // price mean reversion
+	momentum   *factorzoo.MOM           // price momentum from paper, alpha 101
+	drift      *indicatorv2.DriftStream // GBM
+	volume     *factorzoo.VMOM          // quarterly volume momentum
 
 	// Y (output), internal rate of return
 	irr *factorzoo.RR
@@ -50,22 +50,22 @@ func (s *Linear) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.General
 
 	position := orderExecutor.Position()
 	symbol := position.Symbol
-	store, _ := session.MarketDataStore(symbol)
 
 	// initialize factor indicators
-	s.divergence = &factorzoo.PVD{IntervalWindow: types.IntervalWindow{Window: 60, Interval: s.Interval}}
-	s.divergence.Bind(store)
-	s.reversion = &factorzoo.PMR{IntervalWindow: types.IntervalWindow{Window: 60, Interval: s.Interval}}
-	s.reversion.Bind(store)
-	s.drift = &indicator.Drift{IntervalWindow: types.IntervalWindow{Window: 7, Interval: s.Interval}}
-	s.drift.Bind(store)
-	s.momentum = &factorzoo.MOM{IntervalWindow: types.IntervalWindow{Window: 1, Interval: s.Interval}}
-	s.momentum.Bind(store)
-	s.volume = &factorzoo.VMOM{IntervalWindow: types.IntervalWindow{Window: 90, Interval: s.Interval}}
-	s.volume.Bind(store)
+	//
+	// All the factors must be created before registering the kline handler below,
+	// so that they are updated before the handler reads them.
+	// The factors only use the kline passed to their subscriber, so they can subscribe
+	// to the shared kline stream directly: AddSubscriber replays the kline history to them.
+	indicators := session.Indicators(symbol)
+	kLines := indicators.KLines(s.Interval)
+	s.divergence = factorzoo.NewPVD(kLines, 60)
+	s.reversion = factorzoo.NewPMR(kLines, 60)
+	s.drift = indicatorv2.Drift(indicators.CLOSE(s.Interval), 7)
+	s.momentum = factorzoo.NewMOM(kLines, 1)
+	s.volume = factorzoo.NewVMOM(kLines, 90)
 
-	s.irr = &factorzoo.RR{IntervalWindow: types.IntervalWindow{Window: 2, Interval: s.Interval}}
-	s.irr.Bind(store)
+	s.irr = factorzoo.NewRR(kLines, 2)
 
 	predLst := types.NewQueue(s.Window)
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(symbol, s.Interval, func(kline types.KLine) {
@@ -78,17 +78,17 @@ func (s *Linear) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.General
 		// take past window days' values to predict future return
 		// (e.g., 5 here in default configuration file)
 		a := []floats.Slice{
-			s.divergence.Values[len(s.divergence.Values)-s.Window-2 : len(s.divergence.Values)-2],
-			s.reversion.Values[len(s.reversion.Values)-s.Window-2 : len(s.reversion.Values)-2],
-			s.drift.Values[len(s.drift.Values)-s.Window-2 : len(s.drift.Values)-2],
-			s.momentum.Values[len(s.momentum.Values)-s.Window-2 : len(s.momentum.Values)-2],
-			s.volume.Values[len(s.volume.Values)-s.Window-2 : len(s.volume.Values)-2],
+			s.divergence.Slice[len(s.divergence.Slice)-s.Window-2 : len(s.divergence.Slice)-2],
+			s.reversion.Slice[len(s.reversion.Slice)-s.Window-2 : len(s.reversion.Slice)-2],
+			s.drift.Slice[len(s.drift.Slice)-s.Window-2 : len(s.drift.Slice)-2],
+			s.momentum.Slice[len(s.momentum.Slice)-s.Window-2 : len(s.momentum.Slice)-2],
+			s.volume.Slice[len(s.volume.Slice)-s.Window-2 : len(s.volume.Slice)-2],
 		}
 		// e.g., s.window is 5
 		// factors array from day -4 to day 0, [[0.1, 0.2, 0.35, 0.3 , 0.25], [1.1, -0.2, 1.35, -0.3 , -0.25], ...]
 		// the binary(+/-) daily return rate from day -3 to day 1, [0, 1, 1, 0, 0]
 		// then we take the latest available factors array into linear regression model
-		b := []floats.Slice{filter(s.irr.Values[len(s.irr.Values)-s.Window-1:len(s.irr.Values)-1], binary)}
+		b := []floats.Slice{filter(s.irr.Slice[len(s.irr.Slice)-s.Window-1:len(s.irr.Slice)-1], binary)}
 		var x []types.Series
 		var y []types.Series
 

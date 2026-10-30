@@ -38,10 +38,6 @@ type Strategy struct {
 	// This field will be injected automatically since we defined the Symbol field.
 	*types.MarketDataStore
 
-	// StandardIndicatorSet contains the standard indicators of a market (symbol)
-	// This field will be injected automatically since we defined the Symbol field.
-	*bbgo.StandardIndicatorSet
-
 	// Market stores the configuration of the market, for example, VolumePrecision, PricePrecision, MinLotSize... etc
 	// This field will be injected automatically since we defined the Symbol field.
 	types.Market
@@ -86,12 +82,23 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	var inc Float64Indicator
 	var iw = types.IntervalWindow{Interval: s.MovingAverageInterval, Window: s.MovingAverageWindow}
 
+	// the indicator is created before registering the kline handler below,
+	// so that it is always updated before the handler reads it
+	indicators := session.Indicators(s.Symbol)
+	kLines := indicators.KLines(iw.Interval)
+
+	// minKLines is the number of k-lines required before the moving average is used
+	var minKLines = 0
+
 	switch s.MovingAverageType {
 	case "SMA":
-		inc = s.StandardIndicatorSet.SMA(iw)
+		inc = indicators.SMA(iw)
+		// the legacy SMA did not emit any value before the window was full,
+		// and the handler skipped the zero moving average price. keep waiting for a full window.
+		minKLines = iw.Window
 
 	case "EWMA", "EMA":
-		inc = s.StandardIndicatorSet.EWMA(iw)
+		inc = indicators.EWMA(iw)
 
 	default:
 		return fmt.Errorf("unsupported moving average type: %s", s.MovingAverageType)
@@ -101,6 +108,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// skip k-lines from other symbols
 		if kline.Symbol != s.Symbol {
+			return
+		}
+
+		// skip it if the moving average window is not filled yet
+		if kLines.Length() < minKLines {
 			return
 		}
 

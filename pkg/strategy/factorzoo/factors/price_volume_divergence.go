@@ -5,8 +5,7 @@ import (
 
 	"gonum.org/v1/gonum/stat"
 
-	"github.com/c9s/bbgo/pkg/datatype/floats"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -18,70 +17,38 @@ var zeroTime time.Time
 
 type KLineValueMapper func(k types.KLine) float64
 
-//go:generate callbackgen -type PVD
 type PVD struct {
-	types.IntervalWindow
-	types.SeriesBase
+	*types.Float64Series
 
-	Values  floats.Slice
+	window  int
 	Prices  *types.Queue
 	Volumes *types.Queue
 	EndTime time.Time
-
-	updateCallbacks []func(value float64)
 }
 
 var _ types.SeriesExtend = &PVD{}
 
-func (inc *PVD) Update(price float64, volume float64) {
-	if inc.SeriesBase.Series == nil {
-		inc.SeriesBase.Series = inc
-		inc.Prices = types.NewQueue(inc.Window)
-		inc.Volumes = types.NewQueue(inc.Window)
+// NewPVD creates the price volume divergence factor stream from the given kline source.
+// No value is emitted until window klines have been received.
+func NewPVD(source indicatorv2.KLineSubscription, window int) *PVD {
+	inc := &PVD{
+		Float64Series: types.NewFloat64Series(),
+		window:        window,
+		Prices:        types.NewQueue(window),
+		Volumes:       types.NewQueue(window),
 	}
+	source.AddSubscriber(inc.PushK)
+	return inc
+}
+
+func (inc *PVD) Update(price float64, volume float64) {
 	inc.Prices.Update(price)
 	inc.Volumes.Update(volume)
-	if inc.Prices.Length() >= inc.Window && inc.Volumes.Length() >= inc.Window {
-		divergence := -types.Correlation(inc.Prices, inc.Volumes, inc.Window)
-		inc.Values.Push(divergence)
+	if inc.Prices.Length() >= inc.window && inc.Volumes.Length() >= inc.window {
+		divergence := -types.Correlation(inc.Prices, inc.Volumes, inc.window)
+		inc.PushAndEmit(divergence)
+		inc.Slice = types.ShrinkSlice(inc.Slice, indicatorv2.MaxSliceSize, indicatorv2.TruncateSize)
 	}
-}
-
-func (inc *PVD) Last(i int) float64 {
-	return inc.Values.Last(i)
-}
-
-func (inc *PVD) Index(i int) float64 {
-	return inc.Last(i)
-}
-
-func (inc *PVD) Length() int {
-	return len(inc.Values)
-}
-
-func (inc *PVD) CalculateAndUpdate(allKLines []types.KLine) {
-	if len(inc.Values) == 0 {
-		for _, k := range allKLines {
-			inc.PushK(k)
-		}
-		inc.EmitUpdate(inc.Last(0))
-	} else {
-		k := allKLines[len(allKLines)-1]
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last(0))
-	}
-}
-
-func (inc *PVD) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *PVD) Bind(updater indicator.KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
 func (inc *PVD) PushK(k types.KLine) {
@@ -91,7 +58,6 @@ func (inc *PVD) PushK(k types.KLine) {
 
 	inc.Update(types.KLineClosePriceMapper(k), types.KLineVolumeMapper(k))
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last(0))
 }
 
 func CalculateKLinesPVD(allKLines []types.KLine, window int) float64 {

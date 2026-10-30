@@ -9,7 +9,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -175,8 +175,8 @@ type Strategy struct {
 	TradeStats          *types.TradeStats  `persistence:"trade_stats"`
 	CurrentHighestPrice fixedpoint.Value   `persistence:"current_highest_price"`
 
-	triggerEMA  *indicator.EWMA
-	longTermEMA *indicator.EWMA
+	triggerEMA  *indicatorv2.EWMAStream
+	longTermEMA *indicatorv2.EWMAStream
 
 	// Trailing stop
 	TrailingStopTarget  TrailingStopTarget `json:"trailingStopTarget"`
@@ -382,19 +382,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		log.Infof("adjusted minimal support volume to %s according to sensitivity %s", s.MinVolume.String(), s.Sensitivity.String())
 	}
 
-	standardIndicatorSet := session.StandardIndicatorSet(s.Symbol)
+	// the indicators are created before registering the kline handler below,
+	// so that they are always updated before the handler reads them
+	indicators := session.Indicators(s.Symbol)
 
 	if s.TriggerMovingAverage != zeroiw {
-		s.triggerEMA = standardIndicatorSet.EWMA(s.TriggerMovingAverage)
+		s.triggerEMA = indicators.EWMA(s.TriggerMovingAverage)
 	} else {
-		s.triggerEMA = standardIndicatorSet.EWMA(types.IntervalWindow{
+		s.triggerEMA = indicators.EWMA(types.IntervalWindow{
 			Interval: s.Interval,
 			Window:   99, // default window
 		})
 	}
 
 	if s.LongTermMovingAverage != zeroiw {
-		s.longTermEMA = standardIndicatorSet.EWMA(s.LongTermMovingAverage)
+		s.longTermEMA = indicators.EWMA(s.LongTermMovingAverage)
 	}
 
 	if !s.TrailingStopTarget.TrailingStopCallbackRatio.IsZero() {

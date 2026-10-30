@@ -166,3 +166,57 @@ func (i *IndicatorSet) FixedWindowVP(interval types.Interval, window int, delta 
 		return indicatorv2.NewFixedWindowVolumeProfile(source, window, delta)
 	})
 }
+
+func (i *IndicatorSet) HLC3(interval types.Interval) *indicatorv2.PriceStream {
+	return indicatorv2.HLC3(i.KLines(interval))
+}
+
+func (i *IndicatorSet) DEMA(iw types.IntervalWindow) *indicatorv2.DEMAStream {
+	return indicatorv2.DEMA(i.CLOSE(iw.Interval), iw.Window)
+}
+
+func (i *IndicatorSet) HULL(iw types.IntervalWindow) *indicatorv2.HULLStream {
+	return indicatorv2.HULL(i.CLOSE(iw.Interval), iw.Window)
+}
+
+func (i *IndicatorSet) StdDev(iw types.IntervalWindow) *indicatorv2.StdDevStream {
+	return indicatorv2.StdDev(i.CLOSE(iw.Interval), iw.Window)
+}
+
+func (i *IndicatorSet) VWMA(iw types.IntervalWindow) *indicatorv2.VWMAStream {
+	return indicatorv2.WithHistory(i.KLines(iw.Interval), func(source *indicatorv2.KLineStream) *indicatorv2.VWMAStream {
+		return indicatorv2.VWMA(source, iw.Window)
+	})
+}
+
+// PivotHigh returns the pivot high indicator of the kline high prices
+func (i *IndicatorSet) PivotHigh(iw types.IntervalWindow) *indicatorv2.PivotHighStream {
+	return indicatorv2.PivotHigh(indicatorv2.HighPrices(i.KLines(iw.Interval)), iw.Window)
+}
+
+// PivotLow returns the pivot low indicator of the kline low prices
+func (i *IndicatorSet) PivotLow(iw types.IntervalWindow) *indicatorv2.PivotLowStream {
+	return indicatorv2.PivotLow(indicatorv2.LowPrices(i.KLines(iw.Interval)), iw.Window)
+}
+
+func (i *IndicatorSet) EMV(iw types.IntervalWindow) *indicatorv2.EMVStream {
+	return indicatorv2.WithHistory(i.KLines(iw.Interval), func(source *indicatorv2.KLineStream) *indicatorv2.EMVStream {
+		return indicatorv2.EMV(source, iw.Window, 0)
+	})
+}
+
+// CCI returns the commodity channel index of the typical price (HLC3)
+func (i *IndicatorSet) CCI(iw types.IntervalWindow) *indicatorv2.CCIStream {
+	return indicatorv2.CCI(i.HLC3(iw.Interval), iw.Window)
+}
+
+// GHFilter returns the G-H (alpha beta) digital filter of the given interval and the window size.
+func (i *IndicatorSet) GHFilter(iw types.IntervalWindow) *indicatorv2.GHFilterStream {
+	return indicatorv2.GHFilter(i.KLines(iw.Interval), iw.Window)
+}
+
+// KalmanFilter returns the Kalman digital filter of the given interval and the window size,
+// without the additional smoothing.
+func (i *IndicatorSet) KalmanFilter(iw types.IntervalWindow) *indicatorv2.KalmanFilterStream {
+	return indicatorv2.KalmanFilter(i.KLines(iw.Interval), iw.Window, 0)
+}

@@ -2,86 +2,68 @@ package harmonic
 
 import (
 	"math"
-	"time"
 
 	"github.com/c9s/bbgo/pkg/datatype/floats"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var zeroTime time.Time
-
-//go:generate callbackgen -type SHARK
+// SHARK is the harmonic shark pattern score indicator.
+// The values are the long score minus the short score of the shark pattern found in the last window klines,
+// they are pushed once window klines have been collected.
 type SHARK struct {
-	types.IntervalWindow
-	types.SeriesBase
+	*types.Float64Series
 
 	Lows        floats.Slice
 	Highs       floats.Slice
 	LongScores  floats.Slice
 	ShortScores floats.Slice
 
-	Values floats.Slice
-
-	EndTime time.Time
-
-	updateCallbacks []func(value float64)
+	window int
 }
 
-var _ types.SeriesExtend = &SHARK{}
+// NewSHARK creates the SHARK stream of the given kline source
+func NewSHARK(source indicatorv2.KLineSubscription, window int) *SHARK {
+	inc := &SHARK{
+		Float64Series: types.NewFloat64Series(),
+		window:        window,
+	}
+
+	source.AddSubscriber(func(k types.KLine) {
+		inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+	})
+
+	return inc
+}
 
 func (inc *SHARK) Update(high, low, price float64) {
-	if inc.SeriesBase.Series == nil {
-		inc.SeriesBase.Series = inc
-	}
 	inc.Highs.Update(high)
 	inc.Lows.Update(low)
 
-	if inc.Highs.Length() < inc.Window || inc.Lows.Length() < inc.Window {
+	if inc.Highs.Length() < inc.window || inc.Lows.Length() < inc.window {
 		return
 	}
 
-	longScore := inc.SharkLong(inc.Highs, inc.Lows, price, inc.Window)
-	shortScore := inc.SharkShort(inc.Highs, inc.Lows, price, inc.Window)
+	longScore := inc.SharkLong(inc.Highs, inc.Lows, price, inc.window)
+	shortScore := inc.SharkShort(inc.Highs, inc.Lows, price, inc.window)
 
 	inc.LongScores.Push(longScore)
 	inc.ShortScores.Push(shortScore)
 
-	inc.Values.Push(longScore - shortScore)
-
+	inc.PushAndEmit(longScore - shortScore)
+	inc.truncate()
 }
 
-func (inc *SHARK) Last(i int) float64 {
-	return inc.Values.Last(i)
-}
+func (inc *SHARK) truncate() {
+	// SharkLong and SharkShort read the last window+1 highs and lows
+	threshold := max(indicatorv2.MaxSliceSize, 4*(inc.window+2))
+	size := max(indicatorv2.TruncateSize, inc.window+2)
 
-func (inc *SHARK) Index(i int) float64 {
-	return inc.Last(i)
-}
-
-func (inc *SHARK) Length() int {
-	return len(inc.Values)
-}
-
-func (inc *SHARK) BindK(target indicator.KLineClosedEmitter, symbol string, interval types.Interval) {
-	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
-}
-
-func (inc *SHARK) PushK(k types.KLine) {
-	if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
-		return
-	}
-
-	inc.Update(types.KLineHighPriceMapper(k), types.KLineLowPriceMapper(k), types.KLineClosePriceMapper(k))
-	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last(0))
-}
-
-func (inc *SHARK) LoadK(allKLines []types.KLine) {
-	for _, k := range allKLines {
-		inc.PushK(k)
-	}
-	inc.EmitUpdate(inc.Last(0))
+	inc.Highs = types.ShrinkSlice(inc.Highs, threshold, size)
+	inc.Lows = types.ShrinkSlice(inc.Lows, threshold, size)
+	inc.LongScores = types.ShrinkSlice(inc.LongScores, threshold, size)
+	inc.ShortScores = types.ShrinkSlice(inc.ShortScores, threshold, size)
+	inc.Slice = types.ShrinkSlice(inc.Slice, threshold, size)
 }
 
 func (inc SHARK) SharkLong(highs, lows floats.Slice, p float64, lookback int) float64 {
