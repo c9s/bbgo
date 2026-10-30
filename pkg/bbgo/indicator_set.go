@@ -166,3 +166,10 @@ func (i *IndicatorSet) FixedWindowVP(interval types.Interval, window int, delta 
 		return indicatorv2.NewFixedWindowVolumeProfile(source, window, delta)
 	})
 }
+
+func (i *IndicatorSet) Aroon(interval types.Interval, window int) *indicatorv2.AroonStream {
+	return indicatorv2.WithHistory(i.KLines(interval), func(source *indicatorv2.KLineStream) *indicatorv2.AroonStream {
+		return indicatorv2.Aroon(source, window)
+	})
+}
+
