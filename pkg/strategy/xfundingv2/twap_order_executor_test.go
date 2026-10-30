@@ -47,6 +47,7 @@ func testExecutorSetup(
 		false,
 		market,
 		generalExecutor,
+		session.Connectivity,
 		config,
 	)
 
@@ -344,6 +345,59 @@ func TestTWAPOrderExecutor_PlaceOrder(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, createdOrder)
 		assert.Equal(t, uint64(12345), createdOrder.OrderID)
+	})
+
+	t.Run("skips placing order when session is disconnected", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		config := TWAPWorkerConfig{
+			OrderType:  TWAPOrderTypeMaker,
+			NumOfTicks: 1,
+		}
+
+		executor, _, mockExchange := testExecutorSetup(t, ctrl, config)
+		executor.Start()
+
+		stream := &types.StandardStream{}
+		connectivity := types.NewConnectivity()
+		connectivity.Bind(stream)
+		executor.connectivity = types.NewConnectivityGroup(connectivity)
+
+		orderBook := newOrderBook(99.0, 10.0, 100.0, 10.0)
+
+		// disconnected: SubmitOrder must never be called
+		mockExchange.EXPECT().SubmitOrder(gomock.Any(), gomock.Any()).Times(0)
+
+		_, err := executor.PlaceOrder(Number(1.0), types.SideTypeBuy, orderBook, TWAPExecuteOrderOptions{
+			DeadlineExceeded: false,
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "disconnected")
+
+		// reconnect: placement proceeds normally
+		stream.EmitConnect()
+
+		expectedOrder := types.Order{
+			OrderID: 12345,
+			SubmitOrder: types.SubmitOrder{
+				Symbol:   "BTCUSDT",
+				Side:     types.SideTypeBuy,
+				Type:     types.OrderTypeLimitMaker,
+				Quantity: Number(1.0),
+				Price:    Number(99.01),
+			},
+		}
+		mockExchange.EXPECT().
+			SubmitOrder(gomock.Any(), gomock.Any()).
+			Return(&expectedOrder, nil).
+			Times(1)
+
+		createdOrder, err := executor.PlaceOrder(Number(1.0), types.SideTypeBuy, orderBook, TWAPExecuteOrderOptions{
+			DeadlineExceeded: false,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, createdOrder)
 	})
 
 	t.Run("dust quantity returns error", func(t *testing.T) {
