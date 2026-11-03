@@ -1,0 +1,29 @@
+{
+  "name": "bbgo-bars-viewer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start -p 3100",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@mantine/core": "^4.2.5",
+    "@mantine/hooks": "^4.2.5",
+    "@mantine/next": "^4.2.5",
+    "lightweight-charts": "^3.8.0",
+    "next": "12.1.6",
+    "react": "18.1.0",
+    "react-dom": "18.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "17.0.31",
+    "@types/react": "18.0.8",
+    "@types/react-dom": "18.0.3",
+    "eslint": "8.14.0",
+    "eslint-config-next": "12.1.6",
+    "next-transpile-modules": "^9.0.0",
+    "typescript": "4.6.4"
+  }
+}
