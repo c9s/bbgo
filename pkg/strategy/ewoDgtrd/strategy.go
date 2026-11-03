@@ -13,7 +13,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -75,8 +75,9 @@ type Strategy struct {
 	entryPrice   fixedpoint.Value
 	waitForTrade bool
 
-	atr           *indicator.ATR
-	emv           *indicator.EMV
+	kLineFeed     *klineFeed // manually fed klines of Interval, feeds atr and emv
+	atr           *indicatorv2.ATRStream
+	emv           *indicatorv2.EMVStream
 	ccis          *CCISTOCH
 	ma5           types.SeriesExtend
 	ma34          types.SeriesExtend
@@ -115,111 +116,13 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
-// Refer: https://tw.tradingview.com/script/XZyG5SOx-CCI-Stochastic-and-a-quick-lesson-on-Scalping-Trading-Systems/
-type CCISTOCH struct {
-	cci        *indicator.CCI
-	stoch      *indicator.STOCH
-	ma         *indicator.SMA
-	filterHigh float64
-	filterLow  float64
-}
-
-func NewCCISTOCH(i types.Interval, filterHigh, filterLow float64) *CCISTOCH {
-	cci := &indicator.CCI{IntervalWindow: types.IntervalWindow{Interval: i, Window: 28}}
-	stoch := &indicator.STOCH{IntervalWindow: types.IntervalWindow{Interval: i, Window: 28}}
-	ma := &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: i, Window: 3}}
-	return &CCISTOCH{
-		cci:        cci,
-		stoch:      stoch,
-		ma:         ma,
-		filterHigh: filterHigh,
-		filterLow:  filterLow,
-	}
-}
-
-func (inc *CCISTOCH) Update(cloze float64) {
-	inc.cci.Update(cloze)
-	inc.stoch.Update(inc.cci.Last(0), inc.cci.Last(0), inc.cci.Last(0))
-	inc.ma.Update(inc.stoch.LastD())
-}
-
-func (inc *CCISTOCH) BuySignal() bool {
-	hasGrey := false
-	for i := 0; i < inc.ma.Values.Length(); i++ {
-		v := inc.ma.Index(i)
-		if v > inc.filterHigh {
-			return false
-		} else if v >= inc.filterLow && v <= inc.filterHigh {
-			hasGrey = true
-			continue
-		} else if v < inc.filterLow {
-			return hasGrey
-		}
-	}
-	return false
-}
-
-func (inc *CCISTOCH) SellSignal() bool {
-	hasGrey := false
-	for i := 0; i < inc.ma.Values.Length(); i++ {
-		v := inc.ma.Index(i)
-		if v < inc.filterLow {
-			return false
-		} else if v >= inc.filterLow && v <= inc.filterHigh {
-			hasGrey = true
-			continue
-		} else if v > inc.filterHigh {
-			return hasGrey
-		}
-	}
-	return false
-}
-
-type VWEMA struct {
-	PV types.UpdatableSeries
-	V  types.UpdatableSeries
-}
-
-func (inc *VWEMA) Index(i int) float64 {
-	return inc.Last(i)
-}
-
-func (inc *VWEMA) Last(i int) float64 {
-	if i >= inc.PV.Length() {
-		return 0
-	}
-	vi := inc.V.Last(i)
-	if vi == 0 {
-		return 0
-	}
-	return inc.PV.Last(i) / vi
-}
-
-func (inc *VWEMA) Length() int {
-	pvl := inc.PV.Length()
-	vl := inc.V.Length()
-	if pvl < vl {
-		return pvl
-	}
-	return vl
-}
-
-func (inc *VWEMA) Update(kline types.KLine) {
-	inc.PV.Update(kline.Close.Mul(kline.Volume).Float64())
-	inc.V.Update(kline.Volume.Float64())
-}
-
-func (inc *VWEMA) UpdateVal(price float64, vol float64) {
-	inc.PV.Update(price * vol)
-	inc.V.Update(vol)
-}
-
 // Setup the Indicators going to be used
 func (s *Strategy) SetupIndicators(store *types.MarketDataStore) {
-	window5 := types.IntervalWindow{Interval: s.Interval, Window: 5}
-	window34 := types.IntervalWindow{Interval: s.Interval, Window: 34}
-	s.atr = &indicator.ATR{IntervalWindow: window34}
-	s.emv = &indicator.EMV{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 14}}
+	// The indicators are fed manually by the store callbacks registered here, which are registered before
+	// the strategy's kline window callback, so the indicators are current when the strategy reads them.
+	s.kLineFeed = &klineFeed{}
+	s.atr = indicatorv2.ATR2(s.kLineFeed, 34)
+	s.emv = indicatorv2.EMV(s.kLineFeed, 14, 0)
 	s.ccis = NewCCISTOCH(s.Interval, s.FilterHigh, s.FilterLow)
 
 	getSource := func(window types.KLineWindow) types.Series {
@@ -236,28 +139,16 @@ func (s *Strategy) SetupIndicators(store *types.MarketDataStore) {
 	}
 	s.heikinAshi = NewHeikinAshi(500)
 	store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
-		if interval == s.atr.Interval {
-			if s.atr.RMA == nil {
-				for _, kline := range window {
-					high := kline.High.Float64()
-					low := kline.Low.Float64()
-					cloze := kline.Close.Float64()
-					vol := kline.Volume.Float64()
-					s.atr.Update(high, low, cloze)
-					s.emv.Update(high, low, vol)
-				}
-			} else {
-				kline := window[len(window)-1]
-				high := kline.High.Float64()
-				low := kline.Low.Float64()
-				cloze := kline.Close.Float64()
-				vol := kline.Volume.Float64()
-				s.atr.Update(high, low, cloze)
-				s.emv.Update(high, low, vol)
-			}
-		}
 		if s.Interval != interval {
 			return
+		}
+		// updates atr and emv
+		if s.kLineFeed.Length() == 0 {
+			for _, kline := range window {
+				s.kLineFeed.Push(kline)
+			}
+		} else {
+			s.kLineFeed.Push(window[len(window)-1])
 		}
 		if s.heikinAshi.Close.Length() == 0 {
 			for _, kline := range window {
@@ -270,8 +161,8 @@ func (s *Strategy) SetupIndicators(store *types.MarketDataStore) {
 		}
 	})
 	if s.UseEma {
-		ema5 := &indicator.EWMA{IntervalWindow: window5}
-		ema34 := &indicator.EWMA{IntervalWindow: window34}
+		ema5 := newEWMA(5)
+		ema34 := newEWMA(34)
 		store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
 			if s.Interval != interval {
 				return
@@ -293,8 +184,8 @@ func (s *Strategy) SetupIndicators(store *types.MarketDataStore) {
 		s.ma5 = ema5
 		s.ma34 = ema34
 	} else if s.UseSma {
-		sma5 := &indicator.SMA{IntervalWindow: window5}
-		sma34 := &indicator.SMA{IntervalWindow: window34}
+		sma5 := newSMA(5)
+		sma34 := newSMA(34)
 		store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
 			if s.Interval != interval {
 				return
@@ -311,17 +202,11 @@ func (s *Strategy) SetupIndicators(store *types.MarketDataStore) {
 				sma34.Update(cloze)
 			}
 		})
-		s.ma5 = sma5
-		s.ma34 = sma34
+		s.ma5 = types.NewSeries(sma5)
+		s.ma34 = types.NewSeries(sma34)
 	} else {
-		evwma5 := &VWEMA{
-			PV: &indicator.EWMA{IntervalWindow: window5},
-			V:  &indicator.EWMA{IntervalWindow: window5},
-		}
-		evwma34 := &VWEMA{
-			PV: &indicator.EWMA{IntervalWindow: window34},
-			V:  &indicator.EWMA{IntervalWindow: window34},
-		}
+		evwma5 := NewVWEMA(5)
+		evwma34 := NewVWEMA(34)
 		store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
 			if s.Interval != interval {
 				return
@@ -348,9 +233,8 @@ func (s *Strategy) SetupIndicators(store *types.MarketDataStore) {
 
 	s.ewo = s.ma5.Div(s.ma34).Minus(1.0).Mul(100.)
 	s.ewoHistogram = s.ma5.Minus(s.ma34)
-	windowSignal := types.IntervalWindow{Interval: s.Interval, Window: s.SignalWindow}
 	if s.UseEma {
-		sig := &indicator.EWMA{IntervalWindow: windowSignal}
+		sig := newEWMA(s.SignalWindow)
 		store.OnKLineWindowUpdate(func(interval types.Interval, _ types.KLineWindow) {
 			if interval != s.Interval {
 				return
@@ -368,7 +252,7 @@ func (s *Strategy) SetupIndicators(store *types.MarketDataStore) {
 		})
 		s.ewoSignal = sig
 	} else if s.UseSma {
-		sig := &indicator.SMA{IntervalWindow: windowSignal}
+		sig := newSMA(s.SignalWindow)
 		store.OnKLineWindowUpdate(func(interval types.Interval, _ types.KLineWindow) {
 			if interval != s.Interval {
 				return
@@ -384,12 +268,9 @@ func (s *Strategy) SetupIndicators(store *types.MarketDataStore) {
 				sig.Update(s.ewo.Last(0))
 			}
 		})
-		s.ewoSignal = sig
+		s.ewoSignal = types.NewSeries(sig)
 	} else {
-		sig := &VWEMA{
-			PV: &indicator.EWMA{IntervalWindow: windowSignal},
-			V:  &indicator.EWMA{IntervalWindow: windowSignal},
-		}
+		sig := NewVWEMA(s.SignalWindow)
 		store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
 			if interval != s.Interval {
 				return
@@ -399,13 +280,11 @@ func (s *Strategy) SetupIndicators(store *types.MarketDataStore) {
 				ewoVals := s.ewo.Reverse()
 				for i, ewoValue := range ewoVals {
 					vol := window.Volume().Last(i)
-					sig.PV.Update(ewoValue * vol)
-					sig.V.Update(vol)
+					sig.UpdateVal(ewoValue, vol)
 				}
 			} else {
 				vol := window.Volume().Last(0)
-				sig.PV.Update(s.ewo.Last(0) * vol)
-				sig.V.Update(vol)
+				sig.UpdateVal(s.ewo.Last(0), vol)
 			}
 		})
 		s.ewoSignal = types.NewSeries(sig)

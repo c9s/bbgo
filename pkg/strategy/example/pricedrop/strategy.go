@@ -53,13 +53,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return fmt.Errorf("market %s is not defined", s.Symbol)
 	}
 
-	standardIndicatorSet := session.StandardIndicatorSet(s.Symbol)
-	if !ok {
-		return fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
-	}
-
+	// create the indicator before registering the kline handler below,
+	// so that it is always updated before the handler reads it
 	var iw = types.IntervalWindow{Interval: s.Interval, Window: s.MovingAverageWindow}
-	var ema = standardIndicatorSet.EWMA(iw)
+	var ema = session.Indicators(s.Symbol).EWMA(iw)
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// skip k-lines from other symbols
@@ -75,7 +72,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if kline.Close.Float64() > ema.Last(0) {
-			log.Warnf("kline close price %v is above EMA %s %f", kline.Close, ema.IntervalWindow, ema.Last(0))
+			log.Warnf("kline close price %v is above EMA %s %f", kline.Close, iw, ema.Last(0))
 			return
 		}
 

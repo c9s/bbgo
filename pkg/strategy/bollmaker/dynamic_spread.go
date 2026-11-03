@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/indicator"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -95,13 +94,15 @@ type DynamicSpreadAmpSettings struct {
 	// BidSpreadScale is used to define the bid spread range with the given percentage.
 	BidSpreadScale *bbgo.PercentageScale `json:"bidSpreadScale"`
 
-	dynamicAskSpread *indicator.SMA
-	dynamicBidSpread *indicator.SMA
+	// dynamicAskSpread and dynamicBidSpread are the SMAs of the kline amplitudes.
+	// They are not bound to any source, the amplitudes are pushed by update()
+	dynamicAskSpread *indicatorv2.SMAStream
+	dynamicBidSpread *indicatorv2.SMAStream
 }
 
 func (ds *DynamicSpreadAmpSettings) initialize(symbol string, session *bbgo.ExchangeSession) {
-	ds.dynamicBidSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: ds.Interval, Window: ds.Window}}
-	ds.dynamicAskSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: ds.Interval, Window: ds.Window}}
+	ds.dynamicBidSpread = indicatorv2.SMA(nil, ds.Window)
+	ds.dynamicAskSpread = indicatorv2.SMA(nil, ds.Window)
 	kLineStore, _ := session.MarketDataStore(symbol)
 	if klines, ok := kLineStore.KLinesOfInterval(ds.Interval); ok {
 		for i := 0; i < len(*klines); i++ {
@@ -115,19 +116,37 @@ func (ds *DynamicSpreadAmpSettings) update(kline types.KLine) {
 
 	switch kline.Direction() {
 	case types.DirectionUp:
-		ds.dynamicAskSpread.Update(ampl)
-		ds.dynamicBidSpread.Update(0)
+		updateSMA(ds.dynamicAskSpread, ampl)
+		updateSMA(ds.dynamicBidSpread, 0)
 	case types.DirectionDown:
-		ds.dynamicBidSpread.Update(ampl)
-		ds.dynamicAskSpread.Update(0)
+		updateSMA(ds.dynamicBidSpread, ampl)
+		updateSMA(ds.dynamicAskSpread, 0)
 	default:
-		ds.dynamicAskSpread.Update(0)
-		ds.dynamicBidSpread.Update(0)
+		updateSMA(ds.dynamicAskSpread, 0)
+		updateSMA(ds.dynamicBidSpread, 0)
 	}
 }
 
+// updateSMA pushes the value to the unbound SMA stream
+func updateSMA(sma *indicatorv2.SMAStream, v float64) {
+	sma.PushAndEmit(sma.Calculate(v))
+	sma.Truncate()
+}
+
+// numOfFullWindowValues returns the number of the SMA values that are calculated from a full window.
+// The v2 SMA emits a value from the first input, while the legacy SMA only pushed the values calculated
+// from a full window, this keeps the readiness check (number of full window values >= window) unchanged.
+func (ds *DynamicSpreadAmpSettings) numOfFullWindowValues(sma *indicatorv2.SMAStream) int {
+	n := sma.Length() - ds.Window + 1
+	if n < 0 {
+		return 0
+	}
+
+	return n
+}
+
 func (ds *DynamicSpreadAmpSettings) getAskSpread() (askSpread float64, err error) {
-	if ds.AskSpreadScale != nil && ds.dynamicAskSpread.Length() >= ds.Window {
+	if ds.AskSpreadScale != nil && ds.numOfFullWindowValues(ds.dynamicAskSpread) >= ds.Window {
 		askSpread, err = ds.AskSpreadScale.Scale(ds.dynamicAskSpread.Last(0))
 		if err != nil {
 			log.WithError(err).Errorf("can not calculate dynamicAskSpread")
@@ -141,7 +160,7 @@ func (ds *DynamicSpreadAmpSettings) getAskSpread() (askSpread float64, err error
 }
 
 func (ds *DynamicSpreadAmpSettings) getBidSpread() (bidSpread float64, err error) {
-	if ds.BidSpreadScale != nil && ds.dynamicBidSpread.Length() >= ds.Window {
+	if ds.BidSpreadScale != nil && ds.numOfFullWindowValues(ds.dynamicBidSpread) >= ds.Window {
 		bidSpread, err = ds.BidSpreadScale.Scale(ds.dynamicBidSpread.Last(0))
 		if err != nil {
 			log.WithError(err).Errorf("can not calculate dynamicBidSpread")

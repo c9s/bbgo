@@ -1,7 +1,8 @@
 package supertrend
 
 import (
-	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/bbgo"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -12,8 +13,8 @@ type DoubleDema struct {
 	FastDEMAWindow int `json:"fastDEMAWindow"`
 	// SlowDEMAWindow DEMA window for checking breakout
 	SlowDEMAWindow int `json:"slowDEMAWindow"`
-	fastDEMA       *indicator.DEMA
-	slowDEMA       *indicator.DEMA
+	fastDEMA       *indicatorv2.DEMAStream
+	slowDEMA       *indicatorv2.DEMAStream
 }
 
 // getDemaSignal get current DEMA signal
@@ -29,38 +30,21 @@ func (dd *DoubleDema) getDemaSignal(openPrice float64, closePrice float64) types
 	return demaSignal
 }
 
-// preloadDema preloads DEMA indicators
-func (dd *DoubleDema) preloadDema(kLineStore *types.MarketDataStore) {
-	if klines, ok := kLineStore.KLinesOfInterval(dd.fastDEMA.Interval); ok {
-		for i := 0; i < len(*klines); i++ {
-			dd.fastDEMA.Update((*klines)[i].GetClose().Float64())
-		}
-	}
-	if klines, ok := kLineStore.KLinesOfInterval(dd.slowDEMA.Interval); ok {
-		for i := 0; i < len(*klines); i++ {
-			dd.slowDEMA.Update((*klines)[i].GetClose().Float64())
-		}
-	}
-}
-
-// newDoubleDema initializes double DEMA indicators
-func newDoubleDema(kLineStore *types.MarketDataStore, interval types.Interval, fastDEMAWindow int, slowDEMAWindow int) *DoubleDema {
+// newDoubleDema initializes double DEMA indicators on the close prices of the given interval,
+// the kline history of the market data store is loaded by the indicator set.
+func newDoubleDema(indicators *bbgo.IndicatorSet, interval types.Interval, fastDEMAWindow int, slowDEMAWindow int) *DoubleDema {
 	dd := DoubleDema{Interval: interval, FastDEMAWindow: fastDEMAWindow, SlowDEMAWindow: slowDEMAWindow}
 
 	// DEMA
 	if dd.FastDEMAWindow == 0 {
 		dd.FastDEMAWindow = 144
 	}
-	dd.fastDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: dd.Interval, Window: dd.FastDEMAWindow}}
-	dd.fastDEMA.Bind(kLineStore)
+	dd.fastDEMA = indicators.DEMA(types.IntervalWindow{Interval: dd.Interval, Window: dd.FastDEMAWindow})
 
 	if dd.SlowDEMAWindow == 0 {
 		dd.SlowDEMAWindow = 169
 	}
-	dd.slowDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: dd.Interval, Window: dd.SlowDEMAWindow}}
-	dd.slowDEMA.Bind(kLineStore)
-
-	dd.preloadDema(kLineStore)
+	dd.slowDEMA = indicators.DEMA(types.IntervalWindow{Interval: dd.Interval, Window: dd.SlowDEMAWindow})
 
 	return &dd
 }

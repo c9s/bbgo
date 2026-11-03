@@ -6,7 +6,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -30,7 +30,7 @@ type ResistanceShort struct {
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
 
-	resistancePivot        *indicator.PivotLow
+	resistancePivot        *indicatorv2.PivotLowStream
 	resistancePrices       []float64
 	currentResistancePrice fixedpoint.Value
 
@@ -69,7 +69,9 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		s.TrendEMA.Bind(session, orderExecutor)
 	}
 
-	s.resistancePivot = session.StandardIndicatorSet(s.Symbol).PivotLow(s.IntervalWindow)
+	// the pivot indicator must be created before registering the kline handler below,
+	// so that it is updated before the handler reads it
+	s.resistancePivot = newPivotLow(session, s.Symbol, s.IntervalWindow)
 
 	// use the last kline from the history before we get the next closed kline
 	s.updateResistanceOrders(fixedpoint.NewFromFloat(s.resistancePivot.Last(0)))
@@ -101,7 +103,7 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 func (s *ResistanceShort) updateCurrentResistancePrice(closePrice fixedpoint.Value) bool {
 	minDistance := s.MinDistance.Float64()
 	groupDistance := s.GroupDistance.Float64()
-	resistancePrices := findPossibleResistancePrices(closePrice.Float64()*(1.0+minDistance), groupDistance, s.resistancePivot.Values.Tail(6))
+	resistancePrices := findPossibleResistancePrices(closePrice.Float64()*(1.0+minDistance), groupDistance, s.resistancePivot.Slice.Tail(6))
 	if len(resistancePrices) == 0 {
 		return false
 	}

@@ -19,7 +19,7 @@ import (
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -69,12 +69,16 @@ type Strategy struct {
 
 	elapsed                *types.Queue
 	priceLines             *types.Queue
-	trendLine              types.UpdatableSeriesExtend
-	ma                     types.UpdatableSeriesExtend
-	stdevHigh              *indicator.StdDev
-	stdevLow               *indicator.StdDev
+	sourceSeries           *types.Float64Series // manually fed source prices of Interval, feeds ma and trendLine
+	highDiffSeries         *types.Float64Series // manually fed, feeds stdevHigh
+	lowDiffSeries          *types.Float64Series // manually fed, feeds stdevLow
+	kLineFeed              *klineFeed           // manually fed klines of Interval, feeds atr
+	trendLine              *indicatorv2.EWMAStream
+	ma                     *indicatorv2.SMAStream
+	stdevHigh              *indicatorv2.StdDevStream
+	stdevLow               *indicatorv2.StdDevStream
 	drift                  *DriftMA
-	atr                    *indicator.ATR
+	atr                    *indicatorv2.ATRStream
 	midPrice               fixedpoint.Value // the midPrice is the average of bestBid and bestAsk in public orderbook
 	lock                   sync.RWMutex     `ignore:"true"` // lock for midPrice
 	positionLock           sync.RWMutex     `ignore:"true"` // lock for highest/lowest and p
@@ -228,25 +232,24 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	return errors.New("exceed retry limit")
 }
 
+func (s *Strategy) initIndicatorStreams() {
+	// The indicators are fed manually from the klines of the SerialMarketDataStore (see updateIndicators),
+	// so their values are always current when the kline handlers read them.
+	s.sourceSeries = types.NewFloat64Series()
+	s.highDiffSeries = types.NewFloat64Series()
+	s.lowDiffSeries = types.NewFloat64Series()
+	s.kLineFeed = &klineFeed{}
+
+	s.ma = indicatorv2.SMA(s.sourceSeries, s.HLRangeWindow)
+	s.trendLine = indicatorv2.EWMA2(s.sourceSeries, s.TrendWindow)
+	s.stdevHigh = indicatorv2.StdDev(s.highDiffSeries, s.HLRangeWindow)
+	s.stdevLow = indicatorv2.StdDev(s.lowDiffSeries, s.HLRangeWindow)
+	s.drift = NewDriftMA(s.Window, s.SmootherWindow, s.FisherTransformWindow)
+	s.atr = indicatorv2.ATR2(s.kLineFeed, s.ATRWindow)
+}
+
 func (s *Strategy) initIndicators(store *types.SerialMarketDataStore) error {
-	s.ma = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
-	s.stdevHigh = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
-	s.stdevLow = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
-	s.drift = &DriftMA{
-		drift: &indicator.WeightedDrift{
-			MA:             &indicator.SMA{IntervalWindow: s.IntervalWindow},
-			IntervalWindow: s.IntervalWindow,
-		},
-		ma1: &indicator.EWMA{
-			IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.SmootherWindow},
-		},
-		ma2: &indicator.FisherTransform{
-			IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.FisherTransformWindow},
-		},
-	}
-	s.drift.SeriesBase.Series = s.drift
-	s.atr = &indicator.ATR{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.ATRWindow}}
-	s.trendLine = &indicator.EWMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.TrendWindow}}
+	s.initIndicatorStreams()
 
 	if bbgo.KLinePreloadLimit == 0 {
 		return nil
@@ -261,12 +264,12 @@ func (s *Strategy) initIndicators(store *types.SerialMarketDataStore) error {
 		source := s.GetSource(&kline).Float64()
 		high := kline.High.Float64()
 		low := kline.Low.Float64()
-		s.ma.Update(source)
-		s.stdevHigh.Update(high - s.ma.Last(0))
-		s.stdevLow.Update(s.ma.Last(0) - low)
+		pushFloat64(s.sourceSeries, source)
+		ma := s.maLast()
+		pushFloat64(s.highDiffSeries, high-ma)
+		pushFloat64(s.lowDiffSeries, ma-low)
 		s.drift.Update(source, kline.Volume.Abs().Float64())
-		s.trendLine.Update(source)
-		s.atr.PushK(kline)
+		s.kLineFeed.Push(kline)
 		s.priceLines.Update(source)
 	}
 	if s.frameKLine != nil && klines != nil {
@@ -282,6 +285,16 @@ func (s *Strategy) initIndicators(store *types.SerialMarketDataStore) error {
 		s.klineMin.Set(&(*klines)[len(*klines)-1])
 	}
 	return nil
+}
+
+// maLast returns the last value of ma, or 0 if its window is not filled yet.
+// The v2 SMA emits partial window means from the first value,
+// the legacy SMA had no value (0) until its window was filled.
+func (s *Strategy) maLast() float64 {
+	if s.ma.Length() < s.HLRangeWindow {
+		return 0
+	}
+	return s.ma.Last(0)
 }
 
 func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64, syscounter int) (int, error) {
@@ -534,11 +547,12 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 	sourcef := source.Float64()
 
 	s.priceLines.Update(sourcef)
-	s.ma.Update(sourcef)
-	s.trendLine.Update(sourcef)
+	// updates ma and trendLine
+	pushFloat64(s.sourceSeries, sourcef)
 
 	s.drift.Update(sourcef, kline.Volume.Abs().Float64())
-	s.atr.PushK(kline)
+	// updates atr
+	s.kLineFeed.Push(kline)
 	atr := s.atr.Last(0)
 
 	price := kline.Close // s.getLastPrice()
@@ -546,9 +560,9 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 	lowf := math.Min(kline.Low.Float64(), pricef)
 	highf := math.Max(kline.High.Float64(), pricef)
 	lowdiff := pricef - lowf
-	s.stdevLow.Update(lowdiff)
+	pushFloat64(s.lowDiffSeries, lowdiff)
 	highdiff := highf - pricef
-	s.stdevHigh.Update(highdiff)
+	pushFloat64(s.highDiffSeries, highdiff)
 
 	drift := s.drift.Array(2)
 

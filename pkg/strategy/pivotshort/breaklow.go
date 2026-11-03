@@ -5,7 +5,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -44,7 +44,7 @@ type BreakLow struct {
 	// lastBreakLow is the low that the price just break
 	lastBreakLow fixedpoint.Value
 
-	pivotLow, fastPivotLow *indicator.PivotLow
+	pivotLow, fastPivotLow *indicatorv2.PivotLowStream
 	pivotLowPrices         []fixedpoint.Value
 
 	orderExecutor *bbgo.GeneralOrderExecutor
@@ -84,11 +84,12 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 
 	position := orderExecutor.Position()
 	symbol := position.Symbol
-	standardIndicator := session.StandardIndicatorSet(s.Symbol)
 
+	// the pivot indicators must be created before registering the kline handlers below,
+	// so that they are updated before the handlers read them
 	s.lastLow = fixedpoint.Zero
-	s.pivotLow = standardIndicator.PivotLow(s.IntervalWindow)
-	s.fastPivotLow = standardIndicator.PivotLow(types.IntervalWindow{
+	s.pivotLow = newPivotLow(session, s.Symbol, s.IntervalWindow)
+	s.fastPivotLow = newPivotLow(session, s.Symbol, types.IntervalWindow{
 		Interval: s.Interval,
 		Window:   s.FastWindow, // make it faster
 	})

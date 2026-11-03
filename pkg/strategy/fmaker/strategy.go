@@ -13,6 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	floats2 "github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -205,59 +206,28 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.Notify(s.Position)
 	})
 	s.tradeCollector.BindStream(session.UserDataStream)
-	st, _ := session.MarketDataStore(s.Symbol)
-
-	riw := types.IntervalWindow{Window: 1, Interval: s.Interval}
-	s.R = &R{IntervalWindow: riw}
-	s.R.Bind(st)
-
-	s0iw := types.IntervalWindow{Window: 20, Interval: s.Interval}
-	s.S0 = &S0{IntervalWindow: s0iw}
-	s.S0.Bind(st)
-
-	s1iw := types.IntervalWindow{Window: 20, Interval: s.Interval}
-	s.S1 = &S1{IntervalWindow: s1iw}
-	s.S1.Bind(st)
-
-	s2iw := types.IntervalWindow{Window: 20, Interval: s.Interval}
-	s.S2 = &S2{IntervalWindow: s2iw}
-	s.S2.Bind(st)
-
-	s3iw := types.IntervalWindow{Window: 2, Interval: s.Interval}
-	s.S3 = &S3{IntervalWindow: s3iw}
-	s.S3.Bind(st)
-
-	s4iw := types.IntervalWindow{Window: 2, Interval: s.Interval}
-	s.S4 = &S4{IntervalWindow: s4iw}
-	s.S4.Bind(st)
-
-	s5iw := types.IntervalWindow{Window: 10, Interval: s.Interval}
-	s.S5 = &S5{IntervalWindow: s5iw}
-	s.S5.Bind(st)
-
-	s6iw := types.IntervalWindow{Window: 2, Interval: s.Interval}
-	s.S6 = &S6{IntervalWindow: s6iw}
-	s.S6.Bind(st)
-
-	s7iw := types.IntervalWindow{Window: 2, Interval: s.Interval}
-	s.S7 = &S7{IntervalWindow: s7iw}
-	s.S7.Bind(st)
-
-	a2iw := types.IntervalWindow{Window: 2, Interval: s.Interval}
-	s.A2 = &A2{IntervalWindow: a2iw}
-	s.A2.Bind(st)
-
-	a3iw := types.IntervalWindow{Window: 8, Interval: s.Interval}
-	s.A3 = &A3{IntervalWindow: a3iw}
-	s.A3.Bind(st)
-
-	a18iw := types.IntervalWindow{Window: 5, Interval: s.Interval}
-	s.A18 = &A18{IntervalWindow: a18iw}
-	s.A18.Bind(st)
-
-	a34iw := types.IntervalWindow{Window: 12, Interval: s.Interval}
-	s.A34 = &A34{IntervalWindow: a34iw}
-	s.A34.Bind(st)
+	// Build all the factors before registering the kline handler below, so that they are updated
+	// before the handler reads them.
+	//
+	// The factors read their kline window with source.Last(i) from their subscribers, so they are built
+	// on a private kline stream that replays the kline history and then forwards the live klines
+	// kline by kline (see indicatorv2.WithHistory).
+	indicatorv2.WithHistory(session.Indicators(s.Symbol).KLines(s.Interval), func(source *indicatorv2.KLineStream) struct{} {
+		s.R = NewR(source, 1)
+		s.S0 = NewS0(source, 20)
+		s.S1 = NewS1(source, 20)
+		s.S2 = NewS2(source, 20)
+		s.S3 = NewS3(source, 2)
+		s.S4 = NewS4(source, 2)
+		s.S5 = NewS5(source, 10)
+		s.S6 = NewS6(source, 2)
+		s.S7 = NewS7(source, 2)
+		s.A2 = NewA2(source, 2)
+		s.A3 = NewA3(source, 8)
+		s.A18 = NewA18(source, 5)
+		s.A34 = NewA34(source, 12)
+		return struct{}{}
+	})
 
 	session.UserDataStream.OnStart(func() {
 		log.Infof("connected")
@@ -309,35 +279,35 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		var rdps regression.DataPoints
 
 		for i := 1; i <= 15; i++ {
-			s0 := s.S0.Values[len(s.S0.Values)-i-outlook]
-			s1 := s.S1.Values[len(s.S1.Values)-i-outlook]
-			s2 := s.S2.Values[len(s.S2.Values)-i-outlook]
-			// s3 := s.S3.Values[len(s.S3.Values)-i-1]
-			s4 := s.S4.Values[len(s.S4.Values)-i-outlook]
-			s5 := s.S5.Values[len(s.S5.Values)-i-outlook]
-			s6 := s.S6.Values[len(s.S6.Values)-i-outlook]
-			s7 := s.S7.Values[len(s.S7.Values)-i-outlook]
-			a2 := s.A2.Values[len(s.A2.Values)-i-outlook]
-			a3 := s.A3.Values[len(s.A3.Values)-i-outlook]
-			a18 := s.A18.Values[len(s.A18.Values)-i-outlook]
-			a34 := s.A34.Values[len(s.A34.Values)-i-outlook]
+			s0 := s.S0.Slice[len(s.S0.Slice)-i-outlook]
+			s1 := s.S1.Slice[len(s.S1.Slice)-i-outlook]
+			s2 := s.S2.Slice[len(s.S2.Slice)-i-outlook]
+			// s3 := s.S3.Slice[len(s.S3.Slice)-i-1]
+			s4 := s.S4.Slice[len(s.S4.Slice)-i-outlook]
+			s5 := s.S5.Slice[len(s.S5.Slice)-i-outlook]
+			s6 := s.S6.Slice[len(s.S6.Slice)-i-outlook]
+			s7 := s.S7.Slice[len(s.S7.Slice)-i-outlook]
+			a2 := s.A2.Slice[len(s.A2.Slice)-i-outlook]
+			a3 := s.A3.Slice[len(s.A3.Slice)-i-outlook]
+			a18 := s.A18.Slice[len(s.A18.Slice)-i-outlook]
+			a34 := s.A34.Slice[len(s.A34.Slice)-i-outlook]
 
-			ret := s.R.Values[len(s.R.Values)-i]
+			ret := s.R.Slice[len(s.R.Slice)-i]
 			rdps = append(rdps, regression.DataPoint(ret, floats2.Slice{s0, s1, s2, s4, s5, s6, s7, a2, a3, a18, a34}))
 		}
 		// for i := 40; i > 20; i-- {
-		//	s0 := preprocessing(s.S0.Values[len(s.S0.Values)-i : len(s.S0.Values)-i+20-outlook])
-		//	s1 := preprocessing(s.S1.Values[len(s.S1.Values)-i : len(s.S1.Values)-i+20-outlook])
-		//	s2 := preprocessing(s.S2.Values[len(s.S2.Values)-i : len(s.S2.Values)-i+20-outlook])
-		//	//s3 := s.S3.Values[len(s.S3.Values)-i-1]
-		//	s4 := preprocessing(s.S4.Values[len(s.S4.Values)-i : len(s.S4.Values)-i+20-outlook])
-		//	s5 := preprocessing(s.S5.Values[len(s.S5.Values)-i : len(s.S5.Values)-i+20-outlook])
-		//	a2 := preprocessing(s.A2.Values[len(s.A2.Values)-i : len(s.A2.Values)-i+20-outlook])
-		//	a3 := preprocessing(s.A3.Values[len(s.A3.Values)-i : len(s.A3.Values)-i+20-outlook])
-		//	a18 := preprocessing(s.A18.Values[len(s.A18.Values)-i : len(s.A18.Values)-i+20-outlook])
-		//	a34 := preprocessing(s.A18.Values[len(s.A18.Values)-i : len(s.A18.Values)-i+20-outlook])
+		//	s0 := preprocessing(s.S0.Slice[len(s.S0.Slice)-i : len(s.S0.Values)-i+20-outlook])
+		//	s1 := preprocessing(s.S1.Slice[len(s.S1.Slice)-i : len(s.S1.Values)-i+20-outlook])
+		//	s2 := preprocessing(s.S2.Slice[len(s.S2.Slice)-i : len(s.S2.Values)-i+20-outlook])
+		//	//s3 := s.S3.Slice[len(s.S3.Slice)-i-1]
+		//	s4 := preprocessing(s.S4.Slice[len(s.S4.Slice)-i : len(s.S4.Values)-i+20-outlook])
+		//	s5 := preprocessing(s.S5.Slice[len(s.S5.Slice)-i : len(s.S5.Values)-i+20-outlook])
+		//	a2 := preprocessing(s.A2.Slice[len(s.A2.Slice)-i : len(s.A2.Values)-i+20-outlook])
+		//	a3 := preprocessing(s.A3.Slice[len(s.A3.Slice)-i : len(s.A3.Values)-i+20-outlook])
+		//	a18 := preprocessing(s.A18.Slice[len(s.A18.Slice)-i : len(s.A18.Values)-i+20-outlook])
+		//	a34 := preprocessing(s.A18.Slice[len(s.A18.Slice)-i : len(s.A18.Values)-i+20-outlook])
 		//
-		//	ret := s.R.Values[len(s.R.Values)-i]
+		//	ret := s.R.Slice[len(s.R.Slice)-i]
 		//	rdps = append(rdps, regression.DataPoint(ret, types.Float64Slice{s0, s1, s2, s4, s5, a2, a3, a18, a34}))
 		// }
 		r.Train(rdps...)
@@ -363,36 +333,36 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		var qdps regression.DataPoints
 
 		for i := 1; i <= 15; i++ {
-			s0 := math.Pow(s.S0.Values[len(s.S0.Values)-i-outlook], 1)
-			s1 := math.Pow(s.S1.Values[len(s.S1.Values)-i-outlook], 1)
-			s2 := math.Pow(s.S2.Values[len(s.S2.Values)-i-outlook], 1)
-			// s3 := s.S3.Values[len(s.S3.Values)-i-1]
-			s4 := math.Pow(s.S4.Values[len(s.S4.Values)-i-outlook], 1)
-			s5 := math.Pow(s.S5.Values[len(s.S5.Values)-i-outlook], 1)
-			s6 := s.S6.Values[len(s.S6.Values)-i-outlook]
-			s7 := s.S7.Values[len(s.S7.Values)-i-outlook]
-			a2 := math.Pow(s.A2.Values[len(s.A2.Values)-i-outlook], 1)
-			a3 := math.Pow(s.A3.Values[len(s.A3.Values)-i-outlook], 1)
-			a18 := math.Pow(s.A18.Values[len(s.A18.Values)-i-outlook], 1)
-			a34 := math.Pow(s.A34.Values[len(s.A34.Values)-i-outlook], 1)
+			s0 := math.Pow(s.S0.Slice[len(s.S0.Slice)-i-outlook], 1)
+			s1 := math.Pow(s.S1.Slice[len(s.S1.Slice)-i-outlook], 1)
+			s2 := math.Pow(s.S2.Slice[len(s.S2.Slice)-i-outlook], 1)
+			// s3 := s.S3.Slice[len(s.S3.Slice)-i-1]
+			s4 := math.Pow(s.S4.Slice[len(s.S4.Slice)-i-outlook], 1)
+			s5 := math.Pow(s.S5.Slice[len(s.S5.Slice)-i-outlook], 1)
+			s6 := s.S6.Slice[len(s.S6.Slice)-i-outlook]
+			s7 := s.S7.Slice[len(s.S7.Slice)-i-outlook]
+			a2 := math.Pow(s.A2.Slice[len(s.A2.Slice)-i-outlook], 1)
+			a3 := math.Pow(s.A3.Slice[len(s.A3.Slice)-i-outlook], 1)
+			a18 := math.Pow(s.A18.Slice[len(s.A18.Slice)-i-outlook], 1)
+			a34 := math.Pow(s.A34.Slice[len(s.A34.Slice)-i-outlook], 1)
 
-			ret := s.R.Values[len(s.R.Values)-i]
+			ret := s.R.Slice[len(s.R.Slice)-i]
 			qty := math.Abs(ret)
 			qdps = append(qdps, regression.DataPoint(qty, floats2.Slice{s0, s1, s2, s4, s5, s6, s7, a2, a3, a18, a34}))
 		}
 		// for i := 40; i > 20; i-- {
-		//	s0 := preprocessing(s.S0.Values[len(s.S0.Values)-i : len(s.S0.Values)-i+20-outlook])
-		//	s1 := preprocessing(s.S1.Values[len(s.S1.Values)-i : len(s.S1.Values)-i+20-outlook])
-		//	s2 := preprocessing(s.S2.Values[len(s.S2.Values)-i : len(s.S2.Values)-i+20-outlook])
-		//	//s3 := s.S3.Values[len(s.S3.Values)-i-1]
-		//	s4 := preprocessing(s.S4.Values[len(s.S4.Values)-i : len(s.S4.Values)-i+20-outlook])
-		//	s5 := preprocessing(s.S5.Values[len(s.S5.Values)-i : len(s.S5.Values)-i+20-outlook])
-		//	a2 := preprocessing(s.A2.Values[len(s.A2.Values)-i : len(s.A2.Values)-i+20-outlook])
-		//	a3 := preprocessing(s.A3.Values[len(s.A3.Values)-i : len(s.A3.Values)-i+20-outlook])
-		//	a18 := preprocessing(s.A18.Values[len(s.A18.Values)-i : len(s.A18.Values)-i+20-outlook])
-		//	a34 := preprocessing(s.A18.Values[len(s.A18.Values)-i : len(s.A18.Values)-i+20-outlook])
+		//	s0 := preprocessing(s.S0.Slice[len(s.S0.Slice)-i : len(s.S0.Values)-i+20-outlook])
+		//	s1 := preprocessing(s.S1.Slice[len(s.S1.Slice)-i : len(s.S1.Values)-i+20-outlook])
+		//	s2 := preprocessing(s.S2.Slice[len(s.S2.Slice)-i : len(s.S2.Values)-i+20-outlook])
+		//	//s3 := s.S3.Slice[len(s.S3.Slice)-i-1]
+		//	s4 := preprocessing(s.S4.Slice[len(s.S4.Slice)-i : len(s.S4.Values)-i+20-outlook])
+		//	s5 := preprocessing(s.S5.Slice[len(s.S5.Slice)-i : len(s.S5.Values)-i+20-outlook])
+		//	a2 := preprocessing(s.A2.Slice[len(s.A2.Slice)-i : len(s.A2.Values)-i+20-outlook])
+		//	a3 := preprocessing(s.A3.Slice[len(s.A3.Slice)-i : len(s.A3.Values)-i+20-outlook])
+		//	a18 := preprocessing(s.A18.Slice[len(s.A18.Slice)-i : len(s.A18.Values)-i+20-outlook])
+		//	a34 := preprocessing(s.A18.Slice[len(s.A18.Slice)-i : len(s.A18.Values)-i+20-outlook])
 		//
-		//	ret := s.R.Values[len(s.R.Values)-i]
+		//	ret := s.R.Slice[len(s.R.Slice)-i]
 		//	qty := math.Abs(ret)
 		//	qdps = append(qdps, regression.DataPoint(qty, types.Float64Slice{s0, s1, s2, s4, s5, a2, a3, a18, a34}))
 		// }
@@ -405,16 +375,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		log.Infof("Return Rate Regression formula:\n%v", r.Formula)
 		log.Infof("Order Quantity Regression formula:\n%v", q.Formula)
 
-		// s0 := preprocessing(s.S0.Values[len(s.S0.Values)-20 : len(s.S0.Values)-1])
-		// s1 := preprocessing(s.S1.Values[len(s.S1.Values)-20 : len(s.S1.Values)-1-outlook])
-		// s2 := preprocessing(s.S2.Values[len(s.S2.Values)-20 : len(s.S2.Values)-1-outlook])
-		// //s3 := s.S3.Values[len(s.S3.Values)-i-1]
-		// s4 := preprocessing(s.S4.Values[len(s.S4.Values)-20 : len(s.S4.Values)-1-outlook])
-		// s5 := preprocessing(s.S5.Values[len(s.S5.Values)-20 : len(s.S5.Values)-1-outlook])
-		// a2 := preprocessing(s.A2.Values[len(s.A2.Values)-20 : len(s.A2.Values)-1-outlook])
-		// a3 := preprocessing(s.A3.Values[len(s.A3.Values)-20 : len(s.A3.Values)-1-outlook])
-		// a18 := preprocessing(s.A18.Values[len(s.A18.Values)-20 : len(s.A18.Values)-1-outlook])
-		// a34 := preprocessing(s.A18.Values[len(s.A18.Values)-20 : len(s.A18.Values)-1-outlook])
+		// s0 := preprocessing(s.S0.Slice[len(s.S0.Slice)-20 : len(s.S0.Values)-1])
+		// s1 := preprocessing(s.S1.Slice[len(s.S1.Slice)-20 : len(s.S1.Values)-1-outlook])
+		// s2 := preprocessing(s.S2.Slice[len(s.S2.Slice)-20 : len(s.S2.Values)-1-outlook])
+		// //s3 := s.S3.Slice[len(s.S3.Slice)-i-1]
+		// s4 := preprocessing(s.S4.Slice[len(s.S4.Slice)-20 : len(s.S4.Values)-1-outlook])
+		// s5 := preprocessing(s.S5.Slice[len(s.S5.Slice)-20 : len(s.S5.Values)-1-outlook])
+		// a2 := preprocessing(s.A2.Slice[len(s.A2.Slice)-20 : len(s.A2.Values)-1-outlook])
+		// a3 := preprocessing(s.A3.Slice[len(s.A3.Slice)-20 : len(s.A3.Values)-1-outlook])
+		// a18 := preprocessing(s.A18.Slice[len(s.A18.Slice)-20 : len(s.A18.Values)-1-outlook])
+		// a34 := preprocessing(s.A18.Slice[len(s.A18.Slice)-20 : len(s.A18.Values)-1-outlook])
 		// er, _ := r.Predict(types.Float64Slice{s0, s1, s2, s4, s5, a2, a3, a18, a34})
 		// eq, _ := q.Predict(types.Float64Slice{s0, s1, s2, s4, s5, a2, a3, a18, a34})
 		eq, _ := q.Predict(floats2.Slice{s.S0.Last(0), s.S1.Last(0), s.S2.Last(0), s.S4.Last(0), s.S5.Last(0), s.S6.Last(0), s.S7.Last(0), s.A2.Last(0), s.A3.Last(0), s.A18.Last(0), s.A34.Last(0), er})
@@ -435,11 +405,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		BidPrice := kline.Close.Mul(fixedpoint.One.Sub(s.Spread))
 		BidQty := s.QuantityOrAmount.CalculateQuantity(BidPrice)
-		BidQty = BidQty // .Mul(fixedpoint.One.Add(fixedpoint.NewFromFloat(eq)))
+		// BidQty = BidQty.Mul(fixedpoint.One.Add(fixedpoint.NewFromFloat(eq)))
 
 		AskPrice := kline.Close.Mul(fixedpoint.One.Add(s.Spread))
 		AskQty := s.QuantityOrAmount.CalculateQuantity(AskPrice)
-		AskQty = AskQty // .Mul(fixedpoint.One.Add(fixedpoint.NewFromFloat(eq)))
+		// AskQty = AskQty.Mul(fixedpoint.One.Add(fixedpoint.NewFromFloat(eq)))
 
 		if er > 0 || (er < 0 && er > AskAlphaBoundary/kline.Close.Float64()) {
 			submitOrder := types.SubmitOrder{
@@ -530,5 +500,5 @@ func stddev(xs []float64) float64 {
 func preprocessing(xs []float64) float64 {
 	// return 0.5 * tanh(0.01*((xs[len(xs)-1]-mean(xs))/stddev(xs))) // tanh estimator
 	return tanh((xs[len(xs)-1] - mean(xs)) / stddev(xs)) // tanh z-score
-	return (xs[len(xs)-1] - mean(xs)) / stddev(xs)       // z-score
+	// return (xs[len(xs)-1] - mean(xs)) / stddev(xs) // z-score
 }

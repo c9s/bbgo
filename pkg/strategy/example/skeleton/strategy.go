@@ -58,7 +58,8 @@ func (s *Strategy) ID() string {
 // This value will be used for persistence layer to separate the storage.
 //
 // Run:
-//    redis-cli KEYS "*"
+//
+//	redis-cli KEYS "*"
 //
 // And you will see how this instance ID is used in redis.
 func (s *Strategy) InstanceID() string {
@@ -81,11 +82,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.State = &State{Counter: 1}
 	}
 
-	indicators := session.StandardIndicatorSet(s.Symbol)
-	atr := indicators.ATR(types.IntervalWindow{
-		Interval: types.Interval1m,
-		Window:   14,
-	})
+	// Create the indicators before registering the kline callback,
+	// so that the indicators are updated before the callback reads them.
+	indicators := session.Indicators(s.Symbol)
+	atr := indicators.ATR(types.Interval1m, 14)
 
 	// To get the market information from the current session
 	// The market object provides the precision, MoQ (minimal of quantity) information
