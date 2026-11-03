@@ -2,7 +2,7 @@ package kucoinapi
 
 import "github.com/c9s/requestgen"
 
-//go:generate requestgen -method GET -url /api/v1/orders/{orderId} -type GetOrderRequest -responseType .Order
+//go:generate requestgen -method GET -url /api/v1/orders/:orderId -type GetOrderRequest -responseType .APIResponse -responseDataField Data -responseDataType .Order
 type GetOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
