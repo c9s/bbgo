@@ -5,6 +5,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -74,4 +76,40 @@ func Test_ADX(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Test_ADX_FlatMarketKeepsFinite verifies that candles with zero volatility do
+// not poison the +DI and -DI series or the smoothed ADX line.
+func Test_ADX_FlatMarketKeepsFinite(t *testing.T) {
+	stream := &types.StandardStream{}
+	kLines := KLines(stream, "", "")
+	adx := ADX(kLines, 5)
+
+	flat := fixedpoint.NewFromFloat(100)
+	for i := 0; i < 20; i++ {
+		stream.EmitKLineClosed(types.KLine{High: flat, Low: flat, Close: flat})
+	}
+
+	assert.False(t, math.IsNaN(adx.Last(0)), "ADX must stay finite on flat candles")
+	assert.False(t, math.IsNaN(adx.Plus.Last(0)), "Plus (+DI) must stay finite on flat candles")
+	assert.False(t, math.IsNaN(adx.Minus.Last(0)), "Minus (-DI) must stay finite on flat candles")
+	assert.Equal(t, 0.0, adx.Last(0))
+	assert.Equal(t, 0.0, adx.Plus.Last(0))
+	assert.Equal(t, 0.0, adx.Minus.Last(0))
+
+	for i := 1; i <= 40; i++ {
+		c := float64(100 + i)
+		stream.EmitKLineClosed(types.KLine{
+			High:  fixedpoint.NewFromFloat(c + 1),
+			Low:   fixedpoint.NewFromFloat(c - 1),
+			Close: fixedpoint.NewFromFloat(c),
+		})
+	}
+
+	val := adx.Last(0)
+	assert.False(t, math.IsNaN(val), "ADX must recover after flat candles")
+	assert.False(t, math.IsInf(adx.Plus.Last(0), 0), "Plus must stay finite after flat stretch")
+	assert.False(t, math.IsInf(adx.Minus.Last(0), 0), "Minus must stay finite after flat stretch")
+	assert.Greater(t, val, 0.0)
+	assert.LessOrEqual(t, val, 100.0)
 }
