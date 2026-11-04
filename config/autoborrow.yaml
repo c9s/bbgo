@@ -44,6 +44,11 @@ exchangeStrategies:
         - '<!subteam^TEAM_ID>'
 
     assets:
+    # Binance's userMinBorrow is queried from /sapi/v1/margin/allAssets (weight 1)
+    # for each positive borrow candidate. Non-borrowable assets are skipped.
+    # Query failures or missing/null userMinBorrow warn and continue with the configured floor.
+    # Optional minQuantityPerBorrow sets a stricter floor in asset units (default zero).
+    # After all caps are applied, smaller requests are skipped, not rounded up.
     - asset: ETH
       low: 3.0
       maxQuantityPerBorrow: 1.0
@@ -53,4 +58,3 @@ exchangeStrategies:
       low: 1000.0
       maxQuantityPerBorrow: 100.0
       maxTotalBorrow: 10.0
-

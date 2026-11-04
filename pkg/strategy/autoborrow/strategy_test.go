@@ -2,10 +2,12 @@ package autoborrow
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -22,6 +24,18 @@ type fakeMarginBorrowRepayService struct {
 	maxBorrowable map[string]fixedpoint.Value
 	borrowed      map[string]fixedpoint.Value
 	repaid        map[string]fixedpoint.Value
+	assetInfo     map[string]types.MarginAssetInfo
+	assetInfoErr  error
+}
+
+func (f *fakeMarginBorrowRepayService) QueryMarginAssetInfo(_ context.Context, asset string) (types.MarginAssetInfo, error) {
+	if f.assetInfoErr != nil {
+		return types.MarginAssetInfo{}, f.assetInfoErr
+	}
+	if info, ok := f.assetInfo[asset]; ok {
+		return info, nil
+	}
+	return types.MarginAssetInfo{Asset: asset, IsBorrowable: true}, nil
 }
 
 func newFakeMarginBorrowRepayService(maxBorrowable map[string]fixedpoint.Value) *fakeMarginBorrowRepayService {
@@ -105,6 +119,132 @@ func TestCheckAndBorrow_UnheldAssetRespectsBorrowLimits(t *testing.T) {
 
 		assert.Equal(t, Number(200), service.borrowed["DOGE"])
 	})
+}
+
+func TestCheckAndBorrow_MinQuantityPerBorrow(t *testing.T) {
+	tests := []struct {
+		name          string
+		available     fixedpoint.Value
+		borrowed      fixedpoint.Value
+		maxPerBorrow  fixedpoint.Value
+		maxBorrowable fixedpoint.Value
+		minPerBorrow  fixedpoint.Value
+		wantBorrow    fixedpoint.Value
+	}{
+		{
+			name:      "small balance shortfall",
+			available: Number(968.1), maxBorrowable: Number(10000),
+			minPerBorrow: Number(100),
+		},
+		{
+			name:         "per request cap below minimum",
+			maxPerBorrow: Number(31.9), maxBorrowable: Number(10000),
+			minPerBorrow: Number(100),
+		},
+		{
+			name:     "remaining debt allowance below minimum",
+			borrowed: Number(9968.1), maxBorrowable: Number(10000),
+			minPerBorrow: Number(100),
+		},
+		{
+			name:          "exchange maximum below minimum",
+			maxBorrowable: Number(31.9), minPerBorrow: Number(100),
+		},
+		{
+			name:      "exactly minimum",
+			available: Number(900), maxBorrowable: Number(10000),
+			minPerBorrow: Number(100), wantBorrow: Number(100),
+		},
+		{
+			name:      "above minimum",
+			available: Number(800), maxBorrowable: Number(10000),
+			minPerBorrow: Number(100), wantBorrow: Number(200),
+		},
+		{
+			name:      "minimum omitted preserves small borrows",
+			available: Number(968.1), maxBorrowable: Number(10000),
+			wantBorrow: Number(31.9),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newFakeMarginBorrowRepayService(map[string]fixedpoint.Value{"DOGE": tt.maxBorrowable})
+			account := newTestAccount(Number(10), debtBalance("DOGE", tt.available, tt.borrowed))
+			s := newTestStrategy(t, account, service, MarginAssetConfig{
+				Asset: "DOGE", Low: Number(1000), MaxTotalBorrow: Number(10000),
+				MaxQuantityPerBorrow: tt.maxPerBorrow, MinQuantityPerBorrow: tt.minPerBorrow,
+			})
+
+			s.checkAndBorrow(context.Background())
+
+			if tt.wantBorrow.IsZero() {
+				assert.Empty(t, service.borrowed)
+			} else {
+				assert.Equal(t, tt.wantBorrow, service.borrowed["DOGE"])
+			}
+		})
+	}
+}
+
+func TestCheckAndBorrow_ExchangeMinimum(t *testing.T) {
+	tests := []struct {
+		name          string
+		available     fixedpoint.Value
+		borrowed      fixedpoint.Value
+		maxPerBorrow  fixedpoint.Value
+		maxBorrowable fixedpoint.Value
+		configuredMin fixedpoint.Value
+		borrowable    bool
+		queryErr      error
+		wantBorrow    fixedpoint.Value
+	}{
+		{name: "31.9 DOGE below exchange minimum", available: Number(968.1), maxBorrowable: Number(10000), borrowable: true},
+		{name: "per request cap below exchange minimum", maxPerBorrow: Number(31.9), maxBorrowable: Number(10000), borrowable: true},
+		{name: "remaining debt allowance below exchange minimum", borrowed: Number(9968.1), maxBorrowable: Number(10000), borrowable: true},
+		{name: "exchange cap below exchange minimum", maxBorrowable: Number(31.9), borrowable: true},
+		{name: "configured floor cannot lower exchange minimum", available: Number(968.1), maxBorrowable: Number(10000), configuredMin: Number(10), borrowable: true},
+		{name: "configured floor can raise exchange minimum", available: Number(850), maxBorrowable: Number(10000), configuredMin: Number(200), borrowable: true},
+		{name: "exactly exchange minimum", available: Number(900), maxBorrowable: Number(10000), borrowable: true, wantBorrow: Number(100)},
+		{name: "above exchange minimum", available: Number(800), maxBorrowable: Number(10000), borrowable: true, wantBorrow: Number(200)},
+		{name: "not borrowable", maxBorrowable: Number(10000)},
+		{name: "metadata query failure permits small borrow", available: Number(968.1), maxBorrowable: Number(10000), queryErr: errors.New("metadata unavailable"), wantBorrow: Number(31.9)},
+		{name: "metadata query failure respects configured floor", available: Number(968.1), maxBorrowable: Number(10000), configuredMin: Number(100), queryErr: errors.New("metadata unavailable")},
+		{name: "metadata query failure respects exchange cap", maxBorrowable: Number(200), queryErr: errors.New("metadata unavailable"), wantBorrow: Number(200)},
+		{name: "metadata query failure respects debt cap", borrowed: Number(9968.1), maxBorrowable: Number(10000), queryErr: errors.New("metadata unavailable"), wantBorrow: Number(31.9)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newFakeMarginBorrowRepayService(map[string]fixedpoint.Value{"DOGE": tt.maxBorrowable})
+			service.assetInfo = map[string]types.MarginAssetInfo{
+				"DOGE": {Asset: "DOGE", IsBorrowable: tt.borrowable, MinBorrow: Number(100)},
+			}
+			service.assetInfoErr = tt.queryErr
+			account := newTestAccount(Number(10), debtBalance("DOGE", tt.available, tt.borrowed))
+			s := newTestStrategy(t, account, service, MarginAssetConfig{
+				Asset: "DOGE", Low: Number(1000), MaxQuantityPerBorrow: tt.maxPerBorrow,
+				MaxTotalBorrow: Number(10000), MinQuantityPerBorrow: tt.configuredMin,
+			})
+			logger, hook := logrustest.NewNullLogger()
+			s.logger = logger
+
+			s.checkAndBorrow(context.Background())
+
+			if tt.queryErr != nil {
+				assert.NotNil(t, hook.LastEntry())
+				if entry := hook.LastEntry(); entry != nil {
+					assert.Equal(t, logrus.WarnLevel, entry.Level)
+					assert.Contains(t, entry.Message, "continuing with configured minimum borrow floor")
+					assert.Equal(t, "DOGE", entry.Data["asset"])
+				}
+			}
+			if tt.wantBorrow.IsZero() {
+				assert.Empty(t, service.borrowed)
+			} else {
+				assert.Equal(t, tt.wantBorrow, service.borrowed["DOGE"])
+			}
+		})
+	}
 }
 
 func TestCheckAndBorrow_MarginLevelBelowMin(t *testing.T) {
