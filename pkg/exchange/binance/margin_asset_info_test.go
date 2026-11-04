@@ -15,6 +15,31 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// captureLogEntries hooks the package logger instead of replacing it, because the server time
+// goroutine started by New() reads it concurrently and logs unrelated errors.
+func captureLogEntries(t *testing.T) *logrustest.Hook {
+	hook := &logrustest.Hook{}
+	original := log.Logger.ReplaceHooks(make(logrus.LevelHooks))
+	hooks := make(logrus.LevelHooks)
+	for level, levelHooks := range original {
+		hooks[level] = append([]logrus.Hook(nil), levelHooks...)
+	}
+	hooks.Add(hook)
+	log.Logger.ReplaceHooks(hooks)
+	t.Cleanup(func() { log.Logger.ReplaceHooks(original) })
+	return hook
+}
+
+func entriesForAsset(hook *logrustest.Hook, asset string) []logrus.Entry {
+	var entries []logrus.Entry
+	for _, entry := range hook.AllEntries() {
+		if entry.Data["asset"] == asset {
+			entries = append(entries, *entry)
+		}
+	}
+	return entries
+}
+
 func TestQueryMarginAssetInfo(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -35,10 +60,7 @@ func TestQueryMarginAssetInfo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, hook := logrustest.NewNullLogger()
-			originalLog := log
-			log = logrus.NewEntry(logger)
-			t.Cleanup(func() { log = originalLog })
+			hook := captureLogEntries(t)
 			transport := &httptesting.MockTransport{}
 			ex := &Exchange{client2: binanceapi.NewClient("https://api.binance.test")}
 			ex.client2.Auth("test-key", "test-secret", nil)
@@ -63,13 +85,13 @@ func TestQueryMarginAssetInfo(t *testing.T) {
 					MinRepay: fixedpoint.MustNewFromString("0.1"),
 				}, info)
 			}
+			entries := entriesForAsset(hook, "XYZ")
 			if tt.wantWarning {
-				require.NotNil(t, hook.LastEntry())
-				require.Equal(t, logrus.WarnLevel, hook.LastEntry().Level)
-				require.Contains(t, hook.LastEntry().Message, "userMinBorrow is missing or null")
-				require.Equal(t, "XYZ", hook.LastEntry().Data["asset"])
+				require.Len(t, entries, 1)
+				require.Equal(t, logrus.WarnLevel, entries[0].Level)
+				require.Contains(t, entries[0].Message, "userMinBorrow is missing or null")
 			} else {
-				require.Empty(t, hook.AllEntries())
+				require.Empty(t, entries)
 			}
 		})
 	}
