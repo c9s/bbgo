@@ -458,6 +458,36 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(
 	return resp.Amount, nil
 }
 
+func (e *Exchange) QueryMarginAssetInfo(ctx context.Context, asset string) (types.MarginAssetInfo, error) {
+	assets, err := e.client2.NewGetMarginAllAssetsRequest().Asset(asset).Do(ctx)
+	if err != nil {
+		return types.MarginAssetInfo{}, err
+	}
+
+	for _, info := range assets {
+		if info.AssetName != asset {
+			continue
+		}
+		minBorrow := fixedpoint.Zero
+		if info.UserMinBorrow == nil {
+			log.WithField("asset", asset).Warn("Binance userMinBorrow is missing or null, continuing without an exchange minimum borrow floor")
+		} else {
+			minBorrow = *info.UserMinBorrow
+			if minBorrow.Sign() < 0 {
+				return types.MarginAssetInfo{}, fmt.Errorf("invalid minimum borrow amount for %s: %s", asset, minBorrow)
+			}
+		}
+		return types.MarginAssetInfo{
+			Asset:        info.AssetName,
+			IsBorrowable: info.IsBorrowable,
+			MinBorrow:    minBorrow,
+			MinRepay:     info.UserMinRepay,
+		}, nil
+	}
+
+	return types.MarginAssetInfo{}, fmt.Errorf("margin asset information not found for %s", asset)
+}
+
 // isBinanceErrorCode reports whether err is a Binance API error response with the given error code.
 func isBinanceErrorCode(err error, code int) bool {
 	err2, ok := err.(*requestgen.ErrResponse)
