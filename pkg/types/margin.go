@@ -52,6 +52,13 @@ type MarginInterest struct {
 	InterestRate   fixedpoint.Value `json:"interestRate" db:"interest_rate"`
 	IsolatedSymbol string           `json:"isolatedSymbol" db:"isolated_symbol"`
 	Time           Time             `json:"time" db:"time"`
+
+	// Session is the bbgo session name the row was synced for
+	Session string `json:"session" db:"session"`
+
+	// PriceInUSDT is the USDT price of Asset at the time of the charge (1h kline open),
+	// filled during sync. Zero means unknown.
+	PriceInUSDT fixedpoint.Value `json:"priceInUSDT" db:"price_in_usdt"`
 }
 
 type MarginLoan struct {
@@ -62,6 +69,9 @@ type MarginLoan struct {
 	Principle      fixedpoint.Value `json:"principle" db:"principle"`
 	Time           Time             `json:"time" db:"time"`
 	IsolatedSymbol string           `json:"isolatedSymbol" db:"isolated_symbol"`
+
+	// Session is the bbgo session name the row was synced for
+	Session string `json:"session" db:"session"`
 }
 
 type MarginRepay struct {
@@ -72,6 +82,9 @@ type MarginRepay struct {
 	Principle      fixedpoint.Value `json:"principle" db:"principle"`
 	Time           Time             `json:"time" db:"time"`
 	IsolatedSymbol string           `json:"isolatedSymbol" db:"isolated_symbol"`
+
+	// Session is the bbgo session name the row was synced for
+	Session string `json:"session" db:"session"`
 }
 
 type MarginLiquidation struct {
@@ -87,6 +100,9 @@ type MarginLiquidation struct {
 	TimeInForce      TimeInForce      `json:"timeInForce" db:"time_in_force"`
 	IsIsolated       bool             `json:"isIsolated" db:"is_isolated"`
 	UpdatedTime      Time             `json:"updatedTime" db:"time"`
+
+	// Session is the bbgo session name the row was synced for
+	Session string `json:"session" db:"session"`
 }
 
 // MarginHistoryService provides the service of querying loan history and repay history
