@@ -74,3 +74,29 @@ func TestQueryMarginAssetInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestQueryMarginAssetInfos(t *testing.T) {
+	transport := &httptesting.MockTransport{}
+	ex := &Exchange{client2: binanceapi.NewClient("https://api.binance.test")}
+	ex.client2.Auth("test-key", "test-secret", nil)
+	ex.client2.HttpClient = &http.Client{Transport: transport}
+	transport.GET("/sapi/v1/margin/allAssets", func(req *http.Request) (*http.Response, error) {
+		require.Empty(t, req.URL.Query().Get("asset"))
+		return httptesting.BuildResponseString(http.StatusOK, `[
+			{"assetName":"ETH","isBorrowable":true,"userMinBorrow":"0.01","userMinRepay":"0.001"},
+			{"assetName":"BTC","isBorrowable":true,"userMinBorrow":"-1"},
+			{"assetName":"USDT","isBorrowable":true,"userMinBorrow":"5"}
+		]`), nil
+	})
+
+	infos, err := ex.QueryMarginAssetInfos(context.Background(), []string{"ETH", "BTC", "LTC"})
+
+	require.NoError(t, err)
+	require.Equal(t, map[string]types.MarginAssetInfo{
+		"ETH": {
+			Asset: "ETH", IsBorrowable: true,
+			MinBorrow: fixedpoint.MustNewFromString("0.01"),
+			MinRepay:  fixedpoint.MustNewFromString("0.001"),
+		},
+	}, infos, "unrequested USDT, invalid BTC and unlisted LTC are left out")
+}

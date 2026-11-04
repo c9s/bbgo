@@ -468,24 +468,55 @@ func (e *Exchange) QueryMarginAssetInfo(ctx context.Context, asset string) (type
 		if info.AssetName != asset {
 			continue
 		}
-		minBorrow := fixedpoint.Zero
-		if info.UserMinBorrow == nil {
-			log.WithField("asset", asset).Warn("Binance userMinBorrow is missing or null, continuing without an exchange minimum borrow floor")
-		} else {
-			minBorrow = *info.UserMinBorrow
-			if minBorrow.Sign() < 0 {
-				return types.MarginAssetInfo{}, fmt.Errorf("invalid minimum borrow amount for %s: %s", asset, minBorrow)
-			}
-		}
-		return types.MarginAssetInfo{
-			Asset:        info.AssetName,
-			IsBorrowable: info.IsBorrowable,
-			MinBorrow:    minBorrow,
-			MinRepay:     info.UserMinRepay,
-		}, nil
+		return toGlobalMarginAssetInfo(info)
 	}
 
 	return types.MarginAssetInfo{}, fmt.Errorf("margin asset information not found for %s", asset)
+}
+
+func (e *Exchange) QueryMarginAssetInfos(ctx context.Context, assets []string) (map[string]types.MarginAssetInfo, error) {
+	all, err := e.client2.NewGetMarginAllAssetsRequest().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	wanted := make(map[string]struct{}, len(assets))
+	for _, asset := range assets {
+		wanted[asset] = struct{}{}
+	}
+
+	infos := make(map[string]types.MarginAssetInfo, len(assets))
+	for _, info := range all {
+		if _, ok := wanted[info.AssetName]; !ok {
+			continue
+		}
+		converted, err := toGlobalMarginAssetInfo(info)
+		if err != nil {
+			log.WithError(err).WithField("asset", info.AssetName).Warn("skipping invalid Binance margin asset information")
+			continue
+		}
+		infos[info.AssetName] = converted
+	}
+
+	return infos, nil
+}
+
+func toGlobalMarginAssetInfo(info binanceapi.MarginAssetInfo) (types.MarginAssetInfo, error) {
+	minBorrow := fixedpoint.Zero
+	if info.UserMinBorrow == nil {
+		log.WithField("asset", info.AssetName).Warn("Binance userMinBorrow is missing or null, continuing without an exchange minimum borrow floor")
+	} else {
+		minBorrow = *info.UserMinBorrow
+		if minBorrow.Sign() < 0 {
+			return types.MarginAssetInfo{}, fmt.Errorf("invalid minimum borrow amount for %s: %s", info.AssetName, minBorrow)
+		}
+	}
+	return types.MarginAssetInfo{
+		Asset:        info.AssetName,
+		IsBorrowable: info.IsBorrowable,
+		MinBorrow:    minBorrow,
+		MinRepay:     info.UserMinRepay,
+	}, nil
 }
 
 // isBinanceErrorCode reports whether err is a Binance API error response with the given error code.

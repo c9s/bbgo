@@ -37,6 +37,10 @@ type MarginAssetInfo struct {
 
 type MarginAssetInfoService interface {
 	QueryMarginAssetInfo(ctx context.Context, asset string) (MarginAssetInfo, error)
+
+	// QueryMarginAssetInfos returns the entries of the given assets, fetched in bulk.
+	// An asset the exchange does not list is absent from the result.
+	QueryMarginAssetInfos(ctx context.Context, assets []string) (map[string]MarginAssetInfo, error)
 }
 
 type MarginInterest struct {

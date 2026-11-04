@@ -83,14 +83,24 @@ type Strategy struct {
 
 	Assets []MarginAssetConfig `json:"assets"`
 
+	MarginAssetInfoCacheTTL types.Duration `json:"marginAssetInfoCacheTTL"`
+
 	ExchangeSession *bbgo.ExchangeSession
 
 	marginBorrowRepay types.MarginBorrowRepayService
+	marginAssetInfo   marginAssetInfoCache
 	logger            logrus.FieldLogger
 }
 
 func (s *Strategy) ID() string {
 	return ID
+}
+
+func (s *Strategy) Defaults() error {
+	if s.MarginAssetInfoCacheTTL == 0 {
+		s.MarginAssetInfoCacheTTL = types.Duration(30 * time.Minute)
+	}
+	return nil
 }
 
 func (s *Strategy) Initialize() error {
@@ -417,7 +427,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 
 		minBorrow := marginAsset.MinQuantityPerBorrow
 		if service, ok := s.marginBorrowRepay.(types.MarginAssetInfoService); ok {
-			info, err := service.QueryMarginAssetInfo(ctx, marginAsset.Asset)
+			info, err := s.marginAssetInfo.get(ctx, service, s.getAssetStringSlice(), marginAsset.Asset, time.Now(), s.MarginAssetInfoCacheTTL.Duration())
 			if err != nil {
 				s.logger.WithError(err).WithField("asset", marginAsset.Asset).Warn("margin asset information query failed, continuing with configured minimum borrow floor")
 			} else {

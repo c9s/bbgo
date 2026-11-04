@@ -26,9 +26,31 @@ type fakeMarginBorrowRepayService struct {
 	repaid        map[string]fixedpoint.Value
 	assetInfo     map[string]types.MarginAssetInfo
 	assetInfoErr  error
+	bulkInfoErr   error
+
+	singleInfoCalls int
+	bulkInfoCalls   int
+}
+
+func (f *fakeMarginBorrowRepayService) QueryMarginAssetInfos(_ context.Context, assets []string) (map[string]types.MarginAssetInfo, error) {
+	f.bulkInfoCalls++
+	if f.bulkInfoErr != nil {
+		return nil, f.bulkInfoErr
+	}
+	if f.assetInfoErr != nil {
+		return nil, f.assetInfoErr
+	}
+	infos := make(map[string]types.MarginAssetInfo)
+	for _, asset := range assets {
+		if info, ok := f.assetInfo[asset]; ok {
+			infos[asset] = info
+		}
+	}
+	return infos, nil
 }
 
 func (f *fakeMarginBorrowRepayService) QueryMarginAssetInfo(_ context.Context, asset string) (types.MarginAssetInfo, error) {
+	f.singleInfoCalls++
 	if f.assetInfoErr != nil {
 		return types.MarginAssetInfo{}, f.assetInfoErr
 	}
@@ -68,13 +90,15 @@ func newTestStrategy(
 	mockExchange := mocks.NewMockExchange(mockCtrl)
 	mockExchange.EXPECT().QueryAccount(gomock.Any()).Return(account, nil).AnyTimes()
 
-	return &Strategy{
+	s := &Strategy{
 		MinMarginLevel:    Number(1.5),
 		Assets:            assets,
 		ExchangeSession:   &bbgo.ExchangeSession{Exchange: mockExchange, Account: account},
 		marginBorrowRepay: service,
 		logger:            logrus.WithField("strategy", ID),
 	}
+	assert.NoError(t, s.Defaults())
+	return s
 }
 
 func newTestAccount(marginLevel fixedpoint.Value, balances ...types.Balance) *types.Account {
@@ -275,4 +299,73 @@ func TestCheckAndBorrow_MarginLevelBelowMin(t *testing.T) {
 
 		assert.Equal(t, Number(1000), service.borrowed["USDT"])
 	})
+}
+
+func TestCheckAndBorrow_MarginAssetInfoCache(t *testing.T) {
+	newStrategy := func(t *testing.T, service *fakeMarginBorrowRepayService) *Strategy {
+		service.assetInfo = map[string]types.MarginAssetInfo{
+			"ETH": {Asset: "ETH", IsBorrowable: true, MinBorrow: Number(0.01)},
+		}
+		account := newTestAccount(Number(10), debtBalance("ETH", Number(0), Number(0)))
+		return newTestStrategy(t, account, service, MarginAssetConfig{
+			Asset: "ETH", Low: Number(10), MaxQuantityPerBorrow: Number(1), MaxTotalBorrow: Number(100),
+		})
+	}
+
+	t.Run("one bulk query is reused across checks", func(t *testing.T) {
+		service := newFakeMarginBorrowRepayService(map[string]fixedpoint.Value{"ETH": Number(100)})
+		s := newStrategy(t, service)
+
+		s.checkAndBorrow(context.Background())
+		s.checkAndBorrow(context.Background())
+
+		assert.Equal(t, 1, service.bulkInfoCalls)
+		assert.Equal(t, 0, service.singleInfoCalls)
+		assert.Equal(t, Number(1), service.borrowed["ETH"])
+	})
+
+	t.Run("expired cache is refetched", func(t *testing.T) {
+		service := newFakeMarginBorrowRepayService(map[string]fixedpoint.Value{"ETH": Number(100)})
+		s := newStrategy(t, service)
+
+		s.checkAndBorrow(context.Background())
+		s.marginAssetInfo.refreshAfter = time.Now().Add(-time.Second)
+		s.checkAndBorrow(context.Background())
+
+		assert.Equal(t, 2, service.bulkInfoCalls)
+	})
+
+	t.Run("bulk failure falls back to per-asset query and backs off", func(t *testing.T) {
+		service := newFakeMarginBorrowRepayService(map[string]fixedpoint.Value{"ETH": Number(100)})
+		service.bulkInfoErr = errors.New("bulk unavailable")
+		s := newStrategy(t, service)
+
+		s.checkAndBorrow(context.Background())
+		s.checkAndBorrow(context.Background())
+
+		assert.Equal(t, 1, service.bulkInfoCalls)
+		assert.Equal(t, 2, service.singleInfoCalls)
+		assert.Equal(t, Number(1), service.borrowed["ETH"])
+	})
+
+	t.Run("asset missing from bulk result uses per-asset query", func(t *testing.T) {
+		service := newFakeMarginBorrowRepayService(map[string]fixedpoint.Value{"ETH": Number(100)})
+		s := newStrategy(t, service)
+		service.assetInfo = nil
+
+		s.checkAndBorrow(context.Background())
+
+		assert.Equal(t, 1, service.bulkInfoCalls)
+		assert.Equal(t, 1, service.singleInfoCalls)
+	})
+}
+
+func TestDefaults_MarginAssetInfoCacheTTL(t *testing.T) {
+	s := &Strategy{}
+	assert.NoError(t, s.Defaults())
+	assert.Equal(t, 30*time.Minute, s.MarginAssetInfoCacheTTL.Duration())
+
+	s = &Strategy{MarginAssetInfoCacheTTL: types.Duration(5 * time.Minute)}
+	assert.NoError(t, s.Defaults())
+	assert.Equal(t, 5*time.Minute, s.MarginAssetInfoCacheTTL.Duration())
 }
