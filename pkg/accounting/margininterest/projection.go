@@ -12,18 +12,18 @@ const quoteCurrency = "USDT"
 // PriceFunc resolves the USDT price of an asset. ok is false when the price is unknown.
 type PriceFunc func(asset string) (price fixedpoint.Value, ok bool)
 
-// priceOf returns 1 for USDT and otherwise asks price. A nil price or a
+// priceOf returns 1 for USDT and otherwise asks pricer. A nil pricer or a
 // non-positive price counts as unknown.
-func priceOf(price PriceFunc, asset string) (fixedpoint.Value, bool) {
+func priceOf(pricer PriceFunc, asset string) (fixedpoint.Value, bool) {
 	if asset == quoteCurrency {
 		return fixedpoint.One, true
 	}
 
-	if price == nil {
+	if pricer == nil {
 		return fixedpoint.Zero, false
 	}
 
-	p, ok := price(asset)
+	p, ok := pricer(asset)
 	if !ok || p.Sign() <= 0 {
 		return fixedpoint.Zero, false
 	}
@@ -103,7 +103,7 @@ func (p Projection) Complete() bool {
 // interest, so every asset is reported whether it is borrowed or not.
 // Accrued interest is not principal, so only Borrowed counts.
 func ProjectAssets(
-	assets []string, debts types.BalanceMap, rates types.MarginNextHourlyInterestRateMap, price PriceFunc, hours int,
+	assets []string, debts types.BalanceMap, rates types.MarginNextHourlyInterestRateMap, pricer PriceFunc, hours int,
 ) Projection {
 	p := Projection{
 		Hours:     hours,
@@ -141,7 +141,7 @@ func ProjectAssets(
 
 		if ap.Interest.IsZero() {
 			ap.PriceOK = true
-		} else if px, ok := priceOf(price, asset); ok {
+		} else if px, ok := priceOf(pricer, asset); ok {
 			ap.USDT = ap.Interest.Mul(px)
 			ap.PriceOK = true
 			p.TotalUSDT = p.TotalUSDT.Add(ap.USDT)

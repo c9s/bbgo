@@ -34,14 +34,14 @@ func TestSumRealized(t *testing.T) {
 		name        string
 		rows        []types.MarginInterest
 		mode        PriceMode
-		price       PriceFunc
+		pricer      PriceFunc
 		wantUSDT    float64
 		wantMissing []string
 		check       func(t *testing.T, r Realized)
 	}{
-		{name: "charged", rows: twoBTC, mode: PriceModeCharged, price: btcPrice, wantUSDT: 0.25289},
-		{name: "empty mode is charged", rows: twoBTC, mode: "", price: btcPrice, wantUSDT: 0.25289},
-		{name: "current", rows: twoBTC, mode: PriceModeCurrent, price: btcPrice, wantUSDT: 0.25916},
+		{name: "charged", rows: twoBTC, mode: PriceModeCharged, pricer: btcPrice, wantUSDT: 0.25289},
+		{name: "empty mode is charged", rows: twoBTC, mode: "", pricer: btcPrice, wantUSDT: 0.25289},
+		{name: "current", rows: twoBTC, mode: PriceModeCurrent, pricer: btcPrice, wantUSDT: 0.25916},
 		{
 			name: "usdt is always 1", mode: PriceModeCharged,
 			rows:     []types.MarginInterest{interestRow("USDT", "0.00417", "0", h10)},
@@ -72,7 +72,7 @@ func TestSumRealized(t *testing.T) {
 		},
 		{
 			name: "current price unknown", rows: twoBTC, mode: PriceModeCurrent,
-			price:    func(string) (fixedpoint.Value, bool) { return fixedpoint.Zero, false },
+			pricer:   func(string) (fixedpoint.Value, bool) { return fixedpoint.Zero, false },
 			wantUSDT: 0, wantMissing: []string{"BTC"},
 		},
 		{name: "no rows", mode: PriceModeCharged, wantUSDT: 0},
@@ -80,7 +80,7 @@ func TestSumRealized(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := SumRealized(tt.rows, tt.mode, tt.price)
+			r := SumRealized(tt.rows, tt.mode, tt.pricer)
 			assert.InDelta(t, tt.wantUSDT, r.TotalUSDT.Float64(), tol)
 			assert.Equal(t, tt.wantMissing, r.MissingPrice)
 			assert.Equal(t, tt.mode.OrDefault(), r.Mode)
