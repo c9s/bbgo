@@ -108,7 +108,7 @@ func newTestInterestWorker(
 	w.now = func() time.Time { return testNow }
 	w.price = testPrices(map[string]string{"BTC": "60000", "ETH": "3000"})
 	if rates != nil {
-		w.rates = rates
+		w.interestQueryService = rates
 	}
 	if history != nil {
 		w.history = history
