@@ -300,8 +300,14 @@ export DISABLE_MARKET_CACHE=1 # 測試網路支援的市場遠少於主網路
 **注意**：SQLite 不完全支援，我們建議您使用 MySQL 而不是 SQLite。
 
 配置 MySQL 資料庫
-要使用 MySQL 資料庫進行資料同步，首先您需要安裝 MySQL 服務器：
+要使用 MySQL 資料庫進行資料同步，首先您需要一個 MySQL 服務器。建議使用 [Docker](https://hub.docker.com/_/mysql) 運行，並固定為 CI 使用的同一個 LTS 版本：
 #### Configure MySQL Database
+
+```sh
+docker run -d --name bbgo-mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=bbgo -p 3306:3306 mysql:8.4
+```
+
+或者透過系統的套件管理器安裝。請注意，這會安裝您的發行版所提供的版本（不一定是 8.4），而且部分較新的 Ubuntu 版本已不再提供 `mysql-server` 套件：
 
 ```sh
 # Ubuntu Linux
@@ -310,8 +316,6 @@ sudo apt-get install -y mysql-server
 # 對於更新的 Ubuntu Linux
 sudo apt install -y mysql-server
 ```
-
-或者[在 docker 中執行它](https://hub.docker.com/_/mysql)
 
 創建您的 mysql 資料庫：
 
