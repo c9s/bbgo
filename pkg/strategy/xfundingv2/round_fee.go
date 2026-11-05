@@ -149,6 +149,10 @@ func (s *Strategy) acquireFeeAssetAndTransfer(ctx context.Context, rounds []*Arb
 		}
 	}
 	if !buyQuantity.IsZero() {
+		if s.spotSession.Connectivity != nil && !s.spotSession.Connectivity.IsConnected() {
+			return fmt.Errorf("spot session is disconnected, skip acquiring fee asset")
+		}
+
 		orderBook := s.spotOrderBooks[s.FeeSymbol]
 		bestAsk, ok := orderBook.BestAsk()
 		if !ok {

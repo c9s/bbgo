@@ -1,0 +1,16 @@
+{
+  "status": 200, "title": "OK", "description": "Successful request",
+  "payload": {
+    "metadata": {
+      "next": "https://api.amberdata.com/markets/futures/open-interest/BTCUSD_PERP?cursor=N4IgOPAQUE",
+      "api-version": "2023-09-30"
+    },
+    "data": [
+      {
+        "instrument": "BTCUSD_PERP", "exchange": "binance",
+        "exchangeTimestamp": 1717518065771, "exchangeTimestampNanoseconds": 0,
+        "value": 16862174, "type": "PERPETUAL"
+      }
+    ]
+  }
+}

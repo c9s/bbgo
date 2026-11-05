@@ -48,6 +48,7 @@ func (s *PriceStream) Truncate() {
 func (s *PriceStream) PushAndEmit(v float64) {
 	s.Slice.Push(v)
 	s.EmitUpdate(v)
+	s.Truncate()
 }
 
 func ClosePrices(source KLineSubscription) *PriceStream {

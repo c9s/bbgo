@@ -80,7 +80,7 @@ func (b *ActiveOrderBook) Backup() []types.SubmitOrder {
 }
 
 func (b *ActiveOrderBook) BindStream(stream types.Stream) {
-	stream.OnOrderUpdate(b.orderUpdateHandler)
+	stream.OnOrderUpdate(b.OrderUpdateHandler)
 }
 
 func (b *ActiveOrderBook) waitOrderClear(
@@ -318,7 +318,7 @@ func (b *ActiveOrderBook) clear() {
 	b.pendingOrderUpdates.Clear()
 }
 
-func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
+func (b *ActiveOrderBook) OrderUpdateHandler(order types.Order) {
 	if oldOrder, ok := b.Get(order.OrderID); ok {
 		order.Tag = oldOrder.Tag
 		order.GroupID = oldOrder.GroupID

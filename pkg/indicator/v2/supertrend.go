@@ -92,6 +92,8 @@ func (st *SuperTrendStream) update(kline types.KLine) {
 	}
 	st.entities = append(st.entities, e)
 	st.PushAndEmit(e.Value())
+	st.entities = types.ShrinkSlice(st.entities, MaxSliceSize, TruncateSize)
+	st.Slice = generalTruncate(st.Slice)
 }
 
 func (st *SuperTrendStream) Entities() []*SuperTrendBand {

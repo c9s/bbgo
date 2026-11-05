@@ -102,6 +102,7 @@ func NewVolumeProfile(source KLineSubscription, window int) *VolumeProfileStream
 		vahIdx, valIdx := pocIdx+1, pocIdx-1
 		stepVAH, stepVAL := true, true
 
+	expand:
 		for (vaCumVol <= vaTotalVol) &&
 			(vahIdx <= len(s.VP.Hist)-1 && valIdx >= 0) {
 
@@ -131,6 +132,11 @@ func NewVolumeProfile(source KLineSubscription, window int) *VolumeProfileStream
 				vaCumVol += valVol
 				stepVAH, stepVAL = false, true
 			case vahVol == valVol:
+				if vahVol == 0 {
+					// no more volume on either side, the value area can not grow any further
+					break expand
+				}
+
 				vaCumVol += valVol + vahVol
 				stepVAH, stepVAL = true, true
 			}
@@ -141,6 +147,11 @@ func NewVolumeProfile(source KLineSubscription, window int) *VolumeProfileStream
 
 			if valIdx <= 0 {
 				stepVAL = false
+			}
+
+			if !stepVAH && !stepVAL {
+				// neither side can step any further
+				break
 			}
 		}
 

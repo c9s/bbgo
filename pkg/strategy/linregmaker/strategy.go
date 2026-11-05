@@ -10,7 +10,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/risk/dynamicrisk"
 
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/util"
 
 	"github.com/pkg/errors"
@@ -46,7 +46,10 @@ type Strategy struct {
 	// ReverseEMA is used to determine the long-term trend.
 	// Above the ReverseEMA is the long trend and vise versa.
 	// All the opposite trend position will be closed upon the trend change
-	ReverseEMA *indicator.EWMA `json:"reverseEMA"`
+	ReverseEMA *types.IntervalWindow `json:"reverseEMA"`
+
+	// reverseEMA is the EWMA indicator of the ReverseEMA config
+	reverseEMA *indicatorv2.EWMAStream
 
 	// ReverseInterval is the interval to check trend reverse against ReverseEMA. Close price of this interval crossing
 	// the ReverseEMA triggers main trend change.
@@ -60,12 +63,18 @@ type Strategy struct {
 	// FastLinReg is to determine the short-term trend.
 	// Buy/sell orders are placed if the FastLinReg and the ReverseEMA trend are in the same direction, and only orders
 	// that reduce position are placed if the FastLinReg and the ReverseEMA trend are in different directions.
-	FastLinReg *indicator.LinReg `json:"fastLinReg"`
+	FastLinReg *types.IntervalWindow `json:"fastLinReg"`
+
+	// fastLinReg is the linear regression indicator of the FastLinReg config
+	fastLinReg *indicatorv2.LinRegStream
 
 	// SlowLinReg is to determine the midterm trend.
 	// When the SlowLinReg and the ReverseEMA trend are in different directions, creation of opposite position is
 	// allowed.
-	SlowLinReg *indicator.LinReg `json:"slowLinReg"`
+	SlowLinReg *types.IntervalWindow `json:"slowLinReg"`
+
+	// slowLinReg is the linear regression indicator of the SlowLinReg config
+	slowLinReg *indicatorv2.LinRegStream
 
 	// AllowOppositePosition if true, the creation of opposite position is allowed when both fast and slow LinReg are in
 	// the opposite direction to main trend
@@ -81,7 +90,7 @@ type Strategy struct {
 	NeutralBollinger types.IntervalWindowBandWidth `json:"neutralBollinger"`
 
 	// neutralBoll is the neutral price section for TradeInBand
-	neutralBoll *indicator.BOLL
+	neutralBoll *indicatorv2.BOLLStream
 
 	// TradeInBand
 	// When this is on, places orders only when the current price is in the bollinger band.
@@ -142,10 +151,9 @@ type Strategy struct {
 	ProfitStatsTracker *report.ProfitStatsTracker `json:"profitStatsTracker"`
 	TrackParameters    bool                       `json:"trackParameters"`
 
-	Environment          *bbgo.Environment
-	StandardIndicatorSet *bbgo.StandardIndicatorSet
-	Market               types.Market
-	ctx                  context.Context
+	Environment *bbgo.Environment
+	Market      types.Market
+	ctx         context.Context
 
 	session *bbgo.ExchangeSession
 
@@ -211,17 +219,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 		Interval: s.SlowLinReg.Interval,
 	})
-	// Initialize LinRegs
-	kLineStore, _ := session.MarketDataStore(s.Symbol)
-	s.FastLinReg.BindK(session.MarketDataStream, s.Symbol, s.FastLinReg.Interval)
-	if klines, ok := kLineStore.KLinesOfInterval(s.FastLinReg.Interval); ok {
-		s.FastLinReg.LoadK((*klines)[0:])
-	}
-	s.SlowLinReg.BindK(session.MarketDataStream, s.Symbol, s.SlowLinReg.Interval)
-	if klines, ok := kLineStore.KLinesOfInterval(s.SlowLinReg.Interval); ok {
-		s.SlowLinReg.LoadK((*klines)[0:])
-	}
-
 	// Subscribe for BBs
 	if s.NeutralBollinger.Interval != "" {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
@@ -270,12 +267,12 @@ func (s *Strategy) isAllowOppositePosition() bool {
 		return false
 	}
 
-	if (s.mainTrendCurrent == types.DirectionUp && s.FastLinReg.Last(0) < 0 && s.SlowLinReg.Last(0) < 0) ||
-		(s.mainTrendCurrent == types.DirectionDown && s.FastLinReg.Last(0) > 0 && s.SlowLinReg.Last(0) > 0) {
-		log.Infof("%s allow opposite position is enabled: MainTrend %v, FastLinReg: %f, SlowLinReg: %f", s.Symbol, s.mainTrendCurrent, s.FastLinReg.Last(0), s.SlowLinReg.Last(0))
+	if (s.mainTrendCurrent == types.DirectionUp && s.fastLinReg.Last(0) < 0 && s.slowLinReg.Last(0) < 0) ||
+		(s.mainTrendCurrent == types.DirectionDown && s.fastLinReg.Last(0) > 0 && s.slowLinReg.Last(0) > 0) {
+		log.Infof("%s allow opposite position is enabled: MainTrend %v, FastLinReg: %f, SlowLinReg: %f", s.Symbol, s.mainTrendCurrent, s.fastLinReg.Last(0), s.slowLinReg.Last(0))
 		return true
 	}
-	log.Infof("%s allow opposite position is disabled: MainTrend %v, FastLinReg: %f, SlowLinReg: %f", s.Symbol, s.mainTrendCurrent, s.FastLinReg.Last(0), s.SlowLinReg.Last(0))
+	log.Infof("%s allow opposite position is disabled: MainTrend %v, FastLinReg: %f, SlowLinReg: %f", s.Symbol, s.mainTrendCurrent, s.fastLinReg.Last(0), s.slowLinReg.Last(0))
 
 	return false
 }
@@ -403,10 +400,10 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 	}
 
 	// Faster position decrease
-	if s.mainTrendCurrent == types.DirectionUp && s.SlowLinReg.Last(0) < 0 {
+	if s.mainTrendCurrent == types.DirectionUp && s.slowLinReg.Last(0) < 0 {
 		sellQuantity = sellQuantity.Mul(s.FasterDecreaseRatio)
 		log.Infof("faster %s position decrease: sell qty %v", s.Symbol, sellQuantity)
-	} else if s.mainTrendCurrent == types.DirectionDown && s.SlowLinReg.Last(0) > 0 {
+	} else if s.mainTrendCurrent == types.DirectionDown && s.slowLinReg.Last(0) > 0 {
 		buyQuantity = buyQuantity.Mul(s.FasterDecreaseRatio)
 		log.Infof("faster %s position decrease: buy qty %v", s.Symbol, buyQuantity)
 	}
@@ -698,11 +695,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.ProfitStatsTracker.Bind(s.session, s.orderExecutor.TradeCollector())
 	}
 
-	// Indicators initialized by StandardIndicatorSet must be initialized in Run()
+	// Initialize the indicators, they must be created before registering the kline handlers below,
+	// so that they are updated before the handlers read them. The kline history is loaded by the indicator set.
+	indicators := session.Indicators(s.Symbol)
 	// Initialize ReverseEMA
-	s.ReverseEMA = s.StandardIndicatorSet.EWMA(s.ReverseEMA.IntervalWindow)
+	s.reverseEMA = indicators.EWMA(*s.ReverseEMA)
+	// Initialize LinRegs
+	s.fastLinReg = indicatorv2.LinReg(indicators.CLOSE(s.FastLinReg.Interval), s.FastLinReg.Window)
+	s.slowLinReg = indicatorv2.LinReg(indicators.CLOSE(s.SlowLinReg.Interval), s.SlowLinReg.Window)
 	// Initialize BBs
-	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
+	s.neutralBoll = indicators.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
 
 	// Default spread
 	if s.Spread == fixedpoint.Zero {
@@ -735,7 +737,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				closePrice = price
 			}
 		}
-		priceReverseEMA := fixedpoint.NewFromFloat(s.ReverseEMA.Last(0))
+		priceReverseEMA := fixedpoint.NewFromFloat(s.reverseEMA.Last(0))
 
 		// Main trend by ReverseEMA
 		if closePrice.Compare(priceReverseEMA) > 0 {
@@ -750,7 +752,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// closePrice is the close price of current kline
 		closePrice := kline.GetClose()
 		// priceReverseEMA is the current ReverseEMA price
-		priceReverseEMA := fixedpoint.NewFromFloat(s.ReverseEMA.Last(0))
+		priceReverseEMA := fixedpoint.NewFromFloat(s.reverseEMA.Last(0))
 
 		// Main trend by ReverseEMA
 		s.mainTrendPrevious = s.mainTrendCurrent

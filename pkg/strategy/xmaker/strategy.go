@@ -21,6 +21,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo/sessionworker"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/dynamic"
+	"github.com/c9s/bbgo/pkg/exchange/okex"
 	"github.com/c9s/bbgo/pkg/exchange/sandbox"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
@@ -49,6 +50,29 @@ const ID = "xmaker"
 var log = logrus.WithField("strategy", ID)
 
 var raiseWarningLevelLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
+
+// instanceRegistryMu and instanceRegistry enforce that only one xmaker
+// instance runs per Symbol within this process. See registerInstance.
+var (
+	instanceRegistryMu sync.Mutex
+	instanceRegistry   = make(map[string]*Strategy)
+)
+
+// registerInstance claims the given Symbol for s, returning an error if
+// another instance already claimed it. Re-registering the same instance
+// (same pointer) is a no-op so that Validate can be called more than once
+// on the same Strategy without false-positives.
+func registerInstance(s *Strategy) error {
+	instanceRegistryMu.Lock()
+	defer instanceRegistryMu.Unlock()
+
+	if existing, ok := instanceRegistry[s.Symbol]; ok && existing != s {
+		return fmt.Errorf("another xmaker instance is already running for symbol %s (only one xmaker instance per symbol is allowed)", s.Symbol)
+	}
+
+	instanceRegistry[s.Symbol] = s
+	return nil
+}
 
 func nopCover(v fixedpoint.Value) {}
 
@@ -246,6 +270,8 @@ type StrategyConfig struct {
 	CircuitBreaker *circuitbreaker.BasicCircuitBreaker `json:"circuitBreaker"`
 
 	NoBorrowableCooldown types.Duration `json:"noBorrowableCooldown,omitempty"`
+
+	ConnectionDelay types.Duration `json:"connectionDelay,omitempty"`
 }
 
 type Strategy struct {
@@ -400,11 +426,9 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	subscribeFeeTokenMarkets(sourceSession)
 	subscribeFeeTokenMarkets(makerSession)
 
-	if s.SplitHedge != nil && s.SplitHedge.Enabled {
-		for sessionName := range s.SplitHedge.HedgeMarkets {
-			if ses, ok := sessions[sessionName]; ok {
-				subscribeFeeTokenMarkets(ses)
-			}
+	for _, sessionName := range s.splitHedgeSessionNames() {
+		if ses, ok := sessions[sessionName]; ok {
+			subscribeFeeTokenMarkets(ses)
 		}
 	}
 }
@@ -1030,13 +1054,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		s.cooldownAt = time.Time{}
 	}
 
-	if !s.hedgeSession.Connectivity.IsConnected() {
-		s.logger.Warnf("source session is disconnected, skipping update quote")
-		return nil
-	}
-
-	if s.hedgeSession.IsInMaintenance() {
-		s.logger.Warnf("source session is in maintenance, skipping update quote")
+	if !s.isHedgeAvailable() {
+		s.logger.Warnf("no hedge session/market is available, skipping update quote")
 		return nil
 	}
 
@@ -1500,12 +1519,14 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 					makerBestBidPriceMetrics.With(s.metricsLabels).Set(bidPrice.Float64())
 				}
 
-				requiredQuote := fixedpoint.Min(
-					bidQuantity.Mul(bidPrice),
-					makerQuota.QuoteAsset.Available,
-				)
+				requiredQuote := s.makerMarket.TruncateQuoteQuantity(bidQuantity.Mul(bidPrice))
 
-				requiredQuote = s.makerMarket.TruncateQuoteQuantity(requiredQuote)
+				if requiredQuote.Compare(makerQuota.QuoteAsset.Available) > 0 {
+					s.logger.Infof("%s maker quote balance %s is not enough for bid layer %d (required %s), skip remaining bid layers",
+						s.Symbol, makerQuota.QuoteAsset.Available.String(), i, requiredQuote.String())
+					break
+				}
+
 				bidQuantity = s.makerMarket.TruncateQuantity(requiredQuote.Div(bidPrice))
 
 				if s.makerMarket.IsDustQuantity(bidQuantity, bidPrice) {
@@ -1566,8 +1587,15 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 					makerBestAskPriceMetrics.With(s.metricsLabels).Set(askPrice.Float64())
 				}
 
-				requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
-				askQuantity = s.makerMarket.TruncateQuantity(requiredBase)
+				requiredBase := s.makerMarket.TruncateQuantity(askQuantity)
+
+				if requiredBase.Compare(makerQuota.BaseAsset.Available) > 0 {
+					s.logger.Infof("%s maker base balance %s is not enough for ask layer %d (required %s), skip remaining ask layers",
+						s.Symbol, makerQuota.BaseAsset.Available.String(), i, requiredBase.String())
+					break
+				}
+
+				askQuantity = requiredBase
 
 				if s.makerMarket.IsDustQuantity(askQuantity, askPrice) {
 					continue
@@ -1600,11 +1628,12 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			}
 		}
-	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-		// TODO: borrowable check for synthetic hedge
-		s.logger.Debugf("no borrowable check for synthetic hedge...")
 	} else {
-		disableMakerBid, disableMakerAsk = s.simpleHedgeBorrowableCheck(disableMakerBid, disableMakerAsk)
+		if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+			disableMakerBid, disableMakerAsk = s.syntheticHedgeBorrowableCheck(disableMakerBid, disableMakerAsk)
+		} else {
+			disableMakerBid, disableMakerAsk = s.simpleHedgeBorrowableCheck(disableMakerBid, disableMakerAsk)
+		}
 
 		// default maker order generation
 		s.logger.Infof("%s source book ticker: ask/bid = %s/%s (%s)", s.Symbol, bestAskPrice.String(), bestBidPrice.String(), calculateSpread(bestAskPrice, bestBidPrice).Percentage())
@@ -1655,12 +1684,14 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 					makerBestBidPriceMetrics.With(s.metricsLabels).Set(bidPrice.Float64())
 				}
 
-				requiredQuote := fixedpoint.Min(
-					bidQuantity.Mul(bidPrice),
-					makerQuota.QuoteAsset.Available,
-				)
+				requiredQuote := s.makerMarket.TruncateQuoteQuantity(bidQuantity.Mul(bidPrice))
 
-				requiredQuote = s.makerMarket.TruncateQuoteQuantity(requiredQuote)
+				if requiredQuote.Compare(makerQuota.QuoteAsset.Available) > 0 {
+					s.logger.Infof("%s maker quote balance %s is not enough for bid layer %d (required %s), skip remaining bid layers",
+						s.Symbol, makerQuota.QuoteAsset.Available.String(), i, requiredQuote.String())
+					break
+				}
+
 				bidQuantity = s.makerMarket.TruncateQuantity(requiredQuote.Div(bidPrice))
 
 				if s.makerMarket.IsDustQuantity(bidQuantity, bidPrice) {
@@ -1741,8 +1772,15 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 					makerBestAskPriceMetrics.With(s.metricsLabels).Set(askPrice.Float64())
 				}
 
-				requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
-				askQuantity = s.makerMarket.TruncateQuantity(requiredBase)
+				requiredBase := s.makerMarket.TruncateQuantity(askQuantity)
+
+				if requiredBase.Compare(makerQuota.BaseAsset.Available) > 0 {
+					s.logger.Infof("%s maker base balance %s is not enough for ask layer %d (required %s), skip remaining ask layers",
+						s.Symbol, makerQuota.BaseAsset.Available.String(), i, requiredBase.String())
+					break
+				}
+
+				askQuantity = requiredBase
 
 				if s.makerMarket.IsDustQuantity(askQuantity, askPrice) {
 					continue
@@ -2252,6 +2290,14 @@ func (s *Strategy) hedge(ctx context.Context) {
 func (s *Strategy) directHedge(
 	ctx context.Context, uncoveredPosition, hedgeDelta fixedpoint.Value,
 ) (*types.Order, error) {
+	if s.hedgeSession.IsInMaintenance() {
+		return nil, fmt.Errorf("hedge session %s is in maintenance, skip direct hedge", s.hedgeSession.Name)
+	}
+
+	if s.hedgeSession.Connectivity != nil && !s.hedgeSession.Connectivity.IsConnected() {
+		return nil, fmt.Errorf("hedge session %s is disconnected, skip direct hedge", s.hedgeSession.Name)
+	}
+
 	quantity := hedgeDelta.Abs()
 	side := deltaToSide(hedgeDelta)
 	price := s.lastPrice.Get()
@@ -2606,6 +2652,10 @@ func (s *Strategy) Validate() error {
 		}
 	}
 
+	if err := registerInstance(s); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -2789,11 +2839,46 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 	}
 }
 
+// splitHedgeSessionNames returns the session names of the split hedge markets,
+// from either the split hedge or the split source of the synthetic hedge.
+func (s *Strategy) splitHedgeSessionNames() []string {
+	var splitHedge *SplitHedge
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		splitHedge = s.SplitHedge
+	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled && s.SyntheticHedge.isSplitSource() {
+		splitHedge = s.SyntheticHedge.SplitSource
+	}
+
+	if splitHedge == nil {
+		return nil
+	}
+
+	names := make([]string, 0, len(splitHedge.HedgeMarkets))
+	for sessionName := range splitHedge.HedgeMarkets {
+		names = append(names, sessionName)
+	}
+
+	return names
+}
+
 func (s *Strategy) isSimpleHedgeMode() bool {
 	return s.SourceSymbol != "" &&
 		(s.SplitHedge == nil || !s.SplitHedge.Enabled) &&
 		(s.SyntheticHedge == nil || !s.SyntheticHedge.Enabled) &&
 		(s.SpreadMaker == nil || !s.SpreadMaker.Enabled)
+}
+
+// isHedgeAvailable reports whether the strategy currently has at least one
+// usable hedge session/market for its active hedge mode.
+func (s *Strategy) isHedgeAvailable() bool {
+	if s.SplitHedge != nil && s.SplitHedge.Enabled {
+		return s.SplitHedge.HasAvailableMarket()
+	}
+	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		return s.SyntheticHedge.IsAvailable()
+	}
+	return !s.hedgeSession.IsInMaintenance() &&
+		(s.hedgeSession.Connectivity == nil || s.hedgeSession.Connectivity.IsConnected())
 }
 
 func (s *Strategy) CrossRun(
@@ -2829,6 +2914,24 @@ func (s *Strategy) CrossRun(
 	}
 
 	s.makerSession = makerSession
+
+	// when the hedge session runs in margin (cross) mode, verify the okex
+	// account is a loan-enabled margin account before quoting. This is an
+	// okex-specific check (see okex.Exchange.EnsureAutoLoanEnabled): a
+	// misconfigured account (e.g. a spot account on a cross-margin session)
+	// would otherwise reject every hedge order after this instance has
+	// already started placing maker orders. On failure only this strategy
+	// instance is disabled — bbgo keeps running the rest of the portfolio.
+	if s.hedgeSession.Margin {
+		if okexExchange, ok := s.hedgeSession.Exchange.(*okex.Exchange); ok {
+			if _, err := okexExchange.EnsureAutoLoanEnabled(ctx); err != nil {
+				s.logger.WithError(err).Errorf(
+					"xmaker: okex hedge account is not a loan-enabled margin account; " +
+						"this instance will not start (other strategies are unaffected)")
+				return nil
+			}
+		}
+	}
 
 	s.hedgeMarket, ok = s.hedgeSession.Market(s.SourceSymbol)
 	if !ok {
@@ -2965,11 +3068,6 @@ func (s *Strategy) CrossRun(
 	s.priceSolver = pricesolver.NewSimplePriceResolver(allMarkets)
 
 	s.hedgeSession.UserDataStream.OnTradeUpdate(s.priceSolver.UpdateFromTrade)
-
-	s.accountValueCalculator = s.hedgeSession.GetAccountValueCalculator()
-	if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
-		return err
-	}
 
 	updateFeeTokenPrice(s.makerSession, s.priceSolver, s.Position)
 	if s.SplitHedge != nil && s.SplitHedge.Enabled {
@@ -3241,7 +3339,7 @@ func (s *Strategy) CrossRun(
 			borrowableMarkets = append(borrowableMarkets, hedgeMarket)
 		}
 	} else if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-		for _, hedgeMarket := range []*HedgeMarket{s.SyntheticHedge.sourceMarket, s.SyntheticHedge.fiatMarket} {
+		for _, hedgeMarket := range append(s.SyntheticHedge.sourceMarkets(), s.SyntheticHedge.fiatMarket) {
 			if !hedgeMarket.session.Margin {
 				continue
 			}
@@ -3259,6 +3357,17 @@ func (s *Strategy) CrossRun(
 			hedgeMarket.session,
 			market,
 		)
+	}
+	// setup done, start establishing connectivity and workers
+	delayDuration := s.ConnectionDelay.Duration()
+	if delayDuration > 0 {
+		s.logger.Infof("delaying for %s before establishing connectivity...", delayDuration)
+		time.Sleep(delayDuration)
+	}
+
+	s.accountValueCalculator = s.hedgeSession.GetAccountValueCalculator()
+	if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
+		return err
 	}
 
 	s.sourceUserDataConnectivity = s.hedgeSession.UserDataConnectivity
@@ -3452,6 +3561,11 @@ func parseSymbolSelector(
 func (s *Strategy) fixProfit(ctx context.Context, sessions ...*bbgo.ExchangeSession) error {
 	if needFix := s.StrategyProfitFixer.NeedsProfitFixing(); !needFix {
 		return nil
+	}
+
+	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		// need profit fixing and synthetic hedge is enabled
+		return fmt.Errorf("profit fixing is not supported in synthetic hedge mode for %s", s.Symbol)
 	}
 
 	s.logger.Infof("running profit fixing with config: %+v", s.ProfitFixerConfig)

@@ -24,10 +24,11 @@ func (s *EWMAStream) Truncate() {
 }
 
 func (s *EWMAStream) Calculate(v float64) float64 {
-	last := s.Slice.Last(0)
-	if last == 0.0 {
+	if len(s.Slice) == 0 {
 		return v
 	}
+
+	last := s.Slice.Last(0)
 
 	m := s.multiplier
 	return (1.0-m)*last + m*v

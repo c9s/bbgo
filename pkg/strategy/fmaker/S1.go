@@ -3,69 +3,22 @@ package fmaker
 import (
 	"fmt"
 	"math"
-	"time"
 
-	"github.com/c9s/bbgo/pkg/datatype/floats"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-//go:generate callbackgen -type S1
+// S1 is a fmaker factor calculated from the last `window` klines of the source.
 type S1 struct {
-	types.IntervalWindow
-	Values  floats.Slice
-	EndTime time.Time
-
-	UpdateCallbacks []func(value float64)
+	*kLineWindowFactor
 }
 
-func (inc *S1) Last(int) float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
+func NewS1(source indicatorv2.KLineSubscription, window int) *S1 {
+	return &S1{
+		kLineWindowFactor: newKLineWindowFactor("S1", source, window, func(kLines []types.KLine) (float64, error) {
+			return calculateS1(kLines, window, KLineAmplitudeMapper, types.KLineVolumeMapper)
+		}),
 	}
-	return inc.Values[len(inc.Values)-1]
-}
-
-func (inc *S1) CalculateAndUpdate(klines []types.KLine) {
-	if len(klines) < inc.Window {
-		return
-	}
-
-	var end = len(klines) - 1
-	var lastKLine = klines[end]
-
-	if inc.EndTime != zeroTime && lastKLine.GetEndTime().Before(inc.EndTime) {
-		return
-	}
-
-	var recentT = klines[end-(inc.Window-1) : end+1]
-
-	correlation, err := calculateS1(recentT, inc.Window, KLineAmplitudeMapper, types.KLineVolumeMapper)
-	if err != nil {
-		log.WithError(err).Error("can not calculate correlation")
-		return
-	}
-	inc.Values.Push(correlation)
-
-	if len(inc.Values) > indicator.MaxNumOfVOL {
-		inc.Values = inc.Values[indicator.MaxNumOfVOLTruncateSize-1:]
-	}
-
-	inc.EndTime = klines[end].GetEndTime().Time()
-
-	inc.EmitUpdate(correlation)
-}
-
-func (inc *S1) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *S1) Bind(updater indicator.KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
 func calculateS1(klines []types.KLine, window int, valA KLineValueMapper, valB KLineValueMapper) (float64, error) {

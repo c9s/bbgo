@@ -42,6 +42,7 @@ func Stoch(source KLineSubscription, window, dPeriod int) *StochStream {
 		highPrices: highPrices,
 		lowPrices:  lowPrices,
 	}
+	s.SeriesBase.Series = &s.K
 
 	source.AddSubscriber(func(kLine types.KLine) {
 		lowest := s.lowPrices.Slice.Tail(s.window).Min()
@@ -58,6 +59,8 @@ func Stoch(source KLineSubscription, window, dPeriod int) *StochStream {
 
 		d = s.K.Tail(s.dPeriod).Mean()
 		s.D.Push(d)
+		s.K = generalTruncate(s.K)
+		s.D = generalTruncate(s.D)
 		s.EmitUpdate(k, d)
 	})
 	return s

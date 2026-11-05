@@ -50,4 +50,5 @@ func (s *TRStream) calculateAndPush(high, low, cls float64) {
 	s.previousClose = cls
 
 	s.PushAndEmit(trueRange)
+	s.Truncate()
 }

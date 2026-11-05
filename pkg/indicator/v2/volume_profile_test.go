@@ -1,26 +1,20 @@
 package indicatorv2
 
 import (
-	"encoding/csv"
-	"os"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/datasource/csvsource"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/marketdata/sources/binancecsv"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 func TestVolumeProfile(t *testing.T) {
-	file, _ := os.Open(path.Join("testdata", "BTCUSDT-1m-2022-05-06.csv"))
-	defer func() {
-		assert.NoError(t, file.Close())
-	}()
-
-	reader := csv.NewReader(file)
-
-	candles, err := csvsource.NewCSVKLineReader(reader, "BTCUSDT", types.Interval1m).ReadAll()
+	candles, err := binancecsv.ReadKLineFile(
+		path.Join("testdata", "BTCUSDT-1m-2022-05-06.csv"), "BTCUSDT", types.Interval1m)
 	assert.NoError(t, err)
 	assert.NotEmptyf(t, candles, "candles should not be empty")
 
@@ -44,4 +38,27 @@ func TestVolumeProfile(t *testing.T) {
 	assert.InDelta(t, 36612.559259256115, ind.VP.POC, 0.01, "VP.POC")
 	assert.InDelta(t, 36618.43333333, ind.VP.VAH, 0.01, "VP.VAH")
 	assert.InDelta(t, 36617.433, ind.VP.High, 0.01, "VP.HIGH")
+}
+
+func TestVolumeProfile_EmptyBinsDoNotHang(t *testing.T) {
+	// the point of control is the last non-empty bin and the bins below it have no volume,
+	// so the value area can not grow on either side
+	kLines := []types.KLine{
+		{High: fixedpoint.NewFromFloat(100), Low: fixedpoint.NewFromFloat(100), Close: fixedpoint.NewFromFloat(100), Volume: fixedpoint.NewFromFloat(40)},
+		{High: fixedpoint.NewFromFloat(100.2), Low: fixedpoint.NewFromFloat(100.2), Close: fixedpoint.NewFromFloat(100.2), Volume: fixedpoint.NewFromFloat(60)},
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		stream := &KLineStream{}
+		NewVolumeProfile(stream, 2)
+		stream.BackFill(kLines)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("volume profile calculation does not terminate")
+	}
 }

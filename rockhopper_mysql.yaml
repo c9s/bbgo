@@ -16,3 +16,4 @@ dsn: "root:root@tcp(localhost:3306)/bbgo?parseTime=true"
 migrationsDirs:
 - migrations/mysql
 - pkg/strategy/xfundingv2/migrations/mysql
+- pkg/strategy/bfxfunding/migrations/mysql

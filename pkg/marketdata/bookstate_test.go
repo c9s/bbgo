@@ -63,14 +63,22 @@ func TestBookState_UpdateBeforeSnapshot(t *testing.T) {
 	assert.False(t, s.Ready())
 }
 
+// TestBookState_SequenceModes covers the corrected contiguity model.
+//
+// A venue sequence is not a counter. Binance's "u" is the id of the last
+// individual update inside a batched diff event, so consecutive events differ by
+// however many updates they carried — a real capture jumps from 100529710516 to
+// 100529710641 with nothing missing. Contiguity therefore has to be checked
+// against the previous id the venue names (Binance's "pu"), which the event
+// carries as PrevSeq.
 func TestBookState_SequenceModes(t *testing.T) {
-	// seq jumps from 100 to 105: a hole of four updates.
+	// seq jumps from 100 to 105, which on its own says nothing
 	spec := `
 		t=1000 bookSnapshot seq=100 bids=100,10 asks=101,10
 		t=2000 bookUpdate   seq=105 bids=100,20
 	`
 
-	t.Run("none tolerates the gap", func(t *testing.T) {
+	t.Run("none accepts anything forward", func(t *testing.T) {
 		s := marketdata.NewBookState("BTCUSDT", types.ExchangeBinance)
 		s.Mode = marketdata.SequenceNone
 
@@ -80,43 +88,69 @@ func TestBookState_SequenceModes(t *testing.T) {
 		}
 	})
 
-	t.Run("monotonic reports but tolerates", func(t *testing.T) {
+	t.Run("monotonic accepts a forward jump", func(t *testing.T) {
 		s := marketdata.NewBookState("BTCUSDT", types.ExchangeBinance)
 		s.Mode = marketdata.SequenceMonotonic
 
-		var gotExpected, gotActual uint64
-		s.OnGap = func(expected, got uint64) { gotExpected, gotActual = expected, got }
-
 		events := mdtest.Events(t, spec)
 		for i := range events {
-			require.NoError(t, s.Apply(&events[i]))
+			require.NoError(t, s.Apply(&events[i]),
+				"a jump in a venue sequence is not evidence of a lost update")
 		}
-
-		assert.Equal(t, uint64(101), gotExpected)
-		assert.Equal(t, uint64(105), gotActual)
 	})
 
-	t.Run("contiguous errors on the gap", func(t *testing.T) {
+	t.Run("contiguous accepts a chained update", func(t *testing.T) {
 		s := marketdata.NewBookState("BTCUSDT", types.ExchangeBinance)
 		s.Mode = marketdata.SequenceContiguous
 
 		events := mdtest.Events(t, spec)
-		require.NoError(t, s.Apply(&events[0]))
-		assert.ErrorIs(t, s.Apply(&events[1]), marketdata.ErrBookGap)
+		events[1].PrevSeq = 100 // the update says it follows the snapshot
+
+		for i := range events {
+			require.NoError(t, s.Apply(&events[i]))
+		}
+		assert.Zero(t, s.Unverified())
 	})
 
-	t.Run("contiguous accepts consecutive sequences", func(t *testing.T) {
+	t.Run("contiguous rejects a broken chain", func(t *testing.T) {
+		s := marketdata.NewBookState("BTCUSDT", types.ExchangeBinance)
+		s.Mode = marketdata.SequenceContiguous
+
+		var haveSeq, claimedSeq uint64
+		s.OnGap = func(have, claimed uint64) { haveSeq, claimedSeq = have, claimed }
+
+		events := mdtest.Events(t, spec)
+		events[1].PrevSeq = 104 // claims to follow an update we never saw
+
+		require.NoError(t, s.Apply(&events[0]))
+		err := s.Apply(&events[1])
+
+		require.ErrorIs(t, err, marketdata.ErrBookGap)
+		assert.Contains(t, err.Error(), "claims to follow 104")
+		assert.Equal(t, uint64(100), haveSeq)
+		assert.Equal(t, uint64(104), claimedSeq)
+	})
+
+	// This is the case a live Binance recording actually produces today: the
+	// venue's "pu" is not exposed through types.Stream, so the recorder cannot
+	// capture it. Rather than inventing a rule and reporting false gaps, the
+	// state counts what it could not verify.
+	t.Run("contiguous counts what it cannot verify", func(t *testing.T) {
 		s := marketdata.NewBookState("BTCUSDT", types.ExchangeBinance)
 		s.Mode = marketdata.SequenceContiguous
 
 		events := mdtest.Events(t, `
-			t=1000 bookSnapshot seq=100 bids=100,10 asks=101,10
-			t=2000 bookUpdate   seq=101 bids=100,20
-			t=3000 bookUpdate   seq=102 bids=100,30
+			t=1000 bookSnapshot seq=100529710516 bids=100,10 asks=101,10
+			t=2000 bookUpdate   seq=100529710641 bids=100,20
+			t=3000 bookUpdate   seq=100529710890 bids=100,30
 		`)
 		for i := range events {
-			require.NoError(t, s.Apply(&events[i]))
+			require.NoError(t, s.Apply(&events[i]),
+				"real venue sequences jump; that is not a gap")
 		}
+
+		assert.Equal(t, int64(2), s.Unverified(),
+			"the two unprovable updates must be counted, not silently accepted")
 	})
 }
 
@@ -130,7 +164,9 @@ func TestBookState_SequenceGoesBackwards(t *testing.T) {
 	`)
 
 	require.NoError(t, s.Apply(&events[0]))
-	assert.ErrorIs(t, s.Apply(&events[1]), marketdata.ErrBookGap)
+	err := s.Apply(&events[1])
+	require.ErrorIs(t, err, marketdata.ErrBookGap)
+	assert.Contains(t, err.Error(), "went backwards")
 }
 
 func TestBookState_IgnoresNonBookEvents(t *testing.T) {

@@ -22,7 +22,8 @@ func TestFloor(t *testing.T) {
 
 func TestInternal(t *testing.T) {
 	r := &reader{"1.1e-15", 0}
-	c, e := r.getCoef()
+	c, e, err := r.getCoef()
+	assert.NoError(t, err)
 	assert.Equal(t, uint64(1100000000000000), c)
 	assert.Equal(t, 1, e)
 	f := MustNewFromString("1.1e-15")

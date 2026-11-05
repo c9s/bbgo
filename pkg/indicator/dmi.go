@@ -72,12 +72,28 @@ func (inc *DMI) Update(high, low, cloze float64) {
 	if inc.atr.Length() < inc.Window {
 		return
 	}
-	k := 100. / inc.atr.Last(0)
+
 	dmp := inc.DMP.Last(0)
 	dmn := inc.DMN.Last(0)
-	inc.DIPlus.Update(k * dmp)
-	inc.DIMinus.Update(k * dmn)
-	dx := 100. * math.Abs(dmp-dmn) / (dmp + dmn)
+	atr := inc.atr.Last(0)
+
+	// on intervals without volatility (e.g. flat candles without trades) ATR and
+	// both directional movements are zero; gate the divisions so the smoothed
+	// state never turns NaN or Inf, which would poison the RMA permanently
+	diPlus := 0.
+	diMinus := 0.
+	if atr != 0 {
+		k := 100. / atr
+		diPlus = k * dmp
+		diMinus = k * dmn
+	}
+	inc.DIPlus.Update(diPlus)
+	inc.DIMinus.Update(diMinus)
+
+	dx := 0.
+	if dmSum := dmp + dmn; dmSum != 0 {
+		dx = 100. * math.Abs(dmp-dmn) / dmSum
+	}
 	inc.ADX.Update(dx)
 
 }

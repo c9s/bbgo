@@ -1,0 +1,13 @@
+{
+  "status": 200, "title": "OK", "description": "Successful request",
+  "payload": {
+    "metadata": { "next": null, "api-version": "2023-09-30" },
+    "data": [
+      {
+        "instrument": "BTCUSDT", "exchange": "binance",
+        "exchangeTimestamp": 1714928400000, "exchangeTimestampNanoseconds": 0,
+        "period": 1, "longAccount": 0.519, "shortAccount": 0.481, "ratio": 1.079
+      }
+    ]
+  }
+}

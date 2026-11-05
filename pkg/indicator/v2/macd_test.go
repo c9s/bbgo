@@ -43,7 +43,7 @@ func Test_MACD2(t *testing.T) {
 		{
 			name:   "random_case",
 			kLines: buildKLines(input),
-			want:   0.7740187187598249,
+			want:   0.7967670223776384,
 		},
 	}
 

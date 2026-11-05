@@ -69,4 +69,6 @@ func ADX(source KLineSubscription, window int) *ADXStream {
 
 func (s *ADXStream) Truncate() {
 	s.Slice = s.Slice.Truncate(MaxNumOfRMA)
+	s.Plus.Slice = s.Plus.Slice.Truncate(MaxNumOfRMA)
+	s.Minus.Slice = s.Minus.Slice.Truncate(MaxNumOfRMA)
 }
