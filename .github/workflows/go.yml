@@ -36,6 +36,24 @@ jobs:
       MYSQL_USER: "root"
       MYSQL_PASSWORD: "root" # pragma: allowlist secret
 
+    # MySQL runs as a service container instead of the runner image's own MySQL:
+    # ubuntu-latest moved to ubuntu-26.04, which ships without MySQL, so
+    # /etc/init.d/mysql no longer exists. The container keeps the job
+    # independent of what each runner image installs.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: "root" # pragma: allowlist secret
+          MYSQL_DATABASE: bbgo
+        ports:
+        - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
     steps:
 
     - uses: actions/checkout@v7
@@ -49,11 +67,6 @@ jobs:
         # replaces keyed on go.sum alone, so a Go version bump silently reused
         # the previous version's build cache.
         cache: true
-
-    - name: Set up MySQL
-      run: |
-        sudo /etc/init.d/mysql start
-        mysql -e 'CREATE DATABASE ${{ env.MYSQL_DATABASE }};' -u${{ env.MYSQL_USER }} -p${{ env.MYSQL_PASSWORD }}
 
     - name: Set up redis
       uses: shogo82148/actions-setup-redis@v1
