@@ -106,7 +106,7 @@ func newTestInterestWorker(
 		SyncInterval: types.Duration(time.Hour),
 	})
 	w.now = func() time.Time { return testNow }
-	w.price = testPrices(map[string]string{"BTC": "60000", "ETH": "3000"})
+	w.pricer = testPrices(map[string]string{"BTC": "60000", "ETH": "3000"})
 	if rates != nil {
 		w.interestQueryService = rates
 	}
@@ -386,7 +386,7 @@ func TestInterestEstimate_StaleSeriesAreDeleted(t *testing.T) {
 		"ETH":  debtBalance("ETH", fixedpoint.Zero, Number(2)),
 		"USDT": debtBalance("USDT", fixedpoint.Zero, Number(1000)),
 	})
-	w.price = testPrices(map[string]string{"BTC": "60000"})
+	w.pricer = testPrices(map[string]string{"BTC": "60000"})
 	delete(rates.rates, "USDT")
 
 	est := w.tick(context.Background())
