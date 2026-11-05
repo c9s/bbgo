@@ -178,11 +178,12 @@ type interestEstimateWorker struct {
 	// estimate and of the interest sync
 	assets []string
 
-	rates   marginFutureInterestQueryService
-	history marginHistoryStore
-	price   margininterest.PriceFunc
-	logger  logrus.FieldLogger
-	now     func() time.Time
+	// interestQueryService queries the next hourly interest rates; nil when the exchange has none
+	interestQueryService marginFutureInterestQueryService
+	history              marginHistoryStore
+	price                margininterest.PriceFunc
+	logger               logrus.FieldLogger
+	now                  func() time.Time
 
 	// syncSince is where the interest sync starts when the session has no rows of
 	// an asset yet. It is the start of the full margin history sync, not the month
@@ -218,8 +219,8 @@ func newInterestEstimateWorker(s *Strategy, session *bbgo.ExchangeSession, confi
 		labels:     make(map[*prometheus.GaugeVec]map[string][]string),
 	}
 
-	if rates, ok := session.Exchange.(marginFutureInterestQueryService); ok {
-		w.rates = rates
+	if service, ok := session.Exchange.(marginFutureInterestQueryService); ok {
+		w.interestQueryService = service
 	}
 
 	// do not put a typed nil *MarginService into the interface
@@ -251,7 +252,7 @@ func (w *interestEstimateWorker) Run(ctx context.Context) {
 		return
 	}
 
-	if w.rates == nil {
+	if w.interestQueryService == nil {
 		w.logger.Warnf("interest estimate: exchange %s has no hourly interest rate API, projection is disabled", w.session.ExchangeName)
 	}
 
@@ -306,7 +307,7 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 		RealizedOK:      realizedOK,
 		MonthTotalUSDT:  realized.TotalUSDT.Add(projection.TotalUSDT),
 		Rolling:         rolling,
-		RollingComplete: w.rates != nil && allComplete(rolling),
+		RollingComplete: w.interestQueryService != nil && allComplete(rolling),
 	}
 
 	for asset := range w.syncFailed {
@@ -320,7 +321,7 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 	}
 
 	missingHistory := !realizedOK || len(w.syncFailed) > 0
-	est.Complete = w.rates != nil && projection.Complete() && !missingHistory && len(realized.MissingPrice) == 0
+	est.Complete = w.interestQueryService != nil && projection.Complete() && !missingHistory && len(realized.MissingPrice) == 0
 
 	// every autoborrow asset is listed, borrowed or not
 	est.Assets = margininterest.MonthByAsset(projection, realized)
@@ -369,7 +370,7 @@ func (w *interestEstimateWorker) unconfigured(debts types.BalanceMap, rowAssets 
 // queryRates queries the next hourly rate of every autoborrow asset, borrowed or not
 func (w *interestEstimateWorker) queryRates(ctx context.Context) types.MarginNextHourlyInterestRateMap {
 	rates := types.MarginNextHourlyInterestRateMap{}
-	if w.rates == nil {
+	if w.interestQueryService == nil {
 		return rates
 	}
 
@@ -379,7 +380,7 @@ func (w *interestEstimateWorker) queryRates(ctx context.Context) types.MarginNex
 		end := min(start+maxRateAssetsPerQuery, len(assets))
 		chunk := assets[start:end]
 
-		result, err := w.rates.QueryMarginFutureHourlyInterestRate(ctx, chunk)
+		result, err := w.interestQueryService.QueryMarginFutureHourlyInterestRate(ctx, chunk)
 		if err != nil {
 			w.logger.WithError(err).Warnf("interest estimate: unable to query hourly interest rates of %v", chunk)
 			w.countError("rate")
@@ -517,7 +518,7 @@ func (w *interestEstimateWorker) log(est *interestEstimate, rates types.MarginNe
 
 	for _, p := range est.Rolling {
 		w.logger.Infof("interest projection: session=%s hours=%d rolling_months=%d projected_usdt=%s complete=%t",
-			w.session.Name, p.Hours, p.Hours/margininterest.RollingMonthHours, p.TotalUSDT.String(), w.rates != nil && p.Complete())
+			w.session.Name, p.Hours, p.Hours/margininterest.RollingMonthHours, p.TotalUSDT.String(), w.interestQueryService != nil && p.Complete())
 	}
 
 	for _, asset := range estimateAssets(est) {
@@ -616,7 +617,7 @@ func (w *interestEstimateWorker) publishRolling(est *interestEstimate) {
 	for _, p := range est.Rolling {
 		hours := strconv.Itoa(p.Hours)
 		rollingComplete := 0.0
-		if w.rates != nil && p.Complete() {
+		if w.interestQueryService != nil && p.Complete() {
 			rollingComplete = 1.0
 		}
 
