@@ -181,7 +181,7 @@ type interestEstimateWorker struct {
 	// interestQueryService queries the next hourly interest rates; nil when the exchange has none
 	interestQueryService marginFutureInterestQueryService
 	history              marginHistoryStore
-	price                margininterest.PriceFunc
+	pricer               margininterest.PriceFunc
 	logger               logrus.FieldLogger
 	now                  func() time.Time
 
@@ -234,7 +234,7 @@ func newInterestEstimateWorker(s *Strategy, session *bbgo.ExchangeSession, confi
 		w.history = nil
 	}
 
-	w.price = func(asset string) (fixedpoint.Value, bool) {
+	w.pricer = func(asset string) (fixedpoint.Value, bool) {
 		return session.GetPriceSolver().ResolvePrice(asset, currency.USDT)
 	}
 
@@ -287,7 +287,7 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 
 	debts := w.loadDebts(ctx)
 	rates := w.queryRates(ctx)
-	projection := margininterest.ProjectAssets(w.assets, debts, rates, w.price, hours)
+	projection := margininterest.ProjectAssets(w.assets, debts, rates, w.pricer, hours)
 	for range projection.MissingPrice {
 		w.countError("price")
 	}
@@ -296,7 +296,7 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 
 	var rolling []margininterest.Projection
 	for _, h := range w.config.projectionHours() {
-		rolling = append(rolling, margininterest.ProjectAssets(w.assets, debts, rates, w.price, h))
+		rolling = append(rolling, margininterest.ProjectAssets(w.assets, debts, rates, w.pricer, h))
 	}
 
 	est := &interestEstimate{
@@ -447,7 +447,7 @@ func (w *interestEstimateWorker) queryRealized(
 	}
 	sort.Strings(unconfigured)
 
-	return margininterest.SumRealized(counted, mode, w.price), true, unconfigured
+	return margininterest.SumRealized(counted, mode, w.pricer), true, unconfigured
 }
 
 // syncHistory syncs the interest rows of every autoborrow asset, borrowed or
