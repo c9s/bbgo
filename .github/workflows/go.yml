@@ -42,7 +42,7 @@ jobs:
     # independent of what each runner image installs.
     services:
       mysql:
-        image: mysql:8.0
+        image: mysql:8.4
         env:
           MYSQL_ROOT_PASSWORD: "root" # pragma: allowlist secret
           MYSQL_DATABASE: bbgo
