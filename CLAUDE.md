@@ -146,6 +146,30 @@ Exchange-specific notes, to read before extending that adapter:
 Generated files (`*_requestgen.go`, `*_callbacks.go`) are committed — re-run
 `go generate ./pkg/exchange/<name>/...` and commit the result when you change their inputs.
 
+## Market Data Layer
+
+`pkg/marketdata` is the multi-source historical market data layer: an event model
+with a total ordering, a pull-based `Source`/`Cursor` contract, and a k-way heap
+merge that interleaves several origins by event time. Read
+`doc/development/marketdata-layer.md` before touching it or adding a provider.
+
+Providers live in `pkg/marketdata/sources/` (binancecsv, replay, amberdata,
+grpcsource) and are built from config by `pkg/marketdata/registry`. The core
+package must not import them.
+
+Three facts that are easy to get wrong:
+
+- **data.binance.vision has no L2.** No depth diffs, no price-level snapshots;
+  `bookTicker` is L1 and stopped in March 2024, `bookDepth` is percentage-band
+  notional. L2 comes from AmberData, a recording, or gRPC.
+- **Binance spot archives switched from millisecond to microsecond timestamps**
+  mid-dataset. `archive.ParseEpochNano` detects the unit per value; do not assume.
+- **Venue order book sequences are not counters.** Contiguity is checked against
+  `Event.PrevSeq`, the predecessor the venue names, not `Seq + 1`.
+
+Exercise it with `bbgo marketdata download | dump | record` — no database and no
+API key needed.
+
 ## Strategy Development
 
 1. Create package under `pkg/strategy/<name>/`

@@ -1,0 +1,14 @@
+{
+  "status": 200, "title": "OK", "description": "Successful request",
+  "payload": {
+    "metadata": { "next": null, "api-version": "2023-09-30" },
+    "data": [
+      {
+        "instrument": "BTCUSDT", "exchange": "binance",
+        "exchangeTimestamp": 1717518473606, "exchangeTimestampNanoseconds": 0,
+        "bid": 70836.3, "ask": 70836.4, "mid": 70836.35, "last": null,
+        "bidVolume": 2.016, "askVolume": 6.463
+      }
+    ]
+  }
+}

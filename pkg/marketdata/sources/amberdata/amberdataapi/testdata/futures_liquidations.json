@@ -1,0 +1,16 @@
+{
+  "status": 200, "title": "OK", "description": "Successful request",
+  "payload": {
+    "metadata": { "next": null, "api-version": "2023-09-30" },
+    "data": [
+      {
+        "instrument": "BTCUSDT", "exchange": "binance",
+        "exchangeTimestamp": 1717517743430, "exchangeTimestampNanoseconds": 0,
+        "action": null, "orderId": null,
+        "side": "BUY", "status": "FILLED", "timeInForce": "IOC", "type": "LIMIT",
+        "price": 70913.39, "volume": 0.002,
+        "unit": "base_asset", "positionType": "SHORT"
+      }
+    ]
+  }
+}

@@ -26,40 +26,27 @@ func Test_RSI2(t *testing.T) {
 			name:   "RSI",
 			values: values,
 			window: 14,
+			// Wilder's RSI, the first value is calculated from the first 14 price changes
 			want: floats.Slice{
-				100.000000,
-				99.439336,
-				99.440090,
-				98.251826,
-				98.279242,
-				98.297781,
-				98.307626,
-				98.319149,
-				98.334036,
-				98.342426,
-				97.951933,
-				97.957908,
-				97.108036,
-				97.147514,
 				70.464135,
-				70.020964,
-				69.831224,
-				80.567686,
-				73.333333,
-				59.806295,
-				62.528217,
-				60.000000,
-				48.477752,
-				53.878407,
-				48.952381,
-				43.862816,
-				37.732919,
-				32.263514,
-				32.718121,
-				38.142620,
-				31.748252,
-				25.099602,
-				30.217670,
+				66.249619,
+				66.480942,
+				69.346853,
+				66.294713,
+				57.915021,
+				62.880718,
+				63.208789,
+				56.011585,
+				62.339929,
+				54.670971,
+				50.386815,
+				40.019424,
+				41.492635,
+				41.902430,
+				45.499497,
+				37.322778,
+				33.090483,
+				37.788772,
 			},
 		},
 	}
@@ -82,6 +69,32 @@ func Test_RSI2(t *testing.T) {
 					assert.InDelta(t, v, rsi.Slice[i], 0.000001, "Expected rsi.slice[%d] to be %v, but got %v", i, v, rsi.Slice[i])
 				}
 			}
+		})
+	}
+}
+
+func Test_RSI2_OneSided(t *testing.T) {
+	tests := []struct {
+		name   string
+		values []float64
+		want   float64
+	}{
+		{name: "gains only", values: []float64{1, 2, 3, 4, 5}, want: 100},
+		{name: "losses only", values: []float64{5, 4, 3, 2, 1}, want: 0},
+		{name: "flat", values: []float64{3, 3, 3, 3, 3}, want: 100},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prices := ClosePrices(nil)
+			rsi := RSI2(prices, 3)
+			for _, v := range tt.values {
+				prices.PushAndEmit(v)
+			}
+
+			// 4 changes from 5 prices, the first value needs 3 changes
+			assert.Equal(t, 2, rsi.Length())
+			assert.Equal(t, tt.want, rsi.Last(0))
 		})
 	}
 }

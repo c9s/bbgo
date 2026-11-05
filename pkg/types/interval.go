@@ -99,7 +99,7 @@ func (i Interval) Truncate(ts time.Time) (start time.Time) {
 	case Interval2w:
 		return shiftDay(ts, 14)
 	case Interval1mo:
-		return time.Date(ts.Year(), ts.Month(), 0, 0, 0, 0, 0, time.UTC)
+		return time.Date(ts.Year(), ts.Month(), 1, 0, 0, 0, 0, time.UTC)
 	}
 	return start
 }

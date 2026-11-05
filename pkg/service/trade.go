@@ -530,3 +530,65 @@ func SelectLastTrades(ex types.ExchangeName, symbol string, isMargin, isFutures,
 		OrderBy("traded_at DESC").
 		Limit(limit)
 }
+
+// QueryOrderTradesFromDB retrieves trades for a given order query from the database.
+func (s *TradeService) QueryOrderTradesFromDB(q types.OrderQuery) ([]types.Trade, error) {
+	if s.DB == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	orderID, err := strconv.ParseUint(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid order id %q: %w", q.OrderID, err)
+	}
+
+	var trades []types.Trade
+	rows, err := s.DB.NamedQuery("SELECT * FROM trades WHERE order_id = :order_id", map[string]any{
+		"order_id": orderID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var trade types.Trade
+		if err := rows.StructScan(&trade); err != nil {
+			return nil, err
+		}
+		trades = append(trades, trade)
+	}
+
+	return trades, rows.Err()
+}
+
+// QueryOrderFromDB retrieves the order for a given order query from the database.
+func (s *TradeService) QueryOrderFromDB(q types.OrderQuery) (*types.Order, error) {
+	if s.DB == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	orderID, err := strconv.ParseUint(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid order id %q: %w", q.OrderID, err)
+	}
+
+	rows, err := s.DB.NamedQuery("SELECT * FROM orders WHERE order_id = :order_id", map[string]any{
+		"order_id": orderID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, fmt.Errorf("order not found for order_id %d", orderID)
+	}
+
+	var order types.Order
+	if err := rows.StructScan(&order); err != nil {
+		return nil, err
+	}
+	return &order, nil
+
+}

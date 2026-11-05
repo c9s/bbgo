@@ -3,77 +3,39 @@ package factorzoo
 import (
 	"time"
 
-	"github.com/c9s/bbgo/pkg/datatype/floats"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 // simply internal return rate over certain timeframe(interval)
 
-//go:generate callbackgen -type RR
 type RR struct {
-	types.IntervalWindow
-	types.SeriesBase
+	*types.Float64Series
 
+	window  int
 	prices  *types.Queue
-	Values  floats.Slice
 	EndTime time.Time
-
-	updateCallbacks []func(value float64)
 }
 
 var _ types.SeriesExtend = &RR{}
 
-func (inc *RR) Update(price float64) {
-	if inc.SeriesBase.Series == nil {
-		inc.SeriesBase.Series = inc
-		inc.prices = types.NewQueue(inc.Window)
+// NewRR creates the return rate factor stream from the given kline source.
+// A value is emitted for every kline, including the first one.
+func NewRR(source indicatorv2.KLineSubscription, window int) *RR {
+	inc := &RR{
+		Float64Series: types.NewFloat64Series(),
+		window:        window,
+		prices:        types.NewQueue(window),
 	}
+	source.AddSubscriber(inc.PushK)
+	return inc
+}
+
+func (inc *RR) Update(price float64) {
 	inc.prices.Update(price)
 	irr := inc.prices.Last(0)/inc.prices.Index(1) - 1
-	inc.Values.Push(irr)
-
-}
-
-func (inc *RR) Last(i int) float64 {
-	return inc.Values.Last(i)
-}
-
-func (inc *RR) Index(i int) float64 {
-	return inc.Last(i)
-}
-
-func (inc *RR) Length() int {
-	return len(inc.Values)
-}
-
-func (inc *RR) CalculateAndUpdate(allKLines []types.KLine) {
-	if len(inc.Values) == 0 {
-		for _, k := range allKLines {
-			inc.PushK(k)
-		}
-		inc.EmitUpdate(inc.Last(0))
-	} else {
-		k := allKLines[len(allKLines)-1]
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last(0))
-	}
-}
-
-func (inc *RR) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *RR) Bind(updater indicator.KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
-}
-
-func (inc *RR) BindK(target indicator.KLineClosedEmitter, symbol string, interval types.Interval) {
-	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
+	inc.PushAndEmit(irr)
+	inc.Slice = types.ShrinkSlice(inc.Slice, indicatorv2.MaxSliceSize, indicatorv2.TruncateSize)
 }
 
 func (inc *RR) PushK(k types.KLine) {
@@ -83,14 +45,6 @@ func (inc *RR) PushK(k types.KLine) {
 
 	inc.Update(types.KLineClosePriceMapper(k))
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last(0))
-}
-
-func (inc *RR) LoadK(allKLines []types.KLine) {
-	for _, k := range allKLines {
-		inc.PushK(k)
-	}
-	inc.EmitUpdate(inc.Last(0))
 }
 
 // func calculateReturn(klines []types.KLine, window int, val KLineValueMapper) (float64, error) {

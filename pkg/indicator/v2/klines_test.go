@@ -104,3 +104,50 @@ func getGaugeValue(t *testing.T, metric prometheus.Gauge) float64 {
 
 	return pb.GetGauge().GetValue()
 }
+
+func TestWithHistory(t *testing.T) {
+	kLines := randomWalkKLines(500, 7)
+
+	type outputs struct {
+		boll, superTrend, cci, macdSignal, stochD, atrp []float64
+	}
+
+	build := func(source *KLineStream) *outputs {
+		boll := BOLL(ClosePrices(source), 20, 2.0)
+		superTrend := SuperTrend(source, 10, 3.0)
+		cci := CCI(HLC3(source), 20)
+		macd := MACD2(ClosePrices(source), 12, 26, 9)
+		stoch := Stoch(source, 14, 3)
+		atrp := ATRP2(source, 14)
+
+		o := &outputs{}
+		source.OnUpdate(func(_ types.KLine) {
+			// subscribed last, so all the indicators of this kline are updated
+			o.boll = append(o.boll, boll.UpBand.Last(0))
+			o.superTrend = append(o.superTrend, superTrend.Last(0))
+			o.cci = append(o.cci, cci.Last(0))
+			o.macdSignal = append(o.macdSignal, macd.Signal.Last(0))
+			o.stochD = append(o.stochD, stoch.D.Last(0))
+			o.atrp = append(o.atrp, atrp.Last(0))
+		})
+		return o
+	}
+
+	// the reference: indicators built before any kline is pushed
+	live := &KLineStream{}
+	expected := build(live)
+	live.BackFill(kLines)
+
+	// indicators built on a stream that already has 400 klines, then 100 more klines are pushed
+	source := &KLineStream{}
+	source.BackFill(kLines[:400])
+	actual := WithHistory(source, build)
+	source.BackFill(kLines[400:])
+
+	assert.Equal(t, expected.boll, actual.boll, "BOLL")
+	assert.Equal(t, expected.superTrend, actual.superTrend, "SuperTrend")
+	assert.Equal(t, expected.cci, actual.cci, "CCI")
+	assert.Equal(t, expected.macdSignal, actual.macdSignal, "MACD signal")
+	assert.Equal(t, expected.stochD, actual.stochD, "Stoch D")
+	assert.Equal(t, expected.atrp, actual.atrp, "ATRP")
+}

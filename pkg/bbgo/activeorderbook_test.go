@@ -124,7 +124,7 @@ func TestActiveOrderBook_RestoreParametersOnUpdateHandler(t *testing.T) {
 		UpdateTime:       types.Time(t2),
 	}
 	ob.add(orderUpdate1)
-	ob.orderUpdateHandler(orderUpdate2)
+	ob.OrderUpdateHandler(orderUpdate2)
 	assert.Equal(t, "tag1", updatedOrder.Tag)
 	assert.Equal(t, uint32(1), updatedOrder.GroupID)
 
@@ -158,8 +158,8 @@ func Test_isNewerUpdateTime(t *testing.T) {
 // When order a is Finished, it is considered newer than b when b is Triggering, Triggered, or New.
 func Test_isNewerOrderUpdate_OrderStatusFinished(t *testing.T) {
 	baseOrderA := types.Order{
-		OrderID:   1,
-		Status:    types.OrderStatusFinished,
+		OrderID:    1,
+		Status:     types.OrderStatusFinished,
 		UpdateTime: types.NewTimeFromUnix(100, 0),
 	}
 

@@ -1,193 +1,105 @@
+name: Create Release
+
 on:
   push:
     # Sequence of patterns matched against refs/tags
     tags:
       - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
 
-name: Create Release
+# Never cancel a release mid-flight: a cancelled run can leave a release created
+# with only some of its assets attached.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
 
 jobs:
   release:
     name: Create Release
+    # macOS, not ubuntu: `make dist` builds the darwin binaries, and those need
+    # CGO for github.com/mattn/go-sqlite3, which does not cross-compile from
+    # Linux without a macOS toolchain.
     runs-on: macos-latest
-    # runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      # On a tag push ref_name is the tag itself, so there is no need to parse
+      # GITHUB_REF at all. The step that used to do that published its result
+      # with the ::set-output workflow command, which GitHub has deprecated —
+      # and every asset path in this file was built from that output, so an
+      # empty value would have taken the whole release down with it.
+      #
+      # This workflow failed on each of its last five runs, including the
+      # v1.64.0 and v1.64.2 attempts, and the newest published release is
+      # v1.63.0 even though doc/release/v1.64.2.md is in the tree. Those logs
+      # have since expired, so which of the deprecated pieces broke first is no
+      # longer knowable; the deprecated command and the two archived actions
+      # below are both gone now.
+      VERSION: ${{ github.ref_name }}
+
     steps:
-      - name: Get the version
-        id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
       - name: Checkout code
         uses: actions/checkout@v7
+
+      # Checked before the build rather than after: the release body comes from
+      # this file, and discovering it is missing at the upload step means
+      # throwing away a build that takes the better part of an hour.
+      - name: Check release notes exist
+        run: |
+          notes="doc/release/${VERSION}.md"
+          if [ ! -f "$notes" ]; then
+            echo "::error::missing release notes at $notes — add it before tagging ${VERSION}"
+            exit 1
+          fi
+          echo "using release notes from $notes"
+
       - name: Install Go
         uses: actions/setup-go@v7
         with:
           go-version: "1.27"
+          cache: true
+
       - name: Install Node
         uses: actions/setup-node@v7
         with:
-          node-version: "16"
+          node-version: "20"
+
       - name: Build
+        # `go mod download` rather than `go get github.com/mattn/go-sqlite3`:
+        # the dependency is already required by go.mod, and `go get` would
+        # rewrite it during a release build.
         run: |
-          CGO_ENABLED=1 go get github.com/mattn/go-sqlite3
+          go mod download
           npm install --global yarn
-          make dist VERSION=${{ steps.get_version.outputs.VERSION }}
+          make dist VERSION="${VERSION}"
         shell: bash
+
+      - name: Verify assets
+        # The upload below globs, so a build that silently produced nothing
+        # would otherwise create an empty release.
+        run: |
+          count=$(find "dist/${VERSION}" -name '*.tar.gz' | wc -l | tr -d ' ')
+          echo "found ${count} archives in dist/${VERSION}"
+          find "dist/${VERSION}" -name '*.tar.gz' -exec basename {} \; | sort
+          if [ "${count}" -eq 0 ]; then
+            echo "::error::make dist produced no archives"
+            exit 1
+          fi
+
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Replaces actions/create-release@v1 and actions/upload-release-asset@v1,
+        # both of which are archived and unmaintained. It also takes a glob,
+        # which collapses the sixteen near-identical upload steps this had into
+        # the one line below — the asset names are exactly what `make dist`
+        # writes, so they no longer have to be restated here and kept in sync.
+        uses: softprops/action-gh-release@v2
         with:
+          name: BBGO ${{ env.VERSION }}
           tag_name: ${{ github.ref }}
-          release_name: BBGO ${{ github.ref }}
-          body_path: doc/release/${{ steps.get_version.outputs.VERSION }}.md
-          # body: |
-          #   ## Features
-          #   - PR - title
-          #   ## Fixes
-          #   - (commit hash) title
+          body_path: doc/release/${{ env.VERSION }}.md
           draft: false
           prerelease: false
-      - name: Upload slim Linux amd64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-slim-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-          asset_name: bbgo-slim-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload slim Linux arm64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-slim-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
-          asset_name: bbgo-slim-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload slim Darwin amd64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-slim-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-          asset_name: bbgo-slim-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload slim Darwin arm64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-slim-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
-          asset_name: bbgo-slim-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload Linux amd64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-          asset_name: bbgo-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload Linux arm64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
-          asset_name: bbgo-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload Darwin amd64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-          asset_name: bbgo-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload Darwin arm64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
-          asset_name: bbgo-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload slim Linux amd64 dnum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-slim-dnum-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-          asset_name: bbgo-slim-dnum-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload slim Linux arm64 dnum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-slim-dnum-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
-          asset_name: bbgo-slim-dnum-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload slim Darwin amd64 dnum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-slim-dnum-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-          asset_name: bbgo-slim-dnum-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload slim Darwin arm64 dnum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-slim-dnum-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
-          asset_name: bbgo-slim-dnum-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload Linux amd64 dnum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-dnum-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-          asset_name: bbgo-dnum-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload Linux arm64 dnum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-dnum-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
-          asset_name: bbgo-dnum-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload Darwin amd64 dnum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-dnum-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-          asset_name: bbgo-dnum-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Upload Darwin arm64 dnum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/${{ steps.get_version.outputs.VERSION }}/bbgo-dnum-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
-          asset_name: bbgo-dnum-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz
-          asset_content_type: application/octet-stream
+          fail_on_unmatched_files: true
+          files: dist/${{ env.VERSION }}/*.tar.gz

@@ -115,6 +115,29 @@ func KLines(source types.Stream, symbol string, interval types.Interval) *KLineS
 	return s
 }
 
+// WithHistory builds an indicator on a private kline stream and then replays the kline history of source into it.
+//
+// AddSubscriber replays the history to each subscriber as soon as it subscribes. A composite indicator (e.g. BOLL,
+// SuperTrend, MACD) subscribes its inner streams first, so when it is built on a stream that already has history,
+// every inner stream has consumed the whole history before the parent's subscriber runs, and the parent reads the
+// final values of its inner streams for every historical kline.
+//
+// WithHistory builds the indicator on an empty stream, so that the history is emitted kline by kline to all the
+// subscribers in the subscription order, exactly like live klines. The live klines of source are forwarded after that.
+func WithHistory[T any](source *KLineStream, build func(source *KLineStream) T) T {
+	s := &KLineStream{}
+	indicator := build(s)
+	s.BackFill(source.kLines)
+
+	source.OnUpdate(func(k types.KLine) {
+		s.kLines = append(s.kLines, k)
+		s.EmitUpdate(k)
+		s.kLines = types.ShrinkSlice(s.kLines, MaxNumOfKLines, MaxNumOfKLines/5)
+	})
+
+	return indicator
+}
+
 type KLineSubscription interface {
 	AddSubscriber(f func(k types.KLine))
 	Length() int

@@ -5,7 +5,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -25,8 +25,8 @@ type TrendLine struct {
 	session       *bbgo.ExchangeSession
 	activeOrders  *bbgo.ActiveOrderBook
 
-	pivotHigh *indicator.PivotHigh
-	pivotLow  *indicator.PivotLow
+	pivotHigh *indicatorv2.PivotHighStream
+	pivotLow  *indicatorv2.PivotLowStream
 
 	bbgo.QuantityOrAmount
 }
@@ -46,15 +46,13 @@ func (s *TrendLine) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gene
 
 	position := orderExecutor.Position()
 	symbol := position.Symbol
-	standardIndicator := session.StandardIndicatorSet(s.Symbol)
 
-	s.pivotHigh = standardIndicator.PivotHigh(types.IntervalWindow{
-		Interval: s.Interval,
-		Window:   int(3. * s.PivotRightWindow), RightWindow: &s.PivotRightWindow})
-
-	s.pivotLow = standardIndicator.PivotLow(types.IntervalWindow{
-		Interval: s.Interval,
-		Window:   int(3. * s.PivotRightWindow), RightWindow: &s.PivotRightWindow})
+	// the pivot indicators must be created before registering the kline handler below,
+	// so that they are updated before the handler reads them.
+	// The left window is 3 times the right window.
+	indicators := session.Indicators(s.Symbol)
+	s.pivotHigh = indicatorv2.PivotHigh(indicators.HIGH(s.Interval), int(3.*s.PivotRightWindow), s.PivotRightWindow)
+	s.pivotLow = indicatorv2.PivotLow(indicators.LOW(s.Interval), int(3.*s.PivotRightWindow), s.PivotRightWindow)
 
 	resistancePrices := types.NewQueue(3)
 	pivotHighDurationCounter := 0.

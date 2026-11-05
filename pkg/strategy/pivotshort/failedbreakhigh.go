@@ -6,12 +6,12 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type MACDDivergence struct {
-	*indicator.MACDConfig
+	*MACDConfig
 	PivotWindow int `json:"pivotWindow"`
 }
 
@@ -47,7 +47,7 @@ type FailedBreakHigh struct {
 
 	MACDDivergence *MACDDivergence `json:"macdDivergence"`
 
-	macd *indicator.MACDLegacy
+	macd *indicatorv2.MACDStream
 
 	macdTopDivergence bool
 
@@ -55,8 +55,8 @@ type FailedBreakHigh struct {
 	lastHighInvalidated                         bool
 	pivotHighPrices                             []fixedpoint.Value
 
-	pivotHigh, fastPivotHigh *indicator.PivotHigh
-	vwma                     *indicator.VWMA
+	pivotHigh, fastPivotHigh *indicatorv2.PivotHighStream
+	vwma                     *indicatorv2.VWMAStream
 
 	orderExecutor *bbgo.GeneralOrderExecutor
 	session       *bbgo.ExchangeSession
@@ -104,11 +104,13 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 	position := orderExecutor.Position()
 	symbol := position.Symbol
-	standardIndicator := session.StandardIndicatorSet(s.Symbol)
+	indicators := session.Indicators(s.Symbol)
 
+	// the indicators must be created before registering the kline handlers below,
+	// so that they are updated before the handlers read them
 	s.lastHigh = fixedpoint.Zero
-	s.pivotHigh = standardIndicator.PivotHigh(s.IntervalWindow)
-	s.fastPivotHigh = standardIndicator.PivotHigh(types.IntervalWindow{
+	s.pivotHigh = newPivotHigh(session, s.Symbol, s.IntervalWindow)
+	s.fastPivotHigh = newPivotHigh(session, s.Symbol, types.IntervalWindow{
 		Interval: s.IntervalWindow.Interval,
 		Window:   s.FastWindow,
 	})
@@ -116,16 +118,32 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	// Experimental: MACD divergence detection
 	if s.MACDDivergence != nil {
 		log.Infof("MACD divergence detection is enabled")
-		s.macd = standardIndicator.MACD(s.MACDDivergence.IntervalWindow, s.MACDDivergence.ShortPeriod, s.MACDDivergence.LongPeriod)
-		s.macd.OnUpdate(func(macd, signal, histogram float64) {
-			log.Infof("MACD %+v: macd: %f, signal: %f histogram: %f", s.macd.IntervalWindow, macd, signal, histogram)
+
+		macdConfig := s.MACDDivergence.MACDConfig
+		if macdConfig == nil {
+			macdConfig = &MACDConfig{}
+		}
+
+		shortPeriod, longPeriod := macdConfig.ShortPeriod, macdConfig.LongPeriod
+		if shortPeriod == 0 {
+			shortPeriod = 12
+		}
+		if longPeriod == 0 {
+			longPeriod = 26
+		}
+
+		s.macd = indicators.MACD(macdConfig.Interval, shortPeriod, longPeriod, macdConfig.Window)
+
+		// the histogram is the last value updated by the MACD stream
+		s.macd.Histogram.OnUpdate(func(histogram float64) {
+			log.Infof("MACD %+v: macd: %f, signal: %f histogram: %f", macdConfig.IntervalWindow, s.macd.Last(0), s.macd.Signal.Last(0), histogram)
 			s.detectMacdDivergence()
 		})
 		s.detectMacdDivergence()
 	}
 
 	if s.VWMA != nil {
-		s.vwma = standardIndicator.VWMA(types.IntervalWindow{
+		s.vwma = indicators.VWMA(types.IntervalWindow{
 			Interval: s.BreakInterval,
 			Window:   s.VWMA.Window,
 		})
@@ -236,7 +254,9 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 			return
 		}
 
-		if s.vwma != nil {
+		// the legacy VWMA was NaN (no volume filter) before the window is filled, while the v2 VWMA is the
+		// VWMA of the available klines, so the filter is applied only once the window is filled.
+		if s.vwma != nil && s.vwma.Length() >= s.VWMA.Window {
 			vma := fixedpoint.NewFromFloat(s.vwma.Last(0))
 			if kline.Volume.Compare(vma) < 0 {
 				bbgo.Notify("%s %s kline volume %f is less than VMA %f, skip failed break high short", kline.Symbol, kline.Interval, kline.Volume.Float64(), vma.Float64())
@@ -326,7 +346,7 @@ func (s *FailedBreakHigh) detectMacdDivergence() {
 	// always reset the top divergence to false
 	s.macdTopDivergence = false
 
-	histogramValues := s.macd.Histogram
+	histogramValues := s.macd.Histogram.Slice
 
 	pivotWindow := s.MACDDivergence.PivotWindow
 	if pivotWindow == 0 {
