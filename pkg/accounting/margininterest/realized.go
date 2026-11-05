@@ -70,11 +70,11 @@ type interestRowKey struct {
 // margin_interests has no unique key and two processes (e.g. `bbgo sync`
 // next to `bbgo run`) can insert the same rows.
 //
-// current: USDT = sum(interest) x price(asset).
+// current: USDT = sum(interest) x pricer(asset).
 // charged: USDT = sum(interest x row.PriceInUSDT). A row with PriceInUSDT <= 0 is
 // left out of USDT (its Interest still counts) and marks the asset missing.
 // USDT always uses price 1.
-func SumRealized(rows []types.MarginInterest, mode PriceMode, price PriceFunc) Realized {
+func SumRealized(rows []types.MarginInterest, mode PriceMode, pricer PriceFunc) Realized {
 	mode = mode.OrDefault()
 	r := Realized{
 		Mode:      mode,
@@ -114,7 +114,7 @@ func SumRealized(rows []types.MarginInterest, mode PriceMode, price PriceFunc) R
 
 	for asset, ar := range r.Assets {
 		if mode == PriceModeCurrent {
-			if px, ok := priceOf(price, asset); ok {
+			if px, ok := priceOf(pricer, asset); ok {
 				ar.USDT = ar.Interest.Mul(px)
 			} else {
 				ar.PriceOK = false

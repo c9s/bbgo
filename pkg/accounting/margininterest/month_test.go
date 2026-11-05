@@ -26,15 +26,15 @@ func TestMonthByAsset(t *testing.T) {
 		"PEPE": {Asset: "PEPE", HourlyRate: Number("0.000001")},
 		// DOGE has no rate
 	}
-	price := fixedPrices(map[string]string{"BTC": "60000"})
-	p := ProjectAssets([]string{"BTC", "DOGE", "PEPE", "USDT"}, debts, rates, price, 100)
+	pricer := fixedPrices(map[string]string{"BTC": "60000"})
+	p := ProjectAssets([]string{"BTC", "DOGE", "PEPE", "USDT"}, debts, rates, pricer, 100)
 
 	r := SumRealized([]types.MarginInterest{
 		interestRow("BTC", "0.00001", "60000", h10),
 		// ETH was repaid: realized only
 		interestRow("ETH", "0.001", "3000", h10),
 		interestRow("USDT", "0.5", "0", h10),
-	}, PriceModeCharged, price)
+	}, PriceModeCharged, pricer)
 
 	months := MonthByAsset(p, r)
 	assert.Len(t, months, 5)
