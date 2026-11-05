@@ -34,6 +34,7 @@ func (o *TWAPExecutor) Initialize(ctx context.Context, s *Strategy) error {
 		return errors.New("[TWAPExecutor] futures general order executor not found for market: " + o.syncState.Market.Symbol)
 	}
 	o.executor = executor
+	o.connectivity = session.Connectivity
 
 	// sync market
 	if market, ok := session.Market(o.syncState.Market.Symbol); !ok {

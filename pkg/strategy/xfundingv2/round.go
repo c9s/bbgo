@@ -575,7 +575,7 @@ func (r *ArbitrageRound) FundingRecordsDescending(limit int) []FundingFee {
 func dynamicHoldingIntervals(avgFeeIncome, totalPnL fixedpoint.Value, oriMinHoldingIntervals, numHoldingIntervals int) int {
 	// if total PnL is positive or fee income is negative, assume the position can be closed immediately
 	if totalPnL.Sign() > 0 || avgFeeIncome.Sign() <= 0 {
-		return numHoldingIntervals
+		return min(numHoldingIntervals, oriMinHoldingIntervals)
 	}
 
 	breakEvenIntervals := totalPnL.Abs().Div(avgFeeIncome)

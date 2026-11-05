@@ -10,7 +10,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -45,12 +45,8 @@ type Strategy struct {
 	// This field will be injected automatically since we defined the Symbol field.
 	types.Market
 
-	// StandardIndicatorSet contains the standard indicators of a market (symbol)
-	// This field will be injected automatically since we defined the Symbol field.
-	*bbgo.StandardIndicatorSet
-
 	// ewma is the exponential weighted moving average indicator
-	ewma *indicator.EWMA
+	ewma *indicatorv2.EWMAStream
 }
 
 func (s *Strategy) ID() string {
@@ -120,7 +116,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	s.ewma = s.StandardIndicatorSet.EWMA(types.IntervalWindow{
+	// create the indicator before registering the kline handler,
+	// so that it is always updated before the handler reads it
+	s.ewma = session.Indicators(s.Symbol).EWMA(types.IntervalWindow{
 		Interval: s.Interval,
 		Window:   25,
 	})

@@ -17,6 +17,10 @@ type TWAPExecutor struct {
 	exchange types.ExchangeOrderQueryService
 	executor *bbgo.GeneralOrderExecutor
 
+	// connectivity tracks the owning session's websocket connectivity.
+	// PlaceOrder refuses to submit new orders while it reports disconnected.
+	connectivity *types.ConnectivityGroup
+
 	syncState TWAPExecutorSyncState
 	dryRun    bool
 
@@ -34,12 +38,14 @@ func NewTWAPExecutor(
 	isFutures bool,
 	market types.Market,
 	executor *bbgo.GeneralOrderExecutor,
+	connectivity *types.ConnectivityGroup,
 	config TWAPWorkerConfig,
 ) *TWAPExecutor {
 	return &TWAPExecutor{
-		ctx:      ctx,
-		exchange: exchange,
-		executor: executor,
+		ctx:          ctx,
+		exchange:     exchange,
+		executor:     executor,
+		connectivity: connectivity,
 
 		syncState: TWAPExecutorSyncState{
 			Config:    config,
@@ -268,6 +274,11 @@ func (o *TWAPExecutor) getTradesMap() map[uint64][]types.Trade {
 
 // place order
 func (o *TWAPExecutor) PlaceOrder(quantity fixedpoint.Value, side types.SideType, orderBook types.OrderBook, options TWAPExecuteOrderOptions) (*types.Order, error) {
+	if o.connectivity != nil && !o.connectivity.IsConnected() {
+		o.logger.Warnf("[TWAPExecutor] session is disconnected, skip placing order")
+		return nil, fmt.Errorf("session is disconnected, skip placing order")
+	}
+
 	// find the better price and submit new order
 	quantity = o.syncState.Market.TruncateQuantity(quantity)
 	price, err := o.GetPrice(side, orderBook)

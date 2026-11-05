@@ -10,11 +10,13 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 const ID = "bollgrid"
+
+const bollWindow = 21
 
 var log = logrus.WithField("strategy", ID)
 
@@ -37,10 +39,6 @@ type Strategy struct {
 	// and order book updates are maintained in the market data store.
 	// This field will be injected automatically since we defined the Symbol field.
 	*types.MarketDataStore
-
-	// StandardIndicatorSet contains the standard indicators of a market (symbol)
-	// This field will be injected automatically since we defined the Symbol field.
-	*bbgo.StandardIndicatorSet
 
 	// Market stores the configuration of the market, for example, VolumePrecision, PricePrecision, MinLotSize... etc
 	// This field will be injected automatically since we defined the Symbol field.
@@ -75,7 +73,12 @@ type Strategy struct {
 	orders *core.OrderStore
 
 	// boll is the BOLLINGER indicator we used for predicting the price.
-	boll *indicator.BOLL
+	boll *indicatorv2.BOLLStream
+
+	// kLines is the kline stream of the interval, used for checking the indicator warm-up
+	kLines *indicatorv2.KLineStream
+
+	ema7, ema25, ema99 *indicatorv2.EWMAStream
 
 	CancelProfitOrdersOnShutdown bool `json:"shutdownCancelProfitOrders"`
 }
@@ -116,7 +119,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 		return nil, fmt.Errorf("quote balance %s is zero: %v", s.Market.QuoteCurrency, quoteBalance)
 	}
 
-	upBand, downBand := s.boll.LastUpBand(), s.boll.LastDownBand()
+	upBand, downBand := s.lastBands()
 	if upBand <= 0.0 {
 		return nil, fmt.Errorf("up band == 0")
 	}
@@ -133,9 +136,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 		return nil, fmt.Errorf("current price %v exceed the bollinger band %f <> %f", currentPrice, upBand, downBand)
 	}
 
-	ema99 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 99})
-	ema25 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 25})
-	ema7 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 7})
+	ema99, ema25, ema7 := s.ema99, s.ema25, s.ema7
 	if ema7.Last(0) > ema25.Last(0)*1.001 && ema25.Last(0) > ema99.Last(0)*1.0005 {
 		log.Infof("all ema lines trend up, skip buy")
 		return nil, nil
@@ -181,7 +182,7 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 		return nil, fmt.Errorf("base balance %s is zero: %+v", s.Market.BaseCurrency, baseBalance)
 	}
 
-	upBand, downBand := s.boll.LastUpBand(), s.boll.LastDownBand()
+	upBand, downBand := s.lastBands()
 	if upBand <= 0.0 {
 		return nil, fmt.Errorf("up band == 0")
 	}
@@ -200,9 +201,7 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 		return nil, fmt.Errorf("current price exceed the bollinger band")
 	}
 
-	ema99 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 99})
-	ema25 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 25})
-	ema7 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 7})
+	ema99, ema25, ema7 := s.ema99, s.ema25, s.ema7
 	if ema7.Last(0) < ema25.Last(0)*(1-0.004) && ema25.Last(0) < ema99.Last(0)*(1-0.0005) {
 		log.Infof("all ema lines trend down, skip sell")
 		return nil, nil
@@ -271,7 +270,8 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.
 	}
 
 	// skip order updates if up-band - down-band < min profit spread
-	if (s.boll.LastUpBand() - s.boll.LastDownBand()) <= s.ProfitSpread.Float64() {
+	upBand, downBand := s.lastBands()
+	if (upBand - downBand) <= s.ProfitSpread.Float64() {
 		log.Infof("boll: down band price == up band price, skipping...")
 		return
 	}
@@ -321,15 +321,33 @@ func (s *Strategy) submitReverseOrder(order types.Order, session *bbgo.ExchangeS
 	s.orders.Add(createdOrders...)
 }
 
+// lastBands returns the last up band and down band of the bollinger band.
+// It returns zeros until the bollinger window is filled, like the legacy indicator did
+// (the legacy SMA did not emit any value before the window was full).
+func (s *Strategy) lastBands() (upBand, downBand float64) {
+	if s.kLines.Length() < bollWindow || s.boll.UpBand.Length() == 0 {
+		return 0.0, 0.0
+	}
+
+	return s.boll.UpBand.Last(0), s.boll.DownBand.Last(0)
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	if s.GridNum == 0 {
 		s.GridNum = 2
 	}
 
-	s.boll = s.StandardIndicatorSet.BOLL(types.IntervalWindow{
+	// create the indicators before registering any kline handler,
+	// so that they are always updated before the handlers read them
+	indicators := session.Indicators(s.Symbol)
+	s.kLines = indicators.KLines(s.Interval)
+	s.boll = indicators.BOLL(types.IntervalWindow{
 		Interval: s.Interval,
-		Window:   21,
+		Window:   bollWindow,
 	}, 2.0)
+	s.ema99 = indicators.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 99})
+	s.ema25 = indicators.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 25})
+	s.ema7 = indicators.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 7})
 
 	s.orders = core.NewOrderStore(s.Symbol)
 	s.orders.BindStream(session.UserDataStream)

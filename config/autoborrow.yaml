@@ -10,6 +10,7 @@ exchangeStrategies:
   autoborrow:
     interval: 30m
     autoRepayWhenDeposit: true
+    marginAssetInfoCacheTTL: 30m
 
     # minMarginRatio for triggering auto borrow
     # we trigger auto borrow only when the margin ratio is above the number

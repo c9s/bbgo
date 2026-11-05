@@ -464,9 +464,26 @@ func (m *HedgeMarket) newMockTrade(
 
 }
 
+// isAvailable reports whether this hedge market's session can currently be
+// used to place orders: not in a configured maintenance window, and its
+// connectivity group (if any) reports connected.
+func (m *HedgeMarket) isAvailable() bool {
+	if m.session.IsInMaintenance() {
+		return false
+	}
+	if m.session.Connectivity != nil && !m.session.Connectivity.IsConnected() {
+		return false
+	}
+	return true
+}
+
 func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitOrder) (*types.Order, error) {
 	submitOrder.Market = m.market
 	submitOrder.Symbol = m.market.Symbol
+
+	if !m.isAvailable() {
+		return nil, fmt.Errorf("session %s is not available (maintenance or disconnected), skip placing order", m.session.Name)
+	}
 
 	if m.dryRun {
 		m.logger.Infof("[dryRun] hedge order: %+v", submitOrder)

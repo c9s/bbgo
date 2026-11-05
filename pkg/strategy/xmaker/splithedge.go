@@ -271,8 +271,8 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 			continue
 		}
 
-		if hedgeMarket.session.IsInMaintenance() {
-			h.logger.Warnf("splitHedge: hedge market %s is in maintenance, skipping", proportionMarket.Name)
+		if !hedgeMarket.isAvailable() {
+			h.logger.Warnf("splitHedge: hedge market %s is not available, skipping", proportionMarket.Name)
 			continue
 		}
 
@@ -355,8 +355,8 @@ func (h *SplitHedge) hedgeWithBestPriceAlgo(
 	var bestMarket *HedgeMarket
 
 	for _, mkt := range h.hedgeMarketInstances {
-		if mkt.session.IsInMaintenance() {
-			h.logger.Warnf("splitHedge: hedge market %s is in maintenance, skipping", mkt.InstanceID())
+		if !mkt.isAvailable() {
+			h.logger.Warnf("splitHedge: hedge market %s is not available, skipping", mkt.InstanceID())
 			continue
 		}
 
@@ -460,6 +460,17 @@ func (h *SplitHedge) Hedge(
 	}
 }
 
+// HasAvailableMarket reports whether at least one configured hedge market's
+// session is currently usable (not in maintenance, connected).
+func (h *SplitHedge) HasAvailableMarket() bool {
+	for _, m := range h.hedgeMarketInstances {
+		if m.isAvailable() {
+			return true
+		}
+	}
+	return false
+}
+
 func (h *SplitHedge) Start(ctx context.Context) error {
 	if !h.Enabled {
 		return nil
@@ -517,8 +528,8 @@ func (h *SplitHedge) GetBalanceWeightedQuotePrice() (bid, ask fixedpoint.Value, 
 	sumQuoteWeight := fixedpoint.Zero
 
 	for name, mkt := range h.hedgeMarketInstances {
-		if mkt.session.IsInMaintenance() {
-			h.logger.Warnf("splitHedge: hedge market %s is in maintenance, skipping weighting", name)
+		if !mkt.isAvailable() {
+			h.logger.Warnf("splitHedge: hedge market %s is not available, skipping weighting", name)
 			continue
 		}
 

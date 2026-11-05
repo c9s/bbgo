@@ -16,7 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -66,7 +66,8 @@ type Strategy struct {
 	*types.TradeStats  `persistence:"trade_stats"`
 
 	ewo        *ElliottWave
-	atr        *indicator.ATR
+	atr        *indicatorv2.ATRStream
+	kLineFeed  *klineFeed // manually fed klines of Interval, feeds atr
 	heikinAshi *HeikinAshi
 
 	priceLines *types.Queue
@@ -170,13 +171,11 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 func (s *Strategy) initIndicators(store *types.SerialMarketDataStore) error {
 	s.priceLines = types.NewQueue(300)
-	maSlow := &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.WindowSlow}}
-	maQuick := &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.WindowQuick}}
-	s.ewo = &ElliottWave{
-		maSlow:  maSlow,
-		maQuick: maQuick,
-	}
-	s.atr = &indicator.ATR{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.WindowATR}}
+	// The indicators are fed manually from the klines of the SerialMarketDataStore in klineHandler,
+	// so their values are always current when the kline handlers read them.
+	s.ewo = NewElliottWave(s.WindowQuick, s.WindowSlow)
+	s.kLineFeed = &klineFeed{}
+	s.atr = indicatorv2.ATR2(s.kLineFeed, s.WindowATR)
 	klines, ok := store.KLinesOfInterval(s.Interval)
 	klineLength := len(*klines)
 	if !ok || klineLength == 0 {
@@ -187,7 +186,7 @@ func (s *Strategy) initIndicators(store *types.SerialMarketDataStore) error {
 	for _, kline := range *klines {
 		source := s.GetSource(&kline).Float64()
 		s.ewo.Update(source)
-		s.atr.PushK(kline)
+		s.kLineFeed.Push(kline)
 		s.priceLines.Update(source)
 		s.heikinAshi.Update(kline)
 	}
@@ -477,7 +476,8 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	} else {
 		s.ewo.Update(sourcef)
 	}
-	s.atr.PushK(kline)
+	// updates atr
+	s.kLineFeed.Push(kline)
 
 	if s.Status != types.StrategyStatusRunning {
 		return

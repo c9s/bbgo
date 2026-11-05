@@ -138,6 +138,7 @@ func NewTWAPWorker(
 		session.Futures,
 		market,
 		generalExecutor,
+		session.Connectivity,
 		config,
 	)
 	return w, nil

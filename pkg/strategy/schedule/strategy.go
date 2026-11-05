@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -20,10 +19,6 @@ func init() {
 
 type Strategy struct {
 	Market types.Market
-
-	// StandardIndicatorSet contains the standard indicators of a market (symbol)
-	// This field will be injected automatically since we defined the Symbol field.
-	*bbgo.StandardIndicatorSet
 
 	// Interval is the period that you want to submit order
 	Interval types.Interval `json:"interval"`
@@ -77,12 +72,26 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
+// lastMovingAverage returns the last value of the moving average.
+//
+// The legacy SMA did not emit any value before its window was full, so the moving average was zero during the warm-up,
+// while the v2 SMA emits the average of a partial window. This returns zero until the SMA window is full
+// to keep the order conditions unchanged.
+func lastMovingAverage(
+	indicators *bbgo.IndicatorSet, settings *bbgo.MovingAverageSettings, ma types.Float64Indicator,
+) float64 {
+	if settings.Type == "SMA" {
+		iw := settings.IntervalWindow()
+		if indicators.KLines(iw.Interval).Length() < iw.Window {
+			return 0.0
+		}
+	}
+
+	return ma.Last(0)
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.session = session
-
-	if s.StandardIndicatorSet == nil {
-		return errors.New("StandardIndicatorSet can not be nil, injection failed?")
-	}
 
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
@@ -95,18 +104,22 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 	s.orderExecutor.Bind()
 
+	// the indicators are created before registering the kline handler below,
+	// so that they are always updated before the handler reads them
+	indicators := session.Indicators(s.Symbol)
+
 	var belowMA types.Float64Indicator
 	var aboveMA types.Float64Indicator
 	var err error
 	if s.BelowMovingAverage != nil {
-		belowMA, err = s.BelowMovingAverage.Indicator(s.StandardIndicatorSet)
+		belowMA, err = s.BelowMovingAverage.IndicatorV2(indicators)
 		if err != nil {
 			return err
 		}
 	}
 
 	if s.AboveMovingAverage != nil {
-		aboveMA, err = s.AboveMovingAverage.Indicator(s.StandardIndicatorSet)
+		aboveMA, err = s.AboveMovingAverage.IndicatorV2(indicators)
 		if err != nil {
 			return err
 		}
@@ -130,7 +143,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			match := false
 			// if any of the conditions satisfies then we execute order
-			if belowMA != nil && closePriceF < belowMA.Last(0) {
+			if belowMA != nil && closePriceF < lastMovingAverage(indicators, s.BelowMovingAverage, belowMA) {
 				match = true
 				if s.BelowMovingAverage != nil {
 					if s.BelowMovingAverage.Side != nil {
@@ -142,7 +155,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 						quantity = s.BelowMovingAverage.QuantityOrAmount.CalculateQuantity(closePrice)
 					}
 				}
-			} else if aboveMA != nil && closePriceF > aboveMA.Last(0) {
+			} else if aboveMA != nil && closePriceF > lastMovingAverage(indicators, s.AboveMovingAverage, aboveMA) {
 				match = true
 				if s.AboveMovingAverage != nil {
 					if s.AboveMovingAverage.Side != nil {
