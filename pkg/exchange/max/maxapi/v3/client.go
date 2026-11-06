@@ -25,13 +25,14 @@ import (
 	"github.com/c9s/bbgo/pkg/envvar"
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/profile/timeprofile"
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util/apikey"
 	"github.com/c9s/bbgo/pkg/version"
 	"github.com/c9s/requestgen"
 )
 
 var log = logrus.WithFields(logrus.Fields{
-	"exchange": "max",
+	"exchange": types.ExchangeMax,
 	"api":      "v3",
 })
 

@@ -60,7 +60,7 @@ var (
 )
 
 const (
-	ID = "okex"
+	ID = types.ExchangeOKEx
 
 	// PlatformToken is the platform currency of OKEx, pre-allocate static string here
 	PlatformToken = "OKB"
