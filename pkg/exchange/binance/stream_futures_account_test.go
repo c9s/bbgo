@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -98,7 +99,19 @@ func TestParseFuturesWsApiResponse(t *testing.T) {
 		assert.Equal(t, fixedpoint.MustNewFromString("0.86368400"), account.TotalMaintMargin)
 		assert.Equal(t, fixedpoint.MustNewFromString("101.89345678"), account.TotalMarginBalance)
 		assert.Equal(t, fixedpoint.MustNewFromString("0.86368400"), account.Assets["USDT"].MaintMargin)
-		assert.Len(t, account.Positions, 1)
+
+		// the raw positions carry what v2/account.status returns
+		require.Len(t, event.Account.Positions, 1)
+		position := event.Account.Positions[0]
+		assert.Equal(t, "BTCUSDT", position.Symbol)
+		assert.Equal(t, "BOTH", position.PositionSide)
+		assert.Equal(t, fixedpoint.MustNewFromString("0.002"), position.PositionAmt)
+		assert.Equal(t, fixedpoint.MustNewFromString("215.92100000"), position.Notional)
+		assert.Equal(t, fixedpoint.MustNewFromString("0.86368400"), position.MaintMargin)
+
+		// v2/account.status has no entry price, leverage or margin type, so the global account
+		// never carries positions with a zero average cost and leverage
+		assert.Empty(t, account.Positions)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -300,5 +313,86 @@ func TestFuturesAccountStatusStream(t *testing.T) {
 		case <-time.After(3 * time.Second):
 			t.Fatalf("timed out waiting for event %d", i)
 		}
+	}
+}
+
+// Binance drops ws-fapi connections (e.g. after 24 hours); the stream reconnects on its own and
+// the poller has to start again on the new connection, once per connection.
+func TestFuturesAccountStatusStream_PollingResumesAfterReconnect(t *testing.T) {
+	const pollWindow = 1200 * time.Millisecond
+
+	connRequests := make(chan []string, 4)
+	upgrader := websocket.Upgrader{}
+	var connCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		first := connCount.Add(1) == 1
+
+		// collect the requests of this connection for a while
+		var ids []string
+		deadline := time.Now().Add(pollWindow)
+		_ = conn.SetReadDeadline(deadline)
+		for {
+			var req struct {
+				ID string `json:"id"`
+			}
+			if err := conn.ReadJSON(&req); err != nil {
+				break
+			}
+			ids = append(ids, req.ID)
+			resp := strings.Replace(futuresAccountStatusResponse, `"account-status-1"`, strconv.Quote(req.ID), 1)
+			if err := conn.WriteMessage(websocket.TextMessage, []byte(resp)); err != nil {
+				break
+			}
+		}
+		connRequests <- ids
+
+		if first {
+			_ = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseGoingAway, "bye"))
+			return
+		}
+
+		// keep the second connection open until the test closes the stream
+		_ = conn.SetReadDeadline(time.Time{})
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}))
+	defer server.Close()
+
+	ex := New("key", "secret")
+	ex.UseFutures()
+	stream := ex.NewStream().(*Stream)
+	stream.futuresAccountStatusInterval = 200 * time.Millisecond
+
+	statusStream := stream.initFuturesAccountStatusStream()
+	statusStream.SetEndpointCreator(func(ctx context.Context) (string, error) {
+		return "ws" + strings.TrimPrefix(server.URL, "http"), nil
+	})
+	stream.futuresAccountStatusStream = statusStream
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	require.NoError(t, statusStream.Connect(ctx))
+	defer stream.Close()
+
+	first := <-connRequests
+	assert.NotEmpty(t, first)
+
+	// the reconnect waits for the stream's 15s cool down
+	select {
+	case second := <-connRequests:
+		// one poller on the new connection: ~6 requests in the window at 200ms, not ~12
+		assert.GreaterOrEqual(t, len(second), 3, "requests on the second connection: %v", second)
+		assert.LessOrEqual(t, len(second), 8, "requests on the second connection: %v", second)
+
+	case <-time.After(25 * time.Second):
+		t.Fatal("the account status stream did not poll again after reconnecting")
 	}
 }

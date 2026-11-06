@@ -16,6 +16,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -47,18 +48,67 @@ const (
 //	  ..., "assets":[...], "positions":[...]},
 //	  "rateLimits":[{"rateLimitType":"REQUEST_WEIGHT","interval":"MINUTE","intervalNum":1,"limit":2400,"count":10}]}
 type FuturesAccountStatusEvent struct {
-	ID         string                    `json:"id"`
-	Status     int                       `json:"status"`
-	Account    binanceapi.FuturesAccount `json:"result"`
-	RateLimits []RateLimit               `json:"rateLimits,omitempty"`
+	ID         string               `json:"id"`
+	Status     int                  `json:"status"`
+	Account    FuturesAccountStatus `json:"result"`
+	RateLimits []RateLimit          `json:"rateLimits,omitempty"`
 
 	// ReceivedAt is the local time when the response was received
 	ReceivedAt time.Time `json:"-"`
 }
 
-// FuturesAccount converts the account status into the global futures account type.
+// FuturesAccountStatus is the result of v2/account.status. It is not the /fapi/v2/account response:
+// it has no account flags (canTrade, feeTier, updateTime, ...), and its positions only list the
+// symbols with a position or an open order, without the entry price, the leverage or the margin type.
+type FuturesAccountStatus struct {
+	TotalInitialMargin          fixedpoint.Value `json:"totalInitialMargin"`
+	TotalMaintMargin            fixedpoint.Value `json:"totalMaintMargin"`
+	TotalWalletBalance          fixedpoint.Value `json:"totalWalletBalance"`
+	TotalUnrealizedProfit       fixedpoint.Value `json:"totalUnrealizedProfit"`
+	TotalMarginBalance          fixedpoint.Value `json:"totalMarginBalance"`
+	TotalPositionInitialMargin  fixedpoint.Value `json:"totalPositionInitialMargin"`
+	TotalOpenOrderInitialMargin fixedpoint.Value `json:"totalOpenOrderInitialMargin"`
+	TotalCrossWalletBalance     fixedpoint.Value `json:"totalCrossWalletBalance"`
+	TotalCrossUnPnl             fixedpoint.Value `json:"totalCrossUnPnl"`
+	AvailableBalance            fixedpoint.Value `json:"availableBalance"`
+	MaxWithdrawAmount           fixedpoint.Value `json:"maxWithdrawAmount"`
+
+	Assets    []binanceapi.FuturesAccountAsset `json:"assets"`
+	Positions []FuturesAccountStatusPosition   `json:"positions"`
+}
+
+// FuturesAccountStatusPosition is a position of v2/account.status.
+type FuturesAccountStatusPosition struct {
+	Symbol           string           `json:"symbol"`
+	PositionSide     string           `json:"positionSide"`
+	PositionAmt      fixedpoint.Value `json:"positionAmt"`
+	UnrealizedProfit fixedpoint.Value `json:"unrealizedProfit"`
+	IsolatedMargin   fixedpoint.Value `json:"isolatedMargin"`
+	Notional         fixedpoint.Value `json:"notional"`
+	IsolatedWallet   fixedpoint.Value `json:"isolatedWallet"`
+	InitialMargin    fixedpoint.Value `json:"initialMargin"`
+	MaintMargin      fixedpoint.Value `json:"maintMargin"`
+	UpdateTime       int64            `json:"updateTime"`
+}
+
+// FuturesAccount converts the account totals and assets into the global futures account type.
+//
+// Positions is left empty: v2/account.status has no entry price, leverage or margin type, so a
+// converted position would report a zero average cost and leverage. Read Account.Positions for
+// the position amounts and margins instead.
 func (e *FuturesAccountStatusEvent) FuturesAccount() *types.FuturesAccount {
-	return toGlobalFuturesAccountInfo(&e.Account, nil)
+	return &types.FuturesAccount{
+		Assets:                      toGlobalFuturesUserAssets(e.Account.Assets),
+		Positions:                   make(types.FuturesPositionMap),
+		TotalInitialMargin:          e.Account.TotalInitialMargin,
+		TotalMaintMargin:            e.Account.TotalMaintMargin,
+		TotalWalletBalance:          e.Account.TotalWalletBalance,
+		TotalMarginBalance:          e.Account.TotalMarginBalance,
+		TotalOpenOrderInitialMargin: e.Account.TotalOpenOrderInitialMargin,
+		TotalPositionInitialMargin:  e.Account.TotalPositionInitialMargin,
+		TotalUnrealizedProfit:       e.Account.TotalUnrealizedProfit,
+		AvailableBalance:            e.Account.AvailableBalance,
+	}
 }
 
 type futuresWsApiErrorEvent struct {
