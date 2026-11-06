@@ -13,7 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var log = logrus.WithField("exchange", "bitfinex")
+var log = logrus.WithField("exchange", ID)
 
 // Stream represents the Bitfinex websocket stream.
 //

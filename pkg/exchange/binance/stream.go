@@ -163,7 +163,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 				f.CheckPreviousID()
 			}
 
-			f.SetLogger(logrus.WithFields(logrus.Fields{"exchange": "binance", "symbol": e.Symbol, "component": "depthBuffer"}))
+			f.SetLogger(logrus.WithFields(logrus.Fields{"exchange": ID, "symbol": e.Symbol, "component": "depthBuffer"}))
 			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
 				stream.EmitBookSnapshot(snapshot)
 				for _, u := range updates {
