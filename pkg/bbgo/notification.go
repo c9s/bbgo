@@ -8,13 +8,21 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-// DefaultNotificationFlushTimeout is the time budget given to Flush to wait for
+// notificationFlushTimeout is the time budget given to Flush to wait for
 // queued notifications (e.g. Slack/Telegram) to actually be sent before giving up.
-const DefaultNotificationFlushTimeout = 5 * time.Second
+// Overridable via the BBGO_FLUSH_TIMEOUT environment variable (e.g. "10s").
+var notificationFlushTimeout = 5 * time.Second
+
+func init() {
+	if du, ok := envvar.Duration("BBGO_FLUSH_TIMEOUT", notificationFlushTimeout); ok && du > 0 {
+		notificationFlushTimeout = du
+	}
+}
 
 var Notification = &Notifiability{}
 
@@ -23,7 +31,7 @@ func Notify(obj interface{}, args ...interface{}) {
 }
 
 // Flush blocks until all notifiers have sent their queued notifications, up
-// to DefaultNotificationFlushTimeout.
+// to notificationFlushTimeout.
 func Flush() {
 	Notification.Flush()
 }
@@ -89,9 +97,9 @@ func (m *Notifiability) Upload(file *types.UploadFile) {
 }
 
 // Flush waits for all registered notifiers to send their queued notifications
-// concurrently, giving them up to DefaultNotificationFlushTimeout to finish.
+// concurrently, giving them up to notificationFlushTimeout to finish.
 func (m *Notifiability) Flush() {
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultNotificationFlushTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), notificationFlushTimeout)
 	defer cancel()
 
 	var wg sync.WaitGroup
