@@ -10,10 +10,15 @@ import (
 type AssetMonth struct {
 	Asset string
 
-	// Projected, Realized and Total are in asset units
+	// Projected, Realized and Total are in asset units. Realized is nominal:
+	// interest paid in another asset (e.g. BNB) counts at its nominal amount.
 	Projected fixedpoint.Value
 	Realized  fixedpoint.Value
 	Total     fixedpoint.Value
+
+	// RealizedCharged is what was actually charged so far, per paid asset,
+	// e.g. {"BNB": x} for interest paid with BNB deduction. Nil without realized rows.
+	RealizedCharged map[string]fixedpoint.Value
 
 	// ProjectedUSDT, RealizedUSDT and TotalUSDT leave out the parts that have no price
 	ProjectedUSDT fixedpoint.Value
@@ -87,6 +92,7 @@ func MonthByAsset(p Projection, r Realized) map[string]AssetMonth {
 	for asset, ar := range r.Assets {
 		m := get(asset)
 		m.Realized = ar.Interest
+		m.RealizedCharged = ar.Charged
 		m.RealizedUSDT = ar.USDT
 		if !ar.PriceOK {
 			m.MissingPrice = true

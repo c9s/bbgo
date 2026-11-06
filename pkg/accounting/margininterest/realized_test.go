@@ -20,6 +20,20 @@ func interestRow(asset, interest, priceInUSDT string, at time.Time) types.Margin
 	}
 }
 
+// bnbPaid is an hourly charge on principal of raw at a daily rate of 0.00024, paid in BNB
+func bnbPaid(raw, principal, bnbInterest, bnbPrice string, at time.Time) types.MarginInterest {
+	return types.MarginInterest{
+		Asset:        "BNB",
+		RawAsset:     raw,
+		InterestType: "PERIODIC_CONVERTED",
+		Principle:    Number(principal),
+		InterestRate: Number("0.00024"),
+		Interest:     Number(bnbInterest),
+		PriceInUSDT:  Number(bnbPrice),
+		Time:         types.Time(at),
+	}
+}
+
 func TestSumRealized(t *testing.T) {
 	h10 := time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC)
 	h11 := h10.Add(time.Hour)
@@ -76,6 +90,50 @@ func TestSumRealized(t *testing.T) {
 			wantUSDT: 0, wantMissing: []string{"BTC"},
 		},
 		{name: "no rows", mode: PriceModeCharged, wantUSDT: 0},
+		{
+			// one hour of BNB deduction: a row per borrowed asset, all with Asset BNB
+			name: "bnb-paid rows of the same hour all count", mode: PriceModeCharged,
+			rows: []types.MarginInterest{
+				bnbPaid("BTC", "0.5", "0.000003", "600", h10),
+				bnbPaid("ETH", "10", "0.000001", "600", h10),
+				bnbPaid("ETH", "10", "0.000001", "600", h10), // a copy
+			},
+			wantUSDT: 0.0024,
+			check: func(t *testing.T, r Realized) {
+				assert.NotContains(t, r.Assets, "BNB")
+				btc := r.Assets["BTC"]
+				assert.Equal(t, 1, btc.Rows)
+				// nominal 0.5 x 0.00024 / 24, charged in BNB
+				assert.InDelta(t, 0.000005, btc.Interest.Float64(), tol)
+				assert.InDelta(t, 0.000003, btc.Charged["BNB"].Float64(), tol)
+				assert.InDelta(t, 0.0018, btc.USDT.Float64(), tol)
+				assert.Equal(t, 1, r.Assets["ETH"].Rows)
+				assert.InDelta(t, 0.0001, r.Assets["ETH"].Interest.Float64(), tol)
+			},
+		},
+		{
+			// some hours paid in the asset, some in BNB: both amounts are kept apart
+			name: "mixed payment, current price", mode: PriceModeCurrent,
+			rows: []types.MarginInterest{
+				interestRow("BTC", "0.00000209", "0", h10),
+				bnbPaid("BTC", "0.5", "0.000003", "0", h11),
+			},
+			pricer:   fixedPrices(map[string]string{"BTC": "62000", "BNB": "600"}),
+			wantUSDT: 0.00000209*62000 + 0.0018,
+			check: func(t *testing.T, r Realized) {
+				btc := r.Assets["BTC"]
+				assert.InDelta(t, 0.00000209+0.000005, btc.Interest.Float64(), tol)
+				assert.InDelta(t, 0.00000209, btc.Charged["BTC"].Float64(), tol)
+				assert.InDelta(t, 0.000003, btc.Charged["BNB"].Float64(), tol)
+				assert.True(t, btc.PriceOK)
+			},
+		},
+		{
+			name: "current price of the paid asset unknown", mode: PriceModeCurrent,
+			rows:     []types.MarginInterest{bnbPaid("BTC", "0.5", "0.000003", "0", h10)},
+			pricer:   fixedPrices(map[string]string{"BTC": "62000"}),
+			wantUSDT: 0, wantMissing: []string{"BTC"},
+		},
 	}
 
 	for _, tt := range tests {

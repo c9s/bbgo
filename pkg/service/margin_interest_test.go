@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -453,6 +454,17 @@ type fakeMarginExchange struct {
 	types.Exchange
 	interests    []types.MarginInterest
 	liquidations int
+
+	// interestAssets are the assets the interest history was queried for;
+	// the batch query calls it from its own goroutine
+	mu             sync.Mutex
+	interestAssets []string
+}
+
+func (f *fakeMarginExchange) queriedInterestAssets() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.interestAssets...)
 }
 
 func (f *fakeMarginExchange) Name() types.ExchangeName { return types.ExchangeBinance }
@@ -478,7 +490,10 @@ func (f *fakeMarginExchange) QueryRepayHistory(context.Context, string, *time.Ti
 	return nil, nil
 }
 
-func (f *fakeMarginExchange) QueryInterestHistory(context.Context, string, *time.Time, *time.Time) ([]types.MarginInterest, error) {
+func (f *fakeMarginExchange) QueryInterestHistory(_ context.Context, asset string, _, _ *time.Time) ([]types.MarginInterest, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.interestAssets = append(f.interestAssets, asset)
 	return f.interests, nil
 }
 
@@ -509,4 +524,121 @@ func TestMarginService_SyncGoesOnWhenAnInterestIsNotPriced(t *testing.T) {
 	// the worker sync reports it, so the estimate is incomplete
 	err = s.SyncInterests(context.Background(), ex, "a", "BTC", charged.Add(-time.Hour))
 	assert.ErrorIs(t, err, errInterestNotPriced)
+}
+
+func TestInterestSyncTask_IDKeepsBNBPaidRowsApart(t *testing.T) {
+	s := newTestMarginService(t)
+	ex := &fakeMarginExchange{}
+	task := s.interestSyncTask(context.Background(), ex, ex, "a", "BNB")
+
+	// one charge hour has a BNB-paid row per borrowed asset
+	at := types.Time(time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC))
+	btc := types.MarginInterest{Asset: "BNB", RawAsset: "BTC", Time: at}
+	eth := types.MarginInterest{Asset: "BNB", RawAsset: "ETH", Time: at}
+	assert.NotEqual(t, task.ID(btc), task.ID(eth))
+	assert.Equal(t, task.ID(btc), task.ID(btc))
+
+	// a fetched row without RawAsset matches its stored copy, where it is filled
+	fetched := types.MarginInterest{Asset: "USDT", Time: at}
+	assert.Equal(t, task.ID(fetched), task.ID(normalizeInterest(fetched, "a")))
+
+	// the batch query dedups with the same key
+	assert.Equal(t, btc.Key(), task.ID(btc))
+}
+
+func TestNormalizeInterest(t *testing.T) {
+	at := time.Date(2026, 11, 15, 18, 0, 0, 0, time.FixedZone("UTC+8", 8*3600))
+
+	m := normalizeInterest(types.MarginInterest{Asset: "USDT", Time: types.Time(at)}, "a")
+	assert.Equal(t, "a", m.Session)
+	assert.Equal(t, "USDT", m.RawAsset)
+	assert.Equal(t, time.UTC, m.Time.Time().Location())
+
+	m = normalizeInterest(types.MarginInterest{Asset: "BNB", RawAsset: "BTC", Time: types.Time(at)}, "a")
+	assert.Equal(t, "BTC", m.RawAsset)
+}
+
+func TestMarginService_InterestRawAssetAndTypeRoundTrip(t *testing.T) {
+	s := newTestMarginService(t)
+	at := time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC)
+	require.NoError(t, insertType(s.DB, types.MarginInterest{
+		Exchange:     types.ExchangeBinance,
+		Asset:        "BNB",
+		RawAsset:     "BTC",
+		InterestType: "PERIODIC_CONVERTED",
+		Principle:    Number("0.5"),
+		Interest:     Number("0.000003"),
+		InterestRate: Number("0.00024"),
+		Session:      "a",
+		PriceInUSDT:  Number(600),
+		Time:         types.Time(at),
+	}, false))
+
+	rows, err := s.QueryInterests(context.Background(), QueryMarginInterestOptions{
+		Exchange: types.ExchangeBinance, Session: "a", Since: at, Until: at.Add(time.Hour),
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "BTC", rows[0].RawAsset)
+	assert.Equal(t, "PERIODIC_CONVERTED", rows[0].InterestType)
+	assert.Equal(t, "BTC", rows[0].BorrowedAsset())
+}
+
+func TestSyncMarginHistory_SyncsTheFeeAssetInterests(t *testing.T) {
+	t.Setenv("USE_MARKETS_CACHE_IN_MEMORY", "true")
+	charged := time.Now().UTC().Truncate(time.Hour).Add(-3 * time.Hour)
+
+	t.Run("fee asset not listed", func(t *testing.T) {
+		syncer := &SyncService{MarginService: newTestMarginService(t)}
+		// a row the fake cannot price: the fee asset sync warns, it does not fail
+		ex := &fakeMarginExchange{interests: []types.MarginInterest{
+			{Exchange: types.ExchangeBinance, Asset: "BNB", RawAsset: "BTC", InterestType: types.MarginInterestTypePeriodicConverted,
+				Principle: Number(1), Interest: Number("0.0001"), Time: types.Time(charged)},
+		}}
+
+		require.NoError(t, syncer.SyncMarginHistory(context.Background(), ex, "a", charged.Add(-time.Hour), "BTC"))
+		assert.Contains(t, ex.queriedInterestAssets(), "BTC")
+		assert.Contains(t, ex.queriedInterestAssets(), "BNB")
+	})
+
+	t.Run("fee asset listed", func(t *testing.T) {
+		syncer := &SyncService{MarginService: newTestMarginService(t)}
+		ex := &fakeMarginExchange{}
+
+		require.NoError(t, syncer.SyncMarginHistory(context.Background(), ex, "a", charged.Add(-time.Hour), "BNB"))
+		liquidations := ex.liquidations
+		queried := ex.queriedInterestAssets()
+		assert.NotEmpty(t, queried)
+		for _, asset := range queried {
+			assert.Equal(t, "BNB", asset)
+		}
+
+		// BNB went through Sync once, not again through the interest-only sync:
+		// a plain Sync of another session makes as many queries
+		require.NoError(t, syncer.MarginService.Sync(context.Background(), ex, "b", "BNB", charged.Add(-time.Hour)))
+		assert.Len(t, ex.queriedInterestAssets(), 2*len(queried))
+		assert.Equal(t, 2*liquidations, ex.liquidations)
+	})
+
+	t.Run("no fee asset", func(t *testing.T) {
+		syncer := &SyncService{MarginService: newTestMarginService(t)}
+		ex := &maxMarginExchange{fakeMarginExchange: &fakeMarginExchange{}}
+
+		require.NoError(t, syncer.SyncMarginHistory(context.Background(), ex, "a", charged.Add(-time.Hour), "BTC"))
+		queried := ex.queriedInterestAssets()
+		assert.NotEmpty(t, queried)
+		for _, asset := range queried {
+			assert.Equal(t, "BTC", asset)
+		}
+	})
+}
+
+// maxMarginExchange is fakeMarginExchange named MAX, which has no fee asset
+type maxMarginExchange struct{ *fakeMarginExchange }
+
+func (maxMarginExchange) Name() types.ExchangeName { return types.ExchangeMax }
+
+func TestMarginInterestFeeAsset(t *testing.T) {
+	assert.Equal(t, "BNB", MarginInterestFeeAsset(types.ExchangeBinance))
+	assert.Equal(t, "", MarginInterestFeeAsset(types.ExchangeMax))
 }
