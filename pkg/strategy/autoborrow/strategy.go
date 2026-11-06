@@ -611,8 +611,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.ExchangeSession = session
 
 	s.logger = logrus.WithFields(logrus.Fields{
-		"strategy": ID,
-		"exchange": s.ExchangeSession.Name,
+		"strategy":      ID,
+		"exchange_name": s.ExchangeSession.Name,
 	})
 
 	if !session.Margin {

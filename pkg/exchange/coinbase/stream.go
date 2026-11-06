@@ -90,8 +90,8 @@ func NewStream(
 		passphrase:     passphrase,
 		secretKey:      secretKey,
 		logger: logrus.WithFields(logrus.Fields{
-			"exchange": ID,
-			"module":   "stream",
+			"exchange_name": ID,
+			"module":        "stream",
 		}),
 		authEnabled:         len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
 		lastSequenceMsgMap:  make(map[string]SequenceNumberType),

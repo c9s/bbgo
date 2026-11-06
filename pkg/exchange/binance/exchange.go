@@ -84,7 +84,7 @@ var testNet = false
 var debugMode = false
 
 var log = logrus.WithFields(logrus.Fields{
-	"exchange": "binance",
+	"exchange_name": "binance",
 })
 
 func debugDummy(msg string, args ...any) {}

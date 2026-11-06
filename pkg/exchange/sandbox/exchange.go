@@ -13,7 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var log = logrus.WithField("exchange", "sandbox")
+var log = logrus.WithField("exchange_name", "sandbox")
 
 type Stream struct {
 	types.StandardStream

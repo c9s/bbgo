@@ -27,7 +27,7 @@ const (
 	maxQueryLimit = 1000
 )
 
-var log = logrus.WithFields(logrus.Fields{"exchange": ID})
+var log = logrus.WithFields(logrus.Fields{"exchange_name": ID})
 
 var (
 	// Backpack allows 2000 requests per minute per subaccount for the general endpoints,

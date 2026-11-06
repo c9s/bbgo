@@ -41,7 +41,7 @@ const (
 	DefaultKLineLimit = 300
 )
 
-var logger = logrus.WithField("exchange", ID)
+var logger = logrus.WithField("exchange_name", ID)
 var warnFirstLogger = util.NewWarnFirstLogger(
 	5, time.Minute, logger,
 )

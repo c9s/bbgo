@@ -274,7 +274,7 @@ func (s *Stream) handleBookEvent(ex *Exchange) func(e maxapi.BookEvent) {
 				// the depth of websocket orderbook event is 50 by default, so we use 50 as limit here
 				return ex.QueryDepth(context.Background(), e.Market, bookDepth)
 			}, 3*time.Second)
-			f.SetLogger(logrus.WithFields(logrus.Fields{"exchange": "max", "symbol": symbol, "component": "depthBuffer"}))
+			f.SetLogger(logrus.WithFields(logrus.Fields{"exchange_name": "max", "symbol": symbol, "component": "depthBuffer"}))
 			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
 				s.EmitBookSnapshot(snapshot)
 				for _, u := range updates {

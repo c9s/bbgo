@@ -37,7 +37,7 @@ var (
 	sharedRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
 
 	log = logrus.WithFields(logrus.Fields{
-		"exchange": "bybit",
+		"exchange_name": "bybit",
 	})
 
 	_ types.ExchangeAccountService    = &Exchange{}

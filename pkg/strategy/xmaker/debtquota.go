@@ -102,9 +102,9 @@ func (w *DebtQuotaWorker) Run(ctx context.Context, sesWorker *sessionworker.Hand
 	}
 
 	w.logger = w.logger.WithFields(logrus.Fields{
-		"worker":   "debt_quota",
-		"session":  session.Name,
-		"exchange": session.ExchangeName,
+		"worker":        "debt_quota",
+		"session":       session.Name,
+		"exchange_name": session.ExchangeName,
 	})
 
 	ticker := time.NewTicker(w.interval)

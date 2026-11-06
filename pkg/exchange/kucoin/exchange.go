@@ -32,7 +32,7 @@ var (
 )
 
 var log = logrus.WithFields(logrus.Fields{
-	"exchange": "kucoin",
+	"exchange_name": "kucoin",
 })
 
 type Exchange struct {

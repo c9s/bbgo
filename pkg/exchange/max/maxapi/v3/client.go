@@ -31,8 +31,8 @@ import (
 )
 
 var log = logrus.WithFields(logrus.Fields{
-	"exchange": "max",
-	"api":      "v3",
+	"exchange_name": "max",
+	"api":           "v3",
 })
 
 const (

@@ -30,7 +30,7 @@ const (
 )
 
 var log = logrus.WithFields(logrus.Fields{
-	"exchange": ID,
+	"exchange_name": ID,
 })
 
 var (

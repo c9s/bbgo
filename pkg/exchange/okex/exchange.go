@@ -75,7 +75,7 @@ const (
 var dualSidePosition = false
 
 var log = logrus.WithFields(logrus.Fields{
-	"exchange": ID,
+	"exchange_name": ID,
 })
 
 var ErrSymbolRequired = errors.New("symbol is a required parameter")

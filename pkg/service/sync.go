@@ -38,7 +38,7 @@ func (s *SyncService) SyncSessionSymbols(
 		return err
 	}
 
-	logger := log.WithFields(log.Fields{"service": "sync", "exchange": exchange.Name(), "uuid": uuid.New().String()})
+	logger := log.WithFields(log.Fields{"service": "sync", "exchange_name": exchange.Name(), "uuid": uuid.New().String()})
 	ctx = util.SetLoggerToCtx(ctx, logger)
 	for _, symbol := range symbols {
 		// skip symbols do not exist in the market info

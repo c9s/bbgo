@@ -129,7 +129,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.session = session
 	s.watchingDeposits = make(map[string]types.Deposit)
 	s.lastAssetDepositTimes = make(map[string]time.Time)
-	s.logger = s.logger.WithField("exchange", session.ExchangeName)
+	s.logger = s.logger.WithField("exchange_name", session.ExchangeName)
 
 	var ok bool
 
