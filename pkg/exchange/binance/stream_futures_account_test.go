@@ -2,11 +2,17 @@ package binance
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,7 +22,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/testing/httptesting"
 )
 
 const futuresAccountStatusResponse = `{
@@ -125,6 +133,89 @@ func TestEnableFuturesAccountStatusUpdate(t *testing.T) {
 	assert.False(t, spot.shouldUseFuturesAccountStatusStream())
 }
 
+func TestFuturesAccountStatusStream_RequiresCredentials(t *testing.T) {
+	ex := New("", "")
+	ex.UseFutures()
+	stream := ex.NewStream().(*Stream)
+	stream.EnableFuturesAccountStatusUpdate(time.Second)
+	assert.False(t, stream.hasFuturesWsApiCredentials())
+
+	// without credentials the account status stream is never started
+	require.NoError(t, stream.handleBeforeConnect(context.Background()))
+	stream.startFuturesAccountStatusStream()
+	assert.Nil(t, stream.futuresAccountStatusStream)
+}
+
+func TestFuturesAccountStatusStream_StartsAfterConnect(t *testing.T) {
+	ex := New("key", "secret")
+	ex.UseFutures()
+	stream := ex.NewStream().(*Stream)
+	stream.EnableFuturesAccountStatusUpdate(time.Second)
+
+	// handleBeforeConnect only keeps the base context; nothing is started until OnStart.
+	// The context is cancelled up front so that the started stream never dials Binance.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.NoError(t, stream.handleBeforeConnect(ctx))
+	assert.Nil(t, stream.futuresAccountStatusStream)
+
+	stream.startFuturesAccountStatusStream()
+	statusStream := stream.futuresAccountStatusStream
+	require.NotNil(t, statusStream)
+
+	// starting again (e.g. a second Connect) does not open another connection
+	stream.startFuturesAccountStatusStream()
+	assert.Same(t, statusStream, stream.futuresAccountStatusStream)
+	_ = statusStream.Close()
+}
+
+func TestSignFuturesWsApiParams_UsesServerTimeOffset(t *testing.T) {
+	const serverLag = time.Minute
+
+	transport := &httptesting.MockTransport{}
+	transport.GET("/api/v3/time", func(_ *http.Request) (*http.Response, error) {
+		serverTime := time.Now().Add(-serverLag).UnixMilli()
+		return httptesting.BuildResponseString(http.StatusOK, `{"serverTime":`+strconv.FormatInt(serverTime, 10)+`}`), nil
+	})
+
+	client2 := binanceapi.NewClient("https://api.binance.test")
+	client2.HttpClient = &http.Client{Transport: transport}
+	require.NoError(t, client2.SetTimeOffsetFromServer(context.Background()))
+
+	stream := &Stream{exchange: &Exchange{key: "key", secret: "secret", client2: client2}}
+	params, err := stream.signFuturesWsApiParams()
+	require.NoError(t, err)
+
+	// the timestamp follows the server clock, not the local clock
+	expected := time.Now().Add(-serverLag).UnixMilli()
+	assert.InDelta(t, expected, params.Timestamp, float64((5 * time.Second).Milliseconds()))
+}
+
+func TestSignFuturesWsApiParams_PrefersEd25519LikeRest(t *testing.T) {
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	der, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	require.NoError(t, err)
+	privateKeyPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
+
+	// both a secret and an ed25519 private key are configured: REST signs with ed25519
+	ex := New("key", "secret", privateKeyPEM)
+	require.True(t, ex.futuresClient2.IsUsingEd25519Auth())
+
+	stream := ex.NewStream().(*Stream)
+	params, err := stream.signFuturesWsApiParams()
+	require.NoError(t, err)
+
+	signature, err := base64.StdEncoding.DecodeString(params.Signature)
+	require.NoError(t, err)
+
+	payload := url.Values{}
+	payload.Add("apiKey", "key")
+	payload.Add("timestamp", strconv.FormatInt(params.Timestamp, 10))
+	assert.True(t, ed25519.Verify(publicKey, []byte(payload.Encode()), signature))
+}
+
 func TestFuturesAccountStatusStream(t *testing.T) {
 	const key, secret = "test-key", "test-secret"
 
@@ -172,15 +263,18 @@ func TestFuturesAccountStatusStream(t *testing.T) {
 		events <- e
 	})
 
-	aux := stream.initFuturesAccountStatusStream()
-	aux.SetEndpointCreator(func(ctx context.Context) (string, error) {
+	statusStream := stream.initFuturesAccountStatusStream()
+	statusStream.SetEndpointCreator(func(ctx context.Context) (string, error) {
 		return "ws" + strings.TrimPrefix(server.URL, "http"), nil
 	})
+	stream.futuresAccountStatusStream = statusStream
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	require.NoError(t, aux.Connect(ctx))
-	defer aux.Close()
+	require.NoError(t, statusStream.Connect(ctx))
+
+	// Stream.Close closes the account status stream with the write lock held
+	defer stream.Close()
 
 	// the first request is sent on connect, the following ones on every interval
 	for i := 1; i <= 2; i++ {
