@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -50,6 +51,10 @@ type notifyTask struct {
 	threadTs string
 
 	opts []slack.MsgOption
+
+	// flush is set for flush barrier tasks (see Notifier.Flush) instead of a
+	// real message to send; the worker calls it and skips execution.
+	flush func()
 }
 
 func (t *notifyTask) addMsgOption(opts ...slack.MsgOption) {
@@ -71,6 +76,10 @@ type Notifier struct {
 	channel string
 
 	taskC chan notifyTask
+
+	// flushed is set once Flush has been called, after which queueTask
+	// refuses to accept any further tasks.
+	flushed atomic.Bool
 
 	liveNotePool *livenote.Pool
 
@@ -150,6 +159,11 @@ func (n *Notifier) worker(ctx context.Context) {
 			return
 
 		case task := <-n.taskC:
+			if task.flush != nil {
+				task.flush()
+				continue
+			}
+
 			if err := n.executeTask(ctx, task); err != nil {
 				log.WithError(err).
 					WithField("channel", task.channel).
@@ -545,7 +559,42 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 	}, 100*time.Millisecond)
 }
 
+// Flush blocks until all tasks queued prior to the call have been executed by
+// the worker, or ctx is done, whichever happens first. It works by enqueueing
+// a barrier task behind the pending ones and waiting for the worker to reach it.
+func (n *Notifier) Flush(ctx context.Context) {
+	// stop admitting new tasks once a flush has been requested, so queued
+	// work drains deterministically instead of chasing new arrivals.
+	n.flushed.Store(true)
+
+	done := make(chan struct{})
+	task := notifyTask{flush: func() { close(done) }}
+
+	// enqueue the barrier behind whatever is already pending; give up if the
+	// caller's ctx expires first, or the worker itself has already shut down.
+	select {
+	case n.taskC <- task:
+	case <-ctx.Done():
+		return
+	case <-n.ctx.Done():
+		return
+	}
+
+	// wait for the worker to actually reach the barrier (i.e. everything
+	// queued before it has been sent), bounded by the same two signals.
+	select {
+	case <-done:
+	case <-ctx.Done():
+	case <-n.ctx.Done():
+	}
+}
+
 func (n *Notifier) queueTask(ctx context.Context, task notifyTask, timeout time.Duration) {
+	if n.flushed.Load() {
+		log.Warnf("slack notify task is dropped because the notifier has been flushed")
+		return
+	}
+
 	select {
 	case <-ctx.Done():
 		return

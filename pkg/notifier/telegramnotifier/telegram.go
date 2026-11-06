@@ -26,6 +26,10 @@ type notifyTask struct {
 	photoBuffer *bytes.Buffer
 
 	file *types.UploadFile
+
+	// flush is set for flush barrier tasks (see Notifier.Flush) instead of a
+	// real message to send; the worker calls it and skips execution.
+	flush func()
 }
 
 type Notifier struct {
@@ -75,6 +79,11 @@ func (n *Notifier) worker() {
 		case <-ctx.Done():
 			return
 		case task := <-n.taskC:
+			if task.flush != nil {
+				task.flush()
+				continue
+			}
+
 			apiLimiter.Wait(ctx)
 			n.consume(task)
 		}
@@ -221,6 +230,25 @@ func (n *Notifier) Upload(file *types.UploadFile) {
 		return
 	}
 
+}
+
+// Flush blocks until all tasks queued prior to the call have been executed by
+// the worker, or ctx is done, whichever happens first. It works by enqueueing
+// a barrier task behind the pending ones and waiting for the worker to reach it.
+func (n *Notifier) Flush(ctx context.Context) {
+	done := make(chan struct{})
+	task := notifyTask{flush: func() { close(done) }}
+
+	select {
+	case n.taskC <- task:
+	case <-ctx.Done():
+		return
+	}
+
+	select {
+	case <-done:
+	case <-ctx.Done():
+	}
 }
 
 func photoFromBuffer(buffer *bytes.Buffer) telebot.InputMedia {
