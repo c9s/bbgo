@@ -73,7 +73,8 @@ func NewStream(ex *Exchange) *Stream {
 		ex:             ex,
 		logger:         log.WithField("module", "stream"),
 	}
-	stream.SetLogger(log)
+	stream.SetLogger(stream.logger)
+	stream.SetName("spot")
 	stream.SetParser(stream.parser.Parse)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.getEndpoint)

@@ -45,6 +45,7 @@ func NewStream(client *kucoinapi.RestClient, ex *Exchange) *Stream {
 	}
 
 	stream.SetLogger(log)
+	stream.SetName("spot")
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.getEndpoint)

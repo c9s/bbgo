@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
@@ -12,15 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStandardStream_Label(t *testing.T) {
+func TestStandardStream_Kind(t *testing.T) {
 	s := NewStandardStream()
-	assert.Equal(t, "user data", s.label())
+	assert.Equal(t, "user_data", s.kind())
 
 	s.SetPublicOnly()
-	assert.Equal(t, "public", s.label())
-
-	s.SetName("futures public")
-	assert.Equal(t, "futures public", s.label())
+	assert.Equal(t, "public", s.kind())
 }
 
 func TestStandardStream_LoggerFields(t *testing.T) {
@@ -39,7 +35,7 @@ func TestStandardStream_LoggerFields(t *testing.T) {
 
 	s := NewStandardStream()
 	s.SetLogger(logger.WithField("exchange", "test"))
-	s.SetName("aux")
+	s.SetName("futures_public")
 	s.SetEndpointCreator(func(ctx context.Context) (string, error) { return wsURL, nil })
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -47,30 +43,32 @@ func TestStandardStream_LoggerFields(t *testing.T) {
 	require.NoError(t, s.Connect(ctx))
 	require.NoError(t, s.Close())
 
-	connected := findEntry(hook.AllEntries(), "[websocket] aux stream connected, read timeout = 2m0s")
+	connected := findEntry(hook.AllEntries(), "[websocket] user data stream connected, read timeout = 2m0s")
 	require.NotNil(t, connected, "no connected log entry in %v", messages(hook.AllEntries()))
 	assert.Equal(t, "test", connected.Data["exchange"])
-	assert.Equal(t, "aux", connected.Data["stream"])
+	assert.Equal(t, "user_data", connected.Data["stream"])
+	assert.Equal(t, "futures_public", connected.Data["stream_name"])
 
-	closing := findEntry(hook.AllEntries(), "[websocket] closing aux stream...")
+	closing := findEntry(hook.AllEntries(), "[websocket] closing user data stream...")
 	require.NotNil(t, closing, "no closing log entry in %v", messages(hook.AllEntries()))
 	assert.Equal(t, "test", closing.Data["exchange"])
-	assert.Equal(t, "aux", closing.Data["stream"])
+	assert.Equal(t, "user_data", closing.Data["stream"])
+	assert.Equal(t, "futures_public", closing.Data["stream_name"])
 }
 
-// without SetLogger and SetName the messages stay the same as before, plus the stream field
+// without SetLogger and SetName: the standard logger, the stream field, and no stream_name
 func TestStandardStream_DefaultLogger(t *testing.T) {
 	hook := test.NewGlobal()
 	defer hook.Reset()
 
 	s := NewStandardStream()
 	s.SetPublicOnly()
-	s.getLogger().Infof("[websocket] %s stream connected, read timeout = %v", s.label(), 2*time.Minute)
+	s.getLogger().Info("hello")
 
 	entry := hook.LastEntry()
 	require.NotNil(t, entry)
-	assert.Equal(t, "[websocket] public stream connected, read timeout = 2m0s", entry.Message)
 	assert.Equal(t, "public", entry.Data["stream"])
+	assert.NotContains(t, entry.Data, "stream_name")
 }
 
 func findEntry(entries []*logrus.Entry, message string) *logrus.Entry {

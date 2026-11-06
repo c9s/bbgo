@@ -59,6 +59,14 @@ func NewStream(client *okexapi.RestClient, exchange *Exchange) *Stream {
 	}
 
 	stream.SetLogger(log)
+	switch {
+	case exchange.IsFutures:
+		stream.SetName("futures")
+	case exchange.MarginSettings.IsMargin:
+		stream.SetName("margin")
+	default:
+		stream.SetName("spot")
+	}
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.createEndpoint)

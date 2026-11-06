@@ -60,7 +60,8 @@ func NewStream(ex *Exchange, client *backpackapi.RestClient) *Stream {
 		logger:         log.WithField("module", "stream"),
 	}
 
-	s.SetLogger(log)
+	s.SetLogger(s.logger)
+	s.SetName("spot")
 	s.SetParser(backpackapi.ParseWebsocketMessage)
 	s.SetDispatcher(s.dispatchEvent)
 	s.SetEndpointCreator(s.createEndpoint)

@@ -265,6 +265,9 @@ func (s *Stream) updateRiskBalance(ctx context.Context) error {
 }
 
 func (s *Stream) handleBeforeConnect(ctx context.Context) error {
+	// the market flags are read at connect time, like the endpoint
+	s.SetName(streamName(s.exchange))
+
 	if s.exchange.IsMargin {
 		if err := s.updateRiskBalance(ctx); err != nil {
 			return err
@@ -300,7 +303,7 @@ func (s *Stream) writeSubscriptions() error {
 func (s *Stream) initFuturesAuxStream() {
 	aux := types.NewStandardStream()
 	aux.SetLogger(log)
-	aux.SetName("futures public")
+	aux.SetName("futures_public")
 	aux.SetParser(parseWebSocketEvent)
 	aux.SetDispatcher(s.dispatchEvent)
 	aux.SetEndpointCreator(func(ctx context.Context) (string, error) {
@@ -916,4 +919,18 @@ func (s *Stream) getFuturesPrivateEndpointUrl(listenKey string) string {
 		base = TestNetFuturesPrivateWebSocketURL
 	}
 	return base + "/ws?listenKey=" + listenKey + "&events=" + futuresPrivateStreamEvents
+}
+
+// streamName is the "stream_name" log field of the main connection: the market it serves.
+func streamName(ex *Exchange) string {
+	switch {
+	case ex.IsFutures:
+		return "futures"
+	case ex.IsIsolatedMargin:
+		return "isolated_margin"
+	case ex.IsMargin:
+		return "margin"
+	default:
+		return "spot"
+	}
 }

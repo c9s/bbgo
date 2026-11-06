@@ -97,7 +97,7 @@ type StandardStream struct {
 	// package logger with the exchange field). nil uses the standard logger.
 	logger log.FieldLogger
 
-	// name labels the stream in the "stream" log field; empty uses "public" or "user data".
+	// name is the "stream_name" log field: the connection of the exchange adapter, e.g. "futures".
 	name string
 
 	// sg is used to wait until the previous routines are closed.
@@ -566,7 +566,11 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 		return nil
 	})
 
-	s.getLogger().Infof("[websocket] %s stream connected, read timeout = %v", s.label(), readTimeout)
+	if s.PublicOnly {
+		s.getLogger().Infof("[websocket] public stream connected, read timeout = %v", readTimeout)
+	} else {
+		s.getLogger().Infof("[websocket] user data stream connected, read timeout = %v", readTimeout)
+	}
 
 	return conn, nil
 }
@@ -577,7 +581,11 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 // - writes a websocket close frame
 // After Close returns, internal goroutines should be stopped shortly after.
 func (s *StandardStream) Close() error {
-	s.getLogger().Debugf("[websocket] closing %s stream...", s.label())
+	if s.PublicOnly {
+		s.getLogger().Debugf("[websocket] closing public stream...")
+	} else {
+		s.getLogger().Debugf("[websocket] closing user data stream...")
+	}
 
 	// close the close signal channel, so that reader and ping worker will stop
 	close(s.CloseC)
@@ -614,30 +622,25 @@ func (s *StandardStream) String() string {
 	return ss
 }
 
-// SetLogger sets the base logger of the stream logs; every log line adds a "stream" field to it.
-// Exchange adapters pass their package logger so that the logs carry the exchange.
-// It should be called before Connect.
+// SetLogger sets the base logger of the stream logs; every log line adds the "stream" and
+// "stream_name" fields to it. Exchange adapters pass their package (or stream) logger so that the
+// logs carry the exchange. It should be called before Connect.
 func (s *StandardStream) SetLogger(logger log.FieldLogger) {
 	s.logger = logger
 }
 
-// SetName labels the stream in the "stream" log field, for a connection that is neither the
-// public stream nor the user data stream of a session (e.g. an auxiliary connection opened by
-// an exchange adapter). It should be called before Connect.
+// SetName sets the "stream_name" log field, which tells the connections of an exchange adapter
+// apart, e.g. "spot", "futures" or "futures_public" (snake_case). It should be called before Connect.
 func (s *StandardStream) SetName(name string) {
 	s.name = name
 }
 
-// label is the value of the "stream" log field.
-func (s *StandardStream) label() string {
-	switch {
-	case s.name != "":
-		return s.name
-	case s.PublicOnly:
+// kind is the "stream" log field: "public" or "user_data".
+func (s *StandardStream) kind() string {
+	if s.PublicOnly {
 		return "public"
-	default:
-		return "user data"
 	}
+	return "user_data"
 }
 
 func (s *StandardStream) getLogger() log.FieldLogger {
@@ -645,7 +648,12 @@ func (s *StandardStream) getLogger() log.FieldLogger {
 	if s.logger != nil {
 		logger = s.logger
 	}
-	return logger.WithField("stream", s.label())
+
+	fields := log.Fields{"stream": s.kind()}
+	if s.name != "" {
+		fields["stream_name"] = s.name
+	}
+	return logger.WithFields(fields)
 }
 
 // SetHeartBeat installs a custom heartbeat function executed before each ping.
