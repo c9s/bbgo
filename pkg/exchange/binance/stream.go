@@ -143,6 +143,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 		riskBalances: make(map[string]*RiskBalance),
 	}
 
+	stream.SetLogger(log)
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.createEndpoint)
@@ -298,6 +299,8 @@ func (s *Stream) writeSubscriptions() error {
 // Only called once; handleConnect guards with futuresAuxStream != nil check.
 func (s *Stream) initFuturesAuxStream() {
 	aux := types.NewStandardStream()
+	aux.SetLogger(log)
+	aux.SetName("futures public")
 	aux.SetParser(parseWebSocketEvent)
 	aux.SetDispatcher(s.dispatchEvent)
 	aux.SetEndpointCreator(func(ctx context.Context) (string, error) {

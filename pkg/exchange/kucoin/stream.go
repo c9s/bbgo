@@ -44,6 +44,7 @@ func NewStream(client *kucoinapi.RestClient, ex *Exchange) *Stream {
 		depthBuffers:   make(map[string]*depth.Buffer),
 	}
 
+	stream.SetLogger(log)
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.getEndpoint)

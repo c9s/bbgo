@@ -58,6 +58,7 @@ func NewStream(client *okexapi.RestClient, exchange *Exchange) *Stream {
 		kLineStream:    NewKLineStream(exchange),
 	}
 
+	stream.SetLogger(log)
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.createEndpoint)

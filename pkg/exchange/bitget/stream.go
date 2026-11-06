@@ -53,6 +53,7 @@ func NewStream(key, secret, passphrase string) *Stream {
 		passphrase:     passphrase,
 	}
 
+	stream.SetLogger(log)
 	stream.SetEndpointCreator(stream.createEndpoint)
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
