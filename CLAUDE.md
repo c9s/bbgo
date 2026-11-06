@@ -68,6 +68,16 @@ Two sub-packages provide reusable test utilities:
 
 CI uses **revive** for linting and **golangci-lint** with: staticcheck, bodyclose, contextcheck, dupword, decorder, goconst, govet, gosec, misspell. Format with `gofmt -s -w`.
 
+## Pull Request Title Convention
+
+PR titles follow `TYPE: [scope] short imperative description`:
+
+- `TYPE` is uppercase. Common values: `FIX`, `FEATURE`, `REFACTOR`, `CHORE`, `DOCS`, `UPGRADE`, `PORT`, `MISC`, `TEST`.
+- `[scope]` is the primary package or strategy touched, e.g. `[xmaker]`, `[autoborrow]`, `[indicator/v2]`, `[ci]`.
+- Description stays lowercase and concise (no trailing period).
+
+Examples from the repo: `FIX: [autoborrow] enforce Binance minimum borrow quantity`, `FEATURE: [xmaker] add connectionDelay config to delay connectivity establishment`, `REFACTOR: [xfundingv2] refactor round transfer handling and remove retry logic`.
+
 ## Code Generation
 
 Several generators produce committed files — re-run and commit when touching their inputs:
