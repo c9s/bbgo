@@ -184,6 +184,11 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 func (e *Exchange) NewStream() types.Stream {
 	stream := NewStream(e)
 	stream.MarginSettings = e.MarginSettings
+	if e.MarginSettings.IsMargin {
+		stream.SetName("margin")
+	} else {
+		stream.SetName("spot")
+	}
 	return stream
 }
 

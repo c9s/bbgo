@@ -22,6 +22,8 @@ func NewKLineStream(exchange *Exchange) *KLineStream {
 		exchange:       exchange,
 	}
 
+	k.SetLogger(log)
+	k.SetName("business")
 	k.SetParser(parseWebSocketEvent)
 	k.SetDispatcher(k.dispatchEvent)
 	k.SetEndpointCreator(func(_ context.Context) (string, error) { return okexapi.PublicBusinessWebSocketURL, nil })
