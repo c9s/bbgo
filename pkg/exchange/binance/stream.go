@@ -15,6 +15,7 @@ import (
 
 	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -108,6 +109,9 @@ type Stream struct {
 	algoOrderUpdateEventCallbacks     []func(e *AlgoOrderUpdateEvent)
 	serverShutdownEventCallbacks      []func(e *ServerShutdownEvent)
 
+	// futures websocket api (ws-fapi) event callbacks
+	futuresAccountStatusEventCallbacks []func(e *FuturesAccountStatusEvent)
+
 	errorCallbacks []func(e *ErrorEvent)
 
 	// depthBuffers is used for storing the depth info
@@ -128,6 +132,21 @@ type Stream struct {
 	futuresAuxStream  *types.StandardStream
 	futuresPublicSubs []types.Subscription // cached /public subscriptions
 	futuresMarketSubs []types.Subscription // cached /market subscriptions
+
+	// futuresAccountStatusStream polls v2/account.status over the futures WebSocket API.
+	// Only created for futures user data streams when EnableFuturesAccountStatusUpdate is called.
+	futuresAccountStatusStream   *types.StandardStream
+	futuresAccountStatusInterval time.Duration
+	futuresWsApiRequestID        uint64
+
+	// futuresAccountStatusCtx is the base context passed to Connect, used to start the account status stream
+	futuresAccountStatusCtx context.Context
+
+	// futuresWsApiErrorLimiter rate limits the error logs of the futures websocket api responses
+	futuresWsApiErrorLimiter *rate.Limiter
+
+	// futuresWsApiWriteMu serializes the account status requests with the close frame written by Close
+	futuresWsApiWriteMu sync.Mutex
 }
 
 func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Client) *Stream {
@@ -219,6 +238,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnDisconnect(stream.handleDisconnect)
 	stream.OnConnect(stream.handleConnect)
 	stream.SetBeforeConnect(stream.handleBeforeConnect)
+	stream.OnStart(stream.startFuturesAccountStatusStream)
 	stream.OnListenKeyExpired(func(e *ListenKeyExpired) {
 		log.Warnf("listen key expired, triggering reconnect: %+v", e)
 		stream.Reconnect()
@@ -270,18 +290,39 @@ func (s *Stream) handleBeforeConnect(ctx context.Context) error {
 		}
 	}
 
+	// handleBeforeConnect is only called by Connect with the base context; the account status
+	// stream is started with it from OnStart, once the user data stream has connected.
+	if s.shouldUseFuturesAccountStatusStream() {
+		s.ConnLock.Lock()
+		s.futuresAccountStatusCtx = ctx
+		s.ConnLock.Unlock()
+	}
+
 	return nil
 }
 
-// Close closes the stream and, if present, the auxiliary futures /public stream.
+// Close closes the stream and, if present, the auxiliary futures /public stream
+// and the futures account status stream.
 func (s *Stream) Close() error {
 	s.ConnLock.Lock()
 	auxStream := s.futuresAuxStream
+	accountStatusStream := s.futuresAccountStatusStream
 	s.ConnLock.Unlock()
 
 	if auxStream != nil {
 		if err := auxStream.Close(); err != nil {
 			log.WithError(err).Warn("futures aux stream close error")
+		}
+	}
+
+	if accountStatusStream != nil {
+		// hold the write lock so that Close never writes the close frame concurrently with a request;
+		// Close cancels the connection context first, so the poller stops writing afterwards.
+		s.futuresWsApiWriteMu.Lock()
+		err := accountStatusStream.Close()
+		s.futuresWsApiWriteMu.Unlock()
+		if err != nil {
+			log.WithError(err).Warn("futures account status stream close error")
 		}
 	}
 	return s.StandardStream.Close()
