@@ -374,7 +374,13 @@ You can only use one database driver MySQL or SQLite to store your trading data.
 
 #### Configure MySQL Database
 
-To use MySQL database for data syncing, first, you need to install your MySQL server:
+To use MySQL database for data syncing, first, you need a MySQL server. We recommend running it in [Docker](https://hub.docker.com/_/mysql), pinned to the same LTS version used in CI:
+
+```sh
+docker run -d --name bbgo-mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=bbgo -p 3306:3306 mysql:8.4
+```
+
+Alternatively, install MySQL via your OS package manager. Note this installs whichever version your distro ships, not necessarily 8.4 — and some newer Ubuntu releases ship without a `mysql-server` package at all:
 
 ```sh
 # For Ubuntu Linux
@@ -383,8 +389,6 @@ sudo apt-get install -y mysql-server
 # For newer Ubuntu Linux
 sudo apt install -y mysql-server
 ```
-
-Or [run it in docker](https://hub.docker.com/_/mysql)
 
 Create your mysql database:
 
