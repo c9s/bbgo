@@ -82,6 +82,8 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	cancelShutdown()
 	cancelTrading()
 
+	bbgo.Flush()
+
 	return nil
 }
 
@@ -208,6 +210,8 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	bbgo.Shutdown(shtCtx)
 	cancelShutdown()
 	cancelTrading()
+
+	bbgo.Flush()
 
 	if environ.ProfilingService != nil {
 		if err = environ.ProfilingService.Stop(); err != nil {

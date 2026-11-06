@@ -532,6 +532,8 @@ var BacktestCmd = &cobra.Command{
 		bbgo.Shutdown(shtCtx)
 		cancelShutdown()
 
+		bbgo.Flush()
+
 		// put the logger back to print the pnl
 		log.SetLevel(log.InfoLevel)
 

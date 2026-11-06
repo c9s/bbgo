@@ -2,6 +2,9 @@ package bbgo
 
 import (
 	"bytes"
+	"context"
+	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -9,10 +12,20 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+// DefaultNotificationFlushTimeout is the time budget given to Flush to wait for
+// queued notifications (e.g. Slack/Telegram) to actually be sent before giving up.
+const DefaultNotificationFlushTimeout = 5 * time.Second
+
 var Notification = &Notifiability{}
 
 func Notify(obj interface{}, args ...interface{}) {
 	Notification.Notify(obj, args...)
+}
+
+// Flush blocks until all notifiers have sent their queued notifications, up
+// to DefaultNotificationFlushTimeout.
+func Flush() {
+	Notification.Flush()
 }
 
 func SendPhoto(buffer *bytes.Buffer) {
@@ -30,6 +43,10 @@ func Upload(file *types.UploadFile) {
 type Notifier interface {
 	Notify(obj any, args ...any)
 	Upload(file *types.UploadFile)
+
+	// Flush blocks until all notifications queued prior to the call have been
+	// sent, or ctx is done, whichever happens first.
+	Flush(ctx context.Context)
 }
 
 type NullNotifier struct{}
@@ -37,6 +54,8 @@ type NullNotifier struct{}
 func (n *NullNotifier) Notify(_ interface{}, args ...interface{}) {}
 
 func (n *NullNotifier) Upload(_ *types.UploadFile) {}
+
+func (n *NullNotifier) Flush(_ context.Context) {}
 
 type Notifiability struct {
 	notifiers       []Notifier
@@ -67,4 +86,23 @@ func (m *Notifiability) Upload(file *types.UploadFile) {
 	for _, n := range m.notifiers {
 		n.Upload(file)
 	}
+}
+
+// Flush waits for all registered notifiers to send their queued notifications
+// concurrently, giving them up to DefaultNotificationFlushTimeout to finish.
+func (m *Notifiability) Flush() {
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNotificationFlushTimeout)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(len(m.notifiers))
+
+	for _, n := range m.notifiers {
+		go func(n Notifier) {
+			defer wg.Done()
+			n.Flush(ctx)
+		}(n)
+	}
+
+	wg.Wait()
 }
