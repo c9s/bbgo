@@ -48,6 +48,18 @@ func marginHistoryAPI(ex types.Exchange) types.MarginHistoryService {
 	return api
 }
 
+// MarginInterestFeeAsset returns the asset the exchange can charge margin interest
+// in instead of the borrowed asset, empty if none. Binance charges it in BNB when
+// BNB deduction is on. Those rows are stored under BNB (Asset) with the borrowed
+// asset in RawAsset, and the exchange returns them only for asset=BNB, so they are
+// synced only by syncing the interests of BNB.
+func MarginInterestFeeAsset(ex types.ExchangeName) string {
+	if ex == types.ExchangeBinance {
+		return "BNB"
+	}
+	return ""
+}
+
 // MarginService syncs and queries the margin history (loans, repays, interests, liquidations) of a session
 type MarginService struct {
 	DB *sqlx.DB
@@ -221,13 +233,11 @@ func (s *MarginService) interestSyncTask(
 			return obj.(types.MarginInterest).Time.Time()
 		},
 		ID: func(obj interface{}) string {
-			m := obj.(types.MarginInterest)
-			return m.Asset + m.IsolatedSymbol + strconv.FormatInt(m.Time.UnixMilli(), 10)
+			return obj.(types.MarginInterest).Key()
 		},
 		Insert: func(obj interface{}) error {
 			m := obj.(types.MarginInterest)
-			m.Session = session
-			m.Time = types.Time(m.Time.Time().UTC())
+			m = normalizeInterest(m, session)
 			// an unpriced row is not inserted, so the next sync resumes before it
 			p, err := getPricer()
 			if err != nil {
@@ -251,6 +261,15 @@ func (s *MarginService) interestSyncTask(
 		ResumeOverlap: interestResumeOverlap,
 		LogInsert:     true,
 	}
+}
+
+// normalizeInterest stamps the session, normalizes the time to UTC and fills
+// RawAsset, so raw_asset is always the borrowed asset and rows can be grouped by it.
+func normalizeInterest(m types.MarginInterest, session string) types.MarginInterest {
+	m.Session = session
+	m.Time = types.Time(m.Time.Time().UTC())
+	m.RawAsset = m.BorrowedAsset()
+	return m
 }
 
 // QueryMarginInterestOptions selects the interest rows of one session in the

@@ -1,3 +1,4 @@
+// Package sqlite3 contains compiled migration registry helpers.
 package sqlite3
 
 import (
@@ -11,6 +12,7 @@ import (
 
 var registeredGoMigrations = map[rockhopper.RegistryKey]*rockhopper.Migration{}
 
+// MergeMigrationsMap adds migrations without replacing existing registry entries.
 func MergeMigrationsMap(ms map[rockhopper.RegistryKey]*rockhopper.Migration) {
 	for k, m := range ms {
 		if _, ok := registeredGoMigrations[k]; !ok {
@@ -21,6 +23,7 @@ func MergeMigrationsMap(ms map[rockhopper.RegistryKey]*rockhopper.Migration) {
 	}
 }
 
+// GetMigrationsMap returns the generated migration registry.
 func GetMigrationsMap() map[rockhopper.RegistryKey]*rockhopper.Migration {
 	return registeredGoMigrations
 }

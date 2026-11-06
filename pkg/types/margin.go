@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -59,6 +60,58 @@ type MarginInterest struct {
 	// PriceInUSDT is the USDT price of Asset at the time of the charge (1h kline open),
 	// filled during sync. Zero means unknown.
 	PriceInUSDT fixedpoint.Value `json:"priceInUSDT" db:"price_in_usdt"`
+
+	// RawAsset is the borrowed asset. It is Asset, except when the interest is
+	// paid in another asset, e.g. Binance BNB deduction: Asset is BNB, Interest
+	// is in BNB and Principle is in RawAsset. Group by it to sum per borrowed asset.
+	RawAsset string `json:"rawAsset" db:"raw_asset"`
+
+	// InterestType is the exchange interest type, e.g. PERIODIC or PERIODIC_CONVERTED
+	InterestType string `json:"interestType" db:"interest_type"`
+}
+
+// Margin interest types whose interest is paid in another asset (Binance BNB deduction)
+const (
+	MarginInterestTypePeriodicConverted = "PERIODIC_CONVERTED"
+	MarginInterestTypeOnBorrowConverted = "ON_BORROW_CONVERTED"
+)
+
+// BorrowedAsset returns the asset the interest is charged on: RawAsset, or Asset
+// when RawAsset is not set.
+func (m MarginInterest) BorrowedAsset() string {
+	if m.RawAsset != "" {
+		return m.RawAsset
+	}
+	return m.Asset
+}
+
+// IsConverted reports whether the interest is paid in an asset other than the
+// borrowed one. It is decided by InterestType only.
+func (m MarginInterest) IsConverted() bool {
+	return m.InterestType == MarginInterestTypePeriodicConverted ||
+		m.InterestType == MarginInterestTypeOnBorrowConverted
+}
+
+// Key identifies an interest row: one charge of one borrowed asset at one time.
+// The borrowed asset is part of it, because a BNB-paid hour has a row per
+// borrowed asset, all with Asset BNB and the same time. BorrowedAsset, not
+// RawAsset, so a row without RawAsset matches its copy where it is filled.
+func (m MarginInterest) Key() string {
+	return m.Asset + "/" + m.BorrowedAsset() + "/" + m.IsolatedSymbol + "/" + strconv.FormatInt(m.Time.Time().UnixMilli(), 10)
+}
+
+// NominalInterest returns the interest in BorrowedAsset units. A converted row
+// reports only the paid amount, so its nominal interest is the hourly charge
+// Principle x InterestRate / 24. Any discount of paying in another asset is left out.
+//
+// The daily unit of InterestRate is measured, not documented: Binance does not
+// state it, but on BNB-paid rows interest / (principal x rate) matched
+// price(raw)/price(BNB) / 24, less the BNB discount, across many assets.
+func (m MarginInterest) NominalInterest() fixedpoint.Value {
+	if !m.IsConverted() {
+		return m.Interest
+	}
+	return m.Principle.Mul(m.InterestRate).Div(fixedpoint.NewFromInt(24))
 }
 
 type MarginLoan struct {

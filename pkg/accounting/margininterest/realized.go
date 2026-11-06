@@ -37,21 +37,28 @@ func (m PriceMode) OrDefault() PriceMode {
 	return m
 }
 
-// AssetRealized is the interest already charged on one asset in a range
+// AssetRealized is the interest already charged on one borrowed asset in a range
 type AssetRealized struct {
+	// Asset is the borrowed asset (MarginInterest.BorrowedAsset)
 	Asset string
 
-	// Interest is the summed interest in asset units
+	// Interest is the summed nominal interest in Asset units
+	// (MarginInterest.NominalInterest), however it was paid
 	Interest fixedpoint.Value
 
+	// Charged is what was actually charged, per paid asset: Asset itself, or
+	// e.g. BNB for interest paid with BNB deduction
+	Charged map[string]fixedpoint.Value
+
+	// USDT values Charged, so a discount of paying in another asset is included
 	USDT fixedpoint.Value
 	Rows int
 
-	// PriceOK is false if any row (charged) or the asset (current) could not be priced
+	// PriceOK is false if any row (charged) or any paid asset (current) could not be priced
 	PriceOK bool
 }
 
-// Realized is the interest already charged in a range, per asset and in total
+// Realized is the interest already charged in a range, per borrowed asset and in total
 type Realized struct {
 	Mode         PriceMode
 	Assets       map[string]AssetRealized
@@ -59,21 +66,18 @@ type Realized struct {
 	MissingPrice []string
 }
 
-type interestRowKey struct {
-	asset, isolatedSymbol string
-	timeMs                int64
-}
-
-// SumRealized sums interest rows per asset and values them in USDT.
+// SumRealized sums interest rows per borrowed asset and values them in USDT.
+// A row paid in another asset (e.g. BNB) counts toward its RawAsset.
 //
-// Rows with the same (Asset, IsolatedSymbol, Time) are counted once, because
-// margin_interests has no unique key and two processes (e.g. `bbgo sync`
-// next to `bbgo run`) can insert the same rows.
+// Rows with the same Key (Asset, BorrowedAsset, IsolatedSymbol, Time) are counted once,
+// because margin_interests has no unique key and two processes (e.g. `bbgo sync`
+// next to `bbgo run`) can insert the same rows. The borrowed asset is in the key
+// because one hour has a BNB-paid row for every borrowed asset.
 //
-// current: USDT = sum(interest) x pricer(asset).
-// charged: USDT = sum(interest x row.PriceInUSDT). A row with PriceInUSDT <= 0 is
-// left out of USDT (its Interest still counts) and marks the asset missing.
-// USDT always uses price 1.
+// current: USDT = sum over paid assets of Charged[paid] x pricer(paid).
+// charged: USDT = sum(row.Interest x row.PriceInUSDT), the price of the paid asset.
+// A row with PriceInUSDT <= 0 is left out of USDT (its amounts still count) and
+// marks the borrowed asset missing. USDT always uses price 1.
 func SumRealized(rows []types.MarginInterest, mode PriceMode, pricer PriceFunc) Realized {
 	mode = mode.OrDefault()
 	r := Realized{
@@ -82,20 +86,32 @@ func SumRealized(rows []types.MarginInterest, mode PriceMode, pricer PriceFunc) 
 		TotalUSDT: fixedpoint.Zero,
 	}
 
-	seen := make(map[interestRowKey]struct{}, len(rows))
+	seen := make(map[string]struct{}, len(rows))
 	for _, row := range rows {
-		key := interestRowKey{row.Asset, row.IsolatedSymbol, row.Time.Time().UnixMilli()}
+		borrowed := row.BorrowedAsset()
+		key := row.Key()
 		if _, dup := seen[key]; dup {
 			continue
 		}
 		seen[key] = struct{}{}
 
-		ar, ok := r.Assets[row.Asset]
+		ar, ok := r.Assets[borrowed]
 		if !ok {
-			ar = AssetRealized{Asset: row.Asset, Interest: fixedpoint.Zero, USDT: fixedpoint.Zero, PriceOK: true}
+			ar = AssetRealized{
+				Asset:    borrowed,
+				Interest: fixedpoint.Zero,
+				Charged:  make(map[string]fixedpoint.Value),
+				USDT:     fixedpoint.Zero,
+				PriceOK:  true,
+			}
 		}
 
-		ar.Interest = ar.Interest.Add(row.Interest)
+		ar.Interest = ar.Interest.Add(row.NominalInterest())
+		charged, ok := ar.Charged[row.Asset]
+		if !ok {
+			charged = fixedpoint.Zero
+		}
+		ar.Charged[row.Asset] = charged.Add(row.Interest)
 		ar.Rows++
 
 		if mode == PriceModeCharged {
@@ -109,15 +125,17 @@ func SumRealized(rows []types.MarginInterest, mode PriceMode, pricer PriceFunc) 
 			}
 		}
 
-		r.Assets[row.Asset] = ar
+		r.Assets[borrowed] = ar
 	}
 
 	for asset, ar := range r.Assets {
 		if mode == PriceModeCurrent {
-			if px, ok := priceOf(pricer, asset); ok {
-				ar.USDT = ar.Interest.Mul(px)
-			} else {
-				ar.PriceOK = false
+			for paid, amount := range ar.Charged {
+				if px, ok := priceOf(pricer, paid); ok {
+					ar.USDT = ar.USDT.Add(amount.Mul(px))
+				} else {
+					ar.PriceOK = false
+				}
 			}
 			r.Assets[asset] = ar
 		}

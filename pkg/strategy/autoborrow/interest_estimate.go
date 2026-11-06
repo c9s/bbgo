@@ -39,6 +39,11 @@ var defaultProjectionMonths = []int{1, 3}
 // every asset is reported and synced even with no debt. The config is the
 // asset list by design: a debt or a charge of another asset is not counted, only warned.
 //
+// Interest paid in another asset (Binance BNB deduction) counts toward the
+// borrowed asset: its amount at the nominal interest, its USDT value at the BNB
+// actually charged. On Binance, BNB rows are synced too, since the exchange
+// returns them only for asset=BNB.
+//
 // Every figure is counted in hourly charges. Two month windows are built on them:
 //
 //   - the calendar month: realized since the UTC month start plus the projection
@@ -174,9 +179,16 @@ type interestEstimateWorker struct {
 	session *bbgo.ExchangeSession
 	config  *InterestEstimateConfig
 
-	// assets are the autoborrow assets, sorted and distinct: the scope of the
-	// estimate and of the interest sync
+	// assets are the autoborrow assets, sorted and distinct: the scope of the estimate
 	assets []string
+
+	// syncAssets are the assets whose interest rows are synced: assets, plus the
+	// fee asset (BNB on Binance). Interest paid with BNB deduction is stored under
+	// BNB, and the exchange returns it only for asset=BNB, not for the borrowed asset.
+	syncAssets []string
+
+	// feeAsset is the asset interest can be paid in besides the borrowed one, empty if none
+	feeAsset string
 
 	// interestQueryService queries the next hourly interest rates; nil when the exchange has none
 	interestQueryService marginFutureInterestQueryService
@@ -217,6 +229,12 @@ func newInterestEstimateWorker(s *Strategy, session *bbgo.ExchangeSession, confi
 		syncFailed: make(map[string]error),
 		synced:     make(map[string]time.Time),
 		labels:     make(map[*prometheus.GaugeVec]map[string][]string),
+	}
+
+	w.feeAsset = service.MarginInterestFeeAsset(session.ExchangeName)
+	w.syncAssets = w.assets
+	if w.feeAsset != "" {
+		w.syncAssets = sortedDistinct(append(append([]string(nil), w.assets...), w.feeAsset))
 	}
 
 	if service, ok := session.Exchange.(marginFutureInterestQueryService); ok {
@@ -326,8 +344,7 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 	// every autoborrow asset is listed, borrowed or not
 	est.Assets = margininterest.MonthByAsset(projection, realized)
 	for asset, m := range est.Assets {
-		_, failed := w.syncFailed[asset]
-		m.MissingHistory = !realizedOK || failed
+		m.MissingHistory = !realizedOK || w.historyFailed(asset)
 		est.Assets[asset] = m
 	}
 
@@ -432,13 +449,15 @@ func (w *interestEstimateWorker) queryRealized(
 		configured[asset] = struct{}{}
 	}
 
+	// a row counts toward the asset it was borrowed in, also when paid in BNB
 	counted := rows[:0:0]
 	others := map[string]struct{}{}
 	for _, row := range rows {
-		if _, ok := configured[row.Asset]; ok {
+		borrowed := row.BorrowedAsset()
+		if _, ok := configured[borrowed]; ok {
 			counted = append(counted, row)
 		} else {
-			others[row.Asset] = struct{}{}
+			others[borrowed] = struct{}{}
 		}
 	}
 
@@ -462,7 +481,7 @@ func (w *interestEstimateWorker) syncHistory(ctx context.Context, now, rangeStar
 	sctx, cancel := context.WithTimeout(ctx, w.config.Interval.Duration())
 	defer cancel()
 
-	for _, asset := range w.assets {
+	for _, asset := range w.syncAssets {
 		if err := w.history.SyncInterests(sctx, w.session.Exchange, w.session.Name, asset, w.assetSyncStart(asset, rangeStart)); err != nil {
 			w.logger.WithError(err).Warnf("interest estimate: unable to sync %s margin interests", asset)
 			w.countError("sync")
@@ -473,6 +492,20 @@ func (w *interestEstimateWorker) syncHistory(ctx context.Context, now, rangeStar
 		delete(w.syncFailed, asset)
 		w.synced[asset] = now
 	}
+}
+
+// historyFailed reports whether the realized rows of asset may be incomplete
+// because the latest sync of the asset, or of the fee asset its interest may be
+// paid in, failed.
+func (w *interestEstimateWorker) historyFailed(asset string) bool {
+	if _, failed := w.syncFailed[asset]; failed {
+		return true
+	}
+	if w.feeAsset == "" {
+		return false
+	}
+	_, failed := w.syncFailed[w.feeAsset]
+	return failed
 }
 
 // assetSyncStart returns syncStart, or the last successful sync of asset (less
@@ -566,9 +599,13 @@ func (w *interestEstimateWorker) publish(est *interestEstimate) {
 	}
 
 	realizedAmount := map[string]float64{}
+	var realizedCharged []gaugeSample
 	if est.RealizedOK {
 		for asset, r := range est.Realized.Assets {
 			realizedAmount[asset] = r.Interest.Float64()
+			for paid, amount := range r.Charged {
+				realizedCharged = append(realizedCharged, gaugeSample{[]string{asset, paid}, amount.Float64()})
+			}
 		}
 	}
 
@@ -589,6 +626,7 @@ func (w *interestEstimateWorker) publish(est *interestEstimate) {
 	}
 
 	w.setAssetGauges(interestRealizedAmountMetrics, realizedAmount)
+	w.setGauges(interestRealizedChargedAmountMetrics, realizedCharged)
 	w.setAssetGauges(interestMonthAmountMetrics, monthAmount)
 	w.setAssetGauges(interestMonthInUSDTMetrics, monthUSDT)
 	w.setAssetGauges(interestAssetEstimateCompleteMetrics, assetComplete)
