@@ -9,6 +9,13 @@ import (
 )
 
 func toGlobalInterest(record binanceapi.MarginInterest) types.MarginInterest {
+	// a row not paid in BNB is charged in its own asset; rawAsset is read only on
+	// a converted row, see binanceapi.MarginInterest
+	rawAsset := record.Asset
+	if record.Type.IsConverted() && record.RawAsset != "" {
+		rawAsset = record.RawAsset
+	}
+
 	return types.MarginInterest{
 		Exchange:       types.ExchangeBinance,
 		Asset:          record.Asset,
@@ -17,6 +24,8 @@ func toGlobalInterest(record binanceapi.MarginInterest) types.MarginInterest {
 		InterestRate:   record.InterestRate,
 		IsolatedSymbol: record.IsolatedSymbol,
 		Time:           types.Time(record.InterestAccuredTime),
+		RawAsset:       rawAsset,
+		InterestType:   string(record.Type),
 	}
 }
 
