@@ -318,6 +318,17 @@ type Server struct {
 	Config  *bbgo.Config
 	Environ *bbgo.Environment
 	Trader  *bbgo.Trader
+
+	// EnableStrategyRPC turns on StrategyRPCService, which lets a caller
+	// list and invoke methods exported by strategy instances. It is
+	// gated separately from the rest of this gRPC server because it can
+	// expose mutating control over live trading strategies.
+	EnableStrategyRPC bool
+
+	// StrategyRPCToken is the shared bearer token required on every
+	// StrategyRPCService call. Only meaningful when EnableStrategyRPC is
+	// true.
+	StrategyRPCToken string
 }
 
 func (s *Server) ListenAndServe(bind string) error {
@@ -326,7 +337,9 @@ func (s *Server) ListenAndServe(bind string) error {
 		return errors.Wrapf(err, "failed to bind network at %s", bind)
 	}
 
-	var grpcServer = grpc.NewServer()
+	// StrategyRPCInterceptor only gates/audits calls to StrategyRPCService;
+	// it is a no-op pass-through for the other services registered below.
+	var grpcServer = grpc.NewServer(grpc.UnaryInterceptor(StrategyRPCInterceptor(s.StrategyRPCToken)))
 	pb.RegisterMarketDataServiceServer(grpcServer, &MarketDataService{
 		Config:  s.Config,
 		Environ: s.Environ,
@@ -344,6 +357,14 @@ func (s *Server) ListenAndServe(bind string) error {
 		Environ: s.Environ,
 		Trader:  s.Trader,
 	})
+
+	if s.EnableStrategyRPC {
+		pb.RegisterStrategyRPCServiceServer(grpcServer, &StrategyRPCService{
+			Config:  s.Config,
+			Environ: s.Environ,
+			Trader:  s.Trader,
+		})
+	}
 
 	reflection.Register(grpcServer)
 
