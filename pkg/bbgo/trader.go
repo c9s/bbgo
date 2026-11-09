@@ -13,6 +13,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/interact"
+	"github.com/c9s/bbgo/pkg/rpcexport"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -42,6 +43,16 @@ type StrategyValidator interface {
 
 type StrategyShutdown interface {
 	Shutdown(ctx context.Context, wg *sync.WaitGroup)
+}
+
+// RPCExporter is implemented by strategies that want to expose some of
+// their own methods for remote discovery and invocation. ExportRPC is
+// called once, during Trader.Initialize, with a Registry scoped to this
+// strategy instance; the strategy should call reg.Export(...) for each
+// method it wants to expose, and keep a reference to reg so it can drain
+// reg.Requests() from inside its own Run()/CrossRun() loop.
+type RPCExporter interface {
+	ExportRPC(reg *rpcexport.Registry)
 }
 
 // ExchangeSessionSubscriber provides an interface for collecting subscriptions from different strategies
@@ -81,13 +92,32 @@ type Trader struct {
 	// when strategy implements Shutdown(ctx), the func ref will be stored in the callback.
 	gracefulShutdown GracefulShutdown
 
+	// rpcExports holds the RPC registry of every strategy instance that
+	// implements RPCExporter, keyed by its instance ID.
+	rpcExports map[string]*rpcExportEntry
+
 	logger Logger
+}
+
+// rpcExportEntry pairs an instance's RPC registry with its strategy type
+// ID, so ListRPCInstances can report both without the caller needing to
+// look the strategy up separately.
+type rpcExportEntry struct {
+	registry   *rpcexport.Registry
+	strategyID string
+}
+
+// RPCInstance is one strategy instance that has exported RPC methods.
+type RPCInstance struct {
+	InstanceID string
+	StrategyID string
 }
 
 func NewTrader(environ *Environment) *Trader {
 	return &Trader{
 		environment:        environ,
 		exchangeStrategies: make(map[string][]SingleExchangeStrategy),
+		rpcExports:         make(map[string]*rpcExportEntry),
 		logger:             log.StandardLogger(),
 	}
 }
@@ -350,11 +380,40 @@ func (trader *Trader) Initialize(ctx context.Context) error {
 		}
 
 		if initializer, ok := strategy.(StrategyInitializer); ok {
-			return initializer.Initialize()
+			if err := initializer.Initialize(); err != nil {
+				return err
+			}
+		}
+
+		if exporter, ok := strategy.(RPCExporter); ok {
+			id := dynamic.CallID(strategy)
+			reg := rpcexport.NewRegistry(id)
+			exporter.ExportRPC(reg)
+			trader.rpcExports[id] = &rpcExportEntry{registry: reg, strategyID: strategy.ID()}
 		}
 
 		return nil
 	})
+}
+
+// RPCRegistry returns the RPC registry for the strategy instance identified
+// by instanceID, if that strategy implements RPCExporter.
+func (trader *Trader) RPCRegistry(instanceID string) (*rpcexport.Registry, bool) {
+	entry, ok := trader.rpcExports[instanceID]
+	if !ok {
+		return nil, false
+	}
+	return entry.registry, true
+}
+
+// ListRPCInstances returns every strategy instance that has exported RPC
+// methods.
+func (trader *Trader) ListRPCInstances() []RPCInstance {
+	out := make([]RPCInstance, 0, len(trader.rpcExports))
+	for instanceID, entry := range trader.rpcExports {
+		out = append(out, RPCInstance{InstanceID: instanceID, StrategyID: entry.strategyID})
+	}
+	return out
 }
 
 func (trader *Trader) LoadState(ctx context.Context) error {
