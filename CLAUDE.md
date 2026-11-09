@@ -170,6 +170,27 @@ Three facts that are easy to get wrong:
 Exercise it with `bbgo marketdata download | dump | record` — no database and no
 API key needed.
 
+## DeFi / On-Chain Layer
+
+`pkg/chain/evm` is the EVM access layer for Ethereum, BSC and Polygon, and
+`pkg/bbgo/chainsession.go` defines `ChainSession` (one chain + one address, the
+on-chain counterpart of `ExchangeSession`). Read
+`doc/development/defi-chain-layer.md` before touching it or adding a protocol
+adapter under `pkg/defi/`.
+
+Two rules that are easy to get wrong:
+
+- **Raw amounts are `*big.Int`, never `fixedpoint.Value`.** The default build of
+  `fixedpoint` is an int64 with 8 decimal places, so wei overflows it. Convert
+  only at the strategy/display boundary, via the token decimals.
+- **Token decimals are read from the chain.** USDT and USDC are 6 decimals on
+  Ethereum and 18 on BSC. `pkg/chain/evm/token` resolves and caches metadata;
+  batch multi-contract reads through `pkg/chain/evm/multicall` (Multicall3 is at
+  the same address on all three chains).
+
+Exercise it with `bbgo chain info | balance` — no database and no exchange API
+key needed.
+
 ## Strategy Development
 
 1. Create package under `pkg/strategy/<name>/`
