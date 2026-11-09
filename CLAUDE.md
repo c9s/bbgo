@@ -198,6 +198,24 @@ Exercise it with `bbgo chain info | balance | allowance`, and the write commands
 `bbgo chain send | approve`, which simulate unless `--confirm` is passed — no
 database and no exchange API key needed.
 
+## DeFi Protocol Adapters
+
+Protocol adapters live in `pkg/defi/<protocol>/` and are shaped like the
+contracts they wrap; there is deliberately no protocol-agnostic
+`Quoter`/`Swapper` interface yet. It gets extracted once Uniswap, Curve and
+Balancer all exist, because those three swap shapes differ too much to abstract
+in advance (router+pool vs. int128 coin index vs. vault poolId).
+
+- **Aave v3** — `doc/development/defi-aave-v3.md`. Read it before touching
+  `pkg/defi/aave/v3`. Only the `PoolAddressesProvider` is hardcoded, one address
+  per chain; everything else is resolved from it. The units are the trap:
+  account amounts are USD with 8 decimals (not token units), the health factor
+  is WAD and is max uint256 when there is no debt, and the rates are RAY
+  per-second values.
+
+Exercise it with `bbgo aave market | account`, and the write commands
+`bbgo aave supply | withdraw | borrow | repay`, which need `--confirm`.
+
 ## Strategy Development
 
 1. Create package under `pkg/strategy/<name>/`
