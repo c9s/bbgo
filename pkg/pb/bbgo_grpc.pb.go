@@ -508,3 +508,161 @@ var TradingService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "pkg/pb/bbgo.proto",
 }
+
+// StrategyRPCServiceClient is the client API for StrategyRPCService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type StrategyRPCServiceClient interface {
+	ListInstances(ctx context.Context, in *ListInstancesRequest, opts ...grpc.CallOption) (*ListInstancesResponse, error)
+	ListMethods(ctx context.Context, in *ListMethodsRequest, opts ...grpc.CallOption) (*ListMethodsResponse, error)
+	Invoke(ctx context.Context, in *InvokeRequest, opts ...grpc.CallOption) (*InvokeResponse, error)
+}
+
+type strategyRPCServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewStrategyRPCServiceClient(cc grpc.ClientConnInterface) StrategyRPCServiceClient {
+	return &strategyRPCServiceClient{cc}
+}
+
+func (c *strategyRPCServiceClient) ListInstances(ctx context.Context, in *ListInstancesRequest, opts ...grpc.CallOption) (*ListInstancesResponse, error) {
+	out := new(ListInstancesResponse)
+	err := c.cc.Invoke(ctx, "/bbgo.StrategyRPCService/ListInstances", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *strategyRPCServiceClient) ListMethods(ctx context.Context, in *ListMethodsRequest, opts ...grpc.CallOption) (*ListMethodsResponse, error) {
+	out := new(ListMethodsResponse)
+	err := c.cc.Invoke(ctx, "/bbgo.StrategyRPCService/ListMethods", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *strategyRPCServiceClient) Invoke(ctx context.Context, in *InvokeRequest, opts ...grpc.CallOption) (*InvokeResponse, error) {
+	out := new(InvokeResponse)
+	err := c.cc.Invoke(ctx, "/bbgo.StrategyRPCService/Invoke", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// StrategyRPCServiceServer is the server API for StrategyRPCService service.
+// All implementations must embed UnimplementedStrategyRPCServiceServer
+// for forward compatibility
+type StrategyRPCServiceServer interface {
+	ListInstances(context.Context, *ListInstancesRequest) (*ListInstancesResponse, error)
+	ListMethods(context.Context, *ListMethodsRequest) (*ListMethodsResponse, error)
+	Invoke(context.Context, *InvokeRequest) (*InvokeResponse, error)
+	mustEmbedUnimplementedStrategyRPCServiceServer()
+}
+
+// UnimplementedStrategyRPCServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedStrategyRPCServiceServer struct {
+}
+
+func (UnimplementedStrategyRPCServiceServer) ListInstances(context.Context, *ListInstancesRequest) (*ListInstancesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListInstances not implemented")
+}
+func (UnimplementedStrategyRPCServiceServer) ListMethods(context.Context, *ListMethodsRequest) (*ListMethodsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListMethods not implemented")
+}
+func (UnimplementedStrategyRPCServiceServer) Invoke(context.Context, *InvokeRequest) (*InvokeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Invoke not implemented")
+}
+func (UnimplementedStrategyRPCServiceServer) mustEmbedUnimplementedStrategyRPCServiceServer() {}
+
+// UnsafeStrategyRPCServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to StrategyRPCServiceServer will
+// result in compilation errors.
+type UnsafeStrategyRPCServiceServer interface {
+	mustEmbedUnimplementedStrategyRPCServiceServer()
+}
+
+func RegisterStrategyRPCServiceServer(s grpc.ServiceRegistrar, srv StrategyRPCServiceServer) {
+	s.RegisterService(&StrategyRPCService_ServiceDesc, srv)
+}
+
+func _StrategyRPCService_ListInstances_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListInstancesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StrategyRPCServiceServer).ListInstances(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/bbgo.StrategyRPCService/ListInstances",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StrategyRPCServiceServer).ListInstances(ctx, req.(*ListInstancesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StrategyRPCService_ListMethods_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMethodsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StrategyRPCServiceServer).ListMethods(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/bbgo.StrategyRPCService/ListMethods",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StrategyRPCServiceServer).ListMethods(ctx, req.(*ListMethodsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StrategyRPCService_Invoke_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InvokeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StrategyRPCServiceServer).Invoke(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/bbgo.StrategyRPCService/Invoke",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StrategyRPCServiceServer).Invoke(ctx, req.(*InvokeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// StrategyRPCService_ServiceDesc is the grpc.ServiceDesc for StrategyRPCService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var StrategyRPCService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "bbgo.StrategyRPCService",
+	HandlerType: (*StrategyRPCServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListInstances",
+			Handler:    _StrategyRPCService_ListInstances_Handler,
+		},
+		{
+			MethodName: "ListMethods",
+			Handler:    _StrategyRPCService_ListMethods_Handler,
+		},
+		{
+			MethodName: "Invoke",
+			Handler:    _StrategyRPCService_Invoke_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "pkg/pb/bbgo.proto",
+}

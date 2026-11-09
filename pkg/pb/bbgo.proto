@@ -22,6 +22,16 @@ service TradingService {
   rpc QueryTrades(QueryTradesRequest) returns (QueryTradesResponse) {}
 }
 
+// StrategyRPCService lets a caller discover and invoke methods that a
+// running strategy instance has explicitly exported. Every RPC on this
+// service requires a bearer token (see the grpc server's auth interceptor);
+// the other services above are unauthenticated.
+service StrategyRPCService {
+  rpc ListInstances(ListInstancesRequest) returns (ListInstancesResponse) {}
+  rpc ListMethods(ListMethodsRequest) returns (ListMethodsResponse) {}
+  rpc Invoke(InvokeRequest) returns (InvokeResponse) {}
+}
+
 enum Event {
   UNKNOWN = 0;
   SUBSCRIBED = 1;
@@ -277,4 +287,50 @@ message KLine {
   int64 start_time = 10;
   int64 end_time = 11;
   bool closed = 12;
+}
+
+message ListInstancesRequest {}
+
+message StrategyInstance {
+  string instance_id = 1;
+  string strategy_id = 2;
+}
+
+message ListInstancesResponse {
+  repeated StrategyInstance instances = 1;
+  Error error = 2;
+}
+
+message ListMethodsRequest {
+  string instance_id = 1;
+}
+
+message ParamSchema {
+  string name = 1;
+  string type = 2;
+}
+
+message MethodInfo {
+  string name = 1;
+  string description = 2;
+  bool mutating = 3;
+  repeated ParamSchema params = 4;
+}
+
+message ListMethodsResponse {
+  repeated MethodInfo methods = 1;
+  Error error = 2;
+}
+
+message InvokeRequest {
+  string instance_id = 1;
+  string method = 2;
+  // JSON array of positional parameters, e.g. "[\"BTCUSDT\", 1.5]"
+  string params_json = 3;
+}
+
+message InvokeResponse {
+  // JSON-encoded result of the call, if any.
+  string result_json = 1;
+  Error error = 2;
 }
