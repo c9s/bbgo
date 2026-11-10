@@ -284,17 +284,15 @@ func (s *Stream) updateRiskBalance(ctx context.Context) error {
 }
 
 func (s *Stream) handleBeforeConnect(ctx context.Context) error {
+	// keep the base context for the goroutines started after connect,
+	// e.g. the account status stream started from OnStart
+	s.ctx = ctx
+
 	if s.exchange.IsMargin {
 		if err := s.updateRiskBalance(ctx); err != nil {
 			return err
 		}
 	}
-
-	// handleBeforeConnect is only called by Connect with the base context; keep it for the
-	// goroutines started later, e.g. the account status stream started from OnStart.
-	s.ConnLock.Lock()
-	s.ctx = ctx
-	s.ConnLock.Unlock()
 
 	return nil
 }
