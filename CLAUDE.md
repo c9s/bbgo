@@ -68,6 +68,19 @@ Two sub-packages provide reusable test utilities:
 
 CI uses **revive** for linting and **golangci-lint** with: staticcheck, bodyclose, contextcheck, dupword, decorder, goconst, govet, gosec, misspell. Format with `gofmt -s -w`.
 
+## Agent Tooling
+
+`agent/` holds material for coding agents: `agent/design/` has the design
+records (the why behind a workflow, and the dead ends not worth repeating), and
+`agent/scripts/` has the helper scripts, each documented in
+`agent/scripts/README.md`.
+
+- **Why did CI fail?** Run `./agent/scripts/ci-logs.sh <pr-number>` rather than
+  hand-rolling `gh` pipelines. It classifies the failure (code, flaky test,
+  dependency, or a GitHub outage) and prints the command to reproduce it. See
+  `agent/design/0002-ci-log-inspection.md`; `gh run view --log-failed` is
+  unusable on this repository and the record explains why.
+
 ## Code Generation
 
 Several generators produce committed files — re-run and commit when touching their inputs:
