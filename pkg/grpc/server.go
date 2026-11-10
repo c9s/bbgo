@@ -318,6 +318,16 @@ type Server struct {
 	Config  *bbgo.Config
 	Environ *bbgo.Environment
 	Trader  *bbgo.Trader
+
+	// EnableCoreGRPC turns on CoreRPCService, which lets a caller list
+	// and invoke methods bbgo has exported for remote control. It is
+	// gated separately from the rest of this gRPC server because it can
+	// expose mutating control over live state.
+	EnableCoreGRPC bool
+
+	// CoreGRPCToken is the shared bearer token required on every
+	// CoreRPCService call. Only meaningful when EnableCoreGRPC is true.
+	CoreGRPCToken string
 }
 
 func (s *Server) ListenAndServe(bind string) error {
@@ -326,7 +336,9 @@ func (s *Server) ListenAndServe(bind string) error {
 		return errors.Wrapf(err, "failed to bind network at %s", bind)
 	}
 
-	var grpcServer = grpc.NewServer()
+	// CoreRPCInterceptor only gates/audits calls to CoreRPCService; it is
+	// a no-op pass-through for the other services registered below.
+	var grpcServer = grpc.NewServer(grpc.UnaryInterceptor(CoreRPCInterceptor(s.CoreGRPCToken)))
 	pb.RegisterMarketDataServiceServer(grpcServer, &MarketDataService{
 		Config:  s.Config,
 		Environ: s.Environ,
@@ -344,6 +356,14 @@ func (s *Server) ListenAndServe(bind string) error {
 		Environ: s.Environ,
 		Trader:  s.Trader,
 	})
+
+	if s.EnableCoreGRPC {
+		pb.RegisterCoreRPCServiceServer(grpcServer, &CoreRPCService{
+			Config:  s.Config,
+			Environ: s.Environ,
+			Trader:  s.Trader,
+		})
+	}
 
 	reflection.Register(grpcServer)
 
