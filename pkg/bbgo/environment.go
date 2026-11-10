@@ -27,6 +27,7 @@ import (
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/notifier/telegramnotifier"
+	"github.com/c9s/bbgo/pkg/rpcexport"
 	"github.com/c9s/bbgo/pkg/service"
 	googleservice "github.com/c9s/bbgo/pkg/service/google"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
@@ -131,6 +132,12 @@ type Environment struct {
 	sessions map[string]*ExchangeSession
 
 	chainSessions ChainSessionMap
+
+	// rpcRegistry holds every method bbgo components have exported for
+	// remote invocation over gRPC. Lives on Environment (not Trader)
+	// since it's the more fundamental, earlier-constructed object other
+	// components naturally have access to.
+	rpcRegistry *rpcexport.Registry
 }
 
 func NewEnvironment() *Environment {
@@ -143,7 +150,15 @@ func NewEnvironment() *Environment {
 		startTime:     now,
 
 		syncStatus: SyncNotStarted,
+
+		rpcRegistry: rpcexport.NewRegistry(),
 	}
+}
+
+// RPCRegistry returns the registry of methods bbgo components have
+// exported for remote invocation over gRPC. Always non-nil.
+func (environ *Environment) RPCRegistry() *rpcexport.Registry {
+	return environ.rpcRegistry
 }
 
 func (environ *Environment) Logger() log.FieldLogger {
