@@ -2,12 +2,17 @@ package bbgo
 
 import (
 	"context"
+	"math/big"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
 	"github.com/c9s/bbgo/pkg/chain/evm"
+	"github.com/c9s/bbgo/pkg/chain/evm/token"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 // the well-known Hardhat / Anvil test account #0, never used for real funds
@@ -157,4 +162,73 @@ func TestChainSessionMap(t *testing.T) {
 
 	assert.Equal(t, []string{"eth", "polygon"}, sessions.Names())
 	assert.Equal(t, []string{"eth"}, sessions.Filter([]string{"eth", "missing"}).Names())
+}
+
+func TestChainTxConfigSenderConfig(t *testing.T) {
+	// a nil config still carries the session confirmations through
+	var nilConfig *ChainTxConfig
+	senderConfig := nilConfig.SenderConfig(7)
+	assert.Equal(t, 7, senderConfig.Confirmations)
+	assert.Zero(t, senderConfig.BumpInterval)
+
+	config := &ChainTxConfig{
+		Fee:                evm.FeeConfig{MaxFeePerGasGwei: 50, BumpPercent: 20},
+		GasLimitMultiplier: 1.5,
+		BumpInterval:       types.Duration(30 * time.Second),
+		PollInterval:       types.Duration(3 * time.Second),
+		Timeout:            types.Duration(5 * time.Minute),
+		PrivateRelay:       "https://relay.example",
+	}
+
+	senderConfig = config.SenderConfig(12)
+	assert.Equal(t, 12, senderConfig.Confirmations)
+	assert.Equal(t, 1.5, senderConfig.GasLimitMultiplier)
+	assert.Equal(t, 30*time.Second, senderConfig.BumpInterval)
+	assert.Equal(t, 3*time.Second, senderConfig.PollInterval)
+	assert.Equal(t, 5*time.Minute, senderConfig.Timeout)
+	assert.Equal(t, "https://relay.example", senderConfig.PrivateRelay)
+	assert.Equal(t, 20, senderConfig.Fee.BumpPercent)
+	assert.Equal(t, big.NewInt(50_000_000_000), senderConfig.Fee.MaxFeePerGasWei())
+}
+
+func TestChainSessionTxConfigUnmarshal(t *testing.T) {
+	const configYAML = `
+chainSessions:
+  eth:
+    chain: ethereum
+    rpcEndpoints: [ "https://rpc.example/one" ]
+    tx:
+      gasLimitMultiplier: 1.3
+      bumpInterval: 1m
+      timeout: 10m
+      fee:
+        maxFeePerGasGwei: 120
+        bumpPercent: 25
+      allowance:
+        policy: unlimited
+        resetBeforeApprove: true
+`
+
+	var config Config
+	require.NoError(t, yaml.Unmarshal([]byte(configYAML), &config))
+
+	session := config.ChainSessions["eth"]
+	require.NotNil(t, session)
+	require.NotNil(t, session.Tx)
+
+	assert.Equal(t, 1.3, session.Tx.GasLimitMultiplier)
+	assert.Equal(t, time.Minute, session.Tx.BumpInterval.Duration())
+	assert.Equal(t, 10*time.Minute, session.Tx.Timeout.Duration())
+	assert.Equal(t, 120.0, session.Tx.Fee.MaxFeePerGasGwei)
+	assert.Equal(t, 25, session.Tx.Fee.BumpPercent)
+	assert.Equal(t, token.AllowanceUnlimited, session.Tx.Allowance.Policy)
+	assert.True(t, session.Tx.Allowance.ResetBeforeApprove)
+
+	assert.Equal(t, token.AllowanceUnlimited, session.AllowanceConfig().ResolvedPolicy())
+}
+
+func TestChainSessionReadOnlyHasNoSender(t *testing.T) {
+	session := &ChainSession{Name: "eth", Chain: "ethereum", Address: testPrivateKeyAddress}
+	assert.Nil(t, session.Sender())
+	assert.Equal(t, token.AllowanceExact, session.AllowanceConfig().ResolvedPolicy())
 }

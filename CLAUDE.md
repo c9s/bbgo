@@ -198,8 +198,15 @@ Two rules that are easy to get wrong:
   batch multi-contract reads through `pkg/chain/evm/multicall` (Multicall3 is at
   the same address on all three chains).
 
-Exercise it with `bbgo chain info | balance` — no database and no exchange API
-key needed.
+Transaction sending lives in the same package (`evm.Sender`): one transaction in
+flight per address, locally counted nonces, mandatory `eth_call` simulation,
+`eth_feeHistory` pricing with an absolute ceiling, automatic same-nonce fee
+bumping, and confirmation via the `finalized` tag with a confirmation-count
+fallback. `TxResult.GasCost` stays a raw wei `*big.Int`.
+
+Exercise it with `bbgo chain info | balance | allowance`, and the write commands
+`bbgo chain send | approve`, which simulate unless `--confirm` is passed — no
+database and no exchange API key needed.
 
 ## Strategy Development
 

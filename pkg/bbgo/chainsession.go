@@ -12,7 +12,49 @@ import (
 
 	"github.com/c9s/bbgo/pkg/chain/evm"
 	"github.com/c9s/bbgo/pkg/chain/evm/token"
+	"github.com/c9s/bbgo/pkg/types"
 )
+
+// ChainTxConfig is the YAML-friendly form of evm.SenderConfig: the durations
+// accept "45s" instead of a nanosecond count.
+type ChainTxConfig struct {
+	Fee evm.FeeConfig `json:"fee,omitempty" yaml:"fee,omitempty"`
+
+	GasLimitMultiplier float64 `json:"gasLimitMultiplier,omitempty" yaml:"gasLimitMultiplier,omitempty"`
+
+	// BumpInterval is how long a transaction may stay pending before it is
+	// replaced at a higher fee.
+	BumpInterval types.Duration `json:"bumpInterval,omitempty" yaml:"bumpInterval,omitempty"`
+
+	// PollInterval defaults to the chain block time.
+	PollInterval types.Duration `json:"pollInterval,omitempty" yaml:"pollInterval,omitempty"`
+
+	// Timeout bounds the whole lifecycle of one transaction.
+	Timeout types.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+
+	// PrivateRelay reserves the MEV protection hook; it is not implemented yet.
+	PrivateRelay string `json:"privateRelay,omitempty" yaml:"privateRelay,omitempty"`
+
+	// Allowance configures the ERC20 approval policy, which defaults to
+	// approving the exact amount each operation needs.
+	Allowance token.AllowanceConfig `json:"allowance,omitempty" yaml:"allowance,omitempty"`
+}
+
+func (c *ChainTxConfig) SenderConfig(confirmations int) evm.SenderConfig {
+	if c == nil {
+		return evm.SenderConfig{Confirmations: confirmations}
+	}
+
+	return evm.SenderConfig{
+		Fee:                c.Fee,
+		Confirmations:      confirmations,
+		GasLimitMultiplier: c.GasLimitMultiplier,
+		BumpInterval:       c.BumpInterval.Duration(),
+		PollInterval:       c.PollInterval.Duration(),
+		Timeout:            c.Timeout.Duration(),
+		PrivateRelay:       c.PrivateRelay,
+	}
+}
 
 // ChainSession is the on-chain counterpart of ExchangeSession: one chain plus
 // one address. To use several wallets on the same chain, define several
@@ -52,9 +94,14 @@ type ChainSession struct {
 	// Decimals are always read from the chain, never from here.
 	Tokens map[string]string `json:"tokens,omitempty" yaml:"tokens,omitempty"`
 
+	// Tx configures the transaction lifecycle: fee estimation, replacement
+	// policy, timeouts and the ERC20 approval policy.
+	Tx *ChainTxConfig `json:"tx,omitempty" yaml:"tx,omitempty"`
+
 	chain  *evm.Chain
 	client *evm.Client
 	signer evm.Signer
+	sender *evm.Sender
 	tokens *token.Registry
 
 	address     common.Address
@@ -117,6 +164,10 @@ func (s *ChainSession) Init(ctx context.Context, name string) error {
 		}
 
 		s.tokens.AddSymbol(symbol, common.HexToAddress(address))
+	}
+
+	if s.signer != nil {
+		s.sender = evm.NewSender(client, s.signer, s.Tx.SenderConfig(s.Confirmations))
 	}
 
 	s.initialized = true
@@ -230,6 +281,20 @@ func (s *ChainSession) Signer() evm.Signer {
 
 func (s *ChainSession) CanSign() bool {
 	return s.signer != nil
+}
+
+// Sender returns the transaction sender, or nil for a read-only session.
+func (s *ChainSession) Sender() *evm.Sender {
+	return s.sender
+}
+
+// AllowanceConfig returns the ERC20 approval policy of this session.
+func (s *ChainSession) AllowanceConfig() token.AllowanceConfig {
+	if s.Tx == nil {
+		return token.AllowanceConfig{}
+	}
+
+	return s.Tx.Allowance
 }
 
 func (s *ChainSession) TokenRegistry() *token.Registry {

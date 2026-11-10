@@ -15,12 +15,18 @@ import (
 
 var testMulticallAddress = common.HexToAddress(multicall.Address)
 
+type allowanceKey struct {
+	owner   common.Address
+	spender common.Address
+}
+
 type fakeToken struct {
 	symbol        string
 	name          string
 	decimals      uint8
 	bytes32Symbol bool
 	balances      map[common.Address]*big.Int
+	allowances    map[allowanceKey]*big.Int
 	revertBalance bool
 }
 
@@ -118,6 +124,17 @@ func (f *fakeChain) dispatch(target common.Address, callData []byte) ([]byte, er
 
 	case "decimals":
 		return method.Outputs.Pack(token.decimals)
+
+	case "allowance":
+		owner := args[0].(common.Address)
+		spender := args[1].(common.Address)
+
+		allowance, ok := token.allowances[allowanceKey{owner, spender}]
+		if !ok {
+			allowance = big.NewInt(0)
+		}
+
+		return method.Outputs.Pack(allowance)
 
 	case "balanceOf":
 		if token.revertBalance {

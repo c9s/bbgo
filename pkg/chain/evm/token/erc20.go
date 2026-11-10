@@ -30,9 +30,14 @@ const erc20Bytes32ABIJSON = `[
   {"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"bytes32"}],"type":"function"}
 ]`
 
+const erc20TransferABIJSON = `[
+  {"constant":false,"inputs":[{"name":"recipient","type":"address"},{"name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"type":"function"}
+]`
+
 var (
-	erc20ABI        = mustParseABI(erc20ABIJSON)
-	erc20Bytes32ABI = mustParseABI(erc20Bytes32ABIJSON)
+	erc20ABI         = mustParseABI(erc20ABIJSON)
+	erc20Bytes32ABI  = mustParseABI(erc20Bytes32ABIJSON)
+	erc20TransferABI = mustParseABI(erc20TransferABIJSON)
 )
 
 func mustParseABI(s string) abi.ABI {

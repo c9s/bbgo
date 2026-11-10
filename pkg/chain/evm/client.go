@@ -271,3 +271,94 @@ func (c *Client) filterLogs(ctx context.Context, query ethereum.FilterQuery) ([]
 
 	return logs, err
 }
+
+func (c *Client) EstimateGas(ctx context.Context, call ethereum.CallMsg) (uint64, error) {
+	var gas uint64
+	err := c.pool.Do(ctx, func(client *ethclient.Client) error {
+		v, err := client.EstimateGas(ctx, call)
+		if err != nil {
+			return err
+		}
+
+		gas = v
+		return nil
+	})
+
+	return gas, err
+}
+
+func (c *Client) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
+	var price *big.Int
+	err := c.pool.Do(ctx, func(client *ethclient.Client) error {
+		v, err := client.SuggestGasPrice(ctx)
+		if err != nil {
+			return err
+		}
+
+		price = v
+		return nil
+	})
+
+	return price, err
+}
+
+func (c *Client) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
+	var tip *big.Int
+	err := c.pool.Do(ctx, func(client *ethclient.Client) error {
+		v, err := client.SuggestGasTipCap(ctx)
+		if err != nil {
+			return err
+		}
+
+		tip = v
+		return nil
+	})
+
+	return tip, err
+}
+
+func (c *Client) FeeHistory(
+	ctx context.Context, blockCount uint64, lastBlock *big.Int, rewardPercentiles []float64,
+) (*ethereum.FeeHistory, error) {
+	var history *ethereum.FeeHistory
+	err := c.pool.Do(ctx, func(client *ethclient.Client) error {
+		v, err := client.FeeHistory(ctx, blockCount, lastBlock, rewardPercentiles)
+		if err != nil {
+			return err
+		}
+
+		history = v
+		return nil
+	})
+
+	return history, err
+}
+
+// SendTransaction broadcasts a signed transaction. Failing over is safe here:
+// the transaction is already signed, so a second endpoint produces the same
+// hash and answers "already known", which is treated as non-retryable.
+func (c *Client) SendTransaction(ctx context.Context, tx *ethtypes.Transaction) error {
+	return c.pool.Do(ctx, func(client *ethclient.Client) error {
+		return client.SendTransaction(ctx, tx)
+	})
+}
+
+// TransactionReceipt returns the receipt of a transaction. It returns
+// ethereum.NotFound while the transaction is still pending.
+func (c *Client) TransactionReceipt(ctx context.Context, hash common.Hash) (*ethtypes.Receipt, error) {
+	var receipt *ethtypes.Receipt
+	err := c.pool.Do(ctx, func(client *ethclient.Client) error {
+		v, err := client.TransactionReceipt(ctx, hash)
+		if err != nil {
+			return err
+		}
+
+		receipt = v
+		return nil
+	})
+
+	return receipt, err
+}
+
+// Client must stay usable as the sender's backend.
+var _ TxClient = (*Client)(nil)
