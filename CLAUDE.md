@@ -210,6 +210,15 @@ database and no exchange API key needed.
 
 ## Strategy Development
 
+Read `doc/development/strategy-layer-design.md` before adding a non-trivial
+mechanism to a strategy or changing a core API. In short: new mechanisms start
+inside the strategy that needs them, and are promoted into the core API
+(`pkg/bbgo`, `pkg/types`, `pkg/core`, `pkg/indicator`) only once their shape has
+stopped changing — the way the Slack notification layer, `pkg/indicator` and
+`bbgo.GeneralOrderExecutor` arrived. Strategy code itself should stay as small
+and plain as possible; the long-term goal is that a strategy is the trading idea
+and nothing else.
+
 1. Create package under `pkg/strategy/<name>/`
 2. Implement `SingleExchangeStrategy` or `CrossExchangeStrategy` interface
 3. Register with `bbgo.RegisterStrategy("<name>", &Strategy{})` in an `init()` function
