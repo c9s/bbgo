@@ -14,6 +14,10 @@ func BootstrapEnvironmentLightweight(ctx context.Context, environ *Environment, 
 		return errors.Wrap(err, "exchange session configure error")
 	}
 
+	if err := environ.ConfigureChainSessions(ctx, userConfig); err != nil {
+		return errors.Wrap(err, "chain session configure error")
+	}
+
 	if userConfig.Logging != nil {
 		environ.SetLogging(userConfig.Logging)
 	}
@@ -40,6 +44,10 @@ func BootstrapEnvironment(ctx context.Context, environ *Environment, userConfig 
 
 	if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
 		return errors.Wrap(err, "exchange session configure error")
+	}
+
+	if err := environ.ConfigureChainSessions(ctx, userConfig); err != nil {
+		return errors.Wrap(err, "chain session configure error")
 	}
 
 	if userConfig.Logging != nil {

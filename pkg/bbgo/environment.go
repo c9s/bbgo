@@ -129,6 +129,8 @@ type Environment struct {
 	environmentConfig *EnvironmentConfig
 
 	sessions map[string]*ExchangeSession
+
+	chainSessions ChainSessionMap
 }
 
 func NewEnvironment() *Environment {
@@ -137,6 +139,7 @@ func NewEnvironment() *Environment {
 		// default trade scan time
 		syncStartTime: now.AddDate(-1, 0, 0), // defaults to sync from 1 year ago
 		sessions:      make(map[string]*ExchangeSession),
+		chainSessions: make(ChainSessionMap),
 		startTime:     now,
 
 		syncStatus: SyncNotStarted,
@@ -177,6 +180,40 @@ func (environ *Environment) SelectSessions(names ...string) map[string]*Exchange
 	}
 
 	return sessions
+}
+
+// ChainSession returns the on-chain session by name.
+func (environ *Environment) ChainSession(name string) (*ChainSession, bool) {
+	s, ok := environ.chainSessions[name]
+	return s, ok
+}
+
+func (environ *Environment) ChainSessions() ChainSessionMap {
+	return environ.chainSessions
+}
+
+func (environ *Environment) AddChainSession(name string, session *ChainSession) {
+	environ.chainSessions[name] = session
+}
+
+// ConfigureChainSessions initializes the on-chain sessions defined in the
+// config. Each session dials its RPC endpoints and verifies the chain id, so a
+// misconfigured endpoint fails here instead of much later.
+func (environ *Environment) ConfigureChainSessions(ctx context.Context, userConfig *Config) error {
+	for name, session := range userConfig.ChainSessions {
+		if err := session.Init(ctx, name); err != nil {
+			return err
+		}
+
+		environ.AddChainSession(name, session)
+	}
+
+	return nil
+}
+
+// CloseChainSessions releases the RPC connections of all chain sessions.
+func (environ *Environment) CloseChainSessions() {
+	environ.chainSessions.Close()
 }
 
 func (environ *Environment) ConfigureDatabase(ctx context.Context, config *Config) error {
