@@ -139,8 +139,8 @@ type Stream struct {
 	futuresAccountStatusInterval time.Duration
 	futuresWsApiRequestID        uint64
 
-	// futuresAccountStatusCtx is the base context passed to Connect, used to start the account status stream
-	futuresAccountStatusCtx context.Context
+	// ctx is the base context passed to Connect, e.g. used to start the futures account status stream
+	ctx context.Context
 
 	// futuresWsApiErrorLimiter rate limits the error logs of the futures websocket api responses
 	futuresWsApiErrorLimiter *rate.Limiter
@@ -290,13 +290,11 @@ func (s *Stream) handleBeforeConnect(ctx context.Context) error {
 		}
 	}
 
-	// handleBeforeConnect is only called by Connect with the base context; the account status
-	// stream is started with it from OnStart, once the user data stream has connected.
-	if s.shouldUseFuturesAccountStatusStream() {
-		s.ConnLock.Lock()
-		s.futuresAccountStatusCtx = ctx
-		s.ConnLock.Unlock()
-	}
+	// handleBeforeConnect is only called by Connect with the base context; keep it for the
+	// goroutines started later, e.g. the account status stream started from OnStart.
+	s.ConnLock.Lock()
+	s.ctx = ctx
+	s.ConnLock.Unlock()
 
 	return nil
 }

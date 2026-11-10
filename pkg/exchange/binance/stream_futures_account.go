@@ -162,13 +162,13 @@ func (s *Stream) startFuturesAccountStatusStream() {
 	s.ConnLock.Lock()
 	defer s.ConnLock.Unlock()
 
-	if s.futuresAccountStatusStream != nil || s.futuresAccountStatusCtx == nil {
+	if s.futuresAccountStatusStream != nil || s.ctx == nil {
 		return
 	}
 
 	statusStream := s.initFuturesAccountStatusStream()
 	s.futuresAccountStatusStream = statusStream
-	go s.connectFuturesAccountStatusStream(s.futuresAccountStatusCtx, statusStream)
+	go s.connectFuturesAccountStatusStream(s.ctx, statusStream)
 }
 
 func (s *Stream) initFuturesAccountStatusStream() *types.StandardStream {
