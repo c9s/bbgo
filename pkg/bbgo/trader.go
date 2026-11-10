@@ -13,6 +13,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/interact"
+	"github.com/c9s/bbgo/pkg/rpcexport"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -81,6 +82,10 @@ type Trader struct {
 	// when strategy implements Shutdown(ctx), the func ref will be stored in the callback.
 	gracefulShutdown GracefulShutdown
 
+	// rpcRegistry holds every method bbgo has exported for remote
+	// invocation over gRPC. Built once in Run via SetupRPCRegistry.
+	rpcRegistry *rpcexport.Registry
+
 	logger Logger
 }
 
@@ -90,6 +95,25 @@ func NewTrader(environ *Environment) *Trader {
 		exchangeStrategies: make(map[string][]SingleExchangeStrategy),
 		logger:             log.StandardLogger(),
 	}
+}
+
+// RPCRegistry returns the registry of methods bbgo has exported for
+// remote invocation over gRPC. It is only populated after Run has called
+// SetupRPCRegistry; before that it is nil.
+func (trader *Trader) RPCRegistry() *rpcexport.Registry {
+	return trader.rpcRegistry
+}
+
+// SetupRPCRegistry builds the core RPC registry, mirroring how
+// NewCoreInteraction is constructed once per Trader rather than per
+// strategy. Real framework-control methods get added to CoreRPC.ExportRPC
+// incrementally over time; this just wires up the mechanism. Exported
+// (rather than called only from Run) so it can be exercised directly in
+// tests, including from other packages, without needing full
+// session/stream startup.
+func (trader *Trader) SetupRPCRegistry() {
+	trader.rpcRegistry = rpcexport.NewRegistry()
+	NewCoreRPC(trader.environment, trader).ExportRPC(trader.rpcRegistry)
 }
 
 func (trader *Trader) EnableLogging() {
@@ -301,6 +325,8 @@ func (trader *Trader) Run(ctx context.Context) error {
 	// register the core interaction, because we can only get the strategies in this scope
 	// trader.environment.Connect will call interact.Start
 	interact.AddCustomInteraction(NewCoreInteraction(trader.environment, trader))
+
+	trader.SetupRPCRegistry()
 
 	if err := trader.injectFieldsAndSubscribe(ctx); err != nil {
 		return err
