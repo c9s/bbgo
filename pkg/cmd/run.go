@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -32,6 +34,9 @@ func init() {
 
 	RunCmd.Flags().Bool("enable-grpc", false, "enable grpc server")
 	RunCmd.Flags().String("grpc-bind", ":50051", "grpc server binding")
+
+	RunCmd.Flags().Bool("enable-core-grpc", false, "enable core RPC export (adds mutating control over bbgo via grpc); requires --enable-grpc")
+	RunCmd.Flags().String("core-grpc-token", "", "auth token required for core RPC calls; if empty, a random token is generated and logged once at startup")
 
 	RunCmd.Flags().Bool("setup", false, "use setup mode")
 	RootCmd.AddCommand(RunCmd)
@@ -120,6 +125,25 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 		return err
 	}
 
+	enableCoreGRPC, err := cmd.Flags().GetBool("enable-core-grpc")
+	if err != nil {
+		return err
+	}
+
+	coreGRPCToken, err := cmd.Flags().GetString("core-grpc-token")
+	if err != nil {
+		return err
+	}
+
+	if enableCoreGRPC && !enableGrpc {
+		return fmt.Errorf("--enable-core-grpc requires --enable-grpc to also be set")
+	}
+
+	if enableCoreGRPC && coreGRPCToken == "" {
+		coreGRPCToken = uuid.New().String()
+		log.Infof("core grpc token: %s", coreGRPCToken)
+	}
+
 	_ = grpcBind
 	_ = enableGrpc
 
@@ -194,6 +218,9 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 				Config:  userConfig,
 				Environ: environ,
 				Trader:  trader,
+
+				EnableCoreGRPC: enableCoreGRPC,
+				CoreGRPCToken:  coreGRPCToken,
 			}
 			if err := s.ListenAndServe(grpcBind); err != nil {
 				log.WithError(err).Errorf("grpc server bind error")
