@@ -147,7 +147,7 @@ func (s *Stream) hasFuturesWsApiCredentials() bool {
 	return len(s.exchange.key) > 0 && (s.ed25519authentication.usingEd25519 || len(s.exchange.secret) > 0)
 }
 
-// startFuturesAccountStatusStream runs on OnStart, after the user data stream has connected,
+// startFuturesAccountStatusStream runs from handleStart (OnStart), after the user data stream has connected,
 // so a failed user data stream connect never leaves the account status stream running.
 func (s *Stream) startFuturesAccountStatusStream() {
 	if !s.shouldUseFuturesAccountStatusStream() {

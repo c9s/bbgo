@@ -238,7 +238,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnDisconnect(stream.handleDisconnect)
 	stream.OnConnect(stream.handleConnect)
 	stream.SetBeforeConnect(stream.handleBeforeConnect)
-	stream.OnStart(stream.startFuturesAccountStatusStream)
+	stream.OnStart(stream.handleStart)
 	stream.OnListenKeyExpired(func(e *ListenKeyExpired) {
 		log.Warnf("listen key expired, triggering reconnect: %+v", e)
 		stream.Reconnect()
@@ -281,6 +281,11 @@ func (s *Stream) updateRiskBalance(ctx context.Context) error {
 	s.riskBalancesUpdatedAt = time.Now()
 
 	return nil
+}
+
+// handleStart is called once Connect has connected the user data stream.
+func (s *Stream) handleStart() {
+	s.startFuturesAccountStatusStream()
 }
 
 func (s *Stream) handleBeforeConnect(ctx context.Context) error {
