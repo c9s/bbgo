@@ -96,11 +96,14 @@ func TestToFixedPoint(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, fixedpoint.NewFromFloat(1.5), v)
 
-	// 1 wei is below the representable precision and rounds to zero rather
-	// than producing a wrong number
+	// 1 wei at 18 decimals is dust: it must convert without error and stay
+	// negligible. Whether it lands on exactly zero is build dependent, since
+	// the default build keeps 8 decimal places while the dnum build keeps all
+	// 18, so only what both builds guarantee is asserted here.
 	v, err = ToFixedPoint(big.NewInt(1), 18)
 	assert.NoError(t, err)
-	assert.True(t, v.IsZero())
+	assert.GreaterOrEqual(t, v.Float64(), 0.0)
+	assert.Less(t, v.Float64(), 1e-8)
 
 	// the int64-backed build cannot hold this, and must not wrap around
 	_, err = ToFixedPoint(bigFromString(t, "100000000000000000000000000000"), 8)
