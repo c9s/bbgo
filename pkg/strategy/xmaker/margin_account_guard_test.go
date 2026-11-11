@@ -72,9 +72,9 @@ func crossRunSessions(hedge *bbgo.ExchangeSession) map[string]*bbgo.ExchangeSess
 func crossRunStrategy(hedge *bbgo.ExchangeSession) *Strategy {
 	return &Strategy{
 		StrategyConfig: StrategyConfig{
-			SourceSymbol:   "BTCUSDT",
-			SourceExchange: "okex",
-			MakerExchange:  "max",
+			SourceSymbol:  "BTCUSDT",
+			HedgeSession:  "okex",
+			MakerExchange: "max",
 		},
 		Symbol: "BTCUSDT",
 		logger: logrus.New(),
