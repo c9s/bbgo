@@ -99,6 +99,8 @@ func NewStream(
 		channel2LocalIdsMap: make(map[types.Channel][]string),
 		marketInfoMap:       make(map[string]*api.MarketInfo),
 	}
+	s.SetLogger(s.logger)
+	s.SetName("spot")
 	s.SetParser(parseMessage)
 	s.SetDispatcher(s.dispatchEvent)
 	s.SetEndpointCreator(s.createEndpoint)

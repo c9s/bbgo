@@ -54,6 +54,8 @@ func New(publicEx types.ExchangePublic, marketDataStream types.Stream, symbol st
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
 	}
+	stream.SetLogger(log)
+	stream.SetName("sandbox")
 
 	stream.OnConnect(func() {
 		go stream.EmitAuth()

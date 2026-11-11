@@ -93,6 +93,13 @@ type StandardStream struct {
 
 	PublicOnly bool
 
+	// logger is the base logger of the stream logs, set by the exchange adapter (usually its
+	// package logger with the exchange field). nil uses the standard logger.
+	logger log.FieldLogger
+
+	// name is the "stream_name" log field: the connection of the exchange adapter, e.g. "futures".
+	name string
+
 	// sg is used to wait until the previous routines are closed.
 	// only handle routines used internally, avoid including external callback func to prevent issues if they have
 	// bugs and cannot terminate.
@@ -267,7 +274,7 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 
 		default:
 			if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
-				log.WithError(err).Errorf("unable to set read deadline: %v", err)
+				s.getLogger().WithError(err).Errorf("unable to set read deadline: %v", err)
 			}
 
 			mt, message, err := conn.ReadMessage()
@@ -278,7 +285,7 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 				// if it's a websocket related error
 				case *websocket.CloseError:
 					if err2.Code != websocket.CloseNormalClosure {
-						log.WithError(err2).Warnf("websocket error abnormal close: %+v", err2)
+						s.getLogger().WithError(err2).Warnf("websocket error abnormal close: %+v", err2)
 					}
 
 					_ = conn.Close()
@@ -288,13 +295,13 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 					return
 
 				case net.Error:
-					log.WithError(err2).Warn("websocket read network error")
+					s.getLogger().WithError(err2).Warn("websocket read network error")
 					_ = conn.Close()
 					s.Reconnect()
 					return
 
 				default:
-					log.WithError(err2).Warn("unexpected websocket error")
+					s.getLogger().WithError(err2).Warn("unexpected websocket error")
 					_ = conn.Close()
 					s.Reconnect()
 					return
@@ -307,7 +314,7 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 			}
 
 			if debugRawMessage {
-				log.Info(string(message))
+				s.getLogger().Info(string(message))
 			}
 
 			if !hasParser {
@@ -318,7 +325,7 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 			var e interface{}
 			e, err = s.parser(message)
 			if err != nil {
-				log.WithError(err).Errorf("unable to parse the websocket message. err: %v, message: %s", err, message)
+				s.getLogger().WithError(err).Errorf("unable to parse the websocket message. err: %v, message: %s", err, message)
 				// emit raw message even if occurs error, because we want anything can be detected
 				s.EmitRawMessage(message)
 				continue
@@ -350,7 +357,7 @@ func (s *StandardStream) ping(
 ) {
 	defer func() {
 		cancel()
-		log.Debug("[websocket] ping worker stopped")
+		s.getLogger().Debug("[websocket] ping worker stopped")
 	}()
 
 	var pingTicker = time.NewTicker(s.pingInterval)
@@ -375,7 +382,7 @@ func (s *StandardStream) ping(
 			}
 
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout)); err != nil {
-				log.WithError(err).Warnf("unable to write ws control message, ping error: %v", err)
+				s.getLogger().WithError(err).Warnf("unable to write ws control message, ping error: %v", err)
 				s.Reconnect()
 				return
 			}
@@ -473,12 +480,12 @@ func (s *StandardStream) reconnector(ctx context.Context) {
 			return
 
 		case <-s.ReconnectC:
-			log.Warnf("received reconnect signal, cooling for %s...", reconnectCoolDownPeriod)
+			s.getLogger().Warnf("received reconnect signal, cooling for %s...", reconnectCoolDownPeriod)
 			time.Sleep(reconnectCoolDownPeriod)
 
-			log.Warnf("re-connecting...")
+			s.getLogger().Warnf("re-connecting...")
 			if err := s.DialAndConnect(ctx); err != nil {
-				log.WithError(err).Warnf("re-connect error: %v, will reconnect again later...", err)
+				s.getLogger().WithError(err).Warnf("re-connect error: %v, will reconnect again later...", err)
 
 				// re-emit the re-connect signal if error
 				s.Reconnect()
@@ -554,15 +561,15 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 	conn.SetPingHandler(nil)
 	conn.SetPongHandler(func(string) error {
 		if err := conn.SetReadDeadline(time.Now().Add(readTimeout * 2)); err != nil {
-			log.WithError(err).Error("pong handler can not set read deadline")
+			s.getLogger().WithError(err).Error("pong handler can not set read deadline")
 		}
 		return nil
 	})
 
 	if s.PublicOnly {
-		log.Infof("[websocket] public stream connected, read timeout = %v", readTimeout)
+		s.getLogger().Infof("[websocket] public stream connected, read timeout = %v", readTimeout)
 	} else {
-		log.Infof("[websocket] user data stream connected, read timeout = %v", readTimeout)
+		s.getLogger().Infof("[websocket] user data stream connected, read timeout = %v", readTimeout)
 	}
 
 	return conn, nil
@@ -575,9 +582,9 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 // After Close returns, internal goroutines should be stopped shortly after.
 func (s *StandardStream) Close() error {
 	if s.PublicOnly {
-		log.Debugf("[websocket] closing public stream...")
+		s.getLogger().Debugf("[websocket] closing public stream...")
 	} else {
-		log.Debugf("[websocket] closing user data stream...")
+		s.getLogger().Debugf("[websocket] closing user data stream...")
 	}
 
 	// close the close signal channel, so that reader and ping worker will stop
@@ -600,7 +607,7 @@ func (s *StandardStream) Close() error {
 		}
 	}
 
-	log.Debugf("[websocket] stream closed")
+	s.getLogger().Debugf("[websocket] stream closed")
 
 	// let the reader close the connection
 	// TODO: use signal channel instead
@@ -613,6 +620,40 @@ func (s *StandardStream) String() string {
 	ss := "StandardStream"
 	ss += fmt.Sprintf("(%p)", s)
 	return ss
+}
+
+// SetLogger sets the base logger of the stream logs; every log line adds the "stream" and
+// "stream_name" fields to it. Exchange adapters pass their package (or stream) logger so that the
+// logs carry the exchange. It should be called before Connect.
+func (s *StandardStream) SetLogger(logger log.FieldLogger) {
+	s.logger = logger
+}
+
+// SetName sets the "stream_name" log field, which tells the connections of an exchange adapter
+// apart, e.g. "spot", "futures" or "futures_public" (snake_case). It should be called before Connect.
+func (s *StandardStream) SetName(name string) {
+	s.name = name
+}
+
+// kind is the "stream" log field: "public" or "user_data".
+func (s *StandardStream) kind() string {
+	if s.PublicOnly {
+		return "public"
+	}
+	return "user_data"
+}
+
+func (s *StandardStream) getLogger() log.FieldLogger {
+	var logger log.FieldLogger = log.StandardLogger()
+	if s.logger != nil {
+		logger = s.logger
+	}
+
+	fields := log.Fields{"stream": s.kind()}
+	if s.name != "" {
+		fields["stream_name"] = s.name
+	}
+	return logger.WithFields(fields)
 }
 
 // SetHeartBeat installs a custom heartbeat function executed before each ping.
