@@ -147,6 +147,7 @@ type StrategyConfig struct {
 	SourceSymbol string `json:"sourceSymbol,omitempty"`
 
 	// SourceExchange session name
+	// deprecated, use HedgeSession instead
 	SourceExchange string `json:"sourceExchange"`
 	HedgeSession   string `json:"hedgeSession"`
 
@@ -403,9 +404,9 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
-	sourceSession, ok := sessions[s.SourceExchange]
+	sourceSession, ok := sessions[s.HedgeSession]
 	if !ok {
-		panic(fmt.Errorf("source session %s is not defined", s.SourceExchange))
+		panic(fmt.Errorf("source session %s is not defined", s.HedgeSession))
 	}
 
 	sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol, types.SubscribeOptions{Interval: "1m"})
@@ -2901,9 +2902,9 @@ func (s *Strategy) CrossRun(
 	}
 
 	// configure sessions
-	sourceSession, ok := sessions[s.SourceExchange]
+	sourceSession, ok := sessions[s.HedgeSession]
 	if !ok {
-		return fmt.Errorf("source exchange session %s is not defined", s.SourceExchange)
+		return fmt.Errorf("source exchange session %s is not defined", s.HedgeSession)
 	}
 
 	s.hedgeSession = sourceSession
@@ -3010,7 +3011,7 @@ func (s *Strategy) CrossRun(
 
 	if s.hedgeSession.MakerFeeRate.Sign() > 0 || s.hedgeSession.TakerFeeRate.Sign() > 0 {
 		s.Position.SetExchangeFeeRate(
-			types.ExchangeName(s.SourceExchange), types.ExchangeFee{
+			s.hedgeSession.Exchange.Name(), types.ExchangeFee{
 				MakerFeeRate: s.hedgeSession.MakerFeeRate,
 				TakerFeeRate: s.hedgeSession.TakerFeeRate,
 			},
@@ -3058,7 +3059,7 @@ func (s *Strategy) CrossRun(
 	} else {
 		sourceMarkets := s.hedgeSession.Markets()
 		if len(sourceMarkets) == 0 {
-			return fmt.Errorf("source exchange %s has no markets", s.SourceExchange)
+			return fmt.Errorf("source exchange %s has no markets", s.hedgeSession.Exchange.Name())
 		}
 
 		allMarkets = makerMarkets.Merge(sourceMarkets)
