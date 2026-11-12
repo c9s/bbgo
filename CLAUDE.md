@@ -227,7 +227,8 @@ Protocol adapters live in `pkg/defi/<protocol>/` and are shaped like the
 contracts they wrap; there is deliberately no protocol-agnostic
 `Quoter`/`Swapper` interface yet. It gets extracted once Uniswap, Curve and
 Balancer all exist, because those three swap shapes differ too much to abstract
-in advance (router+pool vs. int128 coin index vs. vault poolId).
+in advance (router+pool vs. int128 coin index vs. vault poolId). Two of the
+three are in: Balancer v2 is what the shared interface still waits for.
 
 - **Aave v3** — `doc/development/defi-aave-v3.md`. Read it before touching
   `pkg/defi/aave/v3`. Only the `PoolAddressesProvider` is hardcoded, one address
@@ -245,9 +246,21 @@ in advance (router+pool vs. int128 coin index vs. vault poolId).
   `sqrtPriceX96` must be scaled by `10^(decimals0-decimals1)` or a WBTC/USDC
   pool reads 1e-12 off.
 
-Exercise them with `bbgo aave market | account` and `bbgo uniswap pools | quote`,
-plus the write commands `bbgo aave supply | withdraw | borrow | repay` and
-`bbgo uniswap swap`, which all need `--confirm`.
+- **Curve** — `doc/development/defi-curve.md`. Read it before touching
+  `pkg/defi/curve`. Only the AddressProvider is hardcoded, at one address on
+  every chain, and the MetaRegistry is resolved from it. The trap is that
+  StableSwap types a coin index as `int128` and CryptoSwap as `uint256`, which
+  the registry does not report: the adapter detects it per pool, and a
+  tricrypto-ng pool asked the wrong way answers *successfully* with an empty
+  payload instead of reverting. A pool is quoted through `get_dy`, which is the
+  pool's own arithmetic and not a promise — a deprecated pool keeps quoting a
+  price it cannot honour — and the approval goes to the pool, because Curve has
+  no router.
+
+Exercise them with `bbgo aave market | account`, `bbgo uniswap pools | quote`
+and `bbgo curve pools | pool | quote`, plus the write commands
+`bbgo aave supply | withdraw | borrow | repay`, `bbgo uniswap swap` and
+`bbgo curve swap`, which all need `--confirm`.
 
 ## Strategy Development
 
