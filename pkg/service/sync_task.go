@@ -58,6 +58,20 @@ type SyncTask struct {
 
 	// LogInsert logs the insert record in INFO level
 	LogInsert bool
+
+	// ClampStartTime makes the sync start from max(last record time, startTime)
+	// instead of the last record time, so old gaps before startTime are not fetched.
+	ClampStartTime bool
+
+	// ResumeOverlap starts the sync this long before the last record time, so a
+	// record published after a newer one is still fetched. Records already stored
+	// are skipped by ID, see SelectLimit.
+	ResumeOverlap time.Duration
+
+	// SelectLimit is the LIMIT of Select. With ResumeOverlap, when Select returns
+	// this many records (so older ones may not be loaded), the sync does not start
+	// before the oldest loaded record: every record it fetches again has its ID loaded.
+	SelectLimit int
 }
 
 func (sel SyncTask) execute(
@@ -106,6 +120,10 @@ func (sel SyncTask) execute(
 	if len(endTimeArgs) > 0 {
 		endTime = endTimeArgs[0]
 	}
+
+	// cancel the batch query when execute returns early, so its producer goroutine exits
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	// asset "" means all assets
 	dataC, errC := sel.BatchQuery(ctx, startTime, endTime)
@@ -200,7 +218,18 @@ func lastRecordTime(sel SyncTask, recordSlice reflect.Value, defaultTime time.Ti
 	length := recordSlice.Len()
 	if length > 0 {
 		last := recordSlice.Index(length - 1)
-		since = sel.Time(last.Interface())
+		since = sel.Time(last.Interface()).Add(-sel.ResumeOverlap)
+
+		// records older than the loaded ones have no ID to dedup with
+		if sel.ResumeOverlap > 0 && sel.SelectLimit > 0 && length >= sel.SelectLimit {
+			if oldest := sel.Time(recordSlice.Index(0).Interface()); since.Before(oldest) {
+				since = oldest
+			}
+		}
+	}
+
+	if sel.ClampStartTime && since.Before(defaultTime) {
+		return defaultTime
 	}
 
 	return since

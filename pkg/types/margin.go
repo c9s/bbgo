@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -43,15 +44,45 @@ type MarginAssetInfoService interface {
 	QueryMarginAssetInfos(ctx context.Context, assets []string) (map[string]MarginAssetInfo, error)
 }
 
+// MarginInterest is an interest charge, stored as the exchange returns it.
+// Binance is the reference format: other exchanges map their records to its fields.
 type MarginInterest struct {
-	GID            uint64           `json:"gid" db:"gid"`
-	Exchange       ExchangeName     `json:"exchange" db:"exchange"`
-	Asset          string           `json:"asset" db:"asset"`
-	Principle      fixedpoint.Value `json:"principle" db:"principle"`
+	GID      uint64       `json:"gid" db:"gid"`
+	Exchange ExchangeName `json:"exchange" db:"exchange"`
+
+	// Session is the bbgo session the row was synced for, stamped by the sync.
+	// It is '' on the rows synced before the session was stored.
+	Session string `json:"session" db:"session"`
+
+	// TxID is the exchange's ID of the charge (Binance txId). It is nil when
+	// the exchange has none and on the rows synced before it was stored.
+	TxID *uint64 `json:"txID,omitempty" db:"tx_id"`
+
+	// Asset is the asset the interest is paid in, e.g. BNB when Binance converts it
+	Asset string `json:"asset" db:"asset"`
+
+	// RawAsset is the borrowed asset (Binance rawAsset), '' when the exchange does not return it
+	RawAsset string `json:"rawAsset" db:"raw_asset"`
+
+	// InterestType is the exchange's type of the charge (Binance type), e.g. PERIODIC or ON_BORROW_CONVERTED
+	InterestType string `json:"interestType" db:"interest_type"`
+
+	Principal      fixedpoint.Value `json:"principal" db:"principal"`
 	Interest       fixedpoint.Value `json:"interest" db:"interest"`
 	InterestRate   fixedpoint.Value `json:"interestRate" db:"interest_rate"`
 	IsolatedSymbol string           `json:"isolatedSymbol" db:"isolated_symbol"`
 	Time           Time             `json:"time" db:"time"`
+}
+
+// Key identifies the charge: its TxID, or for a row without one, its asset,
+// isolated symbol and time. Several charges can share an hour and an asset,
+// so rows with a TxID are never told apart by their columns.
+func (m MarginInterest) Key() string {
+	if m.TxID != nil {
+		return "tx:" + strconv.FormatUint(*m.TxID, 10)
+	}
+
+	return m.Asset + "|" + m.IsolatedSymbol + "|" + strconv.FormatInt(m.Time.UnixMilli(), 10)
 }
 
 type MarginLoan struct {
