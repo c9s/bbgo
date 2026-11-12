@@ -24,9 +24,9 @@ func (e *MarginInterestBatchQuery) Query(ctx context.Context, asset string, star
 		T: func(obj interface{}) time.Time {
 			return time.Time(obj.(types.MarginInterest).Time)
 		},
+		// not the time alone: a BNB-paid hour has one row per borrowed asset
 		ID: func(obj interface{}) string {
-			interest := obj.(types.MarginInterest)
-			return interest.Time.String()
+			return obj.(types.MarginInterest).Key()
 		},
 	}
 

@@ -23,6 +23,11 @@ const (
 	InterestTypeOnBorrowConverted InterestType = "ON_BORROW_CONVERTED"
 )
 
+// IsConverted reports whether the interest was paid in BNB instead of the borrowed asset
+func (t InterestType) IsConverted() bool {
+	return t == InterestTypePeriodicConverted || t == InterestTypeOnBorrowConverted
+}
+
 // MarginInterest is the user margin interest record
 type MarginInterest struct {
 	IsolatedSymbol      string                     `json:"isolatedSymbol"`
@@ -32,6 +37,11 @@ type MarginInterest struct {
 	InterestRate        fixedpoint.Value           `json:"interestRate"`
 	Principal           fixedpoint.Value           `json:"principal"`
 	Type                InterestType               `json:"type"`
+
+	// RawAsset is the borrowed asset; on a converted (BNB-paid) row Asset is BNB.
+	// The docs only say it is not returned for isolated margin, and do not define
+	// it on other rows, so read it only when Type.IsConverted().
+	RawAsset string `json:"rawAsset"`
 }
 
 //go:generate requestgen -method GET -url "/sapi/v1/margin/interestHistory" -type GetMarginInterestHistoryRequest -responseType .RowsResponse -responseDataField Rows -responseDataType []MarginInterest

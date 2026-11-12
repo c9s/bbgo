@@ -56,6 +56,8 @@ sync:
 
   # marginAssets lists the assets that are used in the margin.
   # including loan, repay, interest and liquidation
+  # On Binance the BNB interests are synced too, even when BNB is not listed:
+  # interest paid with BNB deduction is stored under BNB, with the borrowed asset in raw_asset.
   marginAssets:
   - USDT
 
