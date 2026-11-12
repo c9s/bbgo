@@ -78,6 +78,19 @@ PR titles follow `TYPE: [scope] short imperative description`:
 
 Examples from the repo: `FIX: [autoborrow] enforce Binance minimum borrow quantity`, `FEATURE: [xmaker] add connectionDelay config to delay connectivity establishment`, `REFACTOR: [xfundingv2] refactor round transfer handling and remove retry logic`.
 
+## Agent Tooling
+
+`agent/` holds material for coding agents: `agent/design/` has the design
+records (the why behind a workflow, and the dead ends not worth repeating), and
+`agent/scripts/` has the helper scripts, each documented in
+`agent/scripts/README.md`.
+
+- **Why did CI fail?** Run `./agent/scripts/ci-logs.sh <pr-number>` rather than
+  hand-rolling `gh` pipelines. It classifies the failure (code, flaky test,
+  dependency, or a GitHub outage) and prints the command to reproduce it. See
+  `agent/design/0002-ci-log-inspection.md`; `gh run view --log-failed` is
+  unusable on this repository and the record explains why.
+
 ## Code Generation
 
 Several generators produce committed files — re-run and commit when touching their inputs:
