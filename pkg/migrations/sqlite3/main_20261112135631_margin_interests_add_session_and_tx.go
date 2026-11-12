@@ -4,11 +4,11 @@ import (
 	"github.com/c9s/rockhopper/v2"
 )
 
-// This migration was compiled from migrations/sqlite3/20261112104111_margin_interests_add_session_and_tx.sql.
+// This migration was compiled from migrations/sqlite3/20261112135631_margin_interests_add_session_and_tx.sql.
 // The SQL statements are registered as data so they can be previewed in the
 // console while the migration runs, exactly like a raw .sql migration.
 func init() {
-	AddStatementMigration("main", 20261112104111, "migrations/sqlite3/20261112104111_margin_interests_add_session_and_tx.sql", true,
+	AddStatementMigration("main", 20261112135631, "migrations/sqlite3/20261112135631_margin_interests_add_session_and_tx.sql", true,
 		[]rockhopper.Statement{
 			{Direction: rockhopper.DirectionUp, SQL: "ALTER TABLE `margin_interests` ADD COLUMN `session` TEXT NOT NULL DEFAULT '';"},
 			{Direction: rockhopper.DirectionUp, SQL: "ALTER TABLE `margin_interests` ADD COLUMN `tx_id` BIGINT NULL;"},
