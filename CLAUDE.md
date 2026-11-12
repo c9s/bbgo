@@ -204,7 +204,12 @@ flight per address, locally counted nonces, mandatory `eth_call` simulation,
 bumping, and confirmation via the `finalized` tag with a confirmation-count
 fallback. `TxResult.GasCost` stays a raw wei `*big.Int`.
 
-Exercise it with `bbgo chain info | balance | allowance`, and the write commands
+`pkg/chain/evm/stream` follows a chain block by block: WebSocket `newHeads`
+only signals new blocks, which are read over HTTP with their logs, so a
+dropped socket is backfilled and reorgs are reported. Read the "Block stream"
+section of the guide before building a watcher on it.
+
+Exercise it with `bbgo chain info | balance | allowance | stream`, and the write commands
 `bbgo chain send | approve`, which simulate unless `--confirm` is passed — no
 database and no exchange API key needed.
 

@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/c9s/bbgo/pkg/chain/evm"
+	"github.com/c9s/bbgo/pkg/chain/evm/stream"
 	"github.com/c9s/bbgo/pkg/chain/evm/token"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -54,6 +55,32 @@ func TestChainSessionResolveEndpoints(t *testing.T) {
 	// and the chain name is the last resort
 	session = &ChainSession{Name: "other", Chain: "bsc", chain: chain}
 	assert.Equal(t, []string{"https://chain.example"}, session.resolveEndpoints())
+}
+
+func TestChainSessionResolveWSEndpoint(t *testing.T) {
+	session := &ChainSession{Chain: "bsc", WSEndpoint: " wss://configured.example "}
+	assert.Equal(t, "wss://configured.example", session.resolveWSEndpoint())
+
+	session = &ChainSession{Name: "nows", Chain: "bsc"}
+	assert.Equal(t, "", session.resolveWSEndpoint())
+
+	// the session name takes precedence over the chain name
+	t.Setenv("MYBSC_WS_ENDPOINT", "wss://session.example")
+	t.Setenv("BSC_WS_ENDPOINT", "wss://chain.example")
+
+	session = &ChainSession{Name: "mybsc", Chain: "bsc"}
+	assert.Equal(t, "wss://session.example", session.resolveWSEndpoint())
+
+	chain, ok := evm.LookupChain("bsc")
+	assert.True(t, ok)
+
+	session = &ChainSession{Name: "other", Chain: "bsc", chain: chain}
+	assert.Equal(t, "wss://chain.example", session.resolveWSEndpoint())
+}
+
+func TestChainSessionNewStreamRequiresInit(t *testing.T) {
+	_, err := (&ChainSession{Name: "bsc", Chain: "bsc"}).NewStream(stream.Config{})
+	assert.Error(t, err)
 }
 
 func TestChainSessionLoadSigner(t *testing.T) {
