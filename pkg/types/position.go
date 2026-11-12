@@ -155,6 +155,8 @@ func (p *Position) CsvRecords() [][]string {
 
 // NewProfit generates the profit object from the current position
 func (p *Position) NewProfit(trade Trade, profit, netProfit fixedpoint.Value) Profit {
+	p.updateRealizedProfitMetrics(profit, netProfit)
+
 	return Profit{
 		Symbol:        p.Symbol,
 		QuoteCurrency: p.QuoteCurrency,
@@ -913,4 +915,19 @@ func (p *Position) updateMetrics(price *fixedpoint.Value) {
 		unrealizedProfit := p.unrealizedProfit(*price)
 		positionUnrealizedProfitMetrics.With(labels).Set(unrealizedProfit.Float64())
 	}
+}
+
+func (p *Position) updateRealizedProfitMetrics(profit, netProfit fixedpoint.Value) {
+	// update the position metrics only if the position defines the strategy ID
+	if p.StrategyInstanceID == "" || p.Strategy == "" {
+		return
+	}
+
+	labels := prometheus.Labels{
+		"strategy_id":   p.StrategyInstanceID,
+		"strategy_type": p.Strategy,
+		"symbol":        p.Symbol,
+	}
+	positionRealizedProfitMetrics.With(labels).Add(profit.Float64())
+	positionRealizedNetProfitMetrics.With(labels).Add(netProfit.Float64())
 }
