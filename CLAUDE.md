@@ -223,8 +223,18 @@ in advance (router+pool vs. int128 coin index vs. vault poolId).
   is WAD and is max uint256 when there is no debt, and the rates are RAY
   per-second values.
 
-Exercise it with `bbgo aave market | account`, and the write commands
-`bbgo aave supply | withdraw | borrow | repay`, which need `--confirm`.
+- **Uniswap v3** — `doc/development/defi-uniswap-v3.md`. Read it before touching
+  `pkg/defi/uniswap/v3`, which also covers the v3 forks (PancakeSwap). Pool
+  addresses come from `Factory.getPool`, never from the CREATE2 derivation,
+  whose init code hash differs per fork. `QuoterV2` is declared `view` in this
+  package's ABI although it is `nonpayable` on chain, so it can be quoted with
+  `eth_call`. The fee ladders differ: Uniswap has 0.3%, PancakeSwap has 0.25%.
+  `sqrtPriceX96` must be scaled by `10^(decimals0-decimals1)` or a WBTC/USDC
+  pool reads 1e-12 off.
+
+Exercise them with `bbgo aave market | account` and `bbgo uniswap pools | quote`,
+plus the write commands `bbgo aave supply | withdraw | borrow | repay` and
+`bbgo uniswap swap`, which all need `--confirm`.
 
 ## Strategy Development
 
