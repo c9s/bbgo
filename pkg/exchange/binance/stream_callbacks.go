@@ -246,6 +246,16 @@ func (s *Stream) EmitServerShutdownEvent(e *ServerShutdownEvent) {
 	}
 }
 
+func (s *Stream) OnFuturesAccountStatusEvent(cb func(e *FuturesAccountStatusEvent)) {
+	s.futuresAccountStatusEventCallbacks = append(s.futuresAccountStatusEventCallbacks, cb)
+}
+
+func (s *Stream) EmitFuturesAccountStatusEvent(e *FuturesAccountStatusEvent) {
+	for _, cb := range s.futuresAccountStatusEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnError(cb func(e *ErrorEvent)) {
 	s.errorCallbacks = append(s.errorCallbacks, cb)
 }
@@ -304,6 +314,8 @@ type StreamEventHub interface {
 	OnAlgoOrderUpdateEvent(cb func(e *AlgoOrderUpdateEvent))
 
 	OnServerShutdownEvent(cb func(e *ServerShutdownEvent))
+
+	OnFuturesAccountStatusEvent(cb func(e *FuturesAccountStatusEvent))
 
 	OnError(cb func(e *ErrorEvent))
 }

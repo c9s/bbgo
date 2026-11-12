@@ -34,7 +34,7 @@ func verifyRecords(ctx context.Context, sessions map[string]*ExchangeSession, or
 	}
 
 	if orderService == nil {
-		log.Warn("order service is not configured, skipping verificaiton")
+		log.Warn("order service is not configured, skipping verification")
 		return nil
 	}
 

@@ -295,7 +295,7 @@ func (rule *SlideRule) Scale() (Scale, error) {
 		return rule.QuadraticScale, nil
 	}
 
-	return nil, fmt.Errorf("no any scale is defined, avaiable scales: log, exp, linear, quadratic")
+	return nil, fmt.Errorf("no scale is defined; available scales: log, exp, linear, quadratic")
 }
 
 // LayerScale defines the scale DSL for maker layers, e.g.,

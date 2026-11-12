@@ -91,7 +91,7 @@ func parseEvent(line string) (marketdata.Event, error) {
 		symbol = v
 	}
 
-	exchange := types.ExchangeName("binance")
+	exchange := types.ExchangeBinance
 	if v, ok := kv["ex"]; ok {
 		exchange = types.ExchangeName(v)
 	}

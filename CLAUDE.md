@@ -68,6 +68,16 @@ Two sub-packages provide reusable test utilities:
 
 CI uses **revive** for linting and **golangci-lint** with: staticcheck, bodyclose, contextcheck, dupword, decorder, goconst, govet, gosec, misspell. Format with `gofmt -s -w`.
 
+## Pull Request Title Convention
+
+PR titles follow `TYPE: [scope] short imperative description`:
+
+- `TYPE` is uppercase. Common values: `FIX`, `FEATURE`, `REFACTOR`, `CHORE`, `DOCS`, `UPGRADE`, `PORT`, `MISC`, `TEST`.
+- `[scope]` is the primary package or strategy touched, e.g. `[xmaker]`, `[autoborrow]`, `[indicator/v2]`, `[ci]`.
+- Description stays lowercase and concise (no trailing period).
+
+Examples from the repo: `FIX: [autoborrow] enforce Binance minimum borrow quantity`, `FEATURE: [xmaker] add connectionDelay config to delay connectivity establishment`, `REFACTOR: [xfundingv2] refactor round transfer handling and remove retry logic`.
+
 ## Agent Tooling
 
 `agent/` holds material for coding agents: `agent/design/` has the design
@@ -240,6 +250,15 @@ plus the write commands `bbgo aave supply | withdraw | borrow | repay` and
 `bbgo uniswap swap`, which all need `--confirm`.
 
 ## Strategy Development
+
+Read `doc/development/strategy-layer-design.md` before adding a non-trivial
+mechanism to a strategy or changing a core API. In short: new mechanisms start
+inside the strategy that needs them, and are promoted into the core API
+(`pkg/bbgo`, `pkg/types`, `pkg/core`, `pkg/indicator`) only once their shape has
+stopped changing — the way the Slack notification layer, `pkg/indicator` and
+`bbgo.GeneralOrderExecutor` arrived. Strategy code itself should stay as small
+and plain as possible; the long-term goal is that a strategy is the trading idea
+and nothing else.
 
 1. Create package under `pkg/strategy/<name>/`
 2. Implement `SingleExchangeStrategy` or `CrossExchangeStrategy` interface
