@@ -277,3 +277,14 @@ func dedupTokens(tokens []Token) []Token {
 
 	return unique
 }
+
+// ToFixedPointOrZero is ToFixedPoint for display paths, returning zero instead
+// of an error when the amount is out of the representable range.
+func (t Token) ToFixedPointOrZero(raw *big.Int) float64 {
+	v, err := ToFixedPoint(raw, t.Decimals)
+	if err != nil {
+		return 0
+	}
+
+	return v.Float64()
+}
