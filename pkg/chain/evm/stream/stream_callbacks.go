@@ -3,7 +3,7 @@
 package stream
 
 import (
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 func (s *Stream) OnBlock(cb func(block *Block)) {
@@ -16,11 +16,11 @@ func (s *Stream) EmitBlock(block *Block) {
 	}
 }
 
-func (s *Stream) OnLog(cb func(log ethtypes.Log)) {
+func (s *Stream) OnLog(cb func(log types.Log)) {
 	s.logCallbacks = append(s.logCallbacks, cb)
 }
 
-func (s *Stream) EmitLog(log ethtypes.Log) {
+func (s *Stream) EmitLog(log types.Log) {
 	for _, cb := range s.logCallbacks {
 		cb(log)
 	}
