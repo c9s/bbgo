@@ -110,6 +110,57 @@ func TestChanCursor_DrainsBufferedEventsBeforeCancel(t *testing.T) {
 	require.NoError(t, c.Close())
 }
 
+// TestChanCursor_CancelAfterFinishIsCanceled: a producer that already finished
+// when the consumer cancels still ends the iteration with the context error, so
+// a cancelled run is never reported as exhausted. The closed channel and the
+// done context used to race in a select, which made sources flaky in CI.
+func TestChanCursor_CancelAfterFinishIsCanceled(t *testing.T) {
+	for i := 0; i < 1000; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		c := marketdata.NewChanCursor(ctx, 16)
+
+		require.True(t, c.Push(tradeEvent(1000)))
+		require.True(t, c.Push(tradeEvent(2000)))
+		c.Finish()
+		cancel()
+
+		var count int
+		for c.Next() {
+			count++
+		}
+
+		require.Equal(t, 2, count, "buffered events must survive a cancellation")
+		require.ErrorIs(t, c.Err(), context.Canceled)
+		require.NoError(t, c.Close())
+	}
+}
+
+// TestChanCursor_FinishIsClean: without a cancellation, Finish ends with no error.
+func TestChanCursor_FinishIsClean(t *testing.T) {
+	c := marketdata.NewChanCursor(context.Background(), 16)
+	require.True(t, c.Push(tradeEvent(1000)))
+	c.Finish()
+
+	assert.True(t, c.Next())
+	assert.False(t, c.Next())
+	assert.NoError(t, c.Err())
+	require.NoError(t, c.Close())
+}
+
+// TestChanCursor_CloseIsNotAnError: closing the cursor cancels its context, but
+// the consumer asked for that, so it is not reported as an error.
+func TestChanCursor_CloseIsNotAnError(t *testing.T) {
+	for i := 0; i < 1000; i++ {
+		c := marketdata.NewChanCursor(context.Background(), 16)
+		require.True(t, c.Push(tradeEvent(1000)))
+		require.NoError(t, c.Close())
+
+		for c.Next() {
+		}
+		require.NoError(t, c.Err())
+	}
+}
+
 func TestChanCursor_BlocksWhenFull(t *testing.T) {
 	c := marketdata.NewChanCursor(context.Background(), 2)
 
