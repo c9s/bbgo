@@ -424,6 +424,12 @@ func (environ *Environment) SetSyncStartTime(t time.Time) *Environment {
 	return environ
 }
 
+// SyncStartTime returns the start time of the sync: sync.since after the
+// startup sync, otherwise the default of one year ago.
+func (environ *Environment) SyncStartTime() time.Time {
+	return environ.syncStartTime
+}
+
 func (environ *Environment) BindSync(config *SyncConfig) {
 	// skip this if we are running back-test
 	if environ.BacktestService != nil {
@@ -652,6 +658,7 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 
 		if userConfig.Sync.MarginHistory {
 			if err := environ.SyncService.SyncMarginHistory(ctx, session.Exchange,
+				session.Name,
 				since,
 				userConfig.Sync.MarginAssets...); err != nil {
 				return err

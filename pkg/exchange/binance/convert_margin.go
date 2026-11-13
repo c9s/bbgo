@@ -9,10 +9,14 @@ import (
 )
 
 func toGlobalInterest(record binanceapi.MarginInterest) types.MarginInterest {
+	txID := record.TxId
 	return types.MarginInterest{
 		Exchange:       types.ExchangeBinance,
+		TxID:           &txID,
 		Asset:          record.Asset,
-		Principle:      record.Principal,
+		RawAsset:       record.RawAsset,
+		InterestType:   string(record.Type),
+		Principal:      record.Principal,
 		Interest:       record.Interest,
 		InterestRate:   record.InterestRate,
 		IsolatedSymbol: record.IsolatedSymbol,

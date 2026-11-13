@@ -43,10 +43,10 @@ func TestMarginService(t *testing.T) {
 	service := &MarginService{DB: dbx}
 
 	logrus.SetLevel(logrus.DebugLevel)
-	err = service.Sync(ctx, ex, "USDT", time.Date(2022, time.February, 1, 0, 0, 0, 0, time.UTC))
+	err = service.Sync(ctx, ex, "binance", "USDT", time.Date(2022, time.February, 1, 0, 0, 0, 0, time.UTC))
 	assert.NoError(t, err)
 
 	// sync second time to ensure that we can query records
-	err = service.Sync(ctx, ex, "USDT", time.Date(2022, time.February, 1, 0, 0, 0, 0, time.UTC))
+	err = service.Sync(ctx, ex, "binance", "USDT", time.Date(2022, time.February, 1, 0, 0, 0, 0, time.UTC))
 	assert.NoError(t, err)
 }

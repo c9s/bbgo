@@ -13,7 +13,7 @@ func TestGetMigrationsMap(t *testing.T) {
 	assert.NotEmpty(t, mm)
 }
 
-func TestMergeMigrationsMap(t *testing.T) {
+func TestMergeMigrationsMap(_ *testing.T) {
 	MergeMigrationsMap(map[rockhopper.RegistryKey]*rockhopper.Migration{
 		{Version: 2}: {},
 		{Version: 3}: {},
