@@ -8,6 +8,9 @@ var AllOrderStatuss = map[OrderStatus]struct{}{
 	OrderStatusCanceled:        {},
 	OrderStatusRejected:        {},
 	OrderStatusExpired:         {},
+	OrderStatusTriggering:      {},
+	OrderStatusTriggered:       {},
+	OrderStatusFinished:        {},
 }
 
 var AllOrderStatussSlice = []OrderStatus{
@@ -17,6 +20,9 @@ var AllOrderStatussSlice = []OrderStatus{
 	OrderStatusCanceled,
 	OrderStatusRejected,
 	OrderStatusExpired,
+	OrderStatusTriggering,
+	OrderStatusTriggered,
+	OrderStatusFinished,
 }
 
 func OrderStatusStrings(slice []OrderStatus) (out []string) {

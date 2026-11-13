@@ -11,10 +11,10 @@ type Generator interface {
 
 type productionGenerator struct{}
 
-var counter uint64
+var counter atomic.Uint64
 
 func (g *productionGenerator) Generate() uint64 {
-	c := atomic.AddUint64(&counter, 1)
+	c := counter.Add(1)
 	ts := uint64(time.Now().UnixMilli())
 	return ts*1000 + c
 }

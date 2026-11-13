@@ -1,9 +1,9 @@
 package xfundingv2
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -17,8 +17,10 @@ type TWAPExecutorSyncState struct {
 	Trades    map[uint64]types.Trade      `json:"trades,omitempty"`
 }
 
-func (o *TWAPExecutor) Initialize(s *Strategy) error {
+func (o *TWAPExecutor) Initialize(ctx context.Context, s *Strategy) error {
 	o.SetLogger(s.logger)
+	o.dryRun = s.DryRun
+	o.ctx = ctx
 	var session *bbgo.ExchangeSession
 	var executor *bbgo.GeneralOrderExecutor
 	if o.syncState.IsFutures {
@@ -32,6 +34,7 @@ func (o *TWAPExecutor) Initialize(s *Strategy) error {
 		return errors.New("[TWAPExecutor] futures general order executor not found for market: " + o.syncState.Market.Symbol)
 	}
 	o.executor = executor
+	o.connectivity = session.Connectivity
 
 	// sync market
 	if market, ok := session.Market(o.syncState.Market.Symbol); !ok {
@@ -50,16 +53,30 @@ func (o *TWAPExecutor) Initialize(s *Strategy) error {
 	for _, query := range o.syncState.Orders {
 		order, err := o.exchange.QueryOrder(o.ctx, query)
 		if err != nil || order == nil {
-			return fmt.Errorf("[TWAPExecutor] failed to query order %v: %w", query, err)
+			s.logger.WithError(err).Warnf("[TWAPExecutor] failed to query order via RESTful API: %v", query)
+			order, err = s.Environment.TradeService.QueryOrderFromDB(query)
+		}
+		if err != nil || order == nil {
+			s.logger.WithError(err).Errorf("[TWAPExecutor] missing order detected on %s: %v", session.Name, query)
+			continue
 		}
 		orderStore.Add(*order)
 
-		trades, err := o.exchange.QueryOrderTrades(o.ctx, query)
-		if err != nil {
-			return fmt.Errorf("[TWAPExecutor] failed to query trades for order %v: %w", query, err)
+		if trades, err := s.Environment.TradeService.QueryOrderTradesFromDB(query); err == nil {
+			s.logger.Infof("[TWAPExecutor] found %d trades for order from DB: %v", len(trades), query)
+			for _, trade := range trades {
+				o.syncState.Trades[trade.ID] = trade
+			}
+		} else {
+			s.logger.WithError(err).Warnf("[TWAPExecutor] failed to query trades for order from DB: %v", query)
 		}
-		for _, trade := range trades {
-			o.syncState.Trades[trade.ID] = trade
+		if trades, err := o.exchange.QueryOrderTrades(o.ctx, query); err == nil {
+			s.logger.Infof("[TWAPExecutor] found %d trades for order via RESTful API: %v", len(trades), query)
+			for _, trade := range trades {
+				o.syncState.Trades[trade.ID] = trade
+			}
+		} else {
+			s.logger.WithError(err).Warnf("[TWAPExecutor] failed to query trades for order via RESTful API: %v", query)
 		}
 	}
 	return nil

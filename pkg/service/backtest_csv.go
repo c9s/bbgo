@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -13,6 +14,14 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// BacktestServiceCSV serves klines aggregated from locally stored trade CSVs.
+//
+// Deprecated: superseded by pkg/marketdata. This implementation has known
+// limitations that are not being fixed: QueryKLinesCh emits only intervals[0],
+// ignores the since/until range and the symbol list, and returns a nil error
+// channel that backtest.Exchange.SubscribeMarketData then blocks a goroutine on
+// forever. It is kept compiling until the backtest engine is rewired onto
+// marketdata.Source.
 type BacktestServiceCSV struct {
 	kLines      map[types.Interval][]types.KLine
 	path        string
@@ -20,6 +29,9 @@ type BacktestServiceCSV struct {
 	granularity csvsource.DataType
 }
 
+// NewBacktestServiceCSV returns the legacy CSV backtest source.
+//
+// Deprecated: see BacktestServiceCSV.
 func NewBacktestServiceCSV(
 	path string,
 	market csvsource.MarketType,
@@ -106,8 +118,7 @@ func (s *BacktestServiceCSV) QueryKLinesBackward(exchange types.Exchange, symbol
 	}
 
 	// Reverse iteration through klines and filter based on endTime and limit
-	for i := len(exchangeKLines) - 1; i >= 0; i-- {
-		kline := exchangeKLines[i]
+	for _, kline := range slices.Backward(exchangeKLines) {
 
 		if kline.StartTime.Before(endTime) {
 			result = append(result, kline)

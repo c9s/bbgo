@@ -28,6 +28,21 @@ type MarginBorrowRepayService interface {
 	QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error)
 }
 
+type MarginAssetInfo struct {
+	Asset        string
+	IsBorrowable bool
+	MinBorrow    fixedpoint.Value
+	MinRepay     fixedpoint.Value
+}
+
+type MarginAssetInfoService interface {
+	QueryMarginAssetInfo(ctx context.Context, asset string) (MarginAssetInfo, error)
+
+	// QueryMarginAssetInfos returns the entries of the given assets, fetched in bulk.
+	// An asset the exchange does not list is absent from the result.
+	QueryMarginAssetInfos(ctx context.Context, assets []string) (map[string]MarginAssetInfo, error)
+}
+
 type MarginInterest struct {
 	GID            uint64           `json:"gid" db:"gid"`
 	Exchange       ExchangeName     `json:"exchange" db:"exchange"`

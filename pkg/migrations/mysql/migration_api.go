@@ -89,3 +89,27 @@ func AddNamedMigration(packageName, filename string, up, down rockhopper.Transac
 
 	registeredGoMigrations[key] = migration
 }
+
+// AddStatementMigration registers a migration that was compiled from a .sql file.
+// The SQL statements are kept as data (rather than baked into a function body) so
+// the console can preview each statement while the migration runs.
+func AddStatementMigration(packageName string, version int64, source string, useTx bool, upStatements, downStatements []rockhopper.Statement) {
+	migration := &rockhopper.Migration{
+		Package:    packageName,
+		Registered: true,
+
+		Version: version,
+		Source:  source,
+		UseTx:   useTx,
+
+		UpStatements:   upStatements,
+		DownStatements: downStatements,
+	}
+
+	key := rockhopper.RegistryKey{Package: packageName, Version: version}
+	if existing, ok := registeredGoMigrations[key]; ok {
+		panic(fmt.Sprintf("failed to add migration %q: version conflicts with key %+v: %+v", source, key, existing))
+	}
+
+	registeredGoMigrations[key] = migration
+}

@@ -42,6 +42,10 @@ func NewMutexOrderBook(symbol string, exchangeName ExchangeName) *MutexOrderBook
 		book = NewRBOrderBook(symbol)
 	}
 
+	if v, _ := strconv.ParseBool(os.Getenv("ENABLE_SKIPLIST_ORDERBOOK")); v {
+		book = NewSkipListOrderBook(symbol)
+	}
+
 	return &MutexOrderBook{
 		Symbol:    symbol,
 		Exchange:  exchangeName,

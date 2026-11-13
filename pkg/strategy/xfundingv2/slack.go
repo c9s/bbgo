@@ -1,0 +1,365 @@
+package xfundingv2
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/slack-go/slack"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/interact"
+	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
+)
+
+var (
+	_ slacknotifier.SlackBlocksCreator = &interactiveCloseRound{}
+)
+
+// closeRoundButtonsBlockID is the block ID of the action block that holds the
+// interactive buttons. It is removed/replaced after a click.
+const closeRoundButtonsBlockID = "xfundingv2_close_round_buttons"
+const listOrderButtonsBlockID = "xfundingv2_list_order_buttons"
+const titleTextBlockID = "xfundingv2_close_round_title"
+const instructionBlockID = "xfundingv2_close_round_instruction"
+const textBlockID = "xfundingv2_close_round_text"
+const spotOrderListBlockID = "xfundingv2_spot_order_list"
+const futuresOrderListBlockID = "xfundingv2_futures_order_list"
+
+// action IDs for the interactive close-round buttons.
+const (
+	closeRoundActionID   = "close_round"
+	confirmCloseActionID = "confirm_close_round"
+	listOrdersActionID   = "list_orders"
+)
+
+// interactiveCloseRound renders a periodic, block-based Slack message carrying a
+// "Close Round" button for a Ready round. It implements
+// slacknotifier.SlackBlocksCreator so bbgo.Notify emits it as a blocks message
+// (interactive buttons require blocks, not attachments).
+//
+// There is no registry: the target round is carried in the button value (the
+// round's spot symbol) and re-located from s.ActiveRounds under s.mu when the
+// operator confirms. This is idempotent and leak-free under periodic re-emission.
+type interactiveCloseRound struct {
+	text string
+	// slackEvtID is the dispatch key. It is rendered as a context block so the
+	// dispatcher can route button clicks on this message to the handler
+	// registered for this strategy instance. IMPORTANT: do not omit it.
+	slackEvtID string
+
+	// symbol is the round's spot symbol; used to look up the live round.
+	symbol string
+
+	// roundID is the round's unique ID. Together with symbol it is encoded into
+	// the button value so a click only affects the exact round the notification
+	// was attached to (a symbol may host a different round by the time an older,
+	// periodically re-emitted message is clicked).
+	roundID string
+
+	spotPrice, futuresPrice fixedpoint.Value
+
+	round *ArbitrageRound
+}
+
+func newInteractiveCloseRound(
+	round *ArbitrageRound, slackEvtID string, spotPrice, futuresPrice fixedpoint.Value,
+) *interactiveCloseRound {
+	return &interactiveCloseRound{
+		slackEvtID:   slackEvtID,
+		symbol:       round.SpotSymbol(),
+		roundID:      round.ID(),
+		spotPrice:    spotPrice,
+		futuresPrice: futuresPrice,
+		round:        round,
+	}
+}
+
+// closeRoundValueSep separates the symbol and round ID inside a button value.
+// Neither a spot symbol nor a UUID round ID contains it.
+const closeRoundValueSep = "||"
+
+// encodeCloseRoundValue packs symbol and round ID into a single button value.
+func encodeCloseRoundValue(symbol, roundID string) string {
+	return symbol + closeRoundValueSep + roundID
+}
+
+// decodeCloseRoundValue splits a button value back into symbol and round ID.
+func decodeCloseRoundValue(value string) (symbol, roundID string) {
+	symbol, roundID, _ = strings.Cut(value, closeRoundValueSep)
+	return symbol, roundID
+}
+
+func (c *interactiveCloseRound) SetText(text string) *interactiveCloseRound {
+	c.text = text
+	return c
+}
+
+func (c *interactiveCloseRound) SlackBlocks() []slack.Block {
+	// The context block ID is the dispatch key. IMPORTANT: keep this block.
+	blocks := []slack.Block{
+		slack.NewContextBlock(
+			c.slackEvtID,
+			slack.NewTextBlockObject(
+				slack.MarkdownType,
+				"   ",
+				false,
+				false,
+			),
+		),
+	}
+	if c.text != "" {
+		blocks = append(blocks, buildTextBlock(c.text, textBlockID))
+	}
+
+	blocks = append(blocks,
+		buildTextBlock(
+			fmt.Sprintf(
+				"🟢 Ready Round %s (%s)",
+				c.symbol,
+				c.roundID,
+			),
+			titleTextBlockID),
+		buildTextBlock("Press *Close Round* to close it.", instructionBlockID),
+	)
+
+	blocks = append(blocks, buildCloseRoundButtonsBlock(c.symbol, c.roundID))
+	blocks = append(blocks, buildListOrdersButtonsBlock(c.symbol, c.roundID))
+	return blocks
+}
+
+// buildCloseRoundButtonsBlock builds the initial single "Close Round" button.
+// The button value carries the round's spot symbol and round ID so the handler
+// can re-locate the exact live round on confirm.
+func buildCloseRoundButtonsBlock(symbol, roundID string) slack.Block {
+	text := fmt.Sprintf("Close Round %s", symbol)
+	return slack.NewActionBlock(
+		closeRoundButtonsBlockID,
+		slack.NewButtonBlockElement(
+			closeRoundActionID,
+			encodeCloseRoundValue(symbol, roundID),
+			slack.NewTextBlockObject(slack.PlainTextType, text, false, false),
+		).WithStyle(slack.StyleDefault),
+	)
+}
+
+// buildConfirmButtonsBlock builds the two-step confirmation buttons that
+// replace the initial "Close Round" button after the first click.
+func buildConfirmButtonsBlock(symbol, roundID string) slack.Block {
+	text := fmt.Sprintf("Confirm Close Round %s", symbol)
+	return slack.NewActionBlock(
+		closeRoundButtonsBlockID,
+		slack.NewButtonBlockElement(
+			confirmCloseActionID,
+			encodeCloseRoundValue(symbol, roundID),
+			slack.NewTextBlockObject(slack.PlainTextType, text, false, false),
+		).WithStyle(slack.StyleDanger),
+	)
+}
+
+func buildListOrdersButtonsBlock(symbol, roundID string) slack.Block {
+	return slack.NewActionBlock(
+		listOrderButtonsBlockID,
+		slack.NewButtonBlockElement(
+			listOrdersActionID,
+			encodeCloseRoundValue(symbol, roundID),
+			slack.NewTextBlockObject(slack.PlainTextType, "List Orders", false, false),
+		).WithStyle(slack.StylePrimary),
+	)
+}
+
+func buildTextBlock(text, blockID string) slack.Block {
+	var options []slack.SectionBlockOption
+	if blockID != "" {
+		options = append(options, slack.SectionBlockOptionBlockID(blockID))
+	}
+	return slack.NewSectionBlock(
+		slack.NewTextBlockObject(
+			slack.MarkdownType,
+			text,
+			false,
+			false,
+		),
+		nil, nil,
+		options...,
+	)
+}
+
+func removeBlockByID(oriBlocks []slack.Block, ids ...string) []slack.Block {
+	var blocks []slack.Block
+	idsMap := make(map[string]struct{})
+	for _, id := range ids {
+		idsMap[id] = struct{}{}
+	}
+	for _, block := range oriBlocks {
+		if _, exists := idsMap[block.ID()]; exists {
+			continue // skip block
+		}
+		blocks = append(blocks, block)
+	}
+	return blocks
+}
+
+// setupCloseRoundInteraction registers the button-click handler for this
+// strategy instance, keyed by s.slackEvtID. All interactive close-round messages
+// emitted by this instance carry that slackEvtID context block, so their clicks
+// route here. The clicked button's value is the round's spot symbol.
+func setupCloseRoundInteraction(s *Strategy, dispatcher *interact.InteractiveMessageDispatcher) {
+	dispatcher.Register(s.slackEvtID, newCloseRoundHandler(s, s.SlackAuthUsers))
+}
+
+// newCloseRoundHandler builds the interactive-message handler closure over the
+// strategy. It is split out from setupCloseRoundInteraction so it can be invoked
+// directly in tests without a dispatcher.
+func newCloseRoundHandler(s *Strategy, authUsers []string) interact.InteractiveMessageHandler {
+	authUsersMap := make(map[string]struct{})
+	for _, user := range authUsers {
+		authUsersMap[user] = struct{}{}
+	}
+	return func(
+		user slack.User, oriMessage slack.Message, actionID string, actionValue string,
+	) ([]interact.InteractionMessageUpdate, error) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		auth := true
+		if len(authUsers) > 0 {
+			_, foundName := authUsersMap[user.Name]
+			_, foundID := authUsersMap[user.ID]
+			auth = foundName || foundID
+		}
+
+		if !auth {
+			s.logger.Warn("slack interactive close round: user authorization failed")
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks:       oriMessage.Blocks.BlockSet,
+					PostInThread: false,
+				},
+				{
+					Blocks: []slack.Block{
+						buildTextBlock(
+							fmt.Sprintf("❌ %s (ID: %s) are not authorized to perform this action.", user.Name, user.ID),
+							"",
+						),
+					},
+					PostInThread: true,
+				},
+			}, nil
+		}
+
+		symbol, roundID := decodeCloseRoundValue(actionValue)
+		round, ok := s.ActiveRounds[symbol]
+		// The close only affects the exact round the notification was attached
+		// to: the live round under this symbol must still be the same round ID.
+		if !ok || round.ID() != roundID {
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks: removeBlockByID(
+						oriMessage.Blocks.BlockSet,
+						instructionBlockID,
+						closeRoundButtonsBlockID,
+						listOrderButtonsBlockID,
+					),
+					PostInThread: false,
+				},
+				{
+					Blocks: []slack.Block{
+						buildTextBlock(
+							fmt.Sprintf(
+								"🔴 Round `%s` (`%s`) is no longer interactable (requested by %s)",
+								symbol, roundID, user.Name,
+							),
+							"",
+						),
+					},
+					PostInThread: true,
+				},
+			}, nil
+		}
+
+		switch actionID {
+		case closeRoundActionID:
+			// first click: swap the single button for Confirm / Cancel. No state change.
+			blocks := removeBlockByID(
+				oriMessage.Blocks.BlockSet,
+				instructionBlockID,
+				closeRoundButtonsBlockID,
+			)
+			blocks = append(
+				[]slack.Block{
+					buildTextBlock("Press *Confirm Close* to confirm.", instructionBlockID),
+					buildConfirmButtonsBlock(symbol, roundID),
+				},
+				blocks...,
+			)
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks:       blocks,
+					PostInThread: false,
+				},
+			}, nil
+		case confirmCloseActionID:
+			_, futuresPrice, _ := s.getLastPrices(round.SpotSymbol(), round.FuturesSymbol())
+			round.SetClosing(time.Now(), s.TWAPWorkerConfig.ClosingDuration, futuresPrice)
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks: []slack.Block{
+						buildTextBlock(
+							fmt.Sprintf(
+								"✅ Round `%s` (`%s`) set to closing by `%s` at `%s`",
+								symbol, roundID, user.Name, time.Now().Format(time.RFC3339),
+							),
+							"",
+						)},
+					PostInThread: false,
+				},
+			}, nil
+		case listOrdersActionID:
+			spotOrders := round.SpotWorker().Executor().AllOrderQueries()
+			futuresOrders := round.FuturesWorker().Executor().AllOrderQueries()
+			spotOrdersList := "Spot Orders:\n"
+			for _, q := range spotOrders {
+				spotOrdersList += fmt.Sprintf("- %+v\n", q)
+			}
+			futuresOrdersList := "Futures Orders:\n"
+			for _, q := range futuresOrders {
+				futuresOrdersList += fmt.Sprintf("- %+v\n", q)
+			}
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks:       oriMessage.Blocks.BlockSet,
+					PostInThread: false,
+				},
+				{
+					Blocks: []slack.Block{
+						buildTextBlock(
+							spotOrdersList,
+							spotOrderListBlockID,
+						),
+						buildTextBlock(
+							futuresOrdersList,
+							futuresOrderListBlockID,
+						),
+						buildTextBlock(
+							fmt.Sprintf("Listing time: %s", time.Now().Format(time.RFC3339)),
+							"",
+						),
+					},
+					PostInThread: true,
+				},
+			}, nil
+		default:
+			return []interact.InteractionMessageUpdate{
+				{
+					Blocks:       oriMessage.Blocks.BlockSet,
+					PostInThread: false,
+				},
+				{
+					Blocks:       []slack.Block{buildTextBlock("Invalid action ID: "+actionID, "")},
+					PostInThread: true,
+				},
+			}, nil
+		}
+	}
+}

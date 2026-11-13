@@ -2,12 +2,14 @@
 package types
 
 var AllOrderTypes = map[OrderType]struct{}{
-	OrderTypeLimit:            {},
-	OrderTypeLimitMaker:       {},
-	OrderTypeMarket:           {},
-	OrderTypeStopLimit:        {},
-	OrderTypeStopMarket:       {},
-	OrderTypeTakeProfitMarket: {},
+	OrderTypeLimit:              {},
+	OrderTypeLimitMaker:         {},
+	OrderTypeMarket:             {},
+	OrderTypeStopLimit:          {},
+	OrderTypeStopMarket:         {},
+	OrderTypeTakeProfit:         {},
+	OrderTypeTakeProfitMarket:   {},
+	OrderTypeTrailingStopMarket: {},
 }
 
 var AllOrderTypesSlice = []OrderType{
@@ -16,7 +18,9 @@ var AllOrderTypesSlice = []OrderType{
 	OrderTypeMarket,
 	OrderTypeStopLimit,
 	OrderTypeStopMarket,
+	OrderTypeTakeProfit,
 	OrderTypeTakeProfitMarket,
+	OrderTypeTrailingStopMarket,
 }
 
 func OrderTypeStrings(slice []OrderType) (out []string) {

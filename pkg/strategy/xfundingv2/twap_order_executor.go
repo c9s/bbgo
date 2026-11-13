@@ -2,6 +2,7 @@ package xfundingv2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,7 +17,12 @@ type TWAPExecutor struct {
 	exchange types.ExchangeOrderQueryService
 	executor *bbgo.GeneralOrderExecutor
 
+	// connectivity tracks the owning session's websocket connectivity.
+	// PlaceOrder refuses to submit new orders while it reports disconnected.
+	connectivity *types.ConnectivityGroup
+
 	syncState TWAPExecutorSyncState
+	dryRun    bool
 
 	logger logrus.FieldLogger
 }
@@ -32,12 +38,14 @@ func NewTWAPExecutor(
 	isFutures bool,
 	market types.Market,
 	executor *bbgo.GeneralOrderExecutor,
+	connectivity *types.ConnectivityGroup,
 	config TWAPWorkerConfig,
 ) *TWAPExecutor {
 	return &TWAPExecutor{
-		ctx:      ctx,
-		exchange: exchange,
-		executor: executor,
+		ctx:          ctx,
+		exchange:     exchange,
+		executor:     executor,
+		connectivity: connectivity,
 
 		syncState: TWAPExecutorSyncState{
 			Config:    config,
@@ -50,11 +58,32 @@ func NewTWAPExecutor(
 }
 
 func (o *TWAPExecutor) SetLogger(logger logrus.FieldLogger) {
-	o.logger = logger
+	accountType := "spot"
+	if o.syncState.IsFutures {
+		accountType = "futures"
+	}
+	o.logger = logger.WithFields(logrus.Fields{
+		"component":   "TWAPExecutor",
+		"accountType": accountType,
+	})
+}
+
+func (o *TWAPExecutor) SetDryRun(dryRun bool) {
+	o.dryRun = dryRun
+}
+
+// SetConfig replaces the executor's config parameters (e.g. to switch order
+// type when the leader/follower role flips). Runtime state is preserved.
+func (o *TWAPExecutor) SetConfig(config TWAPWorkerConfig) {
+	o.syncState.Config = config
 }
 
 func (o *TWAPExecutor) Market() types.Market {
 	return o.syncState.Market
+}
+
+func (o *TWAPExecutor) IsFutures() bool {
+	return o.syncState.IsFutures
 }
 
 func (o *TWAPExecutor) Start() {
@@ -84,11 +113,15 @@ func (o *TWAPExecutor) Stop() error {
 }
 
 // SyncOrder queries the latest order status and updates the internal store and trades.
-// it's designed to be called to restore the state of the executor after a restart or to sync a existing order.
 // it's not thread-safe
 func (o *TWAPExecutor) SyncOrder(order types.Order) error {
 	storeOrder, exists := o.executor.OrderStore().Get(order.OrderID)
-	if exists && storeOrder.GetRemainingQuantity().IsZero() {
+	if !exists {
+		o.logger.Warnf("[SyncOrder] order not found in the order store, skipping sync: %s", order)
+		return nil
+	}
+
+	if storeOrder.GetRemainingQuantity().IsZero() {
 		return nil
 	}
 
@@ -103,18 +136,14 @@ func (o *TWAPExecutor) SyncOrder(order types.Order) error {
 	if err != nil {
 		return fmt.Errorf("failed to query order: %v", query)
 	}
+	orderStore := o.executor.OrderStore()
+	orderStore.Add(*updatedOrder)
 
 	trades, err := o.exchange.QueryOrderTrades(timedCtx, query)
 	if err != nil {
 		return fmt.Errorf("failed to query order trades: %v, %v", query, err)
 	}
 
-	orderStore := o.executor.OrderStore()
-	if !exists {
-		orderStore.AddOrderUpdate = true
-	}
-	orderStore.HandleOrderUpdate(*updatedOrder)
-	orderStore.AddOrderUpdate = false
 	tradeCollector := o.executor.TradeCollector()
 	for _, trade := range trades {
 		tradeCollector.ProcessTrade(trade)
@@ -124,11 +153,82 @@ func (o *TWAPExecutor) SyncOrder(order types.Order) error {
 	return nil
 }
 
+// SyncTrades queries the order and trades of every order placed by this executor whose
+// locally known trades don't already add up to the order's quantity, and adds the trades
+// that are not recorded yet (e.g. missed from the user data stream).
+// It returns the number of newly added trades. it's not thread-safe
+func (o *TWAPExecutor) SyncTrades(ctx context.Context) (int, error) {
+	tradeCollector := o.executor.TradeCollector()
+	orderStore := o.executor.OrderStore()
+	tradesMap := o.getTradesMap()
+	added := 0
+	var errs []error
+	for orderID, query := range o.syncState.Orders {
+		if storeOrder, exists := orderStore.Get(orderID); exists {
+			quantities := make([]fixedpoint.Value, 0, len(tradesMap[orderID]))
+			for _, trade := range tradesMap[orderID] {
+				quantities = append(quantities, trade.Quantity)
+			}
+			if fixedpoint.Sum(quantities).Eq(storeOrder.Quantity) {
+				continue
+			}
+		}
+
+		updatedOrder, err := o.exchange.QueryOrder(ctx, query)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to query order: %v, %w", query, err))
+			continue
+		}
+		orderStore.Add(*updatedOrder)
+
+		trades, err := o.exchange.QueryOrderTrades(ctx, query)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to query order trades: %v, %w", query, err))
+			continue
+		}
+
+		for _, trade := range trades {
+			if _, exists := o.syncState.Trades[trade.ID]; exists {
+				continue
+			}
+			tradeCollector.ProcessTrade(trade)
+			if o.AddTrade(trade) {
+				added++
+			}
+		}
+	}
+	tradeCollector.Process()
+	return added, errors.Join(errs...)
+}
+
 func (o *TWAPExecutor) GetOrder(orderID uint64) (types.Order, bool) {
 	if _, exists := o.syncState.Orders[orderID]; !exists {
+		o.logger.Debugf("[GetOrder] order not exists: %d", orderID)
 		return types.Order{}, false
 	}
-	return o.executor.OrderStore().Get(orderID)
+	orderStore := o.executor.OrderStore()
+	order, found := orderStore.Get(orderID)
+	if found {
+		return order, true
+	}
+
+	query := o.syncState.Orders[orderID]
+	updatedOrder, err := o.exchange.QueryOrder(o.ctx, query)
+	if err != nil {
+		o.logger.Debugf("[GetOrder] failed to query order: %+v", query)
+		return types.Order{}, false
+	}
+	orderStore.Add(*updatedOrder)
+	return *updatedOrder, true
+}
+
+func (o *TWAPExecutor) UpdateOrder(update types.Order) {
+	if _, exists := o.syncState.Orders[update.OrderID]; !exists {
+		o.logger.Debugf("[UpdateOrder] order not exists: %d", update.OrderID)
+		return
+	}
+	orderStore := o.executor.OrderStore()
+	orderStore.Update(update)
 }
 
 func (o *TWAPExecutor) CancelOpenOrders(ctx context.Context) error {
@@ -147,6 +247,14 @@ func (o *TWAPExecutor) AllOrders() []types.Order {
 	return orders
 }
 
+func (o *TWAPExecutor) AllOrderQueries() []types.OrderQuery {
+	var queries []types.OrderQuery
+	for _, query := range o.syncState.Orders {
+		queries = append(queries, query)
+	}
+	return queries
+}
+
 func (o *TWAPExecutor) AllTrades() []types.Trade {
 	var trades []types.Trade
 	for _, trade := range o.syncState.Trades {
@@ -155,11 +263,26 @@ func (o *TWAPExecutor) AllTrades() []types.Trade {
 	return trades
 }
 
+// getTradesMap groups the executor's known trades by order ID.
+func (o *TWAPExecutor) getTradesMap() map[uint64][]types.Trade {
+	tradesMap := make(map[uint64][]types.Trade)
+	for _, trade := range o.syncState.Trades {
+		tradesMap[trade.OrderID] = append(tradesMap[trade.OrderID], trade)
+	}
+	return tradesMap
+}
+
 // place order
 func (o *TWAPExecutor) PlaceOrder(quantity fixedpoint.Value, side types.SideType, orderBook types.OrderBook, options TWAPExecuteOrderOptions) (*types.Order, error) {
+	if o.connectivity != nil && !o.connectivity.IsConnected() {
+		o.logger.Warnf("[TWAPExecutor] session is disconnected, skip placing order")
+		return nil, fmt.Errorf("session is disconnected, skip placing order")
+	}
+
 	// find the better price and submit new order
 	quantity = o.syncState.Market.TruncateQuantity(quantity)
 	price, err := o.GetPrice(side, orderBook)
+	o.logger.Debugf("quantity: %s, price: %s, side: %s", quantity, price, side)
 	if err != nil {
 		o.logger.WithError(err).Warn("[TWAP tick] failed to get price for active order update")
 		return nil, err
@@ -170,9 +293,16 @@ func (o *TWAPExecutor) PlaceOrder(quantity fixedpoint.Value, side types.SideType
 		return nil, fmt.Errorf("order is of dust quantity: %s", quantity)
 	}
 
+	if o.dryRun {
+		msg := fmt.Sprintf("[TWAPExecutor] dry run mode, would have submitted order: %+v", order)
+		o.logger.Warn(msg)
+		return nil, errors.New(msg)
+	}
+
 	timedCtx, cancel := context.WithTimeout(o.ctx, 500*time.Millisecond)
 	defer cancel()
 
+	o.logger.Infof("[TWAPExecutor] submitting order: %+v", order)
 	createdOrders, err := o.executor.SubmitOrders(timedCtx, order)
 	if err != nil || len(createdOrders) == 0 {
 		return nil, fmt.Errorf("failed to submit order: %+v, %v", order, err)
@@ -189,11 +319,11 @@ func (o *TWAPExecutor) buildSubmitOrder(quantity, price fixedpoint.Value, side t
 			Side:       side,
 			Type:       types.OrderTypeMarket,
 			Quantity:   quantity,
-			ReduceOnly: true,
+			ReduceOnly: options.ReduceOnly,
 		}
 	}
 	orderType := types.OrderTypeLimitMaker
-	timeInForce := types.TimeInForceGTC
+	var timeInForce types.TimeInForce
 
 	if o.syncState.Config.OrderType == TWAPOrderTypeTaker {
 		orderType = types.OrderTypeLimit
@@ -298,8 +428,29 @@ func (o *TWAPExecutor) getMakerPrice(side types.SideType, orderBook types.OrderB
 
 // cancel order
 func (o *TWAPExecutor) CancelOrder(ctx context.Context, order types.Order) error {
-	timedCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-	defer cancel()
+	if _, found := o.syncState.Orders[order.OrderID]; !found {
+		o.logger.Warnf("[TWAPExecutor] order not found, skipping cancel: %s", order)
+		return nil
+	}
 
-	return o.executor.CancelOrders(timedCtx, order)
+	o.logger.Debugf("[TWAPExecutor] canceling order: %s", order)
+	// NOTE: GracefulCancel will ensure the order is canceled before returning. That is, it may keep trying forever.
+	// Add a notification ticker to notify if it takes too long to cancel the order.
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	// do GracefulCancel
+	cancelErrC := make(chan error, 1)
+	go func() {
+		cancelErrC <- o.executor.GracefulCancel(ctx, order)
+	}()
+
+	for {
+		select {
+		case <-ticker.C:
+			bbgo.Notify("[TWAPExecutor] taking too long to cancel order: %s", order)
+		case err := <-cancelErrC:
+			return err
+		}
+	}
 }

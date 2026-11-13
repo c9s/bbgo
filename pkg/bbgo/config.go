@@ -17,6 +17,7 @@ import (
 	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/marketdata"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -155,8 +156,25 @@ type Backtest struct {
 	Sessions []string                   `json:"sessions" yaml:"sessions"`
 
 	// sync 1 second interval KLines
-	SyncSecKLines bool                 `json:"syncSecKLines,omitempty" yaml:"syncSecKLines,omitempty"`
-	CsvSource     *csvsource.CsvConfig `json:"csvConfig,omitempty" yaml:"csvConfig,omitempty"`
+	SyncSecKLines bool `json:"syncSecKLines,omitempty" yaml:"syncSecKLines,omitempty"`
+
+	// CsvSource configures the legacy --csv backtest path.
+	//
+	// Deprecated: superseded by DataSources. Kept for one release; no example
+	// config in this repo uses it. See `bbgo marketdata --help`.
+	CsvSource *csvsource.CsvConfig `json:"csvConfig,omitempty" yaml:"csvConfig,omitempty"`
+
+	// DataSources declares the market data sources to replay, merged in
+	// timestamp order.
+	//
+	// It is not yet read by the backtest engine, which still consumes klines
+	// from service.BackTestable; `bbgo marketdata dump --config` exercises it in
+	// the meantime. See pkg/marketdata/registry for the available types.
+	DataSources []marketdata.SourceConfig `json:"dataSources,omitempty" yaml:"dataSources,omitempty"`
+
+	// CacheDir is where archive sources cache their downloads, so each source
+	// does not have to repeat it. Defaults to ~/.bbgo/marketdata.
+	CacheDir string `json:"cacheDir,omitempty" yaml:"cacheDir,omitempty"`
 }
 
 func (b *Backtest) GetAccount(n string) BacktestAccount {
@@ -176,6 +194,8 @@ func (b *Backtest) GetAccount(n string) BacktestAccount {
 type BacktestAccount struct {
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty" yaml:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty" yaml:"takerFeeRate,omitempty"`
+
+	PessimisticMakerFill bool `json:"pessimisticMakerFill,omitempty" yaml:"pessimisticMakerFill,omitempty"`
 
 	Balances BacktestAccountBalanceMap `json:"balances" yaml:"balances"`
 }
@@ -291,6 +311,13 @@ func categorizeSyncSymbol(slice []SyncSymbol) (map[string][]string, []string) {
 	return m, rest
 }
 
+type VerifyAction string
+
+const (
+	VerifyActionWarn   VerifyAction = "warn"
+	VerifyActionDelete VerifyAction = "delete"
+)
+
 type SyncConfig struct {
 	// Sessions to sync, if ignored, all defined sessions will sync
 	Sessions []string `json:"sessions,omitempty" yaml:"sessions,omitempty"`
@@ -323,6 +350,14 @@ type SyncConfig struct {
 		FuturesPosition             bool           `json:"futuresPosition,omitempty" yaml:"futuresPosition,omitempty"`
 		FuturesPositionSyncInterval types.Duration `json:"futuresPositionSyncInterval,omitempty" yaml:"futuresPositionSyncInterval,omitempty"`
 	} `json:"userDataStream,omitempty" yaml:"userDataStream,omitempty"`
+
+	Verify *struct {
+		Enabled  bool                   `json:"enabled" yaml:"enabled"`
+		Since    *types.LooseFormatTime `json:"since,omitempty" yaml:"since,omitempty"`
+		Period   types.Duration         `json:"period" yaml:"period"`
+		Action   VerifyAction           `json:"action" yaml:"action"`
+		Sessions []string               `json:"sessions,omitempty" yaml:"sessions,omitempty"`
+	} `json:"verify,omitempty" yaml:"verify,omitempty"`
 }
 
 type GoogleSpreadSheetServiceConfig struct {
@@ -389,6 +424,9 @@ type Config struct {
 	Environment *EnvironmentConfig `json:"environment,omitempty" yaml:"environment,omitempty"`
 
 	Sessions map[string]*ExchangeSession `json:"sessions,omitempty" yaml:"sessions,omitempty"`
+
+	// ChainSessions defines the on-chain sessions, see ChainSession
+	ChainSessions map[string]*ChainSession `json:"chainSessions,omitempty" yaml:"chainSessions,omitempty"`
 
 	Logging *LoggingConfig `json:"logging,omitempty"`
 
@@ -613,7 +651,12 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 					return err
 				}
 
-				config.CrossExchangeStrategies = append(config.CrossExchangeStrategies, val.(CrossExchangeStrategy))
+				crossExchangeStrategyInstance := val.(CrossExchangeStrategy)
+				if crossExchangeStrategyInstance == nil {
+					return fmt.Errorf("loaded cross exchange strategy instance %s is nil", id)
+				}
+
+				config.CrossExchangeStrategies = append(config.CrossExchangeStrategies, crossExchangeStrategyInstance)
 			}
 		}
 	}
@@ -703,6 +746,10 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 			singleExchangeStrategyInstance, typeOk := strategyInstance.(SingleExchangeStrategy)
 			if !typeOk {
 				return fmt.Errorf("strategy %s is not a SingleExchangeStrategy", id)
+			}
+
+			if singleExchangeStrategyInstance == nil {
+				return fmt.Errorf("loaded exchange strategy instance %s is nil", id)
 			}
 
 			config.ExchangeStrategies = append(config.ExchangeStrategies, ExchangeStrategyMount{

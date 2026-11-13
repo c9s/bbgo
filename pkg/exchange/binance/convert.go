@@ -118,6 +118,14 @@ func toGlobalFuturesMarket(symbol futures.Symbol) types.Market {
 		market.TickSize = fixedpoint.MustNewFromString(f.TickSize)
 	}
 
+	if market.MinNotional.IsZero() {
+		log.Warnf("binance futures market %s minNotional is zero", market.Symbol)
+	}
+
+	if market.MinQuantity.IsZero() {
+		log.Warnf("binance futures market %s minQuantity is zero", market.Symbol)
+	}
+
 	return market
 }
 
@@ -336,7 +344,7 @@ func convertSubscription(s types.Subscription) string {
 	// for trade, it's "<symbol>@trade"
 	// for aggregated trade, it's "<symbol>@aggTrade"
 	switch s.Channel {
-	case types.KLineChannel:
+	case types.KLineChannel, types.IndexPriceKLineChannel:
 		return fmt.Sprintf("%s@%s_%s", strings.ToLower(s.Symbol), s.Channel, s.Options.String())
 	case types.BookChannel:
 		// depth values: 5, 10, 20
@@ -376,6 +384,12 @@ func convertSubscription(s types.Subscription) string {
 		return fmt.Sprintf("%s@aggTrade", strings.ToLower(s.Symbol))
 	case types.ForceOrderChannel:
 		return fmt.Sprintf("%s@forceOrder", strings.ToLower(s.Symbol))
+	case types.MarkPriceChannel:
+		n := strings.ToLower(s.Symbol) + "@markPrice"
+		if s.Options.Interval != "" {
+			n += "@" + s.Options.Interval.String()
+		}
+		return n
 	}
 
 	return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)

@@ -24,28 +24,12 @@ var annualizedFundingRateMetrics = promauto.NewGaugeVec(
 	[]string{"symbol"},
 )
 
-var roundAnnualizedTriggerRateMetrics = promauto.NewGaugeVec(
+var roundTotalPnLMetrics = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "xfundingv2_round_annualized_trigger_rate",
-		Help: "Annualized triggering funding rate of the arbitrage round",
+		Name: "xfundingv2_round_total_pnl",
+		Help: "Total PnL of the arbitrage round",
 	},
-	[]string{"strategy_type", "strategy_id", "symbol"},
-)
-
-var roundHoldingIntervalMetrics = promauto.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "xfundingv2_round_holding_interval",
-		Help: "Holding interval of the arbitrage round in seconds",
-	},
-	[]string{"strategy_type", "strategy_id", "symbol"},
-)
-
-var roundNetPnLMetrics = promauto.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "xfundingv2_round_net_pnl",
-		Help: "Net PnL of the arbitrage round",
-	},
-	[]string{"strategy_type", "strategy_id", "symbol"},
+	[]string{"strategy_id", "symbol"},
 )
 
 var roundPositionFilledRatioMetrics = promauto.NewGaugeVec(
@@ -53,5 +37,61 @@ var roundPositionFilledRatioMetrics = promauto.NewGaugeVec(
 		Name: "xfundingv2_round_position_filled_ratio",
 		Help: "Filled ratio of the position in the arbitrage round. It should be increasing up to 1 when round is opening and decreasing down to 0 when round is closing",
 	},
-	[]string{"strategy_type", "strategy_id", "symbol", "accountType"},
+	[]string{"strategy_id", "symbol", "accountType"},
+)
+
+var roundPositionMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_round_position",
+		Help: "position of the arbitrage round",
+	},
+	[]string{"strategy_id", "symbol", "accountType"},
+)
+
+var roundQuantityDeviationMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_round_quantity_deviation",
+		Help: "Quantity deviation of the arbitrage round",
+	},
+	[]string{"strategy_id", "symbol"},
+)
+
+var roundQuantityQuoteDeviationMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_round_quantity_quote_deviation",
+		Help: "Quantity deviation in quote of the arbitrage round",
+	},
+	[]string{"strategy_id", "symbol"},
+)
+
+var maintMarginRatioMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_maintenance_margin_ratio",
+		Help: "Maintenance margin ratio of the symbol (1.0 -> liquidation)",
+	},
+	[]string{"strategy_id", "symbol"},
+)
+
+var spotFuturesBasisRateMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_spot_futures_basis_rate",
+		Help: "Spot-futures basis rate of the symbol, (spot - futrues) / spot",
+	},
+	[]string{"strategy_id", "symbol"},
+)
+
+var liquidationDistanceRateMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_liquidation_distance_rate",
+		Help: "Liquidation distance rate of the symbol, (liq. price - futures price) / futures price",
+	},
+	[]string{"strategy_id", "symbol"},
+)
+
+var tickDurationMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xfundingv2_tick_duration",
+		Help: "Duration of the tick in seconds",
+	},
+	[]string{"strategy_id"},
 )

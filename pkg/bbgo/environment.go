@@ -27,6 +27,7 @@ import (
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/notifier/telegramnotifier"
+	"github.com/c9s/bbgo/pkg/rpcexport"
 	"github.com/c9s/bbgo/pkg/service"
 	googleservice "github.com/c9s/bbgo/pkg/service/google"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
@@ -129,6 +130,14 @@ type Environment struct {
 	environmentConfig *EnvironmentConfig
 
 	sessions map[string]*ExchangeSession
+
+	chainSessions ChainSessionMap
+
+	// rpcRegistry holds every method bbgo components have exported for
+	// remote invocation over gRPC. Lives on Environment (not Trader)
+	// since it's the more fundamental, earlier-constructed object other
+	// components naturally have access to.
+	rpcRegistry *rpcexport.Registry
 }
 
 func NewEnvironment() *Environment {
@@ -137,10 +146,19 @@ func NewEnvironment() *Environment {
 		// default trade scan time
 		syncStartTime: now.AddDate(-1, 0, 0), // defaults to sync from 1 year ago
 		sessions:      make(map[string]*ExchangeSession),
+		chainSessions: make(ChainSessionMap),
 		startTime:     now,
 
 		syncStatus: SyncNotStarted,
+
+		rpcRegistry: rpcexport.NewRegistry(),
 	}
+}
+
+// RPCRegistry returns the registry of methods bbgo components have
+// exported for remote invocation over gRPC. Always non-nil.
+func (environ *Environment) RPCRegistry() *rpcexport.Registry {
+	return environ.rpcRegistry
 }
 
 func (environ *Environment) Logger() log.FieldLogger {
@@ -177,6 +195,40 @@ func (environ *Environment) SelectSessions(names ...string) map[string]*Exchange
 	}
 
 	return sessions
+}
+
+// ChainSession returns the on-chain session by name.
+func (environ *Environment) ChainSession(name string) (*ChainSession, bool) {
+	s, ok := environ.chainSessions[name]
+	return s, ok
+}
+
+func (environ *Environment) ChainSessions() ChainSessionMap {
+	return environ.chainSessions
+}
+
+func (environ *Environment) AddChainSession(name string, session *ChainSession) {
+	environ.chainSessions[name] = session
+}
+
+// ConfigureChainSessions initializes the on-chain sessions defined in the
+// config. Each session dials its RPC endpoints and verifies the chain id, so a
+// misconfigured endpoint fails here instead of much later.
+func (environ *Environment) ConfigureChainSessions(ctx context.Context, userConfig *Config) error {
+	for name, session := range userConfig.ChainSessions {
+		if err := session.Init(ctx, name); err != nil {
+			return err
+		}
+
+		environ.AddChainSession(name, session)
+	}
+
+	return nil
+}
+
+// CloseChainSessions releases the RPC connections of all chain sessions.
+func (environ *Environment) CloseChainSessions() {
+	environ.chainSessions.Close()
 }
 
 func (environ *Environment) ConfigureDatabase(ctx context.Context, config *Config) error {
@@ -428,7 +480,7 @@ func (environ *Environment) BindSync(config *SyncConfig) {
 		}
 	}
 
-	futuresPositionWriterCreator := func(ex types.ExchangeRiskService) func(types.Trade) {
+	futuresPositionWriterCreator := func(ex service.ExchangeFuturesService) func(types.Trade) {
 		return func(trade types.Trade) {
 			if !(trade.IsFutures || trade.IsIsolated) {
 				return
@@ -477,7 +529,7 @@ func (environ *Environment) BindSync(config *SyncConfig) {
 				)
 				continue
 			}
-			if ex, ok := session.Exchange.(types.ExchangeRiskService); ok {
+			if ex, ok := session.Exchange.(service.ExchangeFuturesService); ok {
 				futuresPositionWriter := futuresPositionWriterCreator(ex)
 				session.UserDataStream.OnTradeUpdate(futuresPositionWriter)
 			}
@@ -607,6 +659,16 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 		}
 	}
 
+	if err := verifyRecords(
+		ctx,
+		environ.sessions,
+		environ.OrderService,
+		environ.TradeService,
+		userConfig,
+	); err != nil {
+		log.WithError(err).Warn("trade record verification failed")
+	}
+
 	return nil
 }
 
@@ -726,6 +788,10 @@ func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSe
 func (environ *Environment) syncSession(
 	ctx context.Context, session *ExchangeSession, syncStartTime time.Time, defaultSymbols ...string,
 ) error {
+	if session.IsInMaintenance() {
+		log.Infof("session %s is in maintenance mode, skipping sync", session.Name)
+		return nil
+	}
 	symbols, err := session.getSessionSymbols(defaultSymbols...)
 	if err != nil {
 		return err
@@ -755,9 +821,17 @@ func (environ *Environment) ConfigureNotificationSystem(ctx context.Context, use
 	var isolation = GetIsolationFromContext(ctx)
 	var persistence = isolation.persistenceServiceFacade.Get()
 
-	err := environ.setupInteraction(persistence)
-	if err != nil {
-		return err
+	// check if telegram bot token is defined
+	telegramBotToken := viper.GetString("telegram-bot-token")
+
+	// the interaction (OTP / auth) subsystem is only meaningful when there is a
+	// messenger (currently only telegram) that can actually send or receive it.
+	// skip it entirely when telegram is not configured so bbgo does not touch
+	// persistence or attempt any network dial when no notifier is set up at all.
+	if len(telegramBotToken) > 0 {
+		if err := environ.setupInteraction(persistence); err != nil {
+			return err
+		}
 	}
 
 	// setup slack
@@ -766,8 +840,6 @@ func (environ *Environment) ConfigureNotificationSystem(ctx context.Context, use
 		environ.setupSlack(userConfig, slackToken, persistence)
 	}
 
-	// check if telegram bot token is defined
-	telegramBotToken := viper.GetString("telegram-bot-token")
 	if len(telegramBotToken) > 0 {
 		if err := environ.setupTelegram(userConfig, telegramBotToken, persistence); err != nil {
 			return err

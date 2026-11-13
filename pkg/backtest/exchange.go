@@ -138,12 +138,13 @@ func (e *Exchange) resetMatchingBooks() {
 
 func (e *Exchange) _addMatchingBook(symbol string, market types.Market) {
 	matching := &SimplePriceMatching{
-		Symbol:          symbol,
-		currentTime:     e.currentTime,
-		account:         e.account,
-		Market:          market,
-		closedOrders:    make(map[uint64]types.Order),
-		feeModeFunction: getFeeModeFunction(e.config.FeeMode),
+		Symbol:               symbol,
+		currentTime:          e.currentTime,
+		account:              e.account,
+		Market:               market,
+		closedOrders:         make(map[uint64]types.Order),
+		feeModeFunction:      getFeeModeFunction(e.config.FeeMode),
+		pessimisticMakerFill: e.config.GetAccount(e.sourceName.String()).PessimisticMakerFill,
 	}
 	e.matchingBooks[symbol] = matching
 }

@@ -73,6 +73,9 @@ type HedgeMarketConfig struct {
 	QuotingDepthInQuote fixedpoint.Value `json:"quotingDepthInQuote"`
 
 	SyncOrder *bool `json:"syncOrder,omitempty"`
+
+	// Verbose, when true, logs the order form before submitting it in submitOrder.
+	Verbose bool `json:"verbose,omitempty"`
 }
 
 func (c *HedgeMarketConfig) Defaults() error {
@@ -212,6 +215,9 @@ type HedgeMarket struct {
 
 	logger logrus.FieldLogger
 
+	// dryRun, when true, skips real order submission in submitOrder and only logs the intended order.
+	dryRun bool
+
 	mu sync.Mutex
 
 	hedgeExecutor HedgeExecutor
@@ -249,13 +255,44 @@ func NewHedgeMarket(
 	position.Strategy = ID
 
 	orderStore := core.NewOrderStore(symbol)
-	orderStore.BindStream(session.UserDataStream)
 
 	tradeCollector := core.NewTradeCollector(symbol, position, orderStore)
-	tradeCollector.BindStream(session.UserDataStream)
+	session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+		if symbol != "" && trade.Symbol != symbol {
+			return
+		}
+
+		// orderStore only ever contains orders this HedgeMarket itself submitted
+		// (see submitOrder's orderCreateCallback). Multiple xmaker instances may share
+		// this fiat (or, under SplitSource, source) session+symbol and therefore this
+		// same UserDataStream, so checking existence here is what keeps a sibling
+		// instance's fills from being processed against this instance's position.
+		if !orderStore.Exists(trade.OrderID) {
+			log.Debugf("ignoring trade update for %s (orderID=%d), order not found in this instance's order store", symbol, trade.OrderID)
+			return
+		}
+
+		tradeCollector.ProcessTrade(trade)
+	})
 
 	activeMakerOrders := bbgo.NewActiveOrderBook(symbol)
-	activeMakerOrders.BindStream(session.UserDataStream)
+	session.UserDataStream.OnOrderUpdate(func(order types.Order) {
+		if symbol != "" && order.Symbol != symbol {
+			return
+		}
+
+		// same ownership rationale as the trade update handler above: orderStore only
+		// ever contains orders this HedgeMarket itself submitted, so an order update
+		// for an order we don't recognize belongs to a sibling instance sharing this
+		// session+symbol and must not be applied to our own orderStore/activeMakerOrders.
+		if !orderStore.Exists(order.OrderID) {
+			log.Debugf("ignoring order update for %s (orderID=%d), order not found in this instance's order store", symbol, order.OrderID)
+			return
+		}
+
+		orderStore.HandleOrderUpdate(order)
+		activeMakerOrders.OrderUpdateHandler(order)
+	})
 
 	// default logger
 	logFields := logrus.Fields{
@@ -427,9 +464,35 @@ func (m *HedgeMarket) newMockTrade(
 
 }
 
+// isAvailable reports whether this hedge market's session can currently be
+// used to place orders: not in a configured maintenance window, and its
+// connectivity group (if any) reports connected.
+func (m *HedgeMarket) isAvailable() bool {
+	if m.session.IsInMaintenance() {
+		return false
+	}
+	if m.session.Connectivity != nil && !m.session.Connectivity.IsConnected() {
+		return false
+	}
+	return true
+}
+
 func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitOrder) (*types.Order, error) {
 	submitOrder.Market = m.market
 	submitOrder.Symbol = m.market.Symbol
+
+	if !m.isAvailable() {
+		return nil, fmt.Errorf("session %s is not available (maintenance or disconnected), skip placing order", m.session.Name)
+	}
+
+	if m.dryRun {
+		m.logger.Infof("[dryRun] hedge order: %+v", submitOrder)
+		return nil, nil
+	}
+
+	if m.Verbose {
+		m.logger.Infof("submitting hedge order: %+v", submitOrder)
+	}
 
 	submitOrders := []types.SubmitOrder{
 		submitOrder,

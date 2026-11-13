@@ -31,8 +31,10 @@ var (
 	_ types.ExchangeOrderQueryService = &Exchange{}
 )
 
+const ID = types.ExchangeKucoin
+
 var log = logrus.WithFields(logrus.Fields{
-	"exchange": "kucoin",
+	"exchange": ID,
 })
 
 type Exchange struct {
@@ -268,17 +270,32 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		return createdOrder, err
 	}
 
-	return &types.Order{
-		SubmitOrder:      order,
-		Exchange:         types.ExchangeKucoin,
-		OrderID:          hashStringID(orderResponse.OrderID),
-		UUID:             orderResponse.OrderID,
-		Status:           types.OrderStatusNew,
-		ExecutedQuantity: fixedpoint.Zero,
-		IsWorking:        true,
-		CreationTime:     types.Time(time.Now()),
-		UpdateTime:       types.Time(time.Now()),
-	}, nil
+	// The place-order API only returns the order id, so the order state has to
+	// be fetched separately. A market order can already be filled at this point.
+	getOrderReq := e.client.TradeService.NewGetOrderRequest()
+	getOrderReq.OrderId(orderResponse.OrderID)
+	kuOrder, err := getOrderReq.Do(ctx)
+	if err != nil {
+		// the order has already been accepted by the exchange, so the failed
+		// lookup must not turn the submission into an error.
+		log.WithError(err).Warnf("kucoin: failed to query the submitted order %s", orderResponse.OrderID)
+		return &types.Order{
+			SubmitOrder:      order,
+			Exchange:         types.ExchangeKucoin,
+			OrderID:          hashStringID(orderResponse.OrderID),
+			UUID:             orderResponse.OrderID,
+			Status:           types.OrderStatusNew,
+			ExecutedQuantity: fixedpoint.Zero,
+			IsWorking:        true,
+			CreationTime:     types.Time(time.Now()),
+			UpdateTime:       types.Time(time.Now()),
+		}, nil
+	}
+
+	globalOrder := toGlobalOrder(*kuOrder)
+	// the order detail response does not carry the market precision metadata
+	globalOrder.Market = order.Market
+	return &globalOrder, nil
 }
 
 // QueryOpenOrders

@@ -25,7 +25,7 @@ PREVIOUS_TAG=${TAGS[1]}
 PREVIOUS_TAG=$LATEST_TAG
 LATEST_TAG=main
 
-# Get a log of commits that occured between two tags
+# Get a log of commits that occurred between two tags
 # We only get the commit hash so we don't have to deal with a bunch of ugly parsing
 # See Pretty format placeholders at https://git-scm.com/docs/pretty-formats
 COMMITS=$(git log $PREVIOUS_TAG..$LATEST_TAG --pretty=format:"%H")

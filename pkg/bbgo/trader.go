@@ -302,6 +302,14 @@ func (trader *Trader) Run(ctx context.Context) error {
 	// trader.environment.Connect will call interact.Start
 	interact.AddCustomInteraction(NewCoreInteraction(trader.environment, trader))
 
+	// the registry itself lives on Environment (always non-nil); Trader
+	// just exports its own demo method onto it here.
+	if err := trader.environment.RPCRegistry().Export("ping", "demo core RPC handler: returns \"pong\"", false, func() (string, error) {
+		return "pong", nil
+	}); err != nil {
+		return err
+	}
+
 	if err := trader.injectFieldsAndSubscribe(ctx); err != nil {
 		return err
 	}
@@ -374,7 +382,7 @@ func (trader *Trader) LoadState(ctx context.Context) error {
 			return customSync.Load(ctx, store)
 		}
 
-		return loadPersistenceFields(strategy, id, ps)
+		return LoadPersistenceFields(strategy, id, ps)
 	})
 }
 

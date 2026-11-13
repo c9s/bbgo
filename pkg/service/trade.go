@@ -498,6 +498,25 @@ func (s *TradeService) DeleteAll() error {
 	return err
 }
 
+func (s *TradeService) DeleteByGID(ctx context.Context, gids []int64) error {
+	if len(gids) == 0 {
+		return nil
+	}
+
+	const batchSize = 100
+	for i := 0; i < len(gids); i += batchSize {
+		end := min(i+batchSize, len(gids))
+		sql, args, err := sq.Delete("trades").Where(sq.Eq{"gid": gids[i:end]}).ToSql()
+		if err != nil {
+			return err
+		}
+		if _, err := s.DB.ExecContext(ctx, sql, args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func SelectLastTrades(ex types.ExchangeName, symbol string, isMargin, isFutures, isIsolated bool, limit uint64) sq.SelectBuilder {
 	return sq.Select("*").
 		From("trades").
@@ -510,4 +529,66 @@ func SelectLastTrades(ex types.ExchangeName, symbol string, isMargin, isFutures,
 		}).
 		OrderBy("traded_at DESC").
 		Limit(limit)
+}
+
+// QueryOrderTradesFromDB retrieves trades for a given order query from the database.
+func (s *TradeService) QueryOrderTradesFromDB(q types.OrderQuery) ([]types.Trade, error) {
+	if s.DB == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	orderID, err := strconv.ParseUint(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid order id %q: %w", q.OrderID, err)
+	}
+
+	var trades []types.Trade
+	rows, err := s.DB.NamedQuery("SELECT * FROM trades WHERE order_id = :order_id", map[string]any{
+		"order_id": orderID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var trade types.Trade
+		if err := rows.StructScan(&trade); err != nil {
+			return nil, err
+		}
+		trades = append(trades, trade)
+	}
+
+	return trades, rows.Err()
+}
+
+// QueryOrderFromDB retrieves the order for a given order query from the database.
+func (s *TradeService) QueryOrderFromDB(q types.OrderQuery) (*types.Order, error) {
+	if s.DB == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	orderID, err := strconv.ParseUint(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid order id %q: %w", q.OrderID, err)
+	}
+
+	rows, err := s.DB.NamedQuery("SELECT * FROM orders WHERE order_id = :order_id", map[string]any{
+		"order_id": orderID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, fmt.Errorf("order not found for order_id %d", orderID)
+	}
+
+	var order types.Order
+	if err := rows.StructScan(&order); err != nil {
+		return nil, err
+	}
+	return &order, nil
+
 }

@@ -70,4 +70,7 @@ coverage_dum.txt
 
 /.credentials
 
+.claude/settings.local.json
 
+# the protobuf python code directory
+python/

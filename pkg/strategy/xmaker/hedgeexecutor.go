@@ -208,9 +208,13 @@ func (m *CounterpartyHedgeExecutor) Clear(ctx context.Context) error {
 	// trigger CancelOrders only if the order is not already closed
 	switch m.hedgeOrder.Status {
 	case types.OrderStatusNew, types.OrderStatusPartiallyFilled:
-		m.logger.Infof("cancelling existing hedge order: %+v", m.hedgeOrder)
-		if err := m.session.Exchange.CancelOrders(ctx, *m.hedgeOrder); err != nil {
-			m.logger.WithError(err).Errorf("failed to cancel order: %+v", m.hedgeOrder)
+		if m.dryRun {
+			m.logger.Infof("[dryRun] skip canceling existing hedge order: %+v", m.hedgeOrder)
+		} else {
+			m.logger.Infof("cancelling existing hedge order: %+v", m.hedgeOrder)
+			if err := m.session.Exchange.CancelOrders(ctx, *m.hedgeOrder); err != nil {
+				m.logger.WithError(err).Errorf("failed to cancel order: %+v", m.hedgeOrder)
+			}
 		}
 	}
 

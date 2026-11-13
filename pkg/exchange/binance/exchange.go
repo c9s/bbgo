@@ -3,6 +3,7 @@ package binance
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -27,6 +28,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/requestgen"
 )
 
 const BNB = "BNB"
@@ -81,8 +83,10 @@ var testNet = false
 
 var debugMode = false
 
+const ID = types.ExchangeBinance
+
 var log = logrus.WithFields(logrus.Fields{
-	"exchange": "binance",
+	"exchange": ID,
 })
 
 func debugDummy(msg string, args ...any) {}
@@ -445,10 +449,91 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(
 
 	resp, err := req.Do(ctx)
 	if err != nil {
+		if isBinanceErrorCode(err, -3045) {
+			// the system does not have enough asset now, treat as no max borrowable amount
+			log.WithError(err).Warnf("system does not have enough asset, returning zero max borrowable amount")
+			return fixedpoint.Zero, nil
+		}
 		return fixedpoint.Zero, err
 	}
 
 	return resp.Amount, nil
+}
+
+func (e *Exchange) QueryMarginAssetInfo(ctx context.Context, asset string) (types.MarginAssetInfo, error) {
+	assets, err := e.client2.NewGetMarginAllAssetsRequest().Asset(asset).Do(ctx)
+	if err != nil {
+		return types.MarginAssetInfo{}, err
+	}
+
+	for _, info := range assets {
+		if info.AssetName != asset {
+			continue
+		}
+		return toGlobalMarginAssetInfo(info)
+	}
+
+	return types.MarginAssetInfo{}, fmt.Errorf("margin asset information not found for %s", asset)
+}
+
+func (e *Exchange) QueryMarginAssetInfos(ctx context.Context, assets []string) (map[string]types.MarginAssetInfo, error) {
+	all, err := e.client2.NewGetMarginAllAssetsRequest().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	wanted := make(map[string]struct{}, len(assets))
+	for _, asset := range assets {
+		wanted[asset] = struct{}{}
+	}
+
+	infos := make(map[string]types.MarginAssetInfo, len(assets))
+	for _, info := range all {
+		if _, ok := wanted[info.AssetName]; !ok {
+			continue
+		}
+		converted, err := toGlobalMarginAssetInfo(info)
+		if err != nil {
+			log.WithError(err).WithField("asset", info.AssetName).Warn("skipping invalid Binance margin asset information")
+			continue
+		}
+		infos[info.AssetName] = converted
+	}
+
+	return infos, nil
+}
+
+func toGlobalMarginAssetInfo(info binanceapi.MarginAssetInfo) (types.MarginAssetInfo, error) {
+	minBorrow := fixedpoint.Zero
+	if info.UserMinBorrow == nil {
+		log.WithField("asset", info.AssetName).Warn("Binance userMinBorrow is missing or null, continuing without an exchange minimum borrow floor")
+	} else {
+		minBorrow = *info.UserMinBorrow
+		if minBorrow.Sign() < 0 {
+			return types.MarginAssetInfo{}, fmt.Errorf("invalid minimum borrow amount for %s: %s", info.AssetName, minBorrow)
+		}
+	}
+	return types.MarginAssetInfo{
+		Asset:        info.AssetName,
+		IsBorrowable: info.IsBorrowable,
+		MinBorrow:    minBorrow,
+		MinRepay:     info.UserMinRepay,
+	}, nil
+}
+
+// isBinanceErrorCode reports whether err is a Binance API error response with the given error code.
+func isBinanceErrorCode(err error, code int) bool {
+	err2, ok := err.(*requestgen.ErrResponse)
+	if !ok {
+		return false
+	}
+
+	errResp := &Error{}
+	if jsonErr := json.Unmarshal(err2.Response.Body, errResp); jsonErr != nil {
+		return false
+	}
+
+	return errResp.Code == code
 }
 
 func (e *Exchange) borrowRepayAsset(
@@ -872,7 +957,7 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 			LongAvailableCredit:  fixedpoint.Zero,
 			ShortAvailableCredit: fixedpoint.Zero,
 			NetAsset:             fixedpoint.Zero,
-			MaxWithdrawAmount:    fixedpoint.Zero,
+			MaxWithdrawAmount:    nil,
 		}
 	}
 
@@ -1690,6 +1775,27 @@ func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (
 	return &rate, nil
 }
 
+func (e *Exchange) QueryBnbBurnStatus(ctx context.Context) (bool, error) {
+	if e.IsFutures {
+		req := e.futuresClient2.NewFuturesBnbBurnStatusRequest()
+		resp, err := req.Do(ctx)
+		if err != nil {
+			return false, err
+		}
+
+		return resp.FeeBurn, nil
+	}
+	req := e.client2.NewBnbBurnStatusRequest()
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return false, err
+	}
+	if e.IsMargin || e.IsIsolatedMargin {
+		return resp.InterestBNBBurn, nil
+	}
+	return resp.SpotBNBBurn, nil
+}
+
 // QueryTakerBuySellVolumes queries the taker buy/sell volumes for a symbol and interval. It is only supported for futures.
 func (e *Exchange) QueryTakerBuySellVolumes(ctx context.Context, symbol string, period types.Interval, options types.TradeQueryOptions) ([]binanceapi.FuturesTakerBuySellVolume, error) {
 	req := e.futuresClient2.NewFuturesTakerBuySellVolumeRequest().
@@ -1714,6 +1820,41 @@ func (e *Exchange) QueryTakerBuySellVolumes(ctx context.Context, symbol string, 
 
 // SessionOptionConfigurer
 func (e *Exchange) ConfigureOptions(options map[string]any) error {
+	if e.IsFutures {
+		return e.configureFuturesOptions(options)
+	}
+	return e.configureSpotOptions(options)
+}
+
+func (e *Exchange) configureFuturesOptions(options map[string]any) (err error) {
+	futuresBnbBurn, futuresOk := options["futuresBnbBurn"].(bool)
+	if !futuresOk {
+		// nothing to configure for bnb burn
+		return nil
+	}
+	req := e.futuresClient2.NewFuturesToggleBnbBurnRequest(futuresBnbBurn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := req.Do(ctx)
+	defer func() {
+		if err == nil {
+			log.Infof("toggle Futures Burn BNB response: %+v", resp)
+		} else {
+			log.WithError(err).Warn("toggle Futures Burn BNB error")
+		}
+	}()
+	if err != nil {
+		if isBinanceErrorCode(err, -4145) {
+			// futures BNB burn is already set to the requested value, no need to switch -> ignore the error
+			err = nil
+		}
+	}
+	return err
+}
+
+func (e *Exchange) configureSpotOptions(options map[string]any) error {
 	spotBnbBurn, spotOk := options["spotBnbBurn"].(bool)
 	interestBnbBurn, interestOk := options["interestBnbBurn"].(bool)
 	if !spotOk && !interestOk {
@@ -1728,14 +1869,15 @@ func (e *Exchange) ConfigureOptions(options map[string]any) error {
 		req.InterestBnbBurn(interestBnbBurn)
 	}
 
-	timedCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	resp, err := req.Do(timedCtx)
+	resp, err := req.Do(ctx)
 	if err != nil {
+		log.WithError(err).Warn("toggle Spot Burn BNB failed")
 		return err
 	}
-	log.Infof("Toggle Burn BNB response: %+v", resp)
+	log.Infof("toggle Spot Burn BNB response: %+v", resp)
 	return nil
 }
 

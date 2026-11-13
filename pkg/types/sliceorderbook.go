@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -177,9 +178,9 @@ func (b *SliceOrderBook) String() string {
 
 	if len(b.Asks) > 0 {
 		sb.WriteString("ASKS:\n")
-		for i := len(b.Asks) - 1; i >= 0; i-- {
+		for _, v := range slices.Backward(b.Asks) {
 			sb.WriteString("- ASK: ")
-			sb.WriteString(b.Asks[i].String())
+			sb.WriteString(v.String())
 			sb.WriteString("\n")
 		}
 	}

@@ -3,6 +3,7 @@ package xfundingv2
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,6 +47,7 @@ func testExecutorSetup(
 		false,
 		market,
 		generalExecutor,
+		session.Connectivity,
 		config,
 	)
 
@@ -173,7 +175,7 @@ func TestTWAPOrderExecutor_GetTakerPrice(t *testing.T) {
 		// minPrice = 99.0 * (1 - 0.01) = 98.01
 		price, err := executor.GetPrice(types.SideTypeSell, orderBook)
 		assert.NoError(t, err)
-		assert.Equal(t, Number(98.01), price)
+		assert.Equal(t, Number("98.01"), price)
 	})
 
 	t.Run("empty order book returns error for buy", func(t *testing.T) {
@@ -283,7 +285,7 @@ func TestTWAPOrderExecutor_BuildSubmitOrder(t *testing.T) {
 		assert.Equal(t, types.OrderTypeLimitMaker, order.Type)
 		assert.Equal(t, Number(1.5), order.Quantity)
 		assert.Equal(t, Number(50000.0), order.Price)
-		assert.Equal(t, types.TimeInForceGTC, order.TimeInForce)
+		assert.Equal(t, types.TimeInForce(""), order.TimeInForce)
 	})
 
 	t.Run("taker order creates limit with IOC", func(t *testing.T) {
@@ -345,6 +347,59 @@ func TestTWAPOrderExecutor_PlaceOrder(t *testing.T) {
 		assert.Equal(t, uint64(12345), createdOrder.OrderID)
 	})
 
+	t.Run("skips placing order when session is disconnected", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		config := TWAPWorkerConfig{
+			OrderType:  TWAPOrderTypeMaker,
+			NumOfTicks: 1,
+		}
+
+		executor, _, mockExchange := testExecutorSetup(t, ctrl, config)
+		executor.Start()
+
+		stream := &types.StandardStream{}
+		connectivity := types.NewConnectivity()
+		connectivity.Bind(stream)
+		executor.connectivity = types.NewConnectivityGroup(connectivity)
+
+		orderBook := newOrderBook(99.0, 10.0, 100.0, 10.0)
+
+		// disconnected: SubmitOrder must never be called
+		mockExchange.EXPECT().SubmitOrder(gomock.Any(), gomock.Any()).Times(0)
+
+		_, err := executor.PlaceOrder(Number(1.0), types.SideTypeBuy, orderBook, TWAPExecuteOrderOptions{
+			DeadlineExceeded: false,
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "disconnected")
+
+		// reconnect: placement proceeds normally
+		stream.EmitConnect()
+
+		expectedOrder := types.Order{
+			OrderID: 12345,
+			SubmitOrder: types.SubmitOrder{
+				Symbol:   "BTCUSDT",
+				Side:     types.SideTypeBuy,
+				Type:     types.OrderTypeLimitMaker,
+				Quantity: Number(1.0),
+				Price:    Number(99.01),
+			},
+		}
+		mockExchange.EXPECT().
+			SubmitOrder(gomock.Any(), gomock.Any()).
+			Return(&expectedOrder, nil).
+			Times(1)
+
+		createdOrder, err := executor.PlaceOrder(Number(1.0), types.SideTypeBuy, orderBook, TWAPExecuteOrderOptions{
+			DeadlineExceeded: false,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, createdOrder)
+	})
+
 	t.Run("dust quantity returns error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -397,12 +452,13 @@ func TestTWAPOrderExecutor_PlaceOrder(t *testing.T) {
 }
 
 func TestTWAPOrderExecutor_SyncOrder(t *testing.T) {
-	t.Run("order not in store queries exchange and adds order", func(t *testing.T) {
+	t.Run("order not in store skips sync", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{}
-		executor, mockOrderQuery, _ := testExecutorSetup(t, ctrl, config)
+		executor, _, _ := testExecutorSetup(t, ctrl, config)
+		executor.Start()
 
 		order := types.Order{
 			OrderID: 12345,
@@ -412,35 +468,14 @@ func TestTWAPOrderExecutor_SyncOrder(t *testing.T) {
 			},
 		}
 
-		updatedOrder := &types.Order{
-			OrderID: 12345,
-			SubmitOrder: types.SubmitOrder{
-				Symbol:   "BTCUSDT",
-				Quantity: Number(1.0),
-			},
-			ExecutedQuantity: Number(0.5),
-			Status:           types.OrderStatusPartiallyFilled,
-		}
-		trades := []types.Trade{
-			{ID: 1, OrderID: 12345},
-		}
-
-		mockOrderQuery.EXPECT().
-			QueryOrder(gomock.Any(), gomock.Any()).
-			Return(updatedOrder, nil).
-			Times(1)
-		mockOrderQuery.EXPECT().
-			QueryOrderTrades(gomock.Any(), gomock.Any()).
-			Return(trades, nil).
-			Times(1)
-
+		// order is not in the store, so SyncOrder should skip without querying the exchange
+		// (mockOrderQuery has no expectations set, so any call would fail the test)
 		err := executor.SyncOrder(order)
 		assert.NoError(t, err)
 
-		// Verify order was added to store
-		storedOrder, found := executor.executor.OrderStore().Get(12345)
-		assert.True(t, found)
-		assert.Equal(t, types.OrderStatusPartiallyFilled, storedOrder.Status)
+		// Verify order was NOT added to store
+		_, found := executor.executor.OrderStore().Get(12345)
+		assert.False(t, found)
 	})
 
 	t.Run("fully filled order skips sync", func(t *testing.T) {
@@ -577,6 +612,153 @@ func TestTWAPOrderExecutor_SyncOrder(t *testing.T) {
 	})
 }
 
+func TestTWAPOrderExecutor_SyncTrades(t *testing.T) {
+	t.Run("backfills missing trades without duplicating existing ones", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		executor, mockOrderQuery, _ := testExecutorSetup(t, ctrl, TWAPWorkerConfig{})
+		order := types.Order{OrderID: 12345, SubmitOrder: types.SubmitOrder{Symbol: "BTCUSDT"}}
+		executor.syncState.Orders[order.OrderID] = order.AsQuery()
+		executor.executor.OrderStore().Add(order)
+
+		existing := makeTrade(1, 12345, types.SideTypeBuy, Number(100), Number(1))
+		missing := makeTrade(2, 12345, types.SideTypeBuy, Number(101), Number(2))
+		assert.True(t, executor.AddTrade(existing))
+
+		mockOrderQuery.EXPECT().
+			QueryOrder(gomock.Any(), gomock.Any()).
+			Return(&order, nil).
+			Times(1)
+		mockOrderQuery.EXPECT().
+			QueryOrderTrades(gomock.Any(), gomock.Any()).
+			Return([]types.Trade{existing, missing}, nil).
+			Times(1)
+
+		added, err := executor.SyncTrades(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, 1, added)
+		assert.Len(t, executor.AllTrades(), 2)
+
+		// a second sync finds nothing new
+		mockOrderQuery.EXPECT().
+			QueryOrder(gomock.Any(), gomock.Any()).
+			Return(&order, nil).
+			Times(1)
+		mockOrderQuery.EXPECT().
+			QueryOrderTrades(gomock.Any(), gomock.Any()).
+			Return([]types.Trade{existing, missing}, nil).
+			Times(1)
+		added, err = executor.SyncTrades(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, 0, added)
+		assert.Len(t, executor.AllTrades(), 2)
+	})
+
+	t.Run("query failure on one order does not block the others", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		executor, mockOrderQuery, _ := testExecutorSetup(t, ctrl, TWAPWorkerConfig{})
+		for _, id := range []uint64{1, 2} {
+			order := types.Order{
+				OrderID:     id,
+				SubmitOrder: types.SubmitOrder{Symbol: "BTCUSDT", Quantity: Number(10)},
+			}
+			executor.syncState.Orders[id] = order.AsQuery()
+			executor.executor.OrderStore().Add(order)
+		}
+
+		mockOrderQuery.EXPECT().
+			QueryOrder(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, q types.OrderQuery) (*types.Order, error) {
+				id, err := strconv.ParseUint(q.OrderID, 10, 64)
+				assert.NoError(t, err)
+				return &types.Order{
+					OrderID:     id,
+					SubmitOrder: types.SubmitOrder{Symbol: "BTCUSDT", Quantity: Number(10)},
+				}, nil
+			}).
+			Times(2)
+		mockOrderQuery.EXPECT().
+			QueryOrderTrades(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, q types.OrderQuery) ([]types.Trade, error) {
+				if q.OrderID == "1" {
+					return nil, errors.New("boom")
+				}
+				return []types.Trade{makeTrade(10, 2, types.SideTypeSell, Number(100), Number(1))}, nil
+			}).
+			Times(2)
+
+		added, err := executor.SyncTrades(context.Background())
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to query order trades")
+		assert.Equal(t, 1, added)
+		assert.Len(t, executor.AllTrades(), 1)
+	})
+
+	t.Run("skips sync when local trades already cover the order quantity", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		executor, mockOrderQuery, _ := testExecutorSetup(t, ctrl, TWAPWorkerConfig{})
+
+		// order 1 is already fully accounted for locally: no exchange calls should be made for it.
+		filledOrder := types.Order{
+			OrderID:     1,
+			SubmitOrder: types.SubmitOrder{Symbol: "BTCUSDT", Quantity: Number(3)},
+		}
+		executor.syncState.Orders[filledOrder.OrderID] = filledOrder.AsQuery()
+		executor.executor.OrderStore().Add(filledOrder)
+		assert.True(t, executor.AddTrade(makeTrade(1, 1, types.SideTypeBuy, Number(100), Number(3))))
+
+		// order 2 is not yet fully accounted for locally, so it should still be synced.
+		pendingOrder := types.Order{
+			OrderID:     2,
+			SubmitOrder: types.SubmitOrder{Symbol: "BTCUSDT", Quantity: Number(5)},
+		}
+		executor.syncState.Orders[pendingOrder.OrderID] = pendingOrder.AsQuery()
+		executor.executor.OrderStore().Add(pendingOrder)
+
+		newTrade := makeTrade(2, 2, types.SideTypeBuy, Number(100), Number(5))
+		mockOrderQuery.EXPECT().
+			QueryOrder(gomock.Any(), gomock.Any()).
+			Return(&pendingOrder, nil).
+			Times(1)
+		mockOrderQuery.EXPECT().
+			QueryOrderTrades(gomock.Any(), gomock.Any()).
+			Return([]types.Trade{newTrade}, nil).
+			Times(1)
+
+		added, err := executor.SyncTrades(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, 1, added)
+		assert.Len(t, executor.AllTrades(), 2)
+	})
+}
+
+func TestTWAPOrderExecutor_GetTradesMap(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	executor, _, _ := testExecutorSetup(t, ctrl, TWAPWorkerConfig{})
+
+	trade1 := makeTrade(1, 100, types.SideTypeBuy, Number(100), Number(1))
+	trade2 := makeTrade(2, 100, types.SideTypeBuy, Number(101), Number(2))
+	trade3 := makeTrade(3, 200, types.SideTypeSell, Number(102), Number(3))
+
+	executor.syncState.Orders[100] = types.OrderQuery{Symbol: "BTCUSDT", OrderID: "100"}
+	executor.syncState.Orders[200] = types.OrderQuery{Symbol: "BTCUSDT", OrderID: "200"}
+	assert.True(t, executor.AddTrade(trade1))
+	assert.True(t, executor.AddTrade(trade2))
+	assert.True(t, executor.AddTrade(trade3))
+
+	tradesMap := executor.getTradesMap()
+	assert.Len(t, tradesMap, 2)
+	assert.ElementsMatch(t, []types.Trade{trade1, trade2}, tradesMap[100])
+	assert.ElementsMatch(t, []types.Trade{trade3}, tradesMap[200])
+}
+
 func TestTWAPOrderExecutor_CancelOrder(t *testing.T) {
 	t.Run("successful cancel", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -584,8 +766,10 @@ func TestTWAPOrderExecutor_CancelOrder(t *testing.T) {
 
 		config := TWAPWorkerConfig{}
 		executor, _, mockExchange := testExecutorSetup(t, ctrl, config)
+		executor.Start()
 
-		order := types.Order{OrderID: 12345}
+		order := types.Order{OrderID: 12345, SubmitOrder: types.SubmitOrder{Symbol: "BTCUSDT"}}
+		executor.syncState.Orders[order.OrderID] = order.AsQuery()
 
 		mockExchange.EXPECT().
 			CancelOrders(gomock.Any(), order).
@@ -597,26 +781,26 @@ func TestTWAPOrderExecutor_CancelOrder(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("cancel failure returns error", func(t *testing.T) {
+	t.Run("cancel exchange error is gracefully ignored", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
 		config := TWAPWorkerConfig{}
 		executor, _, mockExchange := testExecutorSetup(t, ctrl, config)
+		executor.Start()
 
-		order := types.Order{OrderID: 12345}
-		expectedErr := errors.New("cancel failed")
+		order := types.Order{OrderID: 12345, SubmitOrder: types.SubmitOrder{Symbol: "BTCUSDT"}}
+		executor.syncState.Orders[order.OrderID] = order.AsQuery()
 
-		// GeneralOrderExecutor.CancelOrders retries once on failure
+		// GracefulCancel logs CancelOrders errors but does not propagate them
 		mockExchange.EXPECT().
 			CancelOrders(gomock.Any(), order).
-			Return(expectedErr).
-			Times(2)
+			Return(errors.New("cancel failed")).
+			Times(1)
 
 		ctx := context.Background()
 		err := executor.CancelOrder(ctx, order)
-		assert.Error(t, err)
-		assert.Equal(t, expectedErr, err)
+		assert.NoError(t, err)
 	})
 }
 
@@ -682,6 +866,7 @@ func TestTWAPOrderExecutor_GetOrder(t *testing.T) {
 
 	config := TWAPWorkerConfig{}
 	executor, _, _ := testExecutorSetup(t, ctrl, config)
+	executor.Start()
 
 	// Add order to store
 	order := types.Order{

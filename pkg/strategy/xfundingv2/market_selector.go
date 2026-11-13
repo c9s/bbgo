@@ -7,7 +7,6 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,13 +25,15 @@ func getPostionSign(positionType types.PositionType) int {
 type MarketSelectionConfig struct {
 	FuturesDirection types.PositionType `json:"futuresDirection"`
 
-	MaxHoldingHours types.Duration `json:"maxHoldingHours"`
-	// TradeBalanceRatio is the ratio of the asset balance to be invested on the spot market.
-	TradeBalanceRatio fixedpoint.Value `json:"tradeBalanceRatio"`
+	MaxHoldingDuration types.Duration `json:"maxHoldingDuration"`
 
 	// Minimum annualized funding rate to consider (e.g., 0.10 = 10%)
 	// recommended to default to 5%
 	MinAnnualizedRate fixedpoint.Value `json:"minAnnualizedRate"`
+	// AnnualizedRateStep is the step size for the required annualized rate for new market candidates.
+	// For example, if there is already an active round with 10% annualized rate, and the step is 1%,
+	// then the next market candidate must have at least 11% annualized rate to be considered.
+	AnnualizedRateStep fixedpoint.Value `json:"annualizedRateStep"`
 
 	MinCollateralRate fixedpoint.Value `json:"minCollateralRate"`
 
@@ -50,11 +51,8 @@ func (c *MarketSelectionConfig) Defaults() {
 	if c.FuturesDirection == "" {
 		c.FuturesDirection = types.PositionShort
 	}
-	if c.MaxHoldingHours == 0 {
-		c.MaxHoldingHours = types.Duration(time.Hour * 48)
-	}
-	if c.TradeBalanceRatio.IsZero() {
-		c.TradeBalanceRatio = fixedpoint.NewFromFloat(0.999)
+	if c.MaxHoldingDuration == 0 {
+		c.MaxHoldingDuration = types.Duration(time.Hour * 24 * 20)
 	}
 	if c.MinAnnualizedRate.IsZero() {
 		c.MinAnnualizedRate = fixedpoint.NewFromFloat(0.05) // 5%
@@ -70,6 +68,9 @@ func (c *MarketSelectionConfig) Defaults() {
 	}
 	if c.RequiredTakerQuoteVolume24h.IsZero() {
 		c.RequiredTakerQuoteVolume24h = fixedpoint.NewFromFloat(100000)
+	}
+	if c.AnnualizedRateStep.IsZero() {
+		c.AnnualizedRateStep = fixedpoint.NewFromFloat(0.02) // 2%
 	}
 	if c.TopNCap == 0 {
 		c.TopNCap = 10
@@ -96,23 +97,17 @@ type MarketCandidate struct {
 	MinHoldingIntervals int
 }
 
-type FuturesInfoService interface {
-	QueryTakerBuySellVolumes(context.Context, string, types.Interval, types.TradeQueryOptions) ([]binanceapi.FuturesTakerBuySellVolume, error)
-	QueryPremiumIndex(context.Context, string) (*types.PremiumIndex, error)
-	QueryDepth(context.Context, string) (types.SliceOrderBook, int64, error)
-	QueryFuturesFundingInfo(context.Context) ([]binanceapi.FuturesFundingInfo, error)
-	QueryTicker(context.Context, string) (*types.Ticker, error)
-}
-
 // MarketSelector selects the best market based on funding rate and liquidity
 type MarketSelector struct {
 	MarketSelectionConfig
-	service FuturesInfoService
-	logger  logrus.FieldLogger
+
+	activeRounds map[string]*ArbitrageRound
+	service      FuturesService
+	logger       logrus.FieldLogger
 }
 
 // NewMarketSelector creates a new MarketSelector
-func NewMarketSelector(config MarketSelectionConfig, exchange FuturesInfoService, logger logrus.FieldLogger) *MarketSelector {
+func NewMarketSelector(config MarketSelectionConfig, exchange FuturesService, logger logrus.FieldLogger) *MarketSelector {
 	return &MarketSelector{
 		MarketSelectionConfig: config,
 		service:               exchange,
@@ -127,6 +122,9 @@ func (s *MarketSelector) SelectMarkets(ctx context.Context, symbols []string) ([
 	if err != nil {
 		return nil, err
 	}
+	if len(symbols) == 0 {
+		return nil, nil
+	}
 
 	// Step 2: Get funding info
 	fundingInfos, err := queryFundingInfo(ctx, s.service)
@@ -134,7 +132,13 @@ func (s *MarketSelector) SelectMarkets(ctx context.Context, symbols []string) ([
 		return nil, err
 	}
 
-	// Step 3: Filter candidates
+	// Step 3: Get ADL risks
+	adlRisks, err := s.service.QueryFuturesAdlRisk(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+
+	// Step 4: Filter candidates
 	candidates := make([]MarketCandidate, 0, len(indices))
 	// query the volume data
 	takerQuoteVolumes := make(map[string]fixedpoint.Value)
@@ -168,13 +172,10 @@ func (s *MarketSelector) SelectMarkets(ctx context.Context, symbols []string) ([
 			continue
 		}
 		annualized := AnnualizedRate(idx.LastFundingRate, info.FundingIntervalHours)
-		labels := prometheus.Labels{
-			"symbol": idx.Symbol,
-		}
-		annualizedFundingRateMetrics.With(labels).Set(annualized.Float64())
-		fundingRateMetrics.With(labels).Set(idx.LastFundingRate.Float64())
+		numActiveRounds := fixedpoint.NewFromInt(int64(len(s.activeRounds)))
+		requiredAnnualizedRate := s.MinAnnualizedRate.Add(s.AnnualizedRateStep.Mul(numActiveRounds))
 
-		if annualized.Abs().Compare(s.MinAnnualizedRate) < 0 {
+		if annualized.Abs().Compare(requiredAnnualizedRate) < 0 {
 			continue
 		}
 
@@ -202,6 +203,12 @@ func (s *MarketSelector) SelectMarkets(ctx context.Context, symbols []string) ([
 			continue
 		}
 
+		// if the symbol has no ADL risk found, we assume it's low risk.
+		adlRisk, found := adlRisks[idx.Symbol]
+		if found && adlRisk.RiskLevel != binanceapi.AdlRiskLevelLow {
+			continue
+		}
+
 		candidates = append(candidates, MarketCandidate{
 			Symbol:                 idx.Symbol,
 			FundingIntervalHours:   info.FundingIntervalHours,
@@ -215,8 +222,13 @@ func (s *MarketSelector) SelectMarkets(ctx context.Context, symbols []string) ([
 	return candidates, nil
 }
 
+func (s *MarketSelector) SetActiveRounds(rounds map[string]*ArbitrageRound) *MarketSelector {
+	s.activeRounds = rounds
+	return s
+}
+
 // queryFundingRates queries funding rates for the given symbols
-func queryFundingRates(ctx context.Context, service FuturesInfoService, logger logrus.FieldLogger, symbols []string) ([]*types.PremiumIndex, error) {
+func queryFundingRates(ctx context.Context, service FuturesService, logger logrus.FieldLogger, symbols []string) ([]*types.PremiumIndex, error) {
 	indices := make([]*types.PremiumIndex, 0, len(symbols))
 
 	for _, symbol := range symbols {
@@ -232,7 +244,7 @@ func queryFundingRates(ctx context.Context, service FuturesInfoService, logger l
 	return indices, nil
 }
 
-func queryFundingInfo(ctx context.Context, service FuturesInfoService) (map[string]*binanceapi.FuturesFundingInfo, error) {
+func queryFundingInfo(ctx context.Context, service FuturesService) (map[string]*binanceapi.FuturesFundingInfo, error) {
 	m := make(map[string]*binanceapi.FuturesFundingInfo)
 	fundingInfos, err := service.QueryFuturesFundingInfo(ctx)
 	if err != nil {

@@ -73,6 +73,60 @@ func TestWriteSpecificSubscriptions_Empty(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestHandleIndexPriceKLineEvent(t *testing.T) {
+	s := &Stream{}
+
+	// index price klines must not leak into the generic kline sink used by
+	// kline-driven strategies/indicators — they are a different data source.
+	var closedKLines []types.KLine
+	s.OnKLineClosed(func(kline types.KLine) {
+		closedKLines = append(closedKLines, kline)
+	})
+
+	var closedIndexPriceKLines []types.KLine
+	s.OnIndexPriceKLineClosed(func(kline types.KLine) {
+		closedIndexPriceKLines = append(closedIndexPriceKLines, kline)
+	})
+
+	e := &IndexPriceKLineEvent{
+		Symbol: "BTCUSD",
+		KLine: KLine{
+			Symbol:    "0", // placeholder value sent by Binance, must not leak into the kline
+			Closed:    true,
+			StartTime: 1591267020000,
+			EndTime:   1591267079999,
+		},
+	}
+	s.handleIndexPriceKLineEvent(e)
+
+	assert.Empty(t, closedKLines)
+	if assert.Len(t, closedIndexPriceKLines, 1) {
+		assert.Equal(t, "BTCUSD", closedIndexPriceKLines[0].Symbol)
+	}
+
+	// non-closed klines must emit the update sinks but not the closed ones
+	closedIndexPriceKLines = nil
+	var updatedIndexPriceKLines []types.KLine
+	s.OnIndexPriceKLine(func(kline types.KLine) {
+		updatedIndexPriceKLines = append(updatedIndexPriceKLines, kline)
+	})
+
+	e2 := &IndexPriceKLineEvent{Symbol: "BTCUSD", KLine: KLine{Closed: false}}
+	s.handleIndexPriceKLineEvent(e2)
+
+	assert.Empty(t, closedIndexPriceKLines)
+	assert.Len(t, updatedIndexPriceKLines, 1)
+}
+
+func TestConvertSubscription_IndexPriceKLineChannel(t *testing.T) {
+	sub := types.Subscription{
+		Channel: types.IndexPriceKLineChannel,
+		Symbol:  "BTCUSD",
+		Options: types.SubscribeOptions{Interval: types.Interval1m},
+	}
+	assert.Equal(t, "btcusd@indexPriceKline_1m", convertSubscription(sub))
+}
+
 func TestGetPublicEndpointUrl_FuturesOnlyMarket(t *testing.T) {
 	testNet = false
 	ex := &Exchange{}

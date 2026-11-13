@@ -180,11 +180,18 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	err := syn.initialize(strategy)
 	assert.NoError(t, err)
 
+	err = syn.initializeSourcePosition()
+	assert.NoError(t, err)
+
 	// the connectivity waiting is blocking, so we need to run it in a goroutine
 
 	go func() {
 		err := syn.Start(ctx)
 		assert.NoError(t, err)
+	}()
+	defer func() {
+		sourceHedgeMarket.Stop(context.Background())
+		fiatHedgeMarket.Stop(context.Background())
 	}()
 
 	sourceMarketDataStream.EmitConnect()
@@ -290,7 +297,6 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	assert.Equal(t, Number(0).Float64(), fiatHedgeMarket.Position.GetBase().Float64(), "fiat position should be closed to 0")
 	assert.Equal(t, Number(0).Float64(), makerPosition.GetBase().Float64(), "the maker position should be closed to 0")
 
-	cancel()
 }
 
 func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
@@ -393,10 +399,17 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 	err := syn.initialize(strategy)
 	assert.NoError(t, err)
 
+	err = syn.initializeSourcePosition()
+	assert.NoError(t, err)
+
 	// the connectivity waiting is blocking, so we need to run it in a goroutine
 	go func() {
 		err := syn.Start(ctx)
 		assert.NoError(t, err)
+	}()
+	defer func() {
+		sourceHedgeMarket.Stop(context.Background())
+		fiatHedgeMarket.Stop(context.Background())
 	}()
 
 	sourceMarketDataStream.EmitConnect()
@@ -542,6 +555,13 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		Status:           types.OrderStatusCanceled,
 	})
 
+	// the fiat hedge order is submitted asynchronously (triggered by the source trade via
+	// positionDeltaC on the fiat hedge worker goroutine), so wait for it to be registered in
+	// the fiat market's own order store before emitting its trade update.
+	assert.Eventually(t, func() bool {
+		return fiatHedgeMarket.orderStore.Exists(createdOrder4.OrderID)
+	}, time.Second, time.Millisecond)
+
 	fiatUserDataStream.EmitTradeUpdate(types.Trade{
 		ID:            createdOrder4.OrderID,
 		OrderID:       createdOrder4.OrderID,
@@ -616,6 +636,10 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		Status:           types.OrderStatusCanceled,
 	})
 
+	assert.Eventually(t, func() bool {
+		return fiatHedgeMarket.orderStore.Exists(createdOrder5.OrderID)
+	}, time.Second, time.Millisecond)
+
 	fiatUserDataStream.EmitTradeUpdate(types.Trade{
 		ID:            createdOrder5.OrderID,
 		OrderID:       createdOrder5.OrderID,
@@ -634,7 +658,6 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 
 	time.Sleep(stepTime)
 
-	cancel()
 	time.Sleep(stepTime)
 
 	assert.Equal(t, Number(0).Float64(), sourceHedgeMarket.Position.GetBase().Float64(), "source position should be closed to 0")

@@ -58,9 +58,9 @@ func (s *SyncService) SyncSessionSymbols(
 
 		_, isFutures, _, _ := bbgoEx.GetSessionAttributes(exchange)
 		if isFutures {
-			if service, ok := exchange.(types.ExchangeRiskService); ok {
-				logger.Infof("syncing %s %s position risk...", exchange.Name(), symbol)
-				if err := s.FuturesService.Sync(ctx, service, symbol); err != nil {
+			if service, ok := exchange.(ExchangeFuturesService); ok {
+				logger.Infof("syncing %s %s futures data...", exchange.Name(), symbol)
+				if err := s.FuturesService.Sync(ctx, service, symbol, startTime, endTime); err != nil {
 					return err
 				}
 			}

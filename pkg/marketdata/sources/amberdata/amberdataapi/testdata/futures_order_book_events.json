@@ -1,0 +1,36 @@
+{
+  "status": 200,
+  "title": "OK",
+  "description": "Successful request",
+  "payload": {
+    "metadata": {
+      "requestedStartDate": 1717518144224,
+      "requestedEndDate": 1717604544224,
+      "returnedStartDate": 1717518144231,
+      "returnedEndDate": 1717518192414,
+      "next": null,
+      "api-version": "2023-09-30"
+    },
+    "data": [
+      {
+        "instrument": "BTCUSD_PERP",
+        "exchange": "binance",
+        "exchangeTimestamp": 1717518192414,
+        "exchangeTimestampNanoseconds": 0,
+        "sequence": "960251880359",
+        "ask": [
+          { "price": 70960.6, "volume": 75, "numOrders": null },
+          { "price": 70973.5, "volume": 137, "numOrders": null },
+          { "price": 70975.4, "volume": 7914, "numOrders": null },
+          { "price": 70976, "volume": 0, "numOrders": null },
+          { "price": 70976.6, "volume": 20, "numOrders": null }
+        ],
+        "bid": [
+          { "price": 70907, "volume": 51, "numOrders": null },
+          { "price": 70914, "volume": 50, "numOrders": null },
+          { "price": 70928.5, "volume": 25, "numOrders": null }
+        ]
+      }
+    ]
+  }
+}

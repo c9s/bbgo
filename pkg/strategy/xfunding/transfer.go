@@ -25,13 +25,13 @@ func (s *Strategy) resetTransfer(ctx context.Context, ex FuturesTransfer, asset 
 	}
 
 	amount := b.MaxWithdrawAmount
-	if amount.IsZero() {
+	if amount == nil || amount.IsZero() {
 		return nil
 	}
 
-	log.Infof("transferring out futures account asset %s %s", amount, asset)
+	log.Infof("transferring out futures account asset %s %s", *amount, asset)
 
-	err = ex.TransferFuturesAccountAsset(ctx, asset, amount, types.TransferOut)
+	err = ex.TransferFuturesAccountAsset(ctx, asset, *amount, types.TransferOut)
 	if err != nil {
 		return err
 	}
@@ -131,8 +131,8 @@ func (s *Strategy) queryAvailableTransfer(
 	}
 
 	limit := b.Available
-	if b.MaxWithdrawAmount.Sign() > 0 {
-		limit = fixedpoint.Min(b.MaxWithdrawAmount, limit)
+	if b.MaxWithdrawAmount != nil && b.MaxWithdrawAmount.Sign() > 0 {
+		limit = fixedpoint.Min(*b.MaxWithdrawAmount, limit)
 	}
 
 	if limit.Compare(quantity) < 0 {

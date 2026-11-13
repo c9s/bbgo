@@ -95,6 +95,11 @@ environment: dev
 rbTreeOrderbook:
   enabled: false
 
+# this set ENABLE_SKIPLIST_ORDERBOOK env
+# it takes precedence over rbTreeOrderbook when both are enabled
+skipListOrderbook:
+  enabled: false
+
 # sync controls the kubernetes cronjob for data synchronization from exchanges
 # it starts a cronjob to run bbgo sync command periodically
 sync:

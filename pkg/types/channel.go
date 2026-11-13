@@ -13,7 +13,8 @@ const (
 	ForceOrderChannel  = Channel("forceOrder")
 
 	// channels for futures
-	MarkPriceChannel = Channel("markPrice")
+	MarkPriceChannel       = Channel("markPrice")
+	IndexPriceKLineChannel = Channel("indexPriceKline")
 
 	LiquidationOrderChannel = Channel("liquidationOrder")
 

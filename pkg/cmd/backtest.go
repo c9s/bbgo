@@ -34,7 +34,10 @@ import (
 )
 
 func init() {
-	BacktestCmd.Flags().Bool("csv", false, "use csv data source for exchange (if supported)")
+	// Deprecated: the csv backtest path is superseded by pkg/marketdata; see
+	// `bbgo marketdata --help`. Kept working for one release.
+	BacktestCmd.Flags().Bool("csv", false,
+		"use csv data source for exchange (deprecated, see `bbgo marketdata`)")
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
 	BacktestCmd.Flags().Bool("sync-only", false, "sync backtest data only, do not run backtest")
 	BacktestCmd.Flags().String("sync-from", "", "sync backtest data from the given time, which will override the time range in the backtest config")
@@ -577,7 +580,8 @@ var BacktestCmd = &cobra.Command{
 
 				summaryReport.Symbols = append(summaryReport.Symbols, symbol)
 				summaryReport.SymbolReports = append(summaryReport.SymbolReports, *symbolReport)
-				summaryReport.TotalProfit = symbolReport.PnL.Profit
+				summaryReport.TotalProfit = summaryReport.TotalProfit.Add(symbolReport.PnL.Profit)
+				summaryReport.TotalNetProfit = summaryReport.TotalNetProfit.Add(symbolReport.PnL.NetProfit)
 				summaryReport.TotalUnrealizedProfit = symbolReport.PnL.UnrealizedProfit
 				summaryReport.InitialEquityValue = summaryReport.InitialEquityValue.Add(symbolReport.InitialEquityValue())
 				summaryReport.FinalEquityValue = summaryReport.FinalEquityValue.Add(symbolReport.FinalEquityValue())

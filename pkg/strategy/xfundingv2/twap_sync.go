@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 func (w *TWAPWorker) Initialize(ctx context.Context, s *Strategy) error {
@@ -17,12 +16,14 @@ func (w *TWAPWorker) Initialize(ctx context.Context, s *Strategy) error {
 	}
 
 	w.ctx = ctx
-	w.SetLogger(s.logger)
-	if err := w.syncState.TWAPExecutor.Initialize(s); err != nil {
-		return fmt.Errorf("[TWAPWorker] failed to load TWAPExecutor: %w", err)
+	if w.syncState.TWAPExecutor.IsFutures() {
+		w.getAccount = s.futuresSession.GetAccount
+	} else {
+		w.getAccount = s.spotSession.GetAccount
 	}
-	if w.syncState.ActiveOrder != nil {
-		return w.syncState.TWAPExecutor.SyncOrder(*w.syncState.ActiveOrder)
+	w.SetLogger(s.logger)
+	if err := w.syncState.TWAPExecutor.Initialize(ctx, s); err != nil {
+		return fmt.Errorf("[TWAPWorker] failed to load TWAPExecutor: %w", err)
 	}
 	return nil
 }
@@ -30,18 +31,21 @@ func (w *TWAPWorker) Initialize(ctx context.Context, s *Strategy) error {
 type TWAPWorkerSyncState struct {
 	Config TWAPWorkerConfig `json:"config"`
 
+	// DisableTWAP, when true, bypasses slice-quantity calculation:
+	// PlaceOrder uses the full remaining quantity in a single order.
+	DisableTWAP bool `json:"disableTWAP,omitempty"`
+
 	// TargetPosition: positive = buy/long, negative = sell/short
 	TargetPosition       fixedpoint.Value `json:"targetPosition"`
 	State                TWAPWorkerState  `json:"state"`
-	StartTime            time.Time        `json:"startTime"`
-	EndTime              time.Time        `json:"endTime"`
+	StartAt              time.Time        `json:"startAt"`
+	EndAt                time.Time        `json:"endAt"`
 	CurrentIntervalStart time.Time        `json:"currentIntervalStart"`
 	CurrentIntervalEnd   time.Time        `json:"currentIntervalEnd"`
 	LastCheckTime        time.Time        `json:"lastCheckTime"`
 	PlaceOrderInterval   time.Duration    `json:"placeOrderInterval"`
 
 	Symbol       string        `json:"symbol"`
-	ActiveOrder  *types.Order  `json:"activeOrder,omitempty"`
 	TWAPExecutor *TWAPExecutor `json:"executor,omitempty"`
 }
 

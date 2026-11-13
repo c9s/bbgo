@@ -113,6 +113,11 @@ spec:
           - name: ENABLE_RBT_ORDERBOOK
             value: "true"
           {{- end }}
+
+          {{- if .Values.skipListOrderbook.enabled }}
+          - name: ENABLE_SKIPLIST_ORDERBOOK
+            value: "true"
+          {{- end }}
           envFrom:
           - secretRef:
               name: {{ .Values.dotenv.secret | default .Release.Name }}

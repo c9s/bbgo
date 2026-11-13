@@ -23,7 +23,7 @@ func (s *Strategy) InitDrawCommands(profit, cumProfit types.Series) {
 		}
 		bbgo.SendPhoto(&buffer)
 	})
-	bbgo.RegisterCommand("/cumpnl", "Draw Cummulative PNL(Quote)", func(reply interact.Reply) {
+	bbgo.RegisterCommand("/cumpnl", "Draw Cumulative PNL (Quote)", func(reply interact.Reply) {
 		canvas := DrawCumPNL(s.InstanceID(), cumProfit)
 		var buffer bytes.Buffer
 		if err := canvas.Render(chart.PNG, &buffer); err != nil {

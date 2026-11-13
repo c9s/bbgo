@@ -11,10 +11,11 @@ import (
 )
 
 type FundingFee struct {
-	Asset  string           `json:"asset"`
-	Amount fixedpoint.Value `json:"amount"`
-	Txn    int64            `json:"txn"`
-	Time   time.Time        `json:"time"`
+	RoundID string           `json:"round_id" db:"round_id"`
+	Asset   string           `json:"asset" db:"asset"`
+	Amount  fixedpoint.Value `json:"amount" db:"amount"`
+	Txn     int64            `json:"txn" db:"txn"`
+	Time    time.Time        `json:"time" db:"time"`
 }
 
 func (f *FundingFee) SlackAttachment() slack.Attachment {

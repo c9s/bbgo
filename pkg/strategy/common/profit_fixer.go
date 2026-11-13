@@ -90,13 +90,14 @@ func (s *StrategyProfitFixer) Fix(
 
 // ProfitFixerConfig is used for fixing profitStats and position by re-playing the trade history
 type ProfitFixerConfig struct {
-	Apply             bool       `json:"apply,omitempty"`
-	Enabled           bool       `json:"enabled,omitempty"`
-	TradesSince       types.Time `json:"tradesSince,omitempty"`
-	Patch             string     `json:"patch,omitempty"`
-	UseDatabaseTrades bool       `json:"useDatabaseTrades,omitempty"`
-	ProfitCurrency    string     `json:"profitCurrency,omitempty"` // the currency to calculate profit in
-	FeeCurrencies     []string   `json:"feeCurrencies,omitempty"`  // list of fee currencies to consider for fee price conversion
+	Apply             bool           `json:"apply,omitempty"`
+	Enabled           bool           `json:"enabled,omitempty"`
+	TradesSince       types.Time     `json:"tradesSince,omitempty"`
+	Period            types.Duration `json:"period,omitempty"`
+	Patch             string         `json:"patch,omitempty"`
+	UseDatabaseTrades bool           `json:"useDatabaseTrades,omitempty"`
+	ProfitCurrency    string         `json:"profitCurrency,omitempty"` // the currency to calculate profit in
+	FeeCurrencies     []string       `json:"feeCurrencies,omitempty"`  // list of fee currencies to consider for fee price conversion
 	// ExtraSymbolSelectors is a list of symbol selectors to include in profit fixing
 	// In the format of "sessionName.symbol", e.g. "coinbase.BTCUSD"
 	// The trades selected by the selectors will also be included in profit fixing
@@ -119,6 +120,7 @@ func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *Pr
 
 func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
 	return c.TradesSince.Equal(other.TradesSince.Time()) &&
+		c.Period == other.Period &&
 		c.Patch == other.Patch &&
 		c.UseDatabaseTrades == other.UseDatabaseTrades &&
 		c.ProfitCurrency == other.ProfitCurrency &&

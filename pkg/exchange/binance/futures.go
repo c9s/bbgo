@@ -78,6 +78,7 @@ func (e *Exchange) TransferFuturesAccountAsset(
 	req.Asset(asset)
 	req.Amount(amount.String())
 
+	// TODO: Add support for coin-margined futures transfer types
 	switch io {
 	case types.TransferIn:
 		req.TransferType(binanceapi.FuturesTransferSpotToUsdtFutures)
@@ -130,12 +131,23 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 		// - Balance is the actual balance of the asset
 		// - AvailableBalance is the available margin balance (can be used as notional)
 		// - CrossWalletBalance (this will be meaningful when using isolated margin)
-		balances[b.Asset] = types.Balance{
+		bal := types.Balance{
 			Currency:          b.Asset,
-			Available:         b.AvailableBalance,                                  // AvailableBalance here is the available margin, like how much quantity/notional you can SHORT/LONG, not what you can withdraw
-			Locked:            b.Balance.Sub(b.AvailableBalance.Sub(b.CrossUnPnl)), // FIXME: AvailableBalance is the available margin balance, it could be re-calculated by the current formula.
-			MaxWithdrawAmount: b.MaxWithdrawAmount,
+			Available:         b.Balance,
+			Locked:            fixedpoint.Zero, // futures do not have locked balance, the locked balance is calculated by (Balance - AvailableBalance)
+			MaxWithdrawAmount: &b.MaxWithdrawAmount,
 		}
+
+		if b.Asset == "USDT" {
+			// AvailableBalance here is the available margin, like how much quantity/notional you can SHORT/LONG, not what you can withdraw
+			bal.LongAvailableCredit = b.AvailableBalance.Add(b.CrossUnPnl)
+			bal.ShortAvailableCredit = b.AvailableBalance.Add(b.CrossUnPnl)
+
+			// AvailableBalance is the available margin balance, it could be re-calculated by the current formula.
+			// bal.Locked = b.Balance.Sub(b.AvailableBalance.Sub(b.CrossUnPnl))
+		}
+
+		balances[b.Asset] = bal
 	}
 
 	a := &types.Account{
@@ -483,7 +495,7 @@ func (e *Exchange) queryFuturesTrades(
 		return nil, err
 	}
 	for _, t := range remoteTrades {
-		localTrade, err := toGlobalFuturesTrade(*t)
+		localTrade, err := toGlobalFuturesTrade(*t, e.IsIsolatedFutures)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert binance futures trade: %+v", t)
 			continue
@@ -566,6 +578,31 @@ func (e *Exchange) QueryFuturesIncomeHistory(
 
 	resp, err := req.Do(ctx)
 	return resp, err
+}
+
+func (e *Exchange) QueryFundingFeeHistory(
+	ctx context.Context, symbol string, startTime, endTime *time.Time,
+) ([]types.FundingFee, error) {
+	resp, err := e.QueryFuturesIncomeHistory(
+		ctx, symbol, binanceapi.FuturesIncomeFundingFee, startTime, endTime,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var fundingFees []types.FundingFee
+	for _, income := range resp {
+		fundingFees = append(fundingFees, types.FundingFee{
+			Exchange: e.Name(),
+			Symbol:   income.Symbol,
+			Asset:    income.Asset,
+			Amount:   income.Income,
+			Txn:      income.TranId,
+			Time:     income.Time.Time(),
+		})
+	}
+
+	return fundingFees, nil
 }
 
 func (e *Exchange) SetLeverage(ctx context.Context, symbol string, leverage int) error {

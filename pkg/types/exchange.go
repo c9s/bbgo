@@ -26,17 +26,19 @@ const (
 	ExchangeBybit    ExchangeName = "bybit"
 	ExchangeCoinBase ExchangeName = "coinbase"
 	ExchangeBitfinex ExchangeName = "bitfinex"
+	ExchangeBackpack ExchangeName = "backpack"
 )
 
 var SupportedExchanges = map[ExchangeName]struct{}{
-	ExchangeMax:      struct{}{},
-	ExchangeBinance:  struct{}{},
-	ExchangeOKEx:     struct{}{},
-	ExchangeKucoin:   struct{}{},
-	ExchangeBitget:   struct{}{},
-	ExchangeBybit:    struct{}{},
-	ExchangeCoinBase: struct{}{},
-	ExchangeBitfinex: struct{}{},
+	ExchangeMax:      {},
+	ExchangeBinance:  {},
+	ExchangeOKEx:     {},
+	ExchangeKucoin:   {},
+	ExchangeBitget:   {},
+	ExchangeBybit:    {},
+	ExchangeCoinBase: {},
+	ExchangeBitfinex: {},
+	ExchangeBackpack: {},
 	// note: we are not using "backtest"
 }
 
@@ -135,6 +137,16 @@ type ExchangeTradeService interface {
 	QueryOpenOrders(ctx context.Context, symbol string) (orders []Order, err error)
 
 	CancelOrders(ctx context.Context, orders ...Order) error
+
+	ExchangeCancelReplaceService
+}
+
+// ExchangeCancelReplaceService is the venue order-replacement capability.
+// Implementations may use a native atomic endpoint or the conservative
+// cancel-then-create fallback. They must return an error for partial or
+// ambiguous venue results.
+type ExchangeCancelReplaceService interface {
+	CancelReplace(ctx context.Context, cancelReplaceMode CancelReplaceModeType, order Order) (*Order, error)
 }
 
 type ExchangeDefaultFeeRates interface {
@@ -205,6 +217,10 @@ type ExchangeRewardService interface {
 type ExchangeRiskService interface {
 	SetLeverage(ctx context.Context, symbol string, leverage int) error
 	QueryPositionRisk(ctx context.Context, symbol ...string) ([]PositionRisk, error)
+}
+
+type ExchangeFundingFeeService interface {
+	QueryFundingFeeHistory(ctx context.Context, symbol string, startTime, endTime *time.Time) ([]FundingFee, error)
 }
 
 // TradeQueryOptions defines the parameters for querying historical trades from exchanges.

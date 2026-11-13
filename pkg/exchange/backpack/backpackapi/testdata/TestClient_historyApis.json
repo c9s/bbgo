@@ -1,0 +1,186 @@
+[
+  {
+    "timestamp": "2026-09-02T01:54:28.681744+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/wapi/v1/history/orders?limit=10\u0026symbol=USDT_USDC",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "KQTBTbmOK0FjM0XiEgwUEWDzWRUnhGs7ux7MWpg2QDAfJXEzT+p42xErezkuhvz162RBp3po/nIt961p6jVsAw=="
+        ],
+        "X-Timestamp": [
+          "1788285268552"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Alt-Svc": [
+          "h3=\":443\"; ma=86400"
+        ],
+        "Cache-Control": [
+          "no-store",
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "1341"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 01 Sep 2026 17:54:28 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 152f0a797fd488e7badd1335abf5ff74.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "WqkC6Z52LNqNYq5YfY-gN9ZpFhzycS3Xuw_IIcUnzOGsYDndoZcxGA=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Current-Page": [
+          "1"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Page-Count": [
+          "1"
+        ],
+        "X-Page-Size": [
+          "10"
+        ],
+        "X-Total": [
+          "2"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[{\"clientId\":null,\"createdAt\":\"2026-09-01T17:54:04.094\",\"executedQuantity\":\"0\",\"executedQuoteQuantity\":\"0\",\"expiryReason\":null,\"id\":\"59669287267\",\"orderType\":\"Limit\",\"postOnly\":true,\"price\":\"1.0077\",\"quantity\":\"20\",\"quoteQuantity\":\"20.154\",\"selfTradePrevention\":\"RejectTaker\",\"side\":\"Ask\",\"slippageTolerance\":null,\"slippageToleranceType\":null,\"status\":\"Cancelled\",\"stopLossLimitPrice\":null,\"stopLossTriggerBy\":null,\"stopLossTriggerPrice\":null,\"strategyId\":null,\"symbol\":\"USDT_USDC\",\"systemOrderType\":null,\"takeProfitLimitPrice\":null,\"takeProfitTriggerBy\":null,\"takeProfitTriggerPrice\":null,\"timeInForce\":\"GTC\",\"triggerBy\":null,\"triggerPrice\":null,\"triggerQuantity\":null},{\"clientId\":null,\"createdAt\":\"2026-09-01T17:52:37.776\",\"executedQuantity\":\"0\",\"executedQuoteQuantity\":\"0\",\"expiryReason\":null,\"id\":\"59669039887\",\"orderType\":\"Limit\",\"postOnly\":true,\"price\":\"1.0077\",\"quantity\":\"20\",\"quoteQuantity\":\"20.154\",\"selfTradePrevention\":\"RejectTaker\",\"side\":\"Ask\",\"slippageTolerance\":null,\"slippageToleranceType\":null,\"status\":\"Cancelled\",\"stopLossLimitPrice\":null,\"stopLossTriggerBy\":null,\"stopLossTriggerPrice\":null,\"strategyId\":null,\"symbol\":\"USDT_USDC\",\"systemOrderType\":null,\"takeProfitLimitPrice\":null,\"takeProfitTriggerBy\":null,\"takeProfitTriggerPrice\":null,\"timeInForce\":\"GTC\",\"triggerBy\":null,\"triggerPrice\":null,\"triggerQuantity\":null}]"
+    }
+  },
+  {
+    "timestamp": "2026-09-02T01:54:28.762308+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.backpack.exchange/wapi/v1/history/fills?fillType=User\u0026limit=10\u0026symbol=USDT_USDC",
+      "header": {
+        "Accept": [
+          "application/json"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Signature": [
+          "PTVnB1zL4bKs+fUmrqNQOnJY3HOAJEGAR34f+DVTIhs3Sv4Q5y47OBlFBKd6stdjSwYRGH5l6t4K5WTX90GzDg=="
+        ],
+        "X-Timestamp": [
+          "1788285268682"
+        ],
+        "X-Window": [
+          "5000"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Alt-Svc": [
+          "h3=\":443\"; ma=86400"
+        ],
+        "Cache-Control": [
+          "no-store",
+          "no-cache=\"Set-Cookie\""
+        ],
+        "Content-Length": [
+          "2"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Tue, 01 Sep 2026 17:54:28 GMT"
+        ],
+        "Permissions-Policy": [
+          "camera=(), microphone=(), geolocation=(), payment=()"
+        ],
+        "Referrer-Policy": [
+          "strict-origin-when-cross-origin"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubDomains"
+        ],
+        "Vary": [
+          "Origin"
+        ],
+        "Via": [
+          "1.1 152f0a797fd488e7badd1335abf5ff74.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+          "A_EZBtXCG8-Qr11u60RONIzjl2aGCPW-VdhhPYV9NuQUqgk3At9VFw=="
+        ],
+        "X-Amz-Cf-Pop": [
+          "TPE53-P4"
+        ],
+        "X-Cache": [
+          "Miss from cloudfront"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Current-Page": [
+          "1"
+        ],
+        "X-Frame-Options": [
+          "SAMEORIGIN"
+        ],
+        "X-Page-Count": [
+          "1"
+        ],
+        "X-Page-Size": [
+          "10"
+        ],
+        "X-Total": [
+          "0"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[]"
+    }
+  }
+]

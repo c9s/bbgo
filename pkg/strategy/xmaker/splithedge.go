@@ -176,8 +176,28 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 		return nil
 	}
 
+	if err := h.initializeHedgeMarkets(sessions, strategy); err != nil {
+		return err
+	}
+
+	h.bindStrategyTradeCollector(strategy)
+	return nil
+}
+
+// initializeHedgeMarkets creates the hedge market instances and binds the position exposure and redispatch
+// callbacks to the strategy. It does not forward the hedge trades to the strategy trade collector,
+// so that the caller (e.g., SyntheticHedge) can handle the trades by itself.
+func (h *SplitHedge) initializeHedgeMarkets(sessions map[string]*bbgo.ExchangeSession, strategy *Strategy) error {
 	h.strategy = strategy
-	h.logger = strategy.logger.WithField("feature", "split_hedge")
+	if strategy.logger != nil {
+		h.logger = strategy.logger.WithField("feature", "split_hedge")
+	} else {
+		h.logger = log.WithField("feature", "split_hedge")
+	}
+
+	if h.hedgeMarketInstances == nil {
+		h.hedgeMarketInstances = make(map[string]*HedgeMarket)
+	}
 
 	for name, config := range h.HedgeMarkets {
 		hedgeMarket, err := InitializeHedgeMarketFromConfig(config, sessions)
@@ -186,6 +206,7 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 		}
 
 		hedgeMarket.SetLogger(h.logger)
+		hedgeMarket.dryRun = strategy.DryRun
 
 		// ensure the hedge market base currency matches the maker market base currency
 		if h.strategy.makerMarket.BaseCurrency != hedgeMarket.market.BaseCurrency {
@@ -204,7 +225,14 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 			h.logger.Infof("splitHedge: redispatching position %s to strategy position exposure", position.String())
 			strategy.positionExposure.Open(position)
 		})
+	}
 
+	return nil
+}
+
+// bindStrategyTradeCollector forwards the hedge market trades to the strategy trade collector
+func (h *SplitHedge) bindStrategyTradeCollector(strategy *Strategy) {
+	for _, hedgeMarket := range h.hedgeMarketInstances {
 		hedgeMarket.tradeCollector.OnTrade(func(
 			trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value,
 		) {
@@ -221,10 +249,7 @@ func (h *SplitHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession
 			// this updates strategy's profit stats
 			strategy.tradeCollector.ProcessTrade(trade)
 		})
-
 	}
-
-	return nil
 }
 
 func (h *SplitHedge) hedgeWithProportionAlgo(
@@ -246,8 +271,8 @@ func (h *SplitHedge) hedgeWithProportionAlgo(
 			continue
 		}
 
-		if hedgeMarket.session.IsInMaintenance() {
-			h.logger.Warnf("splitHedge: hedge market %s is in maintenance, skipping", proportionMarket.Name)
+		if !hedgeMarket.isAvailable() {
+			h.logger.Warnf("splitHedge: hedge market %s is not available, skipping", proportionMarket.Name)
 			continue
 		}
 
@@ -330,8 +355,8 @@ func (h *SplitHedge) hedgeWithBestPriceAlgo(
 	var bestMarket *HedgeMarket
 
 	for _, mkt := range h.hedgeMarketInstances {
-		if mkt.session.IsInMaintenance() {
-			h.logger.Warnf("splitHedge: hedge market %s is in maintenance, skipping", mkt.InstanceID())
+		if !mkt.isAvailable() {
+			h.logger.Warnf("splitHedge: hedge market %s is not available, skipping", mkt.InstanceID())
 			continue
 		}
 
@@ -435,6 +460,17 @@ func (h *SplitHedge) Hedge(
 	}
 }
 
+// HasAvailableMarket reports whether at least one configured hedge market's
+// session is currently usable (not in maintenance, connected).
+func (h *SplitHedge) HasAvailableMarket() bool {
+	for _, m := range h.hedgeMarketInstances {
+		if m.isAvailable() {
+			return true
+		}
+	}
+	return false
+}
+
 func (h *SplitHedge) Start(ctx context.Context) error {
 	if !h.Enabled {
 		return nil
@@ -492,8 +528,8 @@ func (h *SplitHedge) GetBalanceWeightedQuotePrice() (bid, ask fixedpoint.Value, 
 	sumQuoteWeight := fixedpoint.Zero
 
 	for name, mkt := range h.hedgeMarketInstances {
-		if mkt.session.IsInMaintenance() {
-			h.logger.Warnf("splitHedge: hedge market %s is in maintenance, skipping weighting", name)
+		if !mkt.isAvailable() {
+			h.logger.Warnf("splitHedge: hedge market %s is not available, skipping weighting", name)
 			continue
 		}
 

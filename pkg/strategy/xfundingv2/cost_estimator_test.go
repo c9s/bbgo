@@ -146,7 +146,7 @@ func TestCostEstimator_EstimateEntryCost(t *testing.T) {
 		// maker: spotFee = 100 * 1 * 0.001 = 0.1
 		assert.Equal(t, Number(0.1), cost.SpotFee)
 		// maker: futuresFee = 101 * 1 * 0.0005 = 0.0505
-		assert.Equal(t, Number(0.0505), cost.FuturesFee)
+		assert.Equal(t, Number("0.0505"), cost.FuturesFee)
 	})
 
 	t.Run("empty order book returns error", func(t *testing.T) {

@@ -1,0 +1,22 @@
+{
+  "status": 200, "title": "OK", "description": "Successful request",
+  "payload": {
+    "metadata": { "next": null, "api-version": "2023-09-30" },
+    "data": [
+      {
+        "instrument": "BTCUSD_PERP", "exchange": "binance",
+        "exchangeTimestamp": 1717545600000, "exchangeTimestampNanoseconds": 0,
+        "fundingInterval": null, "fundingRate": 0.0001,
+        "nextFundingRate": null, "nextFundingTime": null,
+        "isActualFundingRate": true
+      },
+      {
+        "instrument": "BTCUSD_PERP", "exchange": "binance",
+        "exchangeTimestamp": 1717545601000, "exchangeTimestampNanoseconds": 0,
+        "fundingInterval": null, "fundingRate": 0.0001,
+        "nextFundingRate": null, "nextFundingTime": null,
+        "isActualFundingRate": false
+      }
+    ]
+  }
+}

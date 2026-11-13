@@ -2,6 +2,10 @@
 
 package binance
 
+import (
+	"github.com/c9s/bbgo/pkg/types"
+)
+
 func (s *Stream) OnDepthEvent(cb func(e *DepthEvent)) {
 	s.depthEventCallbacks = append(s.depthEventCallbacks, cb)
 }
@@ -142,6 +146,36 @@ func (s *Stream) EmitContinuousKLineClosedEvent(e *ContinuousKLineEvent) {
 	}
 }
 
+func (s *Stream) OnIndexPriceKLineEvent(cb func(e *IndexPriceKLineEvent)) {
+	s.indexPriceKLineEventCallbacks = append(s.indexPriceKLineEventCallbacks, cb)
+}
+
+func (s *Stream) EmitIndexPriceKLineEvent(e *IndexPriceKLineEvent) {
+	for _, cb := range s.indexPriceKLineEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnIndexPriceKLine(cb func(kline types.KLine)) {
+	s.indexPriceKLineCallbacks = append(s.indexPriceKLineCallbacks, cb)
+}
+
+func (s *Stream) EmitIndexPriceKLine(kline types.KLine) {
+	for _, cb := range s.indexPriceKLineCallbacks {
+		cb(kline)
+	}
+}
+
+func (s *Stream) OnIndexPriceKLineClosed(cb func(kline types.KLine)) {
+	s.indexPriceKLineClosedCallbacks = append(s.indexPriceKLineClosedCallbacks, cb)
+}
+
+func (s *Stream) EmitIndexPriceKLineClosed(kline types.KLine) {
+	for _, cb := range s.indexPriceKLineClosedCallbacks {
+		cb(kline)
+	}
+}
+
 func (s *Stream) OnOrderTradeUpdateEvent(cb func(e *OrderTradeUpdateEvent)) {
 	s.orderTradeUpdateEventCallbacks = append(s.orderTradeUpdateEventCallbacks, cb)
 }
@@ -192,22 +226,42 @@ func (s *Stream) EmitListenKeyExpired(e *ListenKeyExpired) {
 	}
 }
 
-func (s *Stream) OnError(cb func(e *ErrorEvent)) {
-	s.errorCallbacks = append(s.errorCallbacks, cb)
-}
-
-func (s *Stream) EmitError(e *ErrorEvent) {
-	for _, cb := range s.errorCallbacks {
-		cb(e)
-	}
-}
-
 func (s *Stream) OnAlgoOrderUpdateEvent(cb func(e *AlgoOrderUpdateEvent)) {
 	s.algoOrderUpdateEventCallbacks = append(s.algoOrderUpdateEventCallbacks, cb)
 }
 
 func (s *Stream) EmitAlgoOrderUpdateEvent(e *AlgoOrderUpdateEvent) {
 	for _, cb := range s.algoOrderUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnServerShutdownEvent(cb func(e *ServerShutdownEvent)) {
+	s.serverShutdownEventCallbacks = append(s.serverShutdownEventCallbacks, cb)
+}
+
+func (s *Stream) EmitServerShutdownEvent(e *ServerShutdownEvent) {
+	for _, cb := range s.serverShutdownEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnFuturesAccountStatusEvent(cb func(e *FuturesAccountStatusEvent)) {
+	s.futuresAccountStatusEventCallbacks = append(s.futuresAccountStatusEventCallbacks, cb)
+}
+
+func (s *Stream) EmitFuturesAccountStatusEvent(e *FuturesAccountStatusEvent) {
+	for _, cb := range s.futuresAccountStatusEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnError(cb func(e *ErrorEvent)) {
+	s.errorCallbacks = append(s.errorCallbacks, cb)
+}
+
+func (s *Stream) EmitError(e *ErrorEvent) {
+	for _, cb := range s.errorCallbacks {
 		cb(e)
 	}
 }
@@ -241,6 +295,12 @@ type StreamEventHub interface {
 
 	OnContinuousKLineClosedEvent(cb func(e *ContinuousKLineEvent))
 
+	OnIndexPriceKLineEvent(cb func(e *IndexPriceKLineEvent))
+
+	OnIndexPriceKLine(cb func(kline types.KLine))
+
+	OnIndexPriceKLineClosed(cb func(kline types.KLine))
+
 	OnOrderTradeUpdateEvent(cb func(e *OrderTradeUpdateEvent))
 
 	OnAccountUpdateEvent(cb func(e *AccountUpdateEvent))
@@ -250,6 +310,12 @@ type StreamEventHub interface {
 	OnMarginCallEvent(cb func(e *MarginCallEvent))
 
 	OnListenKeyExpired(cb func(e *ListenKeyExpired))
+
+	OnAlgoOrderUpdateEvent(cb func(e *AlgoOrderUpdateEvent))
+
+	OnServerShutdownEvent(cb func(e *ServerShutdownEvent))
+
+	OnFuturesAccountStatusEvent(cb func(e *FuturesAccountStatusEvent))
 
 	OnError(cb func(e *ErrorEvent))
 }

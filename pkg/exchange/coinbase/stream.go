@@ -129,32 +129,37 @@ func (s *Stream) Connect(ctx context.Context) error {
 	if err := s.StandardStream.Connect(ctx); err != nil {
 		return err
 	}
-	// start balance polling update worker
-	// NOTE: The polling is required. The documentation clearly states that
-	// the balance channel *does not* track every updates to the balance:
-	// https://docs.cdp.coinbase.com/exchange/websocket-feed/channels#balance-channel
-	// rate limit on private endpoints is 15 requests per second:
-	// https://docs.cdp.coinbase.com/exchange/rest-api/rate-limits#private-endpoints
-	go func() {
-		logger := util.NewWarnFirstLogger(5, time.Minute, s.logger)
-		ticker := time.NewTicker(time.Second * 5)
-		defer ticker.Stop()
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				balances, err := s.exchange.QueryAccountBalances(ctx)
-				if err != nil {
-					logger.WarnOrError(err, "failed to query account balances")
-					continue
+	// private endpoints are only available if the user is authenticated
+	if !s.PublicOnly {
+		// start balance polling update worker
+		// NOTE: The polling is required. The documentation clearly states that
+		// the balance channel *does not* track every updates to the balance:
+		// https://docs.cdp.coinbase.com/exchange/websocket-feed/channels#balance-channel
+		// rate limit on private endpoints is 15 requests per second:
+		// https://docs.cdp.coinbase.com/exchange/rest-api/rate-limits#private-endpoints
+		go func() {
+			logger := util.NewWarnFirstLogger(5, time.Minute, s.logger)
+			ticker := time.NewTicker(time.Second * 5)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					balances, err := s.exchange.QueryAccountBalances(ctx)
+					if err != nil {
+						logger.WarnOrError(err, "failed to query account balances")
+						continue
+					}
+					s.EmitBalanceSnapshot(balances)
 				}
-				s.EmitBalanceSnapshot(balances)
 			}
-		}
 
-	}()
+		}()
+	}
+
 	return nil
 }
 

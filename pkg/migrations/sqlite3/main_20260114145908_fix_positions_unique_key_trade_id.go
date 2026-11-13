@@ -1,29 +1,19 @@
 package sqlite3
 
 import (
-	"context"
-
 	"github.com/c9s/rockhopper/v2"
 )
 
+// This migration was compiled from migrations/sqlite3/20260114145908_fix_positions_unique_key_trade_id.sql.
+// The SQL statements are registered as data so they can be previewed in the
+// console while the migration runs, exactly like a raw .sql migration.
 func init() {
-	AddMigration("main", up_main_fixPositionsUniqueKeyTradeId, down_main_fixPositionsUniqueKeyTradeId)
-}
-
-func up_main_fixPositionsUniqueKeyTradeId(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
-	// This code is executed when the migration is applied.
-	_, err = tx.ExecContext(ctx, "CREATE UNIQUE INDEX `positions_trade_id` ON `positions` (`trade_id`, `side`, `symbol`, `exchange`);")
-	if err != nil {
-		return err
-	}
-	return err
-}
-
-func down_main_fixPositionsUniqueKeyTradeId(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
-	// This code is executed when the migration is rolled back.
-	_, err = tx.ExecContext(ctx, "DROP INDEX IF EXISTS `positions_trade_id`;")
-	if err != nil {
-		return err
-	}
-	return err
+	AddStatementMigration("main", 20260114145908, "migrations/sqlite3/20260114145908_fix_positions_unique_key_trade_id.sql", true,
+		[]rockhopper.Statement{
+			{Direction: rockhopper.DirectionUp, SQL: "CREATE UNIQUE INDEX `positions_trade_id` ON `positions` (`trade_id`, `side`, `symbol`, `exchange`);"},
+		},
+		[]rockhopper.Statement{
+			{Direction: rockhopper.DirectionDown, SQL: "DROP INDEX IF EXISTS `positions_trade_id`;"},
+		},
+	)
 }

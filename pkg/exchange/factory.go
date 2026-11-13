@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/c9s/bbgo/pkg/exchange/backpack"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/exchange/bitfinex"
 	"github.com/c9s/bbgo/pkg/exchange/bitget"
@@ -86,6 +87,12 @@ var factories = map[types.ExchangeName]Factory{
 		EnvLoader: DefaultEnvVarLoader,
 		Constructor: func(options Options) (types.Exchange, error) {
 			return coinbase.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret], options[OptionKeyAPIPassphrase], 0), nil
+		},
+	},
+	types.ExchangeBackpack: {
+		EnvLoader: DefaultEnvVarLoader,
+		Constructor: func(options Options) (types.Exchange, error) {
+			return backpack.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret])
 		},
 	},
 }

@@ -20,6 +20,22 @@ func TestTruncate(t *testing.T) {
 
 }
 
+func TestTruncateMonthly(t *testing.T) {
+	for _, ts := range []time.Time{
+		time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2024, 2, 29, 17, 36, 43, 716, time.UTC),
+		time.Date(2024, 3, 15, 12, 0, 0, 0, time.UTC),
+		time.Date(2023, 11, 30, 23, 59, 59, 999, time.UTC),
+	} {
+		t.Run(ts.Format(time.RFC3339Nano), func(t *testing.T) {
+			expected := time.Date(ts.Year(), ts.Month(), 1, 0, 0, 0, 0, time.UTC)
+			actual := Interval1mo.Truncate(ts)
+			assert.Equal(t, expected, actual)
+			assert.Equal(t, actual, Interval1mo.Truncate(actual))
+		})
+	}
+}
+
 func TestParseInterval(t *testing.T) {
 	assert.Equal(t, ParseInterval("1s"), 1)
 	assert.Equal(t, ParseInterval("3m"), 3*60)

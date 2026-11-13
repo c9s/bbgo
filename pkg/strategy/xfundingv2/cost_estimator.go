@@ -42,6 +42,14 @@ func (c *CostEstimator) SetTargetPosition(position fixedpoint.Value) *CostEstima
 	return c
 }
 
+func (c *CostEstimator) GetFuturesFeeRate() types.ExchangeFee {
+	return c.futuresFeeRate
+}
+
+func (c *CostEstimator) GetSpotFeeRate() types.ExchangeFee {
+	return c.spotFeeRate
+}
+
 // EstimatedCost represents the estimated cost of a transaction, either entry or exit
 type EstimatedCost struct {
 	FuturesPosition fixedpoint.Value

@@ -1,14 +1,20 @@
 package xfundingv2
 
 import (
+	"context"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/testing/httptesting"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -39,9 +45,9 @@ func newTestSession(markets types.MarketMap, balances types.BalanceMap) *bbgo.Ex
 func newDefaultTestStrategy() *Strategy {
 	return &Strategy{
 		MarketSelectionConfig: &MarketSelectionConfig{
-			FuturesDirection:  types.PositionShort,
-			TradeBalanceRatio: Number("0.5"),
+			FuturesDirection: types.PositionShort,
 		},
+		TradeBalanceRatio:   Number("0.5"),
 		MaxPositionExposure: make(map[string]fixedpoint.Value),
 		costEstimator:       NewCostEstimator(),
 		logger:              logrus.StandardLogger(),
@@ -64,7 +70,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 	t.Run("short futures selects candidate with shortest breakeven interval", func(t *testing.T) {
 		s := newDefaultTestStrategy()
 		s.MarketSelectionConfig.FuturesDirection = types.PositionShort
-		s.MarketSelectionConfig.TradeBalanceRatio = Number("1.0")
+		s.TradeBalanceRatio = Number("1.0")
 
 		markets := types.MarketMap{
 			"BTCUSDT": btcMarket,
@@ -74,6 +80,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"USDT": Balance("USDT", Number(10000)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		// Both bids and asks are needed: asks for entry (buy spot), bids for exit (sell spot)
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
@@ -126,7 +133,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 	t.Run("long futures selects candidate with shortest breakeven interval", func(t *testing.T) {
 		s := newDefaultTestStrategy()
 		s.MarketSelectionConfig.FuturesDirection = types.PositionLong
-		s.MarketSelectionConfig.TradeBalanceRatio = Number("1.0")
+		s.TradeBalanceRatio = Number("1.0")
 
 		markets := types.MarketMap{
 			"BTCUSDT": btcMarket,
@@ -137,6 +144,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"ETH": Balance("ETH", Number(5)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"BTCUSDT": newTestStreamOrderBook("BTCUSDT",
@@ -188,6 +196,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 		markets := types.MarketMap{"BTCUSDT": btcMarket}
 		balances := types.BalanceMap{}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"BTCUSDT": newTestStreamOrderBook("BTCUSDT",
@@ -224,6 +233,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"USDT": Balance("USDT", Number(10000)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{}
 		s.futuresOrderBooks = map[string]*types.StreamOrderBook{}
 
@@ -251,6 +261,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"USDT": Balance("USDT", Number(10000)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"BTCUSDT": newTestStreamOrderBook("BTCUSDT",
 				[]types.PriceVolume{{Price: Number(49900), Volume: Number(10)}},
@@ -280,7 +291,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 	t.Run("max position exposure caps short futures position", func(t *testing.T) {
 		s := newDefaultTestStrategy()
 		s.MarketSelectionConfig.FuturesDirection = types.PositionShort
-		s.MarketSelectionConfig.TradeBalanceRatio = Number("1.0")
+		s.TradeBalanceRatio = Number("1.0")
 		s.MaxPositionExposure = map[string]fixedpoint.Value{
 			"ETH": Number("0.5"),
 		}
@@ -290,6 +301,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"USDT": Balance("USDT", Number(10000)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"ETHUSDT": newTestStreamOrderBook("ETHUSDT",
@@ -322,7 +334,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 	t.Run("max position exposure caps long futures position", func(t *testing.T) {
 		s := newDefaultTestStrategy()
 		s.MarketSelectionConfig.FuturesDirection = types.PositionLong
-		s.MarketSelectionConfig.TradeBalanceRatio = Number("1.0")
+		s.TradeBalanceRatio = Number("1.0")
 		s.MaxPositionExposure = map[string]fixedpoint.Value{
 			"ETH": Number("0.5"),
 		}
@@ -332,6 +344,7 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 			"ETH": Balance("ETH", Number(5)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"ETHUSDT": newTestStreamOrderBook("ETHUSDT",
@@ -364,13 +377,14 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 	t.Run("zero funding rate candidate is skipped", func(t *testing.T) {
 		s := newDefaultTestStrategy()
 		s.MarketSelectionConfig.FuturesDirection = types.PositionShort
-		s.MarketSelectionConfig.TradeBalanceRatio = Number("1.0")
+		s.TradeBalanceRatio = Number("1.0")
 
 		markets := types.MarketMap{"BTCUSDT": btcMarket}
 		balances := types.BalanceMap{
 			"USDT": Balance("USDT", Number(10000)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"BTCUSDT": newTestStreamOrderBook("BTCUSDT",
@@ -401,13 +415,14 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 	t.Run("single candidate returns that candidate", func(t *testing.T) {
 		s := newDefaultTestStrategy()
 		s.MarketSelectionConfig.FuturesDirection = types.PositionShort
-		s.MarketSelectionConfig.TradeBalanceRatio = Number("1.0")
+		s.TradeBalanceRatio = Number("1.0")
 
 		markets := types.MarketMap{"ETHUSDT": ethMarket}
 		balances := types.BalanceMap{
 			"USDT": Balance("USDT", Number(10000)),
 		}
 		s.spotSession = newTestSession(markets, balances)
+		s.futuresSession = newTestSession(markets, balances)
 
 		s.spotOrderBooks = map[string]*types.StreamOrderBook{
 			"ETHUSDT": newTestStreamOrderBook("ETHUSDT",
@@ -435,5 +450,217 @@ func TestSelectMostProfitableMarket(t *testing.T) {
 		assert.NotNil(t, result)
 		assert.Equal(t, "ETHUSDT", result.Symbol)
 		assert.Equal(t, 8, result.FundingIntervalHours)
+	})
+}
+
+func TestRemoveRoundsOnStartup(t *testing.T) {
+	// helper to build a strategy with the given active-round symbols populated.
+	newStrategyWithRounds := func(t *testing.T, ctrl *gomock.Controller, symbols ...string) *Strategy {
+		s := newDefaultTestStrategy()
+		s.ctx = context.Background()
+		s.ActiveRounds = make(map[string]*ArbitrageRound)
+		s.SpotPositions = make(map[string]*types.Position)
+		s.FuturesPositions = make(map[string]*types.Position)
+		nextFundingTime := time.Now().Add(time.Hour)
+		for _, symbol := range symbols {
+			round, _ := newTestArbitrageRound(t, ctrl, 8, 3, nextFundingTime)
+			s.ActiveRounds[symbol] = round
+			s.SpotPositions[symbol] = &types.Position{}
+			s.FuturesPositions[symbol] = &types.Position{}
+		}
+		return s
+	}
+
+	t.Run("removes configured active round once and records it", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		s := newStrategyWithRounds(t, ctrl, "BTCUSDT", "ETHUSDT")
+		s.RemoveOnStartupSymbols = []string{"BTCUSDT"}
+
+		s.removeRoundsOnStartup()
+
+		_, btcActive := s.ActiveRounds["BTCUSDT"]
+		assert.False(t, btcActive, "BTCUSDT round should be removed")
+		_, ethActive := s.ActiveRounds["ETHUSDT"]
+		assert.True(t, ethActive, "ETHUSDT round should be untouched")
+		_, btcSpot := s.SpotPositions["BTCUSDT"]
+		assert.False(t, btcSpot, "BTCUSDT spot position should be cleared")
+		_, btcFutures := s.FuturesPositions["BTCUSDT"]
+		assert.False(t, btcFutures, "BTCUSDT futures position should be cleared")
+		assert.Contains(t, s.AppliedStartupRemovals, "BTCUSDT")
+	})
+
+	t.Run("does not delete a re-opened round on subsequent startup", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		// first startup removes BTCUSDT and records it in the persisted set.
+		s := newStrategyWithRounds(t, ctrl, "BTCUSDT")
+		s.RemoveOnStartupSymbols = []string{"BTCUSDT"}
+		s.removeRoundsOnStartup()
+
+		// simulate a restart: the persisted set survives, and a new BTCUSDT round was
+		// legitimately opened again while running (still configured for removal).
+		newRound, _ := newTestArbitrageRound(t, ctrl, 8, 3, time.Now().Add(time.Hour))
+		s.ActiveRounds["BTCUSDT"] = newRound
+		s.removeRoundsOnStartup()
+
+		_, btcActive := s.ActiveRounds["BTCUSDT"]
+		assert.True(t, btcActive, "re-opened BTCUSDT round must be preserved on restart")
+	})
+
+	t.Run("re-adding a symbol after config change triggers removal again", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		// startup 1: remove BTCUSDT.
+		s := newStrategyWithRounds(t, ctrl, "BTCUSDT")
+		s.RemoveOnStartupSymbols = []string{"BTCUSDT"}
+		s.removeRoundsOnStartup()
+		assert.Contains(t, s.AppliedStartupRemovals, "BTCUSDT")
+
+		// startup 2: operator drops BTCUSDT from config -> it is pruned from the set,
+		// so no two-step "empty config" restart is required.
+		s.RemoveOnStartupSymbols = nil
+		s.removeRoundsOnStartup()
+		assert.NotContains(t, s.AppliedStartupRemovals, "BTCUSDT")
+
+		// startup 3: operator re-adds BTCUSDT (a new round exists again) -> removed again.
+		newRound, _ := newTestArbitrageRound(t, ctrl, 8, 3, time.Now().Add(time.Hour))
+		s.ActiveRounds["BTCUSDT"] = newRound
+		s.RemoveOnStartupSymbols = []string{"BTCUSDT"}
+		s.removeRoundsOnStartup()
+		_, btcActive := s.ActiveRounds["BTCUSDT"]
+		assert.False(t, btcActive, "BTCUSDT round should be removed again after re-adding to config")
+	})
+
+	t.Run("switching to a different symbol removes only the new one", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		s := newStrategyWithRounds(t, ctrl, "BTCUSDT", "ETHUSDT")
+
+		// startup 1: remove BTCUSDT.
+		s.RemoveOnStartupSymbols = []string{"BTCUSDT"}
+		s.removeRoundsOnStartup()
+
+		// startup 2: switch config directly to ETHUSDT -> BTCUSDT pruned, ETHUSDT removed.
+		s.RemoveOnStartupSymbols = []string{"ETHUSDT"}
+		s.removeRoundsOnStartup()
+
+		_, ethActive := s.ActiveRounds["ETHUSDT"]
+		assert.False(t, ethActive, "ETHUSDT round should be removed after switching config")
+		assert.Contains(t, s.AppliedStartupRemovals, "ETHUSDT")
+		assert.NotContains(t, s.AppliedStartupRemovals, "BTCUSDT")
+	})
+}
+
+// newMockBinanceFuturesExchange builds a *binance.Exchange whose REST clients are
+// backed by a mock HTTP transport, so QueryFuturesExchangeInfo can be exercised
+// without hitting the network. exchangeInfoHandler serves /fapi/v1/exchangeInfo.
+func newMockBinanceFuturesExchange(t *testing.T, exchangeInfoHandler httptesting.RoundTripFunc) *binance.Exchange {
+	t.Helper()
+
+	transport := &httptesting.MockTransport{}
+	transport.GET("/fapi/v1/exchangeInfo", exchangeInfoHandler)
+
+	// keep the background server-time setter goroutine (started by binance.New) quiet
+	serverTime := httptesting.RoundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return httptesting.BuildResponseJson(http.StatusOK, map[string]any{"serverTime": time.Now().UnixMilli()}), nil
+	})
+	transport.GET("/api/v3/time", serverTime)
+	transport.GET("/fapi/v1/time", serverTime)
+
+	// binance.New captures binanceapi.DefaultHttpClient into its REST clients, so
+	// swap it in before constructing the exchange and restore it afterwards.
+	oldClient := binanceapi.DefaultHttpClient
+	binanceapi.DefaultHttpClient = &http.Client{Transport: transport}
+	t.Cleanup(func() {
+		binanceapi.DefaultHttpClient = oldClient
+	})
+
+	ex := binance.New("", "")
+	ex.IsFutures = true
+	return ex
+}
+
+func TestFilterLegitimateAssets(t *testing.T) {
+	// a futures exchange info response advertising BTC, ETH and USDT as assets.
+	okExchangeInfo := httptesting.RoundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return httptesting.BuildResponseJson(http.StatusOK, map[string]any{
+			"assets": []map[string]any{
+				{"asset": "BTC"},
+				{"asset": "ETH"},
+				{"asset": "USDT"},
+			},
+		}), nil
+	})
+
+	t.Run("non-binance futures exchange returns symbols unchanged", func(t *testing.T) {
+		s := newDefaultTestStrategy()
+		// newTestSession leaves Exchange nil, which is not a *binance.Exchange.
+		s.spotSession = newTestSession(types.MarketMap{}, types.BalanceMap{})
+		s.futuresSession = newTestSession(types.MarketMap{}, types.BalanceMap{})
+
+		symbols := []string{"BTCUSDT", "ETHUSDT"}
+		result := s.filterLegitimateAssets(context.Background(), symbols)
+		assert.Equal(t, symbols, result)
+	})
+
+	t.Run("returns symbols unchanged when exchange info query fails", func(t *testing.T) {
+		s := newDefaultTestStrategy()
+		s.spotSession = newTestSession(types.MarketMap{
+			"BTCUSDT": Market("BTCUSDT"),
+		}, types.BalanceMap{})
+		errExchangeInfo := httptesting.RoundTripFunc(func(_ *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusInternalServerError, `{"code":-1000,"msg":"internal error"}`), nil
+		})
+		s.futuresSession = &bbgo.ExchangeSession{
+			Exchange: newMockBinanceFuturesExchange(t, errExchangeInfo),
+		}
+
+		symbols := []string{"BTCUSDT", "ETHUSDT"}
+		result := s.filterLegitimateAssets(context.Background(), symbols)
+		assert.Equal(t, symbols, result)
+	})
+
+	t.Run("keeps legitimate assets and drops the rest", func(t *testing.T) {
+		s := newDefaultTestStrategy()
+		// BNBUSDT is the fee symbol (no market needed, filtered before the lookup).
+		s.FeeSymbol = "BNBUSDT"
+		s.spotSession = newTestSession(types.MarketMap{
+			"BTCUSDT":  Market("BTCUSDT"),  // base BTC   -> legitimate
+			"ETHUSDT":  Market("ETHUSDT"),  // base ETH   -> legitimate
+			"USDCUSDT": Market("USDCUSDT"), // base USDC  -> not a futures asset
+		}, types.BalanceMap{})
+		s.futuresSession = &bbgo.ExchangeSession{
+			Exchange: newMockBinanceFuturesExchange(t, okExchangeInfo),
+		}
+
+		symbols := []string{
+			"BTCUSDT",  // kept
+			"ETHUSDT",  // kept
+			"USDCUSDT", // dropped: USDC is not in the futures assets map
+			"BNBUSDT",  // dropped: it is the fee symbol
+			"DOGEUSDT", // dropped: no spot market
+		}
+		result := s.filterLegitimateAssets(context.Background(), symbols)
+		assert.Equal(t, []string{"BTCUSDT", "ETHUSDT"}, result)
+	})
+
+	t.Run("empty fee symbol does not filter any candidate", func(t *testing.T) {
+		s := newDefaultTestStrategy()
+		s.FeeSymbol = ""
+		s.spotSession = newTestSession(types.MarketMap{
+			"BTCUSDT": Market("BTCUSDT"),
+			"ETHUSDT": Market("ETHUSDT"),
+		}, types.BalanceMap{})
+		s.futuresSession = &bbgo.ExchangeSession{
+			Exchange: newMockBinanceFuturesExchange(t, okExchangeInfo),
+		}
+
+		result := s.filterLegitimateAssets(context.Background(), []string{"BTCUSDT", "ETHUSDT"})
+		assert.Equal(t, []string{"BTCUSDT", "ETHUSDT"}, result)
 	})
 }

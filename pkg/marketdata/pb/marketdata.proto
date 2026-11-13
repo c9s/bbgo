@@ -1,0 +1,179 @@
+syntax = "proto3";
+
+// Package bbgo.marketdata.v1 is the wire protocol for replaying historical
+// market data between bbgo nodes.
+//
+// It is deliberately separate from bbgo.proto rather than an extension of its
+// MarketDataService. That service is a live subscription with no time range,
+// its MarketData and Depth messages carry no per-event timestamp and no
+// sequence, and it already has external users including a Python client.
+// Retrofitting replay onto it would either renumber fields or leave half its
+// fields meaningful only in one mode. This protocol is designed for the job from
+// field number one: every event carries its own nanosecond time and sequence,
+// and the request is bounded and resumable.
+package bbgo.marketdata.v1;
+
+option go_package = "github.com/c9s/bbgo/pkg/marketdata/pb";
+
+service MarketDataService {
+  // Replay streams historical market data over a bounded range, in
+  // non-decreasing (event_time_ns, rank, sequence) order.
+  rpc Replay(ReplayRequest) returns (stream Event) {}
+
+  // Capability reports what this server can serve, so a client can find out
+  // whether the order book is available before reading gigabytes.
+  rpc Capability(CapabilityRequest) returns (CapabilityResponse) {}
+}
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_KLINE = 1;
+  EVENT_TYPE_TRADE = 2;
+  EVENT_TYPE_BOOK_SNAPSHOT = 3;
+  EVENT_TYPE_BOOK_UPDATE = 4;
+  EVENT_TYPE_BOOK_TICKER = 5;
+  EVENT_TYPE_MARK_PRICE = 6;
+  EVENT_TYPE_LIQUIDATION = 7;
+  EVENT_TYPE_METRICS = 8;
+  EVENT_TYPE_DEPTH_BAND = 9;
+}
+
+// Subscription names a channel as a string rather than an enum, so adding a
+// channel needs no coordinated proto bump on both sides.
+message Subscription {
+  string exchange = 1;
+  string channel = 2;   // types.Channel: kline, trade, aggTrade, book, bookTicker...
+  string symbol = 3;
+  string interval = 4;  // kline channels only
+  string depth = 5;     // book channel only
+}
+
+message ReplayRequest {
+  repeated Subscription subscriptions = 1;
+
+  // since_ns is inclusive, until_ns exclusive.
+  int64 since_ns = 2;
+  int64 until_ns = 3;
+
+  // cursor resumes an interrupted replay from an Event.cursor value.
+  string cursor = 4;
+
+  // speed paces the stream as a multiple of real time. Zero means as fast as
+  // the transport allows, which is what a backtest wants.
+  double speed = 5;
+}
+
+message CapabilityRequest {}
+
+message CapabilityResponse {
+  repeated string exchanges = 1;
+  repeated string channels = 2;
+  repeated string intervals = 3;
+  repeated string symbols = 4;
+  bool has_history = 5;
+  int64 coverage_start_ns = 6;
+  int64 coverage_end_ns = 7;
+}
+
+// Event mirrors marketdata.Event. Decimals travel as strings, matching the
+// convention in bbgo.proto: a float64 cannot represent every price exactly, and
+// the receiver parses into fixedpoint anyway.
+message Event {
+  EventType type = 1;
+  string exchange = 2;
+  string symbol = 3;
+
+  // event_time_ns is the venue event time in nanoseconds since the Unix epoch.
+  // It is required: unlike a retrofit, this protocol has no legacy senders to
+  // fall back for.
+  int64 event_time_ns = 4;
+
+  // sequence is the venue-provided sequence: a trade id, or an order book
+  // last-update id.
+  uint64 sequence = 5;
+
+  // prev_sequence is the sequence this event claims to follow, where the venue
+  // says so (Binance's "pu"). Zero when unavailable. It is what lets a receiver
+  // prove no update was lost; a venue sequence is not a counter, so
+  // incrementing `sequence` does not work.
+  uint64 prev_sequence = 6;
+
+  // flags mirrors marketdata.EventFlag.
+  uint32 flags = 7;
+
+  // cursor is an opaque resume token.
+  string cursor = 8;
+
+  oneof payload {
+    KLine kline = 16;
+    Trade trade = 17;
+    Book book = 18;  // both BOOK_SNAPSHOT and BOOK_UPDATE
+    BookTicker book_ticker = 19;
+    MarkPrice mark_price = 20;
+    Metrics metrics = 21;
+    DepthBand depth_band = 22;
+  }
+}
+
+message PriceVolume {
+  string price = 1;
+  string volume = 2;
+}
+
+message Book {
+  repeated PriceVolume asks = 1;
+  repeated PriceVolume bids = 2;
+  int64 last_update_id = 3;
+}
+
+message Trade {
+  string id = 1;
+  string price = 2;
+  string quantity = 3;
+  string quote_quantity = 4;
+  bool is_buyer = 5;
+  bool is_futures = 6;
+}
+
+message KLine {
+  string interval = 1;
+  int64 start_time_ns = 2;
+  string open = 3;
+  string high = 4;
+  string low = 5;
+  string close = 6;
+  string volume = 7;
+  string quote_volume = 8;
+  uint64 number_of_trades = 9;
+  bool closed = 10;
+}
+
+message BookTicker {
+  string best_bid_price = 1;
+  string best_bid_qty = 2;
+  string best_ask_price = 3;
+  string best_ask_qty = 4;
+  int64 update_id = 5;
+  // transaction_time_ns is the matching-engine time, which is what
+  // event_time_ns is derived from; event_time_ns on the envelope may equal it.
+  int64 transaction_time_ns = 6;
+  int64 publish_time_ns = 7;
+}
+
+message MarkPrice {
+  string mark_price = 1;
+  string index_price = 2;
+  string estimated_settle_price = 3;
+  string last_funding_rate = 4;
+  int64 next_funding_time_ns = 5;
+}
+
+message Metrics {
+  map<string, string> values = 1;
+}
+
+message DepthBand {
+  string percentage = 1;
+  string depth = 2;
+  string notional = 3;
+}

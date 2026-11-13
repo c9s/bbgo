@@ -13,6 +13,7 @@ type ADXStream struct {
 	Plus, Minus *types.Float64Series
 
 	window            int
+	initialized       bool
 	prevHigh, prevLow fixedpoint.Value
 }
 
@@ -35,7 +36,8 @@ func ADX(source KLineSubscription, window int) *ADXStream {
 	)
 
 	source.AddSubscriber(func(k types.KLine) {
-		if s.prevHigh.IsZero() || s.prevLow.IsZero() {
+		if !s.initialized {
+			s.initialized = true
 			s.prevHigh, s.prevLow = k.High, k.Low
 			return
 		}
@@ -52,14 +54,21 @@ func ADX(source KLineSubscription, window int) *ADXStream {
 			dmn.PushAndEmit(0.0)
 		}
 
-		s.Plus.PushAndEmit(sdmp.Last(0) * 100 / atr.Last(0))
-		s.Minus.PushAndEmit(sdmn.Last(0) * 100 / atr.Last(0))
-		dx := math.Abs(s.Plus.Last(0)-s.Minus.Last(0)) / (s.Plus.Last(0) + s.Minus.Last(0))
-		if !math.IsNaN(dx) {
-			adx.PushAndEmit(dx * 100.0)
-		} else {
-			adx.PushAndEmit(0.0)
+		diPlus := 0.0
+		diMinus := 0.0
+		if atrVal := atr.Last(0); atrVal != 0 {
+			k := 100.0 / atrVal
+			diPlus = sdmp.Last(0) * k
+			diMinus = sdmn.Last(0) * k
 		}
+		s.Plus.PushAndEmit(diPlus)
+		s.Minus.PushAndEmit(diMinus)
+
+		dx := 0.0
+		if diSum := diPlus + diMinus; diSum != 0 {
+			dx = 100.0 * math.Abs(diPlus-diMinus) / diSum
+		}
+		adx.PushAndEmit(dx)
 
 		s.prevHigh, s.prevLow = k.High, k.Low
 		s.Truncate()
@@ -69,4 +78,6 @@ func ADX(source KLineSubscription, window int) *ADXStream {
 
 func (s *ADXStream) Truncate() {
 	s.Slice = s.Slice.Truncate(MaxNumOfRMA)
+	s.Plus.Slice = s.Plus.Slice.Truncate(MaxNumOfRMA)
+	s.Minus.Slice = s.Minus.Slice.Truncate(MaxNumOfRMA)
 }

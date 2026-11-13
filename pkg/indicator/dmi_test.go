@@ -3,6 +3,7 @@ package indicator
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -84,4 +85,46 @@ func Test_DMI(t *testing.T) {
 		})
 	}
 
+}
+
+// Test_DMI_FlatMarketKeepsFinite verifies that candles with zero volatility do
+// not poison the Wilder smoothing state. Exchanges emit flat candles
+// (high == low == close) for intervals without trades, which makes ATR and both
+// directional movements exactly zero. The ungated divisions then produce Inf /
+// NaN, and because RMA keeps its smoothed value in internal state, the ADX
+// stays NaN forever even after directional movement resumes.
+func Test_DMI_FlatMarketKeepsFinite(t *testing.T) {
+	dmi := &DMI{
+		IntervalWindow: types.IntervalWindow{Window: 5},
+		ADXSmoothing:   14,
+	}
+
+	// a long stretch of no-trade candles at a flat price
+	for i := 0; i < 20; i++ {
+		dmi.Update(100, 100, 100)
+	}
+
+	assert.False(t, math.IsNaN(dmi.GetADX().Last(0)), "ADX must stay finite on flat candles")
+	assert.False(t, math.IsNaN(dmi.GetDIPlus().Last(0)), "DI+ must stay finite on flat candles")
+	assert.False(t, math.IsNaN(dmi.GetDIMinus().Last(0)), "DI- must stay finite on flat candles")
+
+	// zero volatility and zero directional movement means no trend
+	assert.Equal(t, 0.0, dmi.GetADX().Last(0))
+	assert.Equal(t, 0.0, dmi.GetDIPlus().Last(0))
+	assert.Equal(t, 0.0, dmi.GetDIMinus().Last(0))
+
+	// directional movement resumes: the indicator must recover with finite values
+	for i := 1; i <= 40; i++ {
+		cloze := float64(100 + i)
+		dmi.Update(cloze+1, cloze-1, cloze)
+	}
+
+	adx := dmi.GetADX().Last(0)
+	diPlus := dmi.GetDIPlus().Last(0)
+	diMinus := dmi.GetDIMinus().Last(0)
+	assert.False(t, math.IsNaN(adx), "ADX must recover after the flat stretch")
+	assert.False(t, math.IsInf(diPlus, 0), "DI+ must stay finite after the flat stretch")
+	assert.False(t, math.IsInf(diMinus, 0), "DI- must stay finite after the flat stretch")
+	assert.Greater(t, adx, 0.0, "a steady uptrend after a flat stretch must produce a positive ADX")
+	assert.LessOrEqual(t, adx, 100.0)
 }

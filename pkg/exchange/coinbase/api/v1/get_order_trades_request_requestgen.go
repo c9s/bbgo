@@ -10,45 +10,70 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"sync"
 )
 
 var GetOrderTradesRequestLimiter = rate.NewLimiter(10, 1)
 
+/*
+ * OrderID sets
+ */
 func (g *GetOrderTradesRequest) OrderID(orderID string) *GetOrderTradesRequest {
-	g.orderID = orderID
+	g.orderID = &orderID
 	return g
 }
 
+/*
+ * ProductID sets
+ */
 func (g *GetOrderTradesRequest) ProductID(productID string) *GetOrderTradesRequest {
-	g.productID = productID
+	g.productID = &productID
 	return g
 }
 
+/*
+ * Limit sets
+ */
 func (g *GetOrderTradesRequest) Limit(limit int) *GetOrderTradesRequest {
 	g.limit = limit
 	return g
 }
 
+/*
+ * Before sets
+ */
 func (g *GetOrderTradesRequest) Before(before uint64) *GetOrderTradesRequest {
 	g.before = &before
 	return g
 }
 
+/*
+ * After sets
+ */
 func (g *GetOrderTradesRequest) After(after uint64) *GetOrderTradesRequest {
 	g.after = &after
 	return g
 }
 
+/*
+ * MarketType sets
+ */
 func (g *GetOrderTradesRequest) MarketType(marketType MarketType) *GetOrderTradesRequest {
 	g.marketType = &marketType
 	return g
 }
 
+/*
+ * StartDate sets
+ */
 func (g *GetOrderTradesRequest) StartDate(startDate string) *GetOrderTradesRequest {
 	g.startDate = &startDate
 	return g
 }
 
+/*
+ * EndDate sets
+ */
 func (g *GetOrderTradesRequest) EndDate(endDate string) *GetOrderTradesRequest {
 	g.endDate = &endDate
 	return g
@@ -60,7 +85,13 @@ func (g *GetOrderTradesRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
@@ -70,23 +101,48 @@ func (g *GetOrderTradesRequest) GetQueryParameters() (url.Values, error) {
 func (g *GetOrderTradesRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 	// check orderID field -> json key order_id
-	orderID := g.orderID
+	if g.orderID != nil {
+		orderID := *g.orderID
 
-	// assign parameter of orderID
-	params["order_id"] = orderID
+		// TEMPLATE check-required
+		if len(orderID) == 0 {
+		}
+		// END TEMPLATE check-required
+
+		// assign parameter of orderID
+		params["order_id"] = orderID
+	} else {
+	}
 	// check productID field -> json key product_id
-	productID := g.productID
+	if g.productID != nil {
+		productID := *g.productID
 
-	// assign parameter of productID
-	params["product_id"] = productID
+		// TEMPLATE check-required
+		if len(productID) == 0 {
+		}
+		// END TEMPLATE check-required
+
+		// assign parameter of productID
+		params["product_id"] = productID
+	} else {
+	}
 	// check limit field -> json key limit
 	limit := g.limit
+
+	// TEMPLATE check-required
+
+	if limit == 0 {
+	}
+	// END TEMPLATE check-required
 
 	// assign parameter of limit
 	params["limit"] = limit
 	// check before field -> json key before
 	if g.before != nil {
 		before := *g.before
+
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
 
 		// assign parameter of before
 		params["before"] = before
@@ -96,6 +152,9 @@ func (g *GetOrderTradesRequest) GetParameters() (map[string]interface{}, error) 
 	if g.after != nil {
 		after := *g.after
 
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
+
 		// assign parameter of after
 		params["after"] = after
 	} else {
@@ -103,6 +162,11 @@ func (g *GetOrderTradesRequest) GetParameters() (map[string]interface{}, error) 
 	// check marketType field -> json key market_type
 	if g.marketType != nil {
 		marketType := *g.marketType
+
+		// TEMPLATE check-required
+		if len(marketType) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// TEMPLATE check-valid-values
 		switch marketType {
@@ -123,6 +187,11 @@ func (g *GetOrderTradesRequest) GetParameters() (map[string]interface{}, error) 
 	if g.startDate != nil {
 		startDate := *g.startDate
 
+		// TEMPLATE check-required
+		if len(startDate) == 0 {
+		}
+		// END TEMPLATE check-required
+
 		// assign parameter of startDate
 		params["start_date"] = startDate
 	} else {
@@ -130,6 +199,11 @@ func (g *GetOrderTradesRequest) GetParameters() (map[string]interface{}, error) 
 	// check endDate field -> json key end_date
 	if g.endDate != nil {
 		endDate := *g.endDate
+
+		// TEMPLATE check-required
+		if len(endDate) == 0 {
+		}
+		// END TEMPLATE check-required
 
 		// assign parameter of endDate
 		params["end_date"] = endDate
@@ -178,9 +252,19 @@ func (g *GetOrderTradesRequest) GetSlugParameters() (map[string]interface{}, err
 	return params, nil
 }
 
+var GetOrderTradesRequestSlugReCache sync.Map
+
 func (g *GetOrderTradesRequest) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := GetOrderTradesRequestSlugReCache.Load(_k); ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			GetOrderTradesRequestSlugReCache.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 

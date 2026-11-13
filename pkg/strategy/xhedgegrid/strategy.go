@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"sync"
@@ -603,8 +604,8 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(
 
 	// when we need to place a buy-to-sell conversion order, we need to mark the price
 	si := -1
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
+	for i, pin := range slices.Backward(pins) {
+
 		price := fixedpoint.Value(pin)
 
 		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
@@ -664,8 +665,8 @@ func (s *Strategy) checkRequiredInvestmentByAmount(
 
 	// when we need to place a buy-to-sell conversion order, we need to mark the price
 	si := -1
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
+	for i, pin := range slices.Backward(pins) {
+
 		price := fixedpoint.Value(pin)
 
 		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
@@ -727,8 +728,8 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(
 	totalQuotePrice := fixedpoint.Zero
 	si := len(pins)
 	cntOrder := 0
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
+	for i, pin := range slices.Backward(pins) {
+
 		price := fixedpoint.Value(pin)
 
 		if price.Compare(lastPrice) >= 0 {
@@ -789,8 +790,8 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(
 
 	// if it's not configured, calculate the number of sell orders
 	if numberOfSellOrders == 0 {
-		for i := len(pins) - 1; i >= 0; i-- {
-			pin := pins[i]
+		for _, pin := range slices.Backward(pins) {
+
 			price := fixedpoint.Value(pin)
 			sellPrice := price
 			if s.ProfitSpread.Sign() > 0 {
@@ -1240,8 +1241,8 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 
 	// si is for sell order price index
 	var si = len(pins)
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
+	for i, pin := range slices.Backward(pins) {
+
 		price := fixedpoint.Value(pin)
 		sellPrice := price
 
@@ -1578,12 +1579,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	if s.AutoRange != nil {
-		indicatorSet := session.StandardIndicatorSet(s.Symbol)
-		interval := s.AutoRange.Interval()
-		pivotLow := indicatorSet.PivotLow(types.IntervalWindow{Interval: interval, Window: s.AutoRange.Num})
-		pivotHigh := indicatorSet.PivotHigh(types.IntervalWindow{Interval: interval, Window: s.AutoRange.Num})
-		s.UpperPrice = fixedpoint.NewFromFloat(pivotHigh.Last(0))
-		s.LowerPrice = fixedpoint.NewFromFloat(pivotLow.Last(0))
+		iw := types.IntervalWindow{Interval: s.AutoRange.Interval(), Window: s.AutoRange.Num}
+		s.UpperPrice, s.LowerPrice = autoRangeFromPivots(session.Indicators(s.Symbol), iw)
 		s.logger.Infof("autoRange is enabled, using pivot high %f and pivot low %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
 
@@ -1872,4 +1869,26 @@ func (s *Strategy) unlockWriteOrders() {
 		return
 	}
 	s.writeMutex.Unlock()
+}
+
+// autoRangeFromPivots returns the last pivot high and the last pivot low of the kline history as the grid price range.
+// It returns zero for a side that has no pivot found.
+//
+// The legacy pivot indicators did not keep the non-positive pivots, so they are skipped here as well.
+func autoRangeFromPivots(indicators *bbgo.IndicatorSet, iw types.IntervalWindow) (upperPrice, lowerPrice fixedpoint.Value) {
+	pivotHigh := indicators.PivotHigh(iw)
+	pivotLow := indicators.PivotLow(iw)
+	return fixedpoint.NewFromFloat(lastPositive(pivotHigh.Float64Series)),
+		fixedpoint.NewFromFloat(lastPositive(pivotLow.Float64Series))
+}
+
+// lastPositive returns the latest positive value of the series, or zero if there is none
+func lastPositive(series *types.Float64Series) float64 {
+	for i := 0; i < series.Length(); i++ {
+		if v := series.Last(i); v > 0.0 {
+			return v
+		}
+	}
+
+	return 0.0
 }

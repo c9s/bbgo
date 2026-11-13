@@ -57,3 +57,20 @@ func TestTradeStats_consecutiveCounterAndAmount(t *testing.T) {
 	assert.Equal(t, "-200", stats.MaximumConsecutiveLoss.String())
 	assert.Equal(t, 2, stats.MaximumConsecutiveLosses)
 }
+
+func TestTradeStats_TotalNetProfitUsesNetProfit(t *testing.T) {
+	stats := NewTradeStats("BTCUSDT")
+	stats.Add(&Profit{
+		Symbol:    "BTCUSDT",
+		OrderID:   1,
+		Profit:    number("10"),
+		NetProfit: number("8.5"),
+	})
+
+	assert.Equal(t, "8.5", stats.TotalNetProfit.String())
+
+	// Recalculate is used when one order has multiple fills. It must preserve
+	// the same net-profit semantics instead of reverting to gross PnL.
+	stats.Recalculate()
+	assert.Equal(t, "8.5", stats.TotalNetProfit.String())
+}

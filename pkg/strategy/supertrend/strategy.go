@@ -13,7 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/report"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -56,7 +56,7 @@ type Strategy struct {
 	SlowDEMAWindow int `json:"slowDEMAWindow"`
 
 	// SuperTrend indicator
-	Supertrend *indicator.Supertrend
+	Supertrend *SupertrendStream `json:"-"`
 	// SupertrendMultiplier ATR multiplier for calculation of supertrend
 	SupertrendMultiplier float64 `json:"supertrendMultiplier"`
 
@@ -129,7 +129,14 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LinearRegression.Interval})
+	// LinearRegression is optional: setupIndicators() nils it for window==0 or
+	// empty-interval configs, and session.Subscribe panics on an empty kline
+	// interval — guard both panic paths here. Degenerate configs (window==0
+	// with an interval set) keep their historical unused subscription so
+	// existing backtest replay inputs are unchanged.
+	if s.LinearRegression != nil && s.LinearRegression.Interval != "" {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LinearRegression.Interval})
+	}
 
 	s.ExitMethods.SetAndSubscribe(session, s)
 
@@ -176,12 +183,14 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 }
 
 // setupIndicators initializes indicators
+//
+// The indicators are updated by the kline closed events of the market data stream, so setupIndicators must be
+// called before registering the kline handlers that read them.
 func (s *Strategy) setupIndicators() {
-	// K-line store for indicators
-	kLineStore, _ := s.session.MarketDataStore(s.Symbol)
+	indicators := s.session.Indicators(s.Symbol)
 
 	// Double DEMA
-	s.doubleDema = newDoubleDema(kLineStore, s.Interval, s.FastDEMAWindow, s.SlowDEMAWindow)
+	s.doubleDema = newDoubleDema(indicators, s.Interval, s.FastDEMAWindow, s.SlowDEMAWindow)
 
 	// Supertrend
 	if s.Window == 0 {
@@ -190,12 +199,9 @@ func (s *Strategy) setupIndicators() {
 	if s.SupertrendMultiplier == 0 {
 		s.SupertrendMultiplier = 3
 	}
-	s.Supertrend = &indicator.Supertrend{IntervalWindow: types.IntervalWindow{Window: s.Window, Interval: s.Interval}, ATRMultiplier: s.SupertrendMultiplier}
-	s.Supertrend.AverageTrueRange = &indicator.ATR{IntervalWindow: types.IntervalWindow{Window: s.Window, Interval: s.Interval}}
-	s.Supertrend.BindK(s.session.MarketDataStream, s.Symbol, s.Supertrend.Interval)
-	if klines, ok := kLineStore.KLinesOfInterval(s.Supertrend.Interval); ok {
-		s.Supertrend.LoadK((*klines)[0:])
-	}
+	s.Supertrend = indicatorv2.WithHistory(indicators.KLines(s.Interval), func(source *indicatorv2.KLineStream) *SupertrendStream {
+		return NewSupertrendStream(source, s.Window, s.SupertrendMultiplier)
+	})
 
 	// Linear Regression
 	if s.LinearRegression != nil {
@@ -204,10 +210,7 @@ func (s *Strategy) setupIndicators() {
 		} else if s.LinearRegression.Interval == "" {
 			s.LinearRegression = nil
 		} else {
-			s.LinearRegression.BindK(s.session.MarketDataStream, s.Symbol, s.LinearRegression.Interval)
-			if klines, ok := kLineStore.KLinesOfInterval(s.LinearRegression.Interval); ok {
-				s.LinearRegression.LoadK((*klines)[0:])
-			}
+			s.LinearRegression.Bind(indicators.CLOSE(s.LinearRegression.Interval))
 		}
 	}
 }

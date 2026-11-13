@@ -25,13 +25,14 @@ import (
 	"github.com/c9s/bbgo/pkg/envvar"
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/profile/timeprofile"
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util/apikey"
 	"github.com/c9s/bbgo/pkg/version"
 	"github.com/c9s/requestgen"
 )
 
 var log = logrus.WithFields(logrus.Fields{
-	"exchange": "max",
+	"exchange": types.ExchangeMax,
 	"api":      "v3",
 })
 
@@ -59,9 +60,6 @@ var ServerTimestamp = time.Now().Unix()
 
 // reqCount is used for nonce, this variable counts the API request count.
 var reqCount uint64 = 1
-
-// globalTimeOffset is used for nonce
-var globalTimeOffset int64 = 0
 
 var disableUserAgentHeader = false
 
@@ -293,7 +291,7 @@ func (c *Client) GetNonce(apiKey string) int64 {
 	c.mu.Lock()
 	now := time.Now()
 	seconds := now.Unix()
-	offset := atomic.LoadInt64(&globalTimeOffset)
+	offset := atomic.LoadInt64(&ServerTimeOffset)
 	next := (seconds + offset) * 1000
 	if last, ok := c.apiKeyNonce[apiKey]; ok {
 		if next <= last {

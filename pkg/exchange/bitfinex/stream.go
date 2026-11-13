@@ -13,7 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var log = logrus.WithField("exchange", "bitfinex")
+var log = logrus.WithField("exchange", ID)
 
 // Stream represents the Bitfinex websocket stream.
 //
@@ -41,8 +41,10 @@ type Stream struct {
 	bookUpdateEventCallbacks   []func(e *bfxapi.BookUpdateEvent)
 	bookSnapshotEventCallbacks []func(e *bfxapi.BookSnapshotEvent)
 
-	fundingBookEventCallbacks         []func(e *bfxapi.FundingBookUpdateEvent)
-	fundingBookSnapshotEventCallbacks []func(e *bfxapi.FundingBookSnapshotEvent)
+	fundingBookEventCallbacks          []func(e *bfxapi.FundingBookUpdateEvent)
+	fundingBookSnapshotEventCallbacks  []func(e *bfxapi.FundingBookSnapshotEvent)
+	fundingOfferSnapshotEventCallbacks []func(e *bfxapi.FundingOfferSnapshotEvent)
+	fundingOfferUpdateEventCallbacks   []func(e *bfxapi.FundingOfferUpdateEvent)
 
 	walletSnapshotEventCallbacks   []func(e *bfxapi.WalletSnapshotEvent)
 	walletUpdateEventCallbacks     []func(e *bfxapi.Wallet)
@@ -384,6 +386,12 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *bfxapi.FundingBookUpdateEvent:
 		s.EmitFundingBookEvent(evt)
+
+	case *bfxapi.FundingOfferSnapshotEvent:
+		s.EmitFundingOfferSnapshotEvent(evt)
+
+	case *bfxapi.FundingOfferUpdateEvent:
+		s.EmitFundingOfferUpdateEvent(evt)
 
 	default:
 		s.logger.Warnf("unhandled %T event: %+v", evt, evt)

@@ -146,6 +146,11 @@ func (c *FastCancel) fastCancel(ctx context.Context, marketTrade types.Trade) {
 }
 
 func (c *FastCancel) executeFastCancel(ctx context.Context, symbol string, side types.SideType) (err error) {
+	if c.strategy.DryRun {
+		c.logger.Infof("[dryRun] skip fast-canceling %s %s orders", c.makerSymbol, side.String())
+		return nil
+	}
+
 	c.logger.Infof("FastCancel: cancelling %s %s", c.makerSymbol, side.String())
 
 	if service, ok := c.makerExchange.(cancelOrdersBySymbolSide); ok {

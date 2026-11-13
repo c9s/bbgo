@@ -11,6 +11,70 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestToGlobalFuturesMarket_MinNotional(t *testing.T) {
+	// Fixture shaped like fapi/v1/exchangeInfo filters for BTCUSDT (MIN_NOTIONAL).
+	// Regression for #1610: MinNotionalFilter() must populate MinNotional and MinAmount.
+	symbol := futures.Symbol{
+		Symbol:             "BTCUSDT",
+		BaseAsset:          "BTC",
+		QuoteAsset:         "USDT",
+		PricePrecision:     2,
+		QuantityPrecision:  3,
+		BaseAssetPrecision: 8,
+		QuotePrecision:     8,
+		Filters: []map[string]any{
+			{
+				"filterType": "PRICE_FILTER",
+				"maxPrice":   "4529764",
+				"minPrice":   "556.80",
+				"tickSize":   "0.10",
+			},
+			{
+				"filterType": "LOT_SIZE",
+				"maxQty":     "1000",
+				"minQty":     "0.001",
+				"stepSize":   "0.001",
+			},
+			{
+				"filterType": "MIN_NOTIONAL",
+				"notional":   "50",
+			},
+		},
+	}
+
+	market := toGlobalFuturesMarket(symbol)
+	assert.Equal(t, "BTCUSDT", market.Symbol)
+	assert.Equal(t, types.ExchangeBinance, market.Exchange)
+	assert.Equal(t, fixedpoint.MustNewFromString("50"), market.MinNotional)
+	assert.Equal(t, fixedpoint.MustNewFromString("50"), market.MinAmount)
+	assert.Equal(t, fixedpoint.MustNewFromString("0.001"), market.MinQuantity)
+	assert.Equal(t, fixedpoint.MustNewFromString("0.001"), market.StepSize)
+	assert.Equal(t, fixedpoint.MustNewFromString("0.10"), market.TickSize)
+	assert.False(t, market.MinNotional.IsZero())
+	assert.False(t, market.MinAmount.IsZero())
+}
+
+func TestToGlobalFuturesMarket_MinNotionalMissingFilter(t *testing.T) {
+	symbol := futures.Symbol{
+		Symbol:     "BTCUSDT",
+		BaseAsset:  "BTC",
+		QuoteAsset: "USDT",
+		Filters: []map[string]any{
+			{
+				"filterType": "LOT_SIZE",
+				"maxQty":     "1000",
+				"minQty":     "0.001",
+				"stepSize":   "0.001",
+			},
+		},
+	}
+
+	market := toGlobalFuturesMarket(symbol)
+	assert.True(t, market.MinNotional.IsZero())
+	assert.True(t, market.MinAmount.IsZero())
+	assert.Equal(t, fixedpoint.MustNewFromString("0.001"), market.MinQuantity)
+}
+
 func TestToGlobalPositionRisk(t *testing.T) {
 	positions := []binanceapi.FuturesPositionRisk{
 		{

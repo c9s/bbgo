@@ -545,10 +545,11 @@ func TestParser_ParsePrivateMessages(t *testing.T) {
 		msg, err := p.Parse([]byte(body))
 		assert.NoError(t, err)
 		if assert.NotNil(t, msg) {
-			events, ok := msg.([]FundingOfferUpdateEvent)
+			event, ok := msg.(*FundingOfferSnapshotEvent)
+			offers := event.Offers
 			assert.True(t, ok, "expected []FundingOfferUpdateEvent type")
-			assert.Len(t, events, 1)
-			fo := events[0]
+			assert.Len(t, offers, 1)
+			fo := offers[0]
 			assert.Equal(t, int64(41237920), fo.OfferID)
 			assert.Equal(t, "fETH", fo.Symbol)
 			assert.Equal(t, int64(1573912039000), fo.MtsCreated.Time().UnixMilli())

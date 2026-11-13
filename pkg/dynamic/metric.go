@@ -82,11 +82,11 @@ func castToFloat64(valInf any) (float64, bool) {
 }
 
 func InitializeConfigMetrics(id, instanceId string, st any) error {
-	_, err := initializeConfigMetricsWithFieldPrefix(id, instanceId, "", st)
+	_, err := initializeConfigMetricsWithFieldPrefix(id, instanceId, "", "", st)
 	return err
 }
 
-func initializeConfigMetricsWithFieldPrefix(id, instanceId, fieldPrefix string, st any) ([]string, error) {
+func initializeConfigMetricsWithFieldPrefix(id, instanceId, fieldPrefix, parentSymbol string, st any) ([]string, error) {
 	var metricNames []string
 	tv := reflect.TypeOf(st).Elem()
 
@@ -97,12 +97,30 @@ func initializeConfigMetricsWithFieldPrefix(id, instanceId, fieldPrefix string, 
 
 	sv := reflect.Indirect(vv)
 
-	symbolField := sv.FieldByName("Symbol")
-	hasSymbolField := symbolField.IsValid()
+	// symbol is resolved from the nearest struct that declares a Symbol field.
+	// When recursing into a nested/embedded struct that has no Symbol field of
+	// its own, the parent's symbol is inherited so the metric label stays stable.
+	symbol := parentSymbol
+	if symbolField := sv.FieldByName("Symbol"); symbolField.IsValid() && symbolField.Kind() == reflect.String {
+		symbol = symbolField.String()
+	}
 
 	for i := 0; i < tv.NumField(); i++ {
 		field := tv.Field(i)
 		if !field.IsExported() {
+			continue
+		}
+
+		// Recurse into embedded (anonymous) structs so that their promoted json
+		// fields are registered exactly as if they were declared at this level
+		// (same field prefix, i.e. flat metric names).
+		if field.Anonymous && field.Type.Kind() == reflect.Struct {
+			subMetricNames, err := initializeConfigMetricsWithFieldPrefix(id, instanceId, fieldPrefix, symbol, sv.Field(i).Addr().Interface())
+			if err != nil {
+				return nil, err
+			}
+
+			metricNames = append(metricNames, subMetricNames...)
 			continue
 		}
 
@@ -118,7 +136,7 @@ func initializeConfigMetricsWithFieldPrefix(id, instanceId, fieldPrefix string, 
 
 		fieldName := fieldPrefix + toSnakeCase(tagAttrs[0])
 		if field.Type.Kind() == reflect.Pointer && field.Type.Elem().Kind() == reflect.Struct {
-			subMetricNames, err := initializeConfigMetricsWithFieldPrefix(id, instanceId, fieldName+"_", sv.Field(i).Interface())
+			subMetricNames, err := initializeConfigMetricsWithFieldPrefix(id, instanceId, fieldName+"_", symbol, sv.Field(i).Interface())
 			if err != nil {
 				return nil, err
 			}
@@ -132,11 +150,6 @@ func initializeConfigMetricsWithFieldPrefix(id, instanceId, fieldPrefix string, 
 		val, ok := castToFloat64(valInf)
 		if !ok {
 			continue
-		}
-
-		symbol := ""
-		if hasSymbolField {
-			symbol = symbolField.String()
 		}
 
 		metric, metricName, err := getOrCreateMetric(id, fieldName)

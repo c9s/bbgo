@@ -137,6 +137,17 @@ func TestMarginResponseParsing(t *testing.T) {
 	}
 }
 
+func TestParseTwapUpdate(t *testing.T) {
+	event, err := parseWebSocketEvent([]byte(`{"e":"TWAP_UPDATE","E":1774248826691,"tu":{"si":5172798,"st":"FUTURES_TWAP","ss":"EXPIRED","eq":"40.83","ea":"356.23770000","ap":"8.72490081","s":"LINKUSDT","ut":1774248826690}}`))
+
+	assert.NoError(t, err)
+	update, ok := event.(*TwapUpdateEvent)
+	assert.True(t, ok)
+	assert.Equal(t, int64(5172798), update.Update.StrategyID)
+	assert.Equal(t, "LINKUSDT", update.Update.Symbol)
+	assert.Equal(t, "EXPIRED", update.Update.Status)
+}
+
 func TestParseOrderUpdate(t *testing.T) {
 	payload := `{
   "e": "executionReport",        // Event type
@@ -212,7 +223,7 @@ func TestParseOrderUpdate(t *testing.T) {
 	assert.Equal(t, executionReport.CumulativeQuoteAssetTransactedQuantity, fixedpoint.MustNewFromString("0.1"))
 	assert.Equal(t, executionReport.LastQuoteAssetTransactedQuantity, fixedpoint.MustNewFromString("0.00000000"))
 
-	orderUpdate, err := executionReport.Order()
+	orderUpdate, err := executionReport.Order(false, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, orderUpdate)
 }
@@ -349,6 +360,32 @@ func TestFuturesResponseParsing(t *testing.T) {
 				"i": 8886774
 			}`,
 		},
+		{
+			input: `{
+			  "e":"indexPrice_kline",
+			  "E":1591267070033,
+			  "ps":"BTCUSD",
+			  "k":{
+			    "t":1591267020000,
+			    "T":1591267079999,
+			    "s":"0",
+			    "i":"1m",
+			    "f":1591267020000,
+			    "L":1591267070000,
+			    "o":"9542.21900000",
+			    "c":"9542.50440000",
+			    "h":"9542.71640000",
+			    "l":"9542.21040000",
+			    "v":"0",
+			    "n": 51,
+			    "x":false,
+			    "q":"0",
+			    "V":"0",
+			    "Q":"0",
+			    "B":"0"
+			  }
+			}`,
+		},
 	}
 
 	for _, testcase := range testcases {
@@ -425,7 +462,7 @@ func TestParseOrderFuturesUpdate(t *testing.T) {
 	assert.Equal(t, int64(38541728873), orderTradeEvent.OrderTrade.OrderId)
 	assert.Equal(t, int64(1741505949), orderTradeEvent.OrderTrade.TradeId)
 
-	orderUpdate, err := orderTradeEvent.OrderFutures()
+	orderUpdate, err := orderTradeEvent.OrderFutures(false)
 	assert.NoError(t, err)
 	assert.NotNil(t, orderUpdate)
 }
@@ -465,7 +502,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, types.ExchangeBinance, order.Exchange)
@@ -501,7 +538,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, types.OrderStatusCanceled, order.Status)
@@ -525,7 +562,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, types.OrderStatusExpired, order.Status)
@@ -550,7 +587,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, types.OrderStatusRejected, order.Status)
@@ -574,7 +611,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, uint64(456789), order.OrderID)
@@ -601,7 +638,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, fixedpoint.MustNewFromString("5000.0"), order.ExecutedQuantity)
@@ -628,7 +665,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, fixedpoint.MustNewFromString("500.0"), order.ExecutedQuantity)
@@ -647,7 +684,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.Error(t, err)
 		assert.Nil(t, order)
 		assert.Contains(t, err.Error(), "algo update event type is not for futures order")
@@ -674,7 +711,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, fixedpoint.MustNewFromString("1.5"), order.ExecutedQuantity)
@@ -712,7 +749,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 					},
 				}
 
-				order, err := event.OrderFutures()
+				order, err := event.OrderFutures(false, false, false)
 				assert.NoError(t, err)
 				assert.NotNil(t, order)
 				assert.Equal(t, tc.expected, order.Type)
@@ -749,7 +786,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 					},
 				}
 
-				order, err := event.OrderFutures()
+				order, err := event.OrderFutures(false, false, false)
 				assert.NoError(t, err)
 				assert.NotNil(t, order)
 				assert.Equal(t, tc.expected, order.Side)
@@ -776,7 +813,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Equal(t, uint64(987654321), order.ActualOrderId)
@@ -801,7 +838,7 @@ func TestAlgoOrderUpdateEvent_OrderFutures(t *testing.T) {
 			},
 		}
 
-		order, err := event.OrderFutures()
+		order, err := event.OrderFutures(false, false, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, order)
 		assert.Zero(t, order.ActualOrderId)
