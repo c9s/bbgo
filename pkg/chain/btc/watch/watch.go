@@ -23,6 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/chain/btc"
+	"github.com/c9s/bbgo/pkg/chain/btc/balance"
 	"github.com/c9s/bbgo/pkg/chain/btc/stream"
 )
 
@@ -39,36 +40,12 @@ const (
 	Spent Kind = "spent"
 )
 
-// UTXO is an output of a watched address.
-type UTXO struct {
-	Outpoint btc.Outpoint
-
-	// Address is empty for a script without an address; Script is its hex.
-	Address string
-	Script  string
-
-	Value btc.Amount
-
-	// Height and BlockHash are where the output was created. BlockHash is
-	// zero for an output only known from a prevout.
-	Height    int64
-	BlockHash btc.Hash
-
-	// Coinbase outputs are spendable only after btc.CoinbaseMaturity blocks.
-	Coinbase bool
-}
-
-// Mature reports whether the output can be spent in the block after tip.
-func (u *UTXO) Mature(tip int64) bool {
-	return !u.Coinbase || tip+1-u.Height >= btc.CoinbaseMaturity
-}
-
 // Event is one change of a watched output.
 type Event struct {
 	Kind Kind
 
 	// UTXO is the output received or spent.
-	UTXO
+	btc.UTXO
 
 	// TxID is the transaction that created the output (Received) or spent
 	// it (Spent), and Block the block it is in.
@@ -112,7 +89,7 @@ type Watcher struct {
 
 	addresses map[string]struct{}
 	scripts   map[string]struct{}
-	utxos     map[btc.Outpoint]UTXO
+	utxos     map[btc.Outpoint]btc.UTXO
 
 	// journal holds the events of the last processed blocks, oldest first,
 	// to revert them on a reorg.
@@ -135,7 +112,7 @@ func New(config Config) *Watcher {
 	w := &Watcher{
 		addresses:     map[string]struct{}{},
 		scripts:       map[string]struct{}{},
-		utxos:         map[btc.Outpoint]UTXO{},
+		utxos:         map[btc.Outpoint]btc.UTXO{},
 		maxReorgDepth: config.MaxReorgDepth,
 	}
 
@@ -190,7 +167,7 @@ func (w *Watcher) Attach(s *stream.Stream) error {
 
 // Seed adds UTXOs known from elsewhere, e.g. scantxoutset, before the
 // stream starts after their height. A reorg cannot revert seeded outputs.
-func (w *Watcher) Seed(utxos []UTXO) {
+func (w *Watcher) Seed(utxos []btc.UTXO) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -261,7 +238,7 @@ func (w *Watcher) applyTx(tx *btc.Tx, ref stream.BlockRef, events []Event) []Eve
 		if in.Prevout != nil && w.matches(&in.Prevout.ScriptPubKey) {
 			events = append(events, Event{
 				Kind: Spent,
-				UTXO: UTXO{
+				UTXO: btc.UTXO{
 					Outpoint: outpoint,
 					Address:  in.Prevout.ScriptPubKey.Address,
 					Script:   in.Prevout.ScriptPubKey.Hex,
@@ -282,7 +259,7 @@ func (w *Watcher) applyTx(tx *btc.Tx, ref stream.BlockRef, events []Event) []Eve
 			continue
 		}
 
-		u := UTXO{
+		u := btc.UTXO{
 			Outpoint:  btc.Outpoint{TxID: tx.TxID, Vout: out.N},
 			Address:   out.ScriptPubKey.Address,
 			Script:    out.ScriptPubKey.Hex,
@@ -344,9 +321,9 @@ func (w *Watcher) Tip() (stream.BlockRef, bool) {
 }
 
 // UTXOs returns the tracked unspent outputs, by height then outpoint.
-func (w *Watcher) UTXOs() []UTXO {
+func (w *Watcher) UTXOs() []btc.UTXO {
 	w.mu.Lock()
-	out := make([]UTXO, 0, len(w.utxos))
+	out := make([]btc.UTXO, 0, len(w.utxos))
 	for _, u := range w.utxos {
 		out = append(out, u)
 	}
@@ -384,4 +361,12 @@ func (w *Watcher) Balances() map[string]btc.Amount {
 	}
 
 	return balances
+}
+
+// Snapshot returns the tracked UTXOs as of the watcher's tip, for
+// balance.Compute to split by confirmations and coinbase maturity.
+func (w *Watcher) Snapshot() *balance.Snapshot {
+	utxos := w.UTXOs()
+	tip, _ := w.Tip()
+	return &balance.Snapshot{Height: tip.Height, UTXOs: utxos}
 }

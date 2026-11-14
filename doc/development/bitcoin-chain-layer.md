@@ -141,7 +141,34 @@ w.OnRevert(func(e watch.Event) { ... }) // the same events, undone by a reorg
   they can be spent in the next block (`btc.CoinbaseMaturity`).
 
 The watcher is safe to query from other goroutines; callbacks run on the
-stream's goroutine, after the state is updated.
+stream's goroutine, after the state is updated. `Snapshot()` hands its UTXOs
+and tip to `balance.Compute` (see "Balances").
+
+## Balances
+
+There are no balances on chain: an address's balance is the sum of the
+unspent outputs locked to it, and how much of it is spendable depends on the
+chain tip. `pkg/chain/btc/balance` separates the two concerns.
+
+- **`Snapshot{Height, UTXOs}`** is a set of `btc.UTXO` as of a tip height.
+  `btc.UTXO` is the shared UTXO shape: outpoint, address (or script hex),
+  value, the height it was created at (0 in the mempool) and the coinbase
+  flag.
+- **`Compute(snapshot, minConfirmations)`** sums it per address into
+  `Confirmed` (at least `minConfirmations`), `Pending` (fewer, mempool
+  included) and `Immature` (coinbase outputs younger than 100 blocks,
+  whatever `minConfirmations` is). `Sum` and `Of` total and look up.
+- **Sources** produce the snapshot:
+
+  | Source | Sees | Caveats |
+  |---|---|---|
+  | `CoreSource` (`scantxoutset`) | confirmed outputs, coinbase flag, exact height | your own node; scans the whole UTXO set (tens of seconds); takes descriptors too |
+  | `EsploraSource` (`pkg/chain/btc/esplora`) | confirmed and mempool outputs, minus those spent in the mempool | the operator learns the addresses; no coinbase flag, so immature coinbase counts as confirmed; public instances cap busy addresses (HTTP 400 "Too many unspent outputs") |
+  | `watch.Watcher.Snapshot()` | what the watcher has seen since it started, plus seeded outputs | follows reorgs |
+
+  `EsploraSource` lists the addresses one by one and reads the tip after
+  them, so the snapshot height is at least the height of every UTXO; it is
+  not atomic across addresses.
 
 ## Providers
 
@@ -163,6 +190,7 @@ bbgo btc utxo <txid>:<vout>                    # gettxout: unspent or not
 bbgo btc scan <address|descriptor>...          # scantxoutset; needs your own node
 bbgo btc stream [--full-tx --min-value 100] [--confirmations N] [--from-height N] [--chain main]
 bbgo btc watch <address>... [--seed | --from-height N] [--confirmations N]   # received / spent, balances
+bbgo btc balance <address|descriptor>... [--esplora https://mempool.space/api] [--min-conf 6] [--utxos]
 ```
 
 `--min-value` compares the sum of a transaction's outputs, change included.
