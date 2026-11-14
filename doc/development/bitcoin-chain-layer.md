@@ -105,6 +105,44 @@ Callbacks (`OnBlock`, `OnReorg`) run on the `Run` goroutine in chain order.
 Not here yet: ZMQ `hashblock` notifications (polling is enough at Bitcoin's
 block time) and the mempool.
 
+## Address watcher
+
+`pkg/chain/btc/watch` tracks the UTXOs of a set of addresses (or raw
+scripts, for outputs without an address) over a full-transaction stream:
+
+```go
+s := stream.New(client, stream.Config{FullTransactions: true, Confirmations: 1})
+w := watch.New(watch.Config{Addresses: []string{"bc1q..."}})
+_ = w.Attach(s) // fails unless the stream reads full transactions
+
+w.OnEvent(func(e watch.Event) { ... })  // Received / Spent
+w.OnRevert(func(e watch.Event) { ... }) // the same events, undone by a reorg
+```
+
+- **Events.** `Received` is an output paid to a watched address; `Spent` is
+  a watched output spent by an input, with `TxID` the spending transaction and
+  `Block` where it happened. Transactions are applied in block order, so an
+  output created and spent in one block yields both.
+- **Reorgs.** The watcher keeps each block's events for `MaxReorgDepth`
+  blocks (the stream's, via `Attach`). On a reorg it undoes the removed
+  blocks newest first and emits `OnRevert` for their events in reverse order,
+  so `UTXOs()` and `Balances()` always match the stream's chain.
+- **It only knows what it saw.** There is no address index to ask for the
+  starting state, so a balance counts only the outputs received after the
+  watch started. A spend of an older output is still reported from the
+  input's prevout, with `Known` false. `Seed` adds outputs known from
+  elsewhere: `scantxoutset` reports the height its UTXO set is from, so
+  seeding from it and starting the stream at that height + 1 is exact.
+  Seeded outputs cannot be reverted by a reorg below their height.
+- **Matching** is on the address the node writes (bech32 lowercased, base58
+  as is), or the script hex. A spend of a tracked output is matched by
+  outpoint, so it works without a prevout too.
+- **Coinbase outputs** carry `Coinbase`; `UTXO.Mature(tip)` reports whether
+  they can be spent in the next block (`btc.CoinbaseMaturity`).
+
+The watcher is safe to query from other goroutines; callbacks run on the
+stream's goroutine, after the state is updated.
+
 ## Providers
 
 - `https://bitcoin-rpc.publicnode.com` (Core 32 at the time of writing)
@@ -124,6 +162,7 @@ bbgo btc tx <txid> [--block <hash>]            # inputs with their prevouts, out
 bbgo btc utxo <txid>:<vout>                    # gettxout: unspent or not
 bbgo btc scan <address|descriptor>...          # scantxoutset; needs your own node
 bbgo btc stream [--full-tx --min-value 100] [--confirmations N] [--from-height N] [--chain main]
+bbgo btc watch <address>... [--seed | --from-height N] [--confirmations N]   # received / spent, balances
 ```
 
 `--min-value` compares the sum of a transaction's outputs, change included.
