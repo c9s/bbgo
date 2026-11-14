@@ -113,6 +113,23 @@ block time) and the mempool.
 
 ## Exercising it
 
+`bbgo btc` talks to the node directly, without a config file or a session.
+The endpoint comes from `--rpc` or `BTC_RPC_ENDPOINT` (credentials may be in
+the URL), a local node's cookie from `--rpc-cookie` or `BTC_RPC_COOKIE`.
+
+```
+bbgo btc info                                  # chain, height, best block
+bbgo btc block 975765 --tx --min-value 20      # fees, miner tag, transactions moving >= 20 BTC
+bbgo btc tx <txid> [--block <hash>]            # inputs with their prevouts, outputs, fee
+bbgo btc utxo <txid>:<vout>                    # gettxout: unspent or not
+bbgo btc scan <address|descriptor>...          # scantxoutset; needs your own node
+bbgo btc stream [--full-tx --min-value 100] [--confirmations N] [--from-height N] [--chain main]
+```
+
+`--min-value` compares the sum of a transaction's outputs, change included.
+
+The live tests:
+
 ```
 BTC_RPC_ENDPOINT=https://bitcoin-rpc.publicnode.com go test ./pkg/chain/btc -run TestLiveNode -v
 ```
