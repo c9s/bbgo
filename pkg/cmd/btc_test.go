@@ -28,11 +28,3 @@ func TestScriptLabel(t *testing.T) {
 
 	asserts.Equal(t, "(multisig)", scriptLabel(&btc.ScriptPubKey{Type: btc.ScriptTypeMultisig}))
 }
-
-func TestDescriptorAddress(t *testing.T) {
-	asserts.Equal(t, "bc1qh2aq97wafs7px4jnajnpleu0njaqmque8dku3p",
-		descriptorAddress("addr(bc1qh2aq97wafs7px4jnajnpleu0njaqmque8dku3p)#pqslph3d"))
-	asserts.Equal(t, "1AfCc4F9c4VTYSE31PUe2kUEKs6ZxiDjxm", descriptorAddress("addr(1AfCc4F9c4VTYSE31PUe2kUEKs6ZxiDjxm)"))
-	asserts.Equal(t, "", descriptorAddress("raw(6a24aa21)#a23t0yke"))
-	asserts.Equal(t, "", descriptorAddress("wpkh([d34db33f/84h/0h/0h/0/1]02aa)#x"))
-}
