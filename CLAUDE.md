@@ -262,7 +262,11 @@ the JSON literal, never through float64.
 a tip replaced at the same height. Read the "Block stream" section of the guide
 before building a watcher on it.
 
-Exercise it with `bbgo btc info | block | tx | utxo | scan | stream` and
+`pkg/chain/btc/watch` tracks the UTXOs of watched addresses over that stream
+and reverts them on reorgs. It only knows outputs received after it started,
+unless seeded (e.g. from `scantxoutset`); see "Address watcher" in the guide.
+
+Exercise it with `bbgo btc info | block | tx | utxo | scan | stream | watch` and
 `--rpc` or `BTC_RPC_ENDPOINT` — no config file needed.
 
 ## Strategy Development
