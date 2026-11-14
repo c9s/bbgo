@@ -11,16 +11,17 @@ require (
 	github.com/c-bata/goptuna v0.9.0
 	github.com/c9s/requestgen v1.6.0
 	github.com/c9s/rockhopper/v2 v2.5.2
-	github.com/ethereum/go-ethereum v1.17.10
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cheggaaa/pb/v3 v3.2.1
 	github.com/codingconcepts/env v0.0.0-20240618133406-5b0845441187
+	github.com/ethereum/go-ethereum v1.17.10
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/fatih/camelcase v1.0.0
 	github.com/fatih/color v1.19.0
 	github.com/gertd/go-pluralize v0.2.1
 	github.com/gin-contrib/cors v1.7.10
 	github.com/gin-gonic/gin v1.12.0
+	github.com/gizak/termui/v3 v3.1.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/gofrs/flock v0.13.1
@@ -75,6 +76,7 @@ require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/ClickHouse/ch-go v0.75.0 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.50.0 // indirect
+	github.com/Microsoft/go-winio v0.6.4 // indirect
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/andybalholm/brotli v1.2.8 // indirect
@@ -131,9 +133,11 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-runewidth v0.0.31 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
+	github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/nsf/termbox-go v0.0.0-20190121233118-02980233997d // indirect
 	github.com/pandatix/go-abnf v0.5.5 // indirect
 	github.com/parquet-go/bitpack v1.1.0 // indirect
 	github.com/parquet-go/jsonlite v1.5.5 // indirect
