@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"sort"
-	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
 
-	"github.com/c9s/bbgo/pkg/chain/btc"
+	"github.com/c9s/bbgo/pkg/chain/btc/balance"
 	"github.com/c9s/bbgo/pkg/chain/btc/stream"
 	"github.com/c9s/bbgo/pkg/chain/btc/watch"
 )
@@ -64,43 +62,20 @@ var btcWatchCmd = &cobra.Command{
 				return errors.New("--seed starts after the scanned height; it cannot be used with --from-height")
 			}
 
-			descriptors := make([]string, len(args))
-			for i, a := range args {
-				descriptors[i] = "addr(" + a + ")"
-			}
-
 			fmt.Printf("scanning the UTXO set for %d address(es)...\n", len(args))
 
-			result, err := client.ScanTxOutSet(ctx, descriptors)
+			snapshot, err := (&balance.CoreSource{Client: client}).Snapshot(ctx, args)
 			if err != nil {
 				return fmt.Errorf("scantxoutset: %w", err)
 			}
 
-			utxos := make([]watch.UTXO, 0, len(result.Unspents))
-			for _, u := range result.Unspents {
-				utxo := watch.UTXO{
-					Outpoint: u.Outpoint(),
-					Address:  descriptorAddress(u.Desc),
-					Script:   u.ScriptPubKey,
-					Value:    u.Amount,
-					Height:   u.Height,
-					Coinbase: u.Coinbase,
-				}
+			w.Seed(snapshot.UTXOs)
 
-				if u.BlockHash != nil {
-					utxo.BlockHash = *u.BlockHash
-				}
+			// the UTXO set is as of snapshot.Height; the stream picks up from the next block
+			config.FromHeight = snapshot.Height + 1
 
-				utxos = append(utxos, utxo)
-			}
-
-			w.Seed(utxos)
-
-			// the UTXO set is as of result.Height; the stream picks up from the next block
-			config.FromHeight = result.Height + 1
-
-			fmt.Printf("seeded %d UTXO(s) at height %d\n", len(utxos), result.Height)
-			printBalances(w, args)
+			fmt.Printf("seeded %d UTXO(s) at height %d\n", len(snapshot.UTXOs), snapshot.Height)
+			printBalanceTable(balance.Compute(snapshot, 1), args)
 		}
 
 		s := stream.New(client, config)
@@ -129,7 +104,7 @@ var btcWatchCmd = &cobra.Command{
 		s.OnBlock(func(b *stream.Block) {
 			fmt.Printf("block %d %s txs=%d\n", b.Height, b.Hash, len(b.Tx))
 			if changed {
-				printBalances(w, args)
+				printBalanceTable(balance.Compute(w.Snapshot(), 1), args)
 				changed = false
 			}
 		})
@@ -137,7 +112,7 @@ var btcWatchCmd = &cobra.Command{
 		s.OnReorg(func(r stream.Reorg) {
 			fmt.Printf("reorg: back to %s, %d block(s) removed\n", r.Ancestor, len(r.Removed))
 			if changed {
-				printBalances(w, args)
+				printBalanceTable(balance.Compute(w.Snapshot(), 1), args)
 				changed = false
 			}
 		})
@@ -149,50 +124,4 @@ var btcWatchCmd = &cobra.Command{
 
 		return err
 	},
-}
-
-// descriptorAddress returns X of "addr(X)#checksum", or "" for another descriptor.
-func descriptorAddress(desc string) string {
-	desc, _, _ = strings.Cut(desc, "#")
-	if !strings.HasPrefix(desc, "addr(") || !strings.HasSuffix(desc, ")") {
-		return ""
-	}
-
-	return desc[len("addr(") : len(desc)-1]
-}
-
-func printBalances(w *watch.Watcher, addresses []string) {
-	balances := w.Balances()
-
-	keys := make([]string, 0, len(balances))
-	for k := range balances {
-		keys = append(keys, k)
-	}
-
-	// the watched addresses first, in the order given, even at zero
-	seen := map[string]bool{}
-	var order []string
-	for _, a := range addresses {
-		k := watch.NormalizeAddress(a)
-		if !seen[k] {
-			order = append(order, k)
-			seen[k] = true
-		}
-	}
-
-	sort.Strings(keys)
-	for _, k := range keys {
-		if !seen[k] {
-			order = append(order, k)
-			seen[k] = true
-		}
-	}
-
-	var total btc.Amount
-	for _, k := range order {
-		total += balances[k]
-		fmt.Printf("  balance %16s BTC %s\n", balances[k], k)
-	}
-
-	fmt.Printf("  total   %16s BTC in %d UTXO(s)\n", total, len(w.UTXOs()))
 }
