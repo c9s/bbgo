@@ -38,12 +38,20 @@ func init() {
 	btcStreamCmd.Flags().String("chain", "", "the chain the node must follow: main, test, testnet4, signet or regtest")
 	btcStreamCmd.Flags().Duration("poll", 0, "the poll interval of the best block hash, 5s by default")
 
+	btcWatchCmd.Flags().Int64("from-height", 0, "the first block to watch, defaults to the current head")
+	btcWatchCmd.Flags().Int64("confirmations", 0, "how many blocks to stay behind the head")
+	btcWatchCmd.Flags().Bool("seed", false,
+		"load the current UTXOs of the addresses with scantxoutset and watch from the next block; needs your own node")
+	btcWatchCmd.Flags().String("chain", "", "the chain the node must follow: main, test, testnet4, signet or regtest")
+	btcWatchCmd.Flags().Duration("poll", 0, "the poll interval of the best block hash, 5s by default")
+
 	btcCmd.AddCommand(btcInfoCmd)
 	btcCmd.AddCommand(btcBlockCmd)
 	btcCmd.AddCommand(btcTxCmd)
 	btcCmd.AddCommand(btcUTXOCmd)
 	btcCmd.AddCommand(btcScanCmd)
 	btcCmd.AddCommand(btcStreamCmd)
+	btcCmd.AddCommand(btcWatchCmd)
 	RootCmd.AddCommand(btcCmd)
 }
 
