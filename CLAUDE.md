@@ -262,6 +262,9 @@ the JSON literal, never through float64.
 a tip replaced at the same height. Read the "Block stream" section of the guide
 before building a watcher on it.
 
+Exercise it with `bbgo btc info | block | tx | utxo | scan | stream` and
+`--rpc` or `BTC_RPC_ENDPOINT` — no config file needed.
+
 ## Strategy Development
 
 Read `doc/development/strategy-layer-design.md` before adding a non-trivial
