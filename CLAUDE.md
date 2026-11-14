@@ -257,6 +257,11 @@ UTXO model has no sender field and no balances, `Hash` is stored in wire byte
 order (the RPC shows it reversed), and `Amount` is int64 satoshis parsed from
 the JSON literal, never through float64.
 
+`pkg/chain/btc/stream` follows the chain block by block by polling
+`getbestblockhash`, backfilling from its cursor and reporting reorgs, including
+a tip replaced at the same height. Read the "Block stream" section of the guide
+before building a watcher on it.
+
 ## Strategy Development
 
 Read `doc/development/strategy-layer-design.md` before adding a non-trivial

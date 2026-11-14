@@ -2,8 +2,9 @@
 
 `pkg/chain/btc` is the lowest Bitcoin layer: a JSON-RPC client for Bitcoin
 Core (and providers that speak its API) with Go types that mirror the RPC JSON
-field for field. It has no block stream, no indexer and no `ChainSession`
-integration yet; those are meant to be built on top of it.
+field for field. `pkg/chain/btc/stream` follows the chain block by block on
+top of it (see "Block stream" below). There is no indexer and no
+`ChainSession` integration yet.
 
 Read this before building on it. Bitcoin is not an EVM chain with a different
 RPC: the data model is different, and most EVM habits are wrong here.
@@ -64,6 +65,46 @@ basic auth and stripped from `Endpoint()`. `WithCookieFile` reads the `.cookie`
 a local bitcoind writes; the cookie changes on every node restart, so it is
 read again after a 401.
 
+## Block stream
+
+`pkg/chain/btc/stream` delivers the blocks of the node's chain in order, with
+the same design as `pkg/chain/evm/stream`: something signals that the chain
+moved, then every block from the cursor up to the head is read and
+parent-checked.
+
+- **The signal is a poll of `getbestblockhash`** (`PollInterval`, 5s by
+  default), which is one cheap call against a ten-minute block time. The
+  header is read only when the hash changed.
+- **Backfill.** Blocks are read by height from the cursor up to the head
+  minus `Confirmations`, so nothing is lost while the node was unreachable.
+  Persist `Cursor().Height + 1` as `FromHeight` to resume.
+- **Reorgs.** Every block's `previousblockhash` is checked against the last
+  delivered block; a mismatch walks the recent window (`MaxReorgDepth`, 64)
+  back to the common ancestor and emits `Reorg{Ancestor, Removed}`, newest
+  first. Deeper than the window, `Run` returns `ErrReorgTooDeep`.
+- **Same-height reorgs.** A competing block can replace the tip without the
+  height moving, and the next block that would reveal it is ten minutes away.
+  So whenever the best block hash changes, the stream also checks that its
+  cursor is still the node's block at that height.
+- **Shorter chains.** The chain with the most work wins, not the longest, so
+  after a reorg the node's height can be lower than the cursor. Heads are not
+  monotonic here, unlike the EVM stream; the stream waits until the node's
+  chain reaches the cursor's height again before deciding what was removed.
+- **Lagging backends.** A "height out of range" (-8) or "not found" (-5)
+  answer for the next block means the backend that answered is behind the
+  one that reported the head; the stream waits for the next poll instead of
+  failing.
+- **`FullTransactions`** reads blocks with verbosity=3, so every input has
+  its prevout and every transaction its fee. Without it only the header and
+  `TxIDs` are read; a full mainnet block is around 15 MB of JSON.
+- **`Chain`** ("main", "testnet4", ...) makes `Run` fail when the node
+  follows another chain, instead of retrying.
+
+Callbacks (`OnBlock`, `OnReorg`) run on the `Run` goroutine in chain order.
+
+Not here yet: ZMQ `hashblock` notifications (polling is enough at Bitcoin's
+block time) and the mempool.
+
 ## Providers
 
 - `https://bitcoin-rpc.publicnode.com` (Core 32 at the time of writing)
@@ -78,3 +119,9 @@ BTC_RPC_ENDPOINT=https://bitcoin-rpc.publicnode.com go test ./pkg/chain/btc -run
 
 reads the tip block, checks every transaction's fee against its prevouts, and
 checks that the coinbase claims no more than the subsidy and the fees.
+
+```
+BTC_RPC_ENDPOINT=https://bitcoin-rpc.publicnode.com go test ./pkg/chain/btc/stream -run TestLiveStream -v
+```
+
+streams the last three blocks with full transactions and checks they chain.
