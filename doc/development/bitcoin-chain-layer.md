@@ -6,6 +6,9 @@ field for field. `pkg/chain/btc/stream` follows the chain block by block on
 top of it (see "Block stream" below). There is no indexer and no
 `ChainSession` integration yet.
 
+The design record, with what is deliberately not supported yet, is
+`doc/design/bitcoin-chain-layer.md`.
+
 Read this before building on it. Bitcoin is not an EVM chain with a different
 RPC: the data model is different, and most EVM habits are wrong here.
 
