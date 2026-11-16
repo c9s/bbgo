@@ -112,6 +112,9 @@ type Environment struct {
 	PersistentService *service.PersistenceServiceFacade
 	ProfilingService  *pyroscope.Profiler
 
+	// MarginInterestValuationService values the synced margin interests in USDT
+	MarginInterestValuationService *service.MarginInterestValuationService
+
 	// external services
 	GoogleSpreadSheetService *googleservice.SpreadSheetService
 
@@ -289,6 +292,7 @@ func (environ *Environment) ConfigureDatabaseDriver(
 	environ.ProfitService = &service.ProfitService{DB: db}
 	environ.PositionService = &service.PositionService{DB: db}
 	environ.MarginService = &service.MarginService{DB: db}
+	environ.MarginInterestValuationService = &service.MarginInterestValuationService{DB: db}
 	environ.WithdrawService = &service.WithdrawService{DB: db}
 	environ.DepositService = &service.DepositService{DB: db}
 	environ.SyncService = &service.SyncService{
@@ -299,6 +303,8 @@ func (environ *Environment) ConfigureDatabaseDriver(
 		WithdrawService: &service.WithdrawService{DB: db},
 		DepositService:  &service.DepositService{DB: db},
 		FuturesService:  service.NewFuturesService(db),
+
+		MarginInterestValuationService: environ.MarginInterestValuationService,
 	}
 
 	return nil

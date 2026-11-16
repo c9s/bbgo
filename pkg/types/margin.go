@@ -85,6 +85,54 @@ func (m MarginInterest) Key() string {
 	return m.Asset + "|" + m.IsolatedSymbol + "|" + strconv.FormatInt(m.Time.UnixMilli(), 10)
 }
 
+// MarginInterestValuation is a margin interest charge valued in USDT at the time
+// it was charged. It is derived from a margin_interests row and the 1h klines,
+// and can be recomputed from them at any time.
+type MarginInterestValuation struct {
+	GID uint64 `json:"gid" db:"gid"`
+
+	// InterestGID is the gid of the margin_interests row
+	InterestGID uint64 `json:"interestGID" db:"interest_gid"`
+
+	Exchange       ExchangeName `json:"exchange" db:"exchange"`
+	Session        string       `json:"session" db:"session"`
+	Time           Time         `json:"time" db:"time"`
+	IsolatedSymbol string       `json:"isolatedSymbol" db:"isolated_symbol"`
+
+	// PaidAsset is the asset the interest was paid in, e.g. BNB when Binance converts it
+	PaidAsset string `json:"paidAsset" db:"paid_asset"`
+
+	// BorrowedAsset is the asset the interest was charged on. It is '' when
+	// unknown: a converted row without rawAsset, e.g. on isolated margin.
+	BorrowedAsset string `json:"borrowedAsset" db:"borrowed_asset"`
+
+	// Converted is true when the interest was paid in another asset than the borrowed one
+	Converted bool `json:"converted" db:"converted"`
+
+	// Interest is in PaidAsset units
+	Interest fixedpoint.Value `json:"interest" db:"interest"`
+
+	// BorrowedInterest is in BorrowedAsset units: Interest, or on a converted row
+	// principal x daily rate / 24, an estimate. nil when BorrowedAsset is unknown.
+	BorrowedInterest *fixedpoint.Value `json:"borrowedInterest,omitempty" db:"borrowed_interest"`
+
+	// PriceSymbol is the market PriceInUSDT comes from, e.g. BNBUSDT, or USDTTRY
+	// for an inverse pair; '' for USDT or when the asset has no USDT market
+	PriceSymbol string `json:"priceSymbol" db:"price_symbol"`
+
+	// PriceKLineStart is the start of the 1h kline whose close is the price,
+	// the hour before the charge hour. Zero when not priced.
+	PriceKLineStart Time `json:"priceKLineStart" db:"price_kline_start"`
+
+	// PriceInUSDT is the USDT price of PaidAsset; nil when not priced (yet)
+	PriceInUSDT *fixedpoint.Value `json:"priceInUSDT,omitempty" db:"price_in_usdt"`
+
+	// InterestUSDT is Interest x PriceInUSDT; nil when not priced (yet)
+	InterestUSDT *fixedpoint.Value `json:"interestUSDT,omitempty" db:"interest_usdt"`
+
+	UpdatedTime Time `json:"updatedTime" db:"updated_at"`
+}
+
 type MarginLoan struct {
 	GID            uint64           `json:"gid" db:"gid"`
 	Exchange       ExchangeName     `json:"exchange" db:"exchange"`

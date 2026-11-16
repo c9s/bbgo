@@ -25,6 +25,9 @@ type SyncService struct {
 	DepositService  *DepositService
 	MarginService   *MarginService
 	FuturesService  *FuturesService
+
+	// MarginInterestValuationService, when set, values the synced margin interests in USDT
+	MarginInterestValuationService *MarginInterestValuationService
 }
 
 // SyncSessionSymbols syncs the trades from the given exchange session
@@ -93,6 +96,14 @@ func (s *SyncService) SyncMarginHistory(
 	for _, asset := range assets {
 		if err := s.MarginService.Sync(ctx, exchange, sessionName, asset, startTime); err != nil {
 			return err
+		}
+	}
+
+	// a row that cannot be priced now is stored unpriced and priced by a later
+	// sync, so a kline or market failure does not stop the startup sync
+	if s.MarginInterestValuationService != nil {
+		if err := s.MarginInterestValuationService.Sync(ctx, exchange, sessionName, startTime); err != nil {
+			log.WithError(err).Warnf("unable to value the %s margin interests of session %q", exchange.Name(), sessionName)
 		}
 	}
 
