@@ -11,13 +11,20 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func interestRow(asset, interest, priceInUSDT string, at time.Time) types.MarginInterest {
-	return types.MarginInterest{
-		Asset:       asset,
-		Interest:    Number(interest),
-		PriceInUSDT: Number(priceInUSDT),
-		Time:        types.Time(at),
+// interestRow is a valued row; priceInUSDT "" leaves it unpriced
+func interestRow(asset, interest, priceInUSDT string, at time.Time) types.MarginInterestValuation {
+	row := types.MarginInterestValuation{
+		PaidAsset:     asset,
+		BorrowedAsset: asset,
+		Interest:      Number(interest),
+		Time:          types.Time(at),
 	}
+	if priceInUSDT != "" {
+		price := Number(priceInUSDT)
+		usdt := row.Interest.Mul(price)
+		row.PriceInUSDT, row.InterestUSDT = &price, &usdt
+	}
+	return row
 }
 
 func TestSumRealized(t *testing.T) {
@@ -25,14 +32,14 @@ func TestSumRealized(t *testing.T) {
 	h11 := h10.Add(time.Hour)
 	btcPrice := fixedPrices(map[string]string{"BTC": "62000"})
 
-	twoBTC := []types.MarginInterest{
+	twoBTC := []types.MarginInterestValuation{
 		interestRow("BTC", "0.00000209", "60000", h10),
 		interestRow("BTC", "0.00000209", "61000", h11),
 	}
 
 	tests := []struct {
 		name        string
-		rows        []types.MarginInterest
+		rows        []types.MarginInterestValuation
 		mode        PriceMode
 		pricer      PriceFunc
 		wantUSDT    float64
@@ -44,14 +51,14 @@ func TestSumRealized(t *testing.T) {
 		{name: "current", rows: twoBTC, mode: PriceModeCurrent, pricer: btcPrice, wantUSDT: 0.25916},
 		{
 			name: "usdt is always 1", mode: PriceModeCharged,
-			rows:     []types.MarginInterest{interestRow("USDT", "0.00417", "0", h10)},
+			rows:     []types.MarginInterestValuation{interestRow("USDT", "0.00417", "", h10)},
 			wantUSDT: 0.00417,
 		},
 		{
 			name: "unpriced row", mode: PriceModeCharged,
-			rows: []types.MarginInterest{
+			rows: []types.MarginInterestValuation{
 				interestRow("BTC", "0.00000209", "60000", h10),
-				interestRow("BTC", "0.00000209", "0", h11),
+				interestRow("BTC", "0.00000209", "", h11),
 			},
 			wantUSDT: 0.1254, wantMissing: []string{"BTC"},
 			check: func(t *testing.T, r Realized) {
@@ -60,14 +67,29 @@ func TestSumRealized(t *testing.T) {
 			},
 		},
 		{
-			name: "duplicate rows count once", mode: PriceModeCharged,
-			rows: []types.MarginInterest{
+			// e.g. an ON_BORROW and a PERIODIC charge in the same hour
+			name: "charges of the same hour all count", mode: PriceModeCharged,
+			rows: []types.MarginInterestValuation{
 				interestRow("BTC", "0.00000209", "60000", h10),
 				interestRow("BTC", "0.00000209", "60000", h10),
 			},
-			wantUSDT: 0.1254,
+			wantUSDT: 0.2508,
 			check: func(t *testing.T, r Realized) {
-				assert.Equal(t, 1, r.Assets["BTC"].Rows)
+				assert.Equal(t, 2, r.Assets["BTC"].Rows)
+			},
+		},
+		{
+			// the price of the paid asset, BNB, not of the borrowed one
+			name: "converted row is valued in the paid asset", mode: PriceModeCharged,
+			rows: []types.MarginInterestValuation{func() types.MarginInterestValuation {
+				row := interestRow("BNB", "0.0001", "600", h10)
+				row.BorrowedAsset, row.Converted = "BTC", true
+				return row
+			}()},
+			wantUSDT: 0.06,
+			check: func(t *testing.T, r Realized) {
+				assert.Contains(t, r.Assets, "BNB")
+				assert.NotContains(t, r.Assets, "BTC")
 			},
 		},
 		{

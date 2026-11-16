@@ -15,7 +15,7 @@ const (
 	// PriceModeCurrent values the summed interest at the current price.
 	PriceModeCurrent PriceMode = "current"
 
-	// PriceModeCharged values each row at the price when it was charged (MarginInterest.PriceInUSDT).
+	// PriceModeCharged values each row at the price when it was charged (MarginInterestValuation.InterestUSDT).
 	PriceModeCharged PriceMode = "charged"
 )
 
@@ -59,22 +59,16 @@ type Realized struct {
 	MissingPrice []string
 }
 
-type interestRowKey struct {
-	asset, isolatedSymbol string
-	timeMs                int64
-}
-
-// SumRealized sums interest rows per asset and values them in USDT.
+// SumRealized sums the valued interest rows per paid asset and values them in USDT.
 //
-// Rows with the same (Asset, IsolatedSymbol, Time) are counted once, because
-// margin_interests has no unique key and two processes (e.g. `bbgo sync`
-// next to `bbgo run`) can insert the same rows.
+// The rows are not deduplicated: there is one valuation per margin_interests
+// row, and margin_interests stores each charge once (its tx_id is unique).
 //
 // current: USDT = sum(interest) x pricer(asset).
-// charged: USDT = sum(interest x row.PriceInUSDT). A row with PriceInUSDT <= 0 is
-// left out of USDT (its Interest still counts) and marks the asset missing.
+// charged: USDT = sum(row.InterestUSDT). A row without InterestUSDT is left out
+// of USDT (its Interest still counts) and marks the asset missing.
 // USDT always uses price 1.
-func SumRealized(rows []types.MarginInterest, mode PriceMode, pricer PriceFunc) Realized {
+func SumRealized(rows []types.MarginInterestValuation, mode PriceMode, pricer PriceFunc) Realized {
 	mode = mode.OrDefault()
 	r := Realized{
 		Mode:      mode,
@@ -82,17 +76,11 @@ func SumRealized(rows []types.MarginInterest, mode PriceMode, pricer PriceFunc) 
 		TotalUSDT: fixedpoint.Zero,
 	}
 
-	seen := make(map[interestRowKey]struct{}, len(rows))
 	for _, row := range rows {
-		key := interestRowKey{row.Asset, row.IsolatedSymbol, row.Time.Time().UnixMilli()}
-		if _, dup := seen[key]; dup {
-			continue
-		}
-		seen[key] = struct{}{}
-
-		ar, ok := r.Assets[row.Asset]
+		asset := row.PaidAsset
+		ar, ok := r.Assets[asset]
 		if !ok {
-			ar = AssetRealized{Asset: row.Asset, Interest: fixedpoint.Zero, USDT: fixedpoint.Zero, PriceOK: true}
+			ar = AssetRealized{Asset: asset, Interest: fixedpoint.Zero, USDT: fixedpoint.Zero, PriceOK: true}
 		}
 
 		ar.Interest = ar.Interest.Add(row.Interest)
@@ -100,16 +88,16 @@ func SumRealized(rows []types.MarginInterest, mode PriceMode, pricer PriceFunc) 
 
 		if mode == PriceModeCharged {
 			switch {
-			case row.Asset == quoteCurrency:
+			case asset == quoteCurrency:
 				ar.USDT = ar.USDT.Add(row.Interest)
-			case row.PriceInUSDT.Sign() > 0:
-				ar.USDT = ar.USDT.Add(row.Interest.Mul(row.PriceInUSDT))
+			case row.InterestUSDT != nil:
+				ar.USDT = ar.USDT.Add(*row.InterestUSDT)
 			default:
 				ar.PriceOK = false
 			}
 		}
 
-		r.Assets[row.Asset] = ar
+		r.Assets[asset] = ar
 	}
 
 	for asset, ar := range r.Assets {
