@@ -85,7 +85,14 @@ type Strategy struct {
 
 	MarginAssetInfoCacheTTL types.Duration `json:"marginAssetInfoCacheTTL"`
 
+	// InterestEstimate logs and exports the margin interest of the UTC calendar month (realized + projected)
+	// and the projections over the next rolling months of 30 x 24 hours
+	InterestEstimate *InterestEstimateConfig `json:"interestEstimate,omitempty"`
+
 	ExchangeSession *bbgo.ExchangeSession
+
+	// Environment is injected; its MarginService provides the realized interest
+	Environment *bbgo.Environment
 
 	marginBorrowRepay types.MarginBorrowRepayService
 	marginAssetInfo   marginAssetInfoCache
@@ -99,6 +106,14 @@ func (s *Strategy) ID() string {
 func (s *Strategy) Defaults() error {
 	if s.MarginAssetInfoCacheTTL == 0 {
 		s.MarginAssetInfoCacheTTL = types.Duration(30 * time.Minute)
+	}
+	return nil
+}
+
+// Validate checks the interest estimate config, if set
+func (s *Strategy) Validate() error {
+	if s.InterestEstimate != nil {
+		return s.InterestEstimate.Validate()
 	}
 	return nil
 }
@@ -612,7 +627,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.logger = logrus.WithFields(logrus.Fields{
 		"strategy": ID,
-		"exchange": s.ExchangeSession.Name,
+		"session":  s.ExchangeSession.Name,
+		"exchange": s.ExchangeSession.ExchangeName,
 	})
 
 	if !session.Margin {
@@ -642,6 +658,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.MarginHighInterestRateAlertConfig != nil {
 		go newMarginHighInterestRateWorker(s, s.MarginHighInterestRateAlertConfig).Run(ctx)
+	}
+
+	if cfg := s.InterestEstimate; cfg != nil && cfg.Interval.Duration() > 0 {
+		go newInterestEstimateWorker(s, session, cfg).Run(ctx)
 	}
 
 	go s.run(ctx, s.Interval.Duration())

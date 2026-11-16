@@ -20,6 +20,20 @@ exchangeStrategies:
     # if the margin ratio is high enough, we don't have the urge to repay
     maxMarginLevel: 20.0
 
+    # interestEstimate logs and exports (Prometheus) the margin interest of the `assets` below,
+    # borrowed or not (a debt of another asset is not counted, only warned), in USDT, counted in hourly charges:
+    # - the UTC calendar month: interest projected on the current principal until the month end,
+    #   plus the interest already charged this month (synced into the database, needs a configured DB).
+    # - rolling months of 30 x 24 hours: the current principal projected over the next n x 720 hours.
+    interestEstimate:
+      interval: 5m
+      syncInterval: 1h
+      # charged: value realized interest at the price when it was charged (default)
+      # current: value it at the current price
+      realizedPriceMode: charged
+      # rolling months to project, 1 and 3 by default (720 and 2160 hours)
+      projectionMonths: [1, 3]
+
     marginRepayAlert:
       slack:
         mentions:
