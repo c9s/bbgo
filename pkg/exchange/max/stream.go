@@ -57,6 +57,7 @@ func NewStream(ex *Exchange) *Stream {
 		debts:          make(map[string]maxapi.Debt, 20),
 		exchange:       ex,
 	}
+	stream.SetLogger(log)
 	stream.SetEndpointCreator(stream.getEndpoint)
 	stream.SetParser(maxapi.ParseMessage)
 	stream.SetDispatcher(stream.dispatchEvent)

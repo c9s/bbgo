@@ -147,6 +147,9 @@ type Stream struct {
 
 	// futuresWsApiWriteMu serializes the account status requests with the close frame written by Close
 	futuresWsApiWriteMu sync.Mutex
+
+	// logger is the base logger of the stream and its side streams, see SetLogger
+	logger logrus.FieldLogger
 }
 
 func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Client) *Stream {
@@ -162,6 +165,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 		riskBalances: make(map[string]*RiskBalance),
 	}
 
+	stream.SetLogger(log)
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.createEndpoint)
@@ -288,6 +292,23 @@ func (s *Stream) handleStart() {
 	s.startFuturesAccountStatusStream()
 }
 
+// SetLogger sets the base logger of the stream, and of the side streams it opens later: they
+// add the "endpoint" field to it, which tells their connections apart from the main one.
+// It should be called before Connect.
+func (s *Stream) SetLogger(logger logrus.FieldLogger) {
+	s.logger = logger
+	s.StandardStream.SetLogger(logger)
+}
+
+// sideStreamLogger is the logger of a side stream connecting to the given endpoint.
+func (s *Stream) sideStreamLogger(endpoint string) logrus.FieldLogger {
+	var logger logrus.FieldLogger = log
+	if s.logger != nil {
+		logger = s.logger
+	}
+	return logger.WithField("endpoint", endpoint)
+}
+
 func (s *Stream) handleBeforeConnect(ctx context.Context) error {
 	// keep the base context for the goroutines started after connect,
 	// e.g. the account status stream started from OnStart
@@ -340,6 +361,9 @@ func (s *Stream) writeSubscriptions() error {
 // Only called once; handleConnect guards with futuresAuxStream != nil check.
 func (s *Stream) initFuturesAuxStream() {
 	aux := types.NewStandardStream()
+	aux.SetLogger(s.sideStreamLogger("public"))
+	// the "stream" log field; a bare StandardStream reads PublicOnly for its logs only
+	aux.SetPublicOnly()
 	aux.SetParser(parseWebSocketEvent)
 	aux.SetDispatcher(s.dispatchEvent)
 	aux.SetEndpointCreator(func(ctx context.Context) (string, error) {

@@ -173,6 +173,7 @@ func (s *Stream) startFuturesAccountStatusStream() {
 
 func (s *Stream) initFuturesAccountStatusStream() *types.StandardStream {
 	statusStream := types.NewStandardStream()
+	statusStream.SetLogger(s.sideStreamLogger("ws_api"))
 	statusStream.SetParser(parseFuturesWsApiResponse)
 	statusStream.SetDispatcher(s.dispatchFuturesWsApiEvent)
 	statusStream.SetEndpointCreator(func(ctx context.Context) (string, error) {
