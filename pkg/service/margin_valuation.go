@@ -26,8 +26,9 @@ const valuationQuote = "USDT"
 // The price of a charge at t is the close of the 1h kline of <asset>USDT that
 // ends at the top of t's hour, i.e. the price at that hour. Without a USDT
 // market the inverse USDT<asset> is used; without either the row stays
-// unpriced. The asset priced is the one the interest was paid in (BNB when
-// Binance converts it).
+// unpriced. Both the asset the interest was paid in (BNB when Binance converts
+// it) and the borrowed asset are priced, at the same kline. PriceStatus tells
+// which values are set; only the rows missing a kline are valued again.
 //
 // The table is derived from margin_interests and the kline tables, so it can be
 // emptied and recomputed at any time.
@@ -43,9 +44,9 @@ type spotKLineExchange struct {
 	types.Exchange
 }
 
-// Sync syncs the 1h klines the unpriced rows of session since since need, then
-// values every row that has no valuation yet or is still unpriced. A row whose
-// kline cannot be synced is stored unpriced and retried by the next Sync.
+// Sync syncs the 1h klines the pending rows of session since since need, then
+// values every row that has no valuation yet or is missing a kline. A row whose
+// kline cannot be synced is stored as kline_missing and valued again by the next Sync.
 func (s *MarginInterestValuationService) Sync(ctx context.Context, ex types.Exchange, session string, since time.Time) error {
 	pending, err := s.selectPending(ctx, ex.Name(), session, since)
 	if err != nil {
@@ -61,23 +62,37 @@ func (s *MarginInterestValuationService) Sync(ctx context.Context, ex types.Exch
 		return fmt.Errorf("unable to load %s markets to value margin interests: %w", ex.Name(), err)
 	}
 
-	pairs := make(map[string]pricePair)
+	pricer := interestPricer{
+		pairs:  make(map[string]pricePair),
+		closes: make(map[string]map[int64]fixedpoint.Value),
+	}
+
+	// oldest is the oldest kline start each price pair needs
 	oldest := make(map[string]time.Time)
-	for _, p := range pending {
-		pair, ok := pairs[p.Asset]
+	need := func(asset string, start time.Time) {
+		if asset == "" || asset == valuationQuote {
+			return
+		}
+
+		pair, ok := pricer.pairs[asset]
 		if !ok {
-			pair = findPricePair(p.Asset, markets)
-			pairs[p.Asset] = pair
+			pair = findPricePair(asset, markets)
+			pricer.pairs[asset] = pair
 		}
 
 		if pair.symbol == "" {
-			continue
+			return
 		}
 
-		start := priceKLineStart(p.Time.Time())
 		if t, ok := oldest[pair.symbol]; !ok || start.Before(t) {
 			oldest[pair.symbol] = start
 		}
+	}
+
+	for _, p := range pending {
+		start := priceKLineStart(p.Time.Time())
+		need(p.Asset, start)
+		need(borrowedAssetOf(p.MarginInterest), start)
 	}
 
 	klines := &BacktestService{DB: s.DB}
@@ -85,7 +100,6 @@ func (s *MarginInterestValuationService) Sync(ctx context.Context, ex types.Exch
 	now := time.Now()
 
 	var errs []error
-	closes := make(map[string]map[int64]fixedpoint.Value, len(oldest))
 	for symbol, start := range oldest {
 		if err := klines.Sync(ctx, spot, symbol, []types.Interval{types.Interval1h}, start, now); err != nil {
 			errs = append(errs, fmt.Errorf("unable to sync %s 1h klines: %w", symbol, err))
@@ -97,12 +111,11 @@ func (s *MarginInterestValuationService) Sync(ctx context.Context, ex types.Exch
 			errs = append(errs, err)
 			continue
 		}
-		closes[symbol] = c
+		pricer.closes[symbol] = c
 	}
 
 	for _, p := range pending {
-		pair := pairs[p.Asset]
-		v := valueInterest(p.MarginInterest, pair, closes[pair.symbol], now)
+		v := valueInterest(p.MarginInterest, pricer, now)
 		if err := s.write(ctx, v, p.ValuationGID.Valid); err != nil {
 			return err
 		}
@@ -116,15 +129,15 @@ func (s *MarginInterestValuationService) Sync(ctx context.Context, ex types.Exch
 	return nil
 }
 
-// pendingInterest is a margin_interests row without a priced valuation
+// pendingInterest is a margin_interests row without a valuation, or with one missing a kline
 type pendingInterest struct {
 	types.MarginInterest
 
-	// ValuationGID is set when the row has an unpriced valuation
+	// ValuationGID is set when the row has a valuation, missing a kline
 	ValuationGID sql.NullInt64 `db:"valuation_gid"`
 }
 
-// selectPending selects the rows of session since since with no valuation or an unpriced one
+// selectPending selects the rows of session since since with no valuation or one missing a kline
 func (s *MarginInterestValuationService) selectPending(
 	ctx context.Context, ex types.ExchangeName, session string, since time.Time,
 ) ([]pendingInterest, error) {
@@ -140,7 +153,7 @@ func (s *MarginInterestValuationService) selectPending(
 		LeftJoin("margin_interest_valuations v ON v.interest_gid = mi.gid").
 		Where(sq.Eq{"mi.exchange": ex, "mi.session": session}).
 		Where(sq.GtOrEq{"mi.time": since.UTC()}).
-		Where(sq.Or{sq.Eq{"v.gid": nil}, sq.Eq{"v.price_in_usdt": nil}}).
+		Where(sq.Or{sq.Eq{"v.gid": nil}, sq.Eq{"v.price_status": string(types.MarginInterestKLineMissing)}}).
 		OrderBy("mi.time ASC").
 		ToSql()
 	if err != nil {
@@ -193,21 +206,29 @@ var valuationInsertSQL = "INSERT INTO margin_interest_valuations (" + strings.Jo
 
 // valuationColumns are the columns of margin_interest_valuations but gid
 var valuationColumns = fieldsNamesOf(types.MarginInterestValuation{
-	BorrowedInterest: new(fixedpoint.Value),
-	PriceInUSDT:      new(fixedpoint.Value),
-	InterestUSDT:     new(fixedpoint.Value),
+	BorrowedInterest:     new(fixedpoint.Value),
+	PriceInUSDT:          new(fixedpoint.Value),
+	InterestUSDT:         new(fixedpoint.Value),
+	BorrowedPriceInUSDT:  new(fixedpoint.Value),
+	BorrowedInterestUSDT: new(fixedpoint.Value),
+	PrincipalUSDT:        new(fixedpoint.Value),
 })
 
-// valuationPriceUpdateSQL prices an existing, unpriced valuation
-const valuationPriceUpdateSQL = "UPDATE margin_interest_valuations SET " +
-	"price_symbol = :price_symbol, price_kline_start = :price_kline_start, " +
-	"price_in_usdt = :price_in_usdt, interest_usdt = :interest_usdt, updated_at = :updated_at " +
-	"WHERE interest_gid = :interest_gid"
+// valuationUpdateSQL values an existing valuation again, every column but the keys
+var valuationUpdateSQL = func() string {
+	sets := make([]string, 0, len(valuationColumns))
+	for _, c := range valuationColumns {
+		if c != "interest_gid" {
+			sets = append(sets, c+" = :"+c)
+		}
+	}
+	return "UPDATE margin_interest_valuations SET " + strings.Join(sets, ", ") + " WHERE interest_gid = :interest_gid"
+}()
 
 func (s *MarginInterestValuationService) write(ctx context.Context, v types.MarginInterestValuation, exists bool) error {
 	query := valuationInsertSQL
 	if exists {
-		query = valuationPriceUpdateSQL
+		query = valuationUpdateSQL
 	}
 
 	_, err := s.DB.NamedExecContext(ctx, query, v)
@@ -251,8 +272,81 @@ func isConvertedInterest(interestType string) bool {
 	return strings.HasSuffix(interestType, "_CONVERTED")
 }
 
-// valueInterest values m from the 1h kline closes of its price pair
-func valueInterest(m types.MarginInterest, pair pricePair, closes map[int64]fixedpoint.Value, now time.Time) types.MarginInterestValuation {
+// borrowedAssetOf is the asset m was borrowed in: rawAsset, else the paid asset
+// when the interest was not converted, else "" (unknown)
+func borrowedAssetOf(m types.MarginInterest) string {
+	switch {
+	case m.RawAsset != "":
+		return m.RawAsset
+	case !isConvertedInterest(m.InterestType):
+		return m.Asset
+	}
+	return ""
+}
+
+// interestPricer prices assets from the 1h kline closes a Sync has loaded
+type interestPricer struct {
+	// pairs is the price pair of each asset; an asset not in it has no market
+	pairs map[string]pricePair
+
+	// closes is the close of each stored 1h kline, by symbol, then start time
+	closes map[string]map[int64]fixedpoint.Value
+}
+
+// assetPrice is the USDT price of an asset at a charge
+type assetPrice struct {
+	symbol string
+
+	// price is nil when the asset is not priced
+	price  *fixedpoint.Value
+	status types.MarginInterestPriceStatus
+
+	// fromKLine: price is the close of a kline, not the 1 of USDT
+	fromKLine bool
+}
+
+// priceAt prices asset from the close of the 1h kline starting at start
+func (p interestPricer) priceAt(asset string, start time.Time) assetPrice {
+	if asset == valuationQuote {
+		one := fixedpoint.One
+		return assetPrice{price: &one, status: types.MarginInterestPriced}
+	}
+
+	pair := p.pairs[asset]
+	if pair.symbol == "" {
+		return assetPrice{status: types.MarginInterestNoMarket}
+	}
+
+	closePrice, ok := p.closes[pair.symbol][start.UnixMilli()]
+	if !ok || closePrice.Sign() <= 0 {
+		return assetPrice{symbol: pair.symbol, status: types.MarginInterestKLineMissing}
+	}
+
+	price := closePrice
+	if pair.inverse {
+		price = fixedpoint.One.Div(closePrice)
+	}
+
+	return assetPrice{symbol: pair.symbol, price: &price, status: types.MarginInterestPriced, fromKLine: true}
+}
+
+// priceStatusRank orders the statuses: when several apply, the lowest wins
+var priceStatusRank = map[types.MarginInterestPriceStatus]int{
+	types.MarginInterestKLineMissing:    0,
+	types.MarginInterestNoMarket:        1,
+	types.MarginInterestUnknownBorrowed: 2,
+	types.MarginInterestPriced:          3,
+}
+
+func firstPriceStatus(a, b types.MarginInterestPriceStatus) types.MarginInterestPriceStatus {
+	if priceStatusRank[b] < priceStatusRank[a] {
+		return b
+	}
+	return a
+}
+
+// valueInterest values m in its paid and its borrowed asset
+func valueInterest(m types.MarginInterest, pricer interestPricer, now time.Time) types.MarginInterestValuation {
 	v := types.MarginInterestValuation{
 		InterestGID:    m.GID,
 		Exchange:       m.Exchange,
@@ -260,17 +354,13 @@ func valueInterest(m types.MarginInterest, pair pricePair, closes map[int64]fixe
 		Time:           types.Time(m.Time.Time().UTC()),
 		IsolatedSymbol: m.IsolatedSymbol,
 		PaidAsset:      m.Asset,
+		BorrowedAsset:  borrowedAssetOf(m),
+		InterestType:   m.InterestType,
 		Converted:      isConvertedInterest(m.InterestType),
+		Principal:      m.Principal,
+		InterestRate:   m.InterestRate,
 		Interest:       m.Interest,
-		PriceSymbol:    pair.symbol,
 		UpdatedTime:    types.Time(now.UTC()),
-	}
-
-	switch {
-	case m.RawAsset != "":
-		v.BorrowedAsset = m.RawAsset
-	case !v.Converted:
-		v.BorrowedAsset = m.Asset
 	}
 
 	switch {
@@ -285,30 +375,38 @@ func valueInterest(m types.MarginInterest, pair pricePair, closes map[int64]fixe
 		v.BorrowedInterest = &estimate
 	}
 
-	if m.Asset == valuationQuote {
-		one, interest := fixedpoint.One, m.Interest
-		v.PriceInUSDT, v.InterestUSDT = &one, &interest
-		return v
-	}
-
-	if pair.symbol == "" {
-		return v
-	}
-
 	start := priceKLineStart(m.Time.Time())
-	closePrice, ok := closes[start.UnixMilli()]
-	if !ok || closePrice.Sign() <= 0 {
-		return v
+	paid := pricer.priceAt(m.Asset, start)
+	v.PriceSymbol, v.PriceStatus = paid.symbol, paid.status
+	if paid.price != nil {
+		interestUSDT := m.Interest.Mul(*paid.price)
+		v.PriceInUSDT, v.InterestUSDT = paid.price, &interestUSDT
 	}
 
-	price := closePrice
-	if pair.inverse {
-		price = fixedpoint.One.Div(closePrice)
+	borrowed := paid
+	switch v.BorrowedAsset {
+	case "":
+		v.PriceStatus = firstPriceStatus(v.PriceStatus, types.MarginInterestUnknownBorrowed)
+		borrowed = assetPrice{}
+	case m.Asset:
+	default:
+		borrowed = pricer.priceAt(v.BorrowedAsset, start)
+		v.PriceStatus = firstPriceStatus(v.PriceStatus, borrowed.status)
 	}
 
-	interestUSDT := m.Interest.Mul(price)
-	v.PriceKLineStart = types.Time(start)
-	v.PriceInUSDT, v.InterestUSDT = &price, &interestUSDT
+	v.BorrowedPriceSymbol = borrowed.symbol
+	if borrowed.price != nil {
+		borrowedPrice := *borrowed.price
+		interestUSDT := v.BorrowedInterest.Mul(borrowedPrice)
+		principalUSDT := m.Principal.Mul(borrowedPrice)
+		v.BorrowedPriceInUSDT = &borrowedPrice
+		v.BorrowedInterestUSDT, v.PrincipalUSDT = &interestUSDT, &principalUSDT
+	}
+
+	if paid.fromKLine || borrowed.fromKLine {
+		v.PriceKLineStart = types.Time(start)
+	}
+
 	return v
 }
 

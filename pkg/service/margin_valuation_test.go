@@ -21,7 +21,18 @@ func TestValueInterest(t *testing.T) {
 	h10 := time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC)
 	h9 := h10.Add(-time.Hour)
 	now := h10.Add(3 * time.Hour)
-	closes := map[int64]fixedpoint.Value{h9.UnixMilli(): Number(600)}
+	pricer := interestPricer{
+		pairs: map[string]pricePair{
+			"BNB": {symbol: "BNBUSDT"}, "BTC": {symbol: "BTCUSDT"}, "TRY": {symbol: "USDTTRY", inverse: true},
+			"ETH": {symbol: "ETHUSDT"}, "DOGE": {},
+		},
+		closes: map[string]map[int64]fixedpoint.Value{
+			"BNBUSDT": {h9.UnixMilli(): Number(600)},
+			"BTCUSDT": {h9.UnixMilli(): Number(90000)},
+			"USDTTRY": {h9.UnixMilli(): Number(40)},
+			"ETHUSDT": {},
+		},
+	}
 
 	row := func(asset, rawAsset, typ string) types.MarginInterest {
 		return types.MarginInterest{
@@ -32,66 +43,125 @@ func TestValueInterest(t *testing.T) {
 	}
 
 	t.Run("priced by the close of the hour before", func(t *testing.T) {
-		v := valueInterest(row("BNB", "BNB", "PERIODIC"), pricePair{symbol: "BNBUSDT"}, closes, now)
+		v := valueInterest(row("BNB", "BNB", "PERIODIC"), pricer, now)
 		require.NotNil(t, v.InterestUSDT)
 		assert.Equal(t, "600", v.PriceInUSDT.String())
 		assert.InDelta(t, 0.06, v.InterestUSDT.Float64(), 1e-12)
 		assert.Equal(t, h9, v.PriceKLineStart.Time().UTC())
 		assert.Equal(t, uint64(7), v.InterestGID)
 		assert.False(t, v.Converted)
+		assert.Equal(t, "PERIODIC", v.InterestType)
+		assert.Equal(t, "0.5", v.Principal.String())
+		assert.Equal(t, "0.0024", v.InterestRate.String())
 		assert.Equal(t, "BNB", v.BorrowedAsset)
 		assert.Equal(t, "0.0001", v.BorrowedInterest.String())
+		assert.Equal(t, types.MarginInterestPriced, v.PriceStatus)
+	})
+
+	t.Run("not converted: the borrowed values are the paid ones", func(t *testing.T) {
+		v := valueInterest(row("BNB", "BNB", "PERIODIC"), pricer, now)
+		assert.Equal(t, "BNBUSDT", v.BorrowedPriceSymbol)
+		assert.Equal(t, "600", v.BorrowedPriceInUSDT.String())
+		assert.InDelta(t, 0.06, v.BorrowedInterestUSDT.Float64(), 1e-12)
+		assert.InDelta(t, 300, v.PrincipalUSDT.Float64(), 1e-9)
 	})
 
 	t.Run("a charge inside the hour uses the same kline", func(t *testing.T) {
 		m := row("BNB", "", "ON_BORROW")
 		m.Time = types.Time(h10.Add(25 * time.Minute))
-		v := valueInterest(m, pricePair{symbol: "BNBUSDT"}, closes, now)
+		v := valueInterest(m, pricer, now)
 		require.NotNil(t, v.PriceInUSDT)
 		assert.Equal(t, h9, v.PriceKLineStart.Time().UTC())
 		assert.Equal(t, "BNB", v.BorrowedAsset, "rawAsset not returned: the paid asset")
+		assert.Equal(t, "ON_BORROW", v.InterestType)
 	})
 
-	t.Run("converted: paid in BNB, borrowed interest estimated", func(t *testing.T) {
-		v := valueInterest(row("BNB", "BTC", "PERIODIC_CONVERTED"), pricePair{symbol: "BNBUSDT"}, closes, now)
+	t.Run("converted: priced in the paid and the borrowed asset", func(t *testing.T) {
+		m := row("BNB", "BTC", "PERIODIC_CONVERTED")
+		m.Interest = Number("0.0072")
+		v := valueInterest(m, pricer, now)
 		assert.True(t, v.Converted)
 		assert.Equal(t, "BNB", v.PaidAsset)
 		assert.Equal(t, "BTC", v.BorrowedAsset)
 		// 0.5 x 0.0024 / 24
 		assert.InDelta(t, 0.00005, v.BorrowedInterest.Float64(), fixedTol)
-		assert.InDelta(t, 0.06, v.InterestUSDT.Float64(), 1e-12, "valued in the paid asset")
+		assert.InDelta(t, 4.32, v.InterestUSDT.Float64(), 1e-9, "what was paid: 0.0072 BNB at 600")
+		assert.Equal(t, "BTCUSDT", v.BorrowedPriceSymbol)
+		assert.Equal(t, "90000", v.BorrowedPriceInUSDT.String())
+		assert.InDelta(t, 4.5, v.BorrowedInterestUSDT.Float64(), 90000*fixedTol, "what it would have cost in BTC")
+		assert.InDelta(t, 45000, v.PrincipalUSDT.Float64(), 1e-6)
+		assert.Equal(t, types.MarginInterestPriced, v.PriceStatus)
+	})
+
+	t.Run("converted: the borrowed kline is missing", func(t *testing.T) {
+		v := valueInterest(row("BNB", "ETH", "PERIODIC_CONVERTED"), pricer, now)
+		assert.NotNil(t, v.InterestUSDT, "the paid asset is still priced")
+		assert.Equal(t, "ETHUSDT", v.BorrowedPriceSymbol)
+		assert.Nil(t, v.BorrowedPriceInUSDT)
+		assert.Nil(t, v.BorrowedInterestUSDT)
+		assert.Nil(t, v.PrincipalUSDT)
+		assert.Equal(t, types.MarginInterestKLineMissing, v.PriceStatus)
+	})
+
+	t.Run("converted: the borrowed asset has no market", func(t *testing.T) {
+		v := valueInterest(row("BNB", "DOGE", "PERIODIC_CONVERTED"), pricer, now)
+		assert.NotNil(t, v.InterestUSDT)
+		assert.Nil(t, v.PrincipalUSDT)
+		assert.Equal(t, types.MarginInterestNoMarket, v.PriceStatus)
 	})
 
 	t.Run("converted without rawAsset: borrowed asset unknown", func(t *testing.T) {
 		m := row("BNB", "", "PERIODIC_CONVERTED")
 		m.IsolatedSymbol = "BTCUSDT"
-		v := valueInterest(m, pricePair{symbol: "BNBUSDT"}, closes, now)
+		v := valueInterest(m, pricer, now)
 		assert.Equal(t, "", v.BorrowedAsset)
 		assert.Nil(t, v.BorrowedInterest)
+		assert.Equal(t, "", v.BorrowedPriceSymbol)
+		assert.Nil(t, v.BorrowedPriceInUSDT)
+		assert.Nil(t, v.PrincipalUSDT)
 		assert.NotNil(t, v.InterestUSDT, "still priced in the paid asset")
+		assert.Equal(t, types.MarginInterestUnknownBorrowed, v.PriceStatus)
+	})
+
+	t.Run("a missing kline comes first: the row is valued again", func(t *testing.T) {
+		m := row("ETH", "", "PERIODIC_CONVERTED")
+		v := valueInterest(m, pricer, now)
+		assert.Equal(t, types.MarginInterestKLineMissing, v.PriceStatus)
 	})
 
 	t.Run("usdt is 1 without a kline", func(t *testing.T) {
-		v := valueInterest(row("USDT", "USDT", "PERIODIC"), pricePair{}, nil, now)
+		v := valueInterest(row("USDT", "USDT", "PERIODIC"), pricer, now)
 		assert.Equal(t, "1", v.PriceInUSDT.String())
 		assert.Equal(t, "0.0001", v.InterestUSDT.String())
+		assert.Equal(t, "0.5", v.PrincipalUSDT.String())
 		assert.True(t, v.PriceKLineStart.Time().IsZero())
+		assert.Equal(t, types.MarginInterestPriced, v.PriceStatus)
+	})
+
+	t.Run("borrowed usdt paid in bnb", func(t *testing.T) {
+		v := valueInterest(row("BNB", "USDT", "PERIODIC_CONVERTED"), pricer, now)
+		assert.Equal(t, "1", v.BorrowedPriceInUSDT.String())
+		assert.Equal(t, h9, v.PriceKLineStart.Time().UTC(), "the paid price came from a kline")
 	})
 
 	t.Run("inverse pair", func(t *testing.T) {
-		v := valueInterest(row("TRY", "TRY", "PERIODIC"), pricePair{symbol: "USDTTRY", inverse: true},
-			map[int64]fixedpoint.Value{h9.UnixMilli(): Number(40)}, now)
+		v := valueInterest(row("TRY", "TRY", "PERIODIC"), pricer, now)
 		assert.InDelta(t, 0.025, v.PriceInUSDT.Float64(), 1e-12)
+		assert.Equal(t, "USDTTRY", v.PriceSymbol)
 	})
 
 	t.Run("no market or no kline: unpriced", func(t *testing.T) {
-		v := valueInterest(row("DOGE", "DOGE", "PERIODIC"), pricePair{}, nil, now)
+		v := valueInterest(row("DOGE", "DOGE", "PERIODIC"), pricer, now)
 		assert.Nil(t, v.PriceInUSDT)
+		assert.Nil(t, v.BorrowedPriceInUSDT)
 		assert.Equal(t, "", v.PriceSymbol)
+		assert.Equal(t, types.MarginInterestNoMarket, v.PriceStatus)
 
-		v = valueInterest(row("BNB", "BNB", "PERIODIC"), pricePair{symbol: "BNBUSDT"}, map[int64]fixedpoint.Value{}, now)
+		v = valueInterest(row("ETH", "ETH", "PERIODIC"), pricer, now)
 		assert.Nil(t, v.PriceInUSDT)
-		assert.Equal(t, "BNBUSDT", v.PriceSymbol)
+		assert.Equal(t, "ETHUSDT", v.PriceSymbol)
+		assert.True(t, v.PriceKLineStart.Time().IsZero())
+		assert.Equal(t, types.MarginInterestKLineMissing, v.PriceStatus)
 	})
 }
 
@@ -150,12 +220,14 @@ func TestMarginInterestValuationService_Sync(t *testing.T) {
 	h := time.Now().UTC().Truncate(time.Hour).Add(-5 * time.Hour)
 	ethListed := false
 	ex := &fakeKLineExchange{
-		markets:    types.MarketMap{"BNBUSDT": {}, "ETHUSDT": {}, "USDTTRY": {}},
+		markets:    types.MarketMap{"BNBUSDT": {}, "BTCUSDT": {}, "ETHUSDT": {}, "USDTTRY": {}},
 		klineCalls: map[string]int{},
 		closeAt: func(symbol string, start time.Time) (fixedpoint.Value, bool) {
 			switch symbol {
 			case "BNBUSDT":
 				return Number(600), true
+			case "BTCUSDT":
+				return Number(90000), true
 			case "USDTTRY":
 				return Number(40), true
 			case "ETHUSDT":
@@ -203,10 +275,17 @@ func TestMarginInterestValuationService_Sync(t *testing.T) {
 	assert.Equal(t, "BTC", vs["BNB"].BorrowedAsset)
 	assert.True(t, vs["BNB"].Converted)
 	assert.InDelta(t, 0.00005, vs["BNB"].BorrowedInterest.Float64(), fixedTol)
+	assert.InDelta(t, 4.5, vs["BNB"].BorrowedInterestUSDT.Float64(), 90000*fixedTol, "valued in BTC too")
+	assert.InDelta(t, 45000, vs["BNB"].PrincipalUSDT.Float64(), 1e-6)
+	assert.Equal(t, "PERIODIC_CONVERTED", vs["BNB"].InterestType)
+	assert.Equal(t, types.MarginInterestPriced, vs["BNB"].PriceStatus)
 	assert.Equal(t, h.Add(-time.Hour), vs["BNB"].PriceKLineStart.Time().UTC())
 	assert.InDelta(t, 0.1, vs["TRY"].InterestUSDT.Float64(), 1e-9, "4 TRY at USDTTRY 40")
 	assert.Nil(t, vs["DOGE"].InterestUSDT, "no USDT market")
+	assert.Equal(t, types.MarginInterestNoMarket, vs["DOGE"].PriceStatus)
 	assert.Nil(t, vs["ETH"].InterestUSDT, "no kline yet")
+	assert.Equal(t, types.MarginInterestKLineMissing, vs["ETH"].PriceStatus)
+	dogeValued := vs["DOGE"].UpdatedTime.Time()
 	assert.Equal(t, "ETHUSDT", vs["ETH"].PriceSymbol)
 	assert.Empty(t, query("b"), "another session is not valued")
 	assert.Zero(t, ex.klineCalls["DOGE"]+ex.klineCalls["USDT"])
@@ -218,6 +297,8 @@ func TestMarginInterestValuationService_Sync(t *testing.T) {
 	require.Len(t, vs, 5)
 	require.NotNil(t, vs["ETH"].InterestUSDT)
 	assert.InDelta(t, 3.0, vs["ETH"].InterestUSDT.Float64(), 1e-9)
+	assert.Equal(t, types.MarginInterestPriced, vs["ETH"].PriceStatus)
+	assert.True(t, dogeValued.Equal(vs["DOGE"].UpdatedTime.Time()), "no_market is final: not valued again")
 
 	// priced rows are not valued again
 	bnbCalls := ex.klineCalls["BNBUSDT"]
@@ -250,9 +331,12 @@ func TestSyncService_SyncMarginHistoryValuesInterests(t *testing.T) {
 
 	h := time.Now().UTC().Truncate(time.Hour).Add(-3 * time.Hour)
 	ex := &fakeKLineExchange{
-		markets:    types.MarketMap{"BNBUSDT": {}},
+		markets:    types.MarketMap{"BNBUSDT": {}, "BTCUSDT": {}},
 		klineCalls: map[string]int{},
 		closeAt: func(symbol string, start time.Time) (fixedpoint.Value, bool) {
+			if symbol == "BTCUSDT" {
+				return Number(90000), true
+			}
 			return Number(600), symbol == "BNBUSDT"
 		},
 	}
@@ -271,4 +355,7 @@ func TestSyncService_SyncMarginHistoryValuesInterests(t *testing.T) {
 	require.NotNil(t, vs[0].InterestUSDT)
 	assert.InDelta(t, 0.06, vs[0].InterestUSDT.Float64(), 1e-9)
 	assert.Equal(t, "BTC", vs[0].BorrowedAsset)
+	assert.Equal(t, types.MarginInterestPriced, vs[0].PriceStatus)
+	require.NotNil(t, vs[0].PrincipalUSDT)
+	assert.InDelta(t, 45000, vs[0].PrincipalUSDT.Float64(), 1e-6)
 }
