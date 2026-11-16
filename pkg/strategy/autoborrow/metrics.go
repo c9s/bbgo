@@ -31,8 +31,16 @@ var interestRealizedInUSDTMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 
 var interestRealizedAmountMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 	Name: "autoborrow_interest_realized_amount",
-	Help: "margin interest charged since the start of the UTC calendar month, in asset units",
+	Help: "nominal margin interest charged since the start of the UTC calendar month, in asset units; interest paid in another asset (e.g. BNB) counts at its nominal amount",
 }, assetLabels)
+
+// charged_asset is the asset the interest was paid in: the asset itself, or e.g. BNB
+var chargedAssetLabels = []string{"session", "exchange", "asset", "charged_asset"}
+
+var interestRealizedChargedAmountMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_realized_charged_amount",
+	Help: "margin interest of the asset actually charged since the start of the UTC calendar month, in charged_asset units",
+}, chargedAssetLabels)
 
 var interestMonthAmountMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 	Name: "autoborrow_interest_month_amount",
@@ -106,6 +114,7 @@ func init() {
 		interestHourlyRateMetrics,
 		interestRealizedInUSDTMetrics,
 		interestRealizedAmountMetrics,
+		interestRealizedChargedAmountMetrics,
 		interestMonthAmountMetrics,
 		interestMonthInUSDTMetrics,
 		interestAssetEstimateCompleteMetrics,

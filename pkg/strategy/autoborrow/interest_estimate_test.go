@@ -205,6 +205,8 @@ func valuedRow(asset, interest, priceInUSDT string, at time.Time) types.MarginIn
 	row := types.MarginInterestValuation{
 		PaidAsset: asset, BorrowedAsset: asset, Interest: Number(interest), Time: types.Time(at),
 	}
+	borrowed := row.Interest
+	row.BorrowedInterest = &borrowed
 	if priceInUSDT != "" {
 		price := Number(priceInUSDT)
 		usdt := row.Interest.Mul(price)
@@ -247,14 +249,15 @@ func TestInterestEstimate_ProjectionAndRealized(t *testing.T) {
 	// realized ends after the current hour, where the projection starts
 	assert.Equal(t, time.Date(2026, 11, 15, 11, 0, 0, 0, time.UTC), history.queries[0].Until)
 
-	// without a sync start, syncs the configured assets from the month start
+	// without a sync start, syncs the configured assets from the month start,
+	// plus BNB on Binance: interest paid with BNB deduction is returned only for BNB
 	var synced []string
 	for _, c := range history.syncs {
 		assert.Equal(t, w.session.Name, c.session)
 		assert.Equal(t, time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), c.start)
 		synced = append(synced, c.asset)
 	}
-	assert.Equal(t, []string{"BTC", "ETH", "USDT"}, synced)
+	assert.Equal(t, []string{"BNB", "BTC", "ETH", "USDT"}, synced)
 
 	assert.InDelta(t, 48.21771, sessionGauge(t, w, "autoborrow_interest_projected_total_in_usdt"), usdtTol)
 	assert.InDelta(t, 48.22605, sessionGauge(t, w, "autoborrow_interest_month_total_in_usdt"), usdtTol)
@@ -335,7 +338,7 @@ func TestInterestEstimate_SyncCadenceAndFailure(t *testing.T) {
 	w := newTestInterestWorker(t, account, rates, history, configured("USDT")...)
 
 	est := w.tick(context.Background())
-	assert.Len(t, history.syncs, 1)
+	assert.Len(t, history.syncs, 2) // BNB and USDT
 	assert.False(t, est.Complete)
 	assert.Equal(t, []string{"USDT"}, est.SyncFailed)
 	assert.Equal(t, 1.0, errorCount(t, w, "sync"))
@@ -346,7 +349,7 @@ func TestInterestEstimate_SyncCadenceAndFailure(t *testing.T) {
 	now := testNow.Add(30 * time.Minute)
 	w.now = func() time.Time { return now }
 	est = w.tick(context.Background())
-	assert.Len(t, history.syncs, 1)
+	assert.Len(t, history.syncs, 2)
 	assert.Len(t, history.queries, 2)
 	assert.False(t, est.Complete)
 
@@ -354,7 +357,7 @@ func TestInterestEstimate_SyncCadenceAndFailure(t *testing.T) {
 	history.syncErr = nil
 	now = testNow.Add(time.Hour)
 	est = w.tick(context.Background())
-	assert.Len(t, history.syncs, 2)
+	assert.Len(t, history.syncs, 4)
 	assert.Empty(t, est.SyncFailed)
 	assert.True(t, est.Complete)
 	assert.True(t, est.Assets["USDT"].Complete())
@@ -615,7 +618,7 @@ func TestInterestEstimate_ConfiguredAssetsAreSyncedWithoutDebt(t *testing.T) {
 	w := newTestInterestWorker(t, account, rates, history, configured("USDT", "BTC")...)
 
 	est := w.tick(context.Background())
-	assert.Equal(t, []string{"BTC", "USDT"}, syncedAssets(history, 0))
+	assert.Equal(t, []string{"BNB", "BTC", "USDT"}, syncedAssets(history, 0))
 	assert.True(t, est.Projection.TotalUSDT.IsZero())
 	assert.InDelta(t, 0.6, est.MonthTotalUSDT.Float64(), 1e-6)
 	assert.True(t, est.Complete)
@@ -626,7 +629,7 @@ func TestInterestEstimate_ConfiguredAssetsAreSyncedWithoutDebt(t *testing.T) {
 	w.now = func() time.Time { return later }
 	n := len(history.syncs)
 	w.tick(context.Background())
-	assert.Equal(t, []string{"BTC", "USDT"}, syncedAssets(history, n))
+	assert.Equal(t, []string{"BNB", "BTC", "USDT"}, syncedAssets(history, n))
 }
 
 func TestInterestEstimate_UnconfiguredAssetsAreNotCounted(t *testing.T) {
@@ -646,7 +649,7 @@ func TestInterestEstimate_UnconfiguredAssetsAreNotCounted(t *testing.T) {
 	est := w.tick(context.Background())
 
 	assert.Equal(t, [][]string{{"USDT"}}, rates.calls)
-	assert.Equal(t, []string{"USDT"}, syncedAssets(history, 0))
+	assert.Equal(t, []string{"BNB", "USDT"}, syncedAssets(history, 0))
 	assert.Equal(t, []string{"DOGE", "ETH"}, est.Unconfigured)
 	assert.ElementsMatch(t, []string{"USDT"}, keysOfMonths(est.Assets))
 	assert.InDelta(t, 0.001, est.Realized.TotalUSDT.Float64(), 1e-12)
@@ -705,7 +708,7 @@ func TestInterestEstimate_SyncResumesFromTheLastSuccessfulSync(t *testing.T) {
 	w.syncSince = since
 
 	w.tick(context.Background())
-	assert.Equal(t, map[string]time.Time{"BTC": since, "USDT": since}, syncStarts(history, 0))
+	assert.Equal(t, map[string]time.Time{"BNB": since, "BTC": since, "USDT": since}, syncStarts(history, 0))
 
 	// USDT synced: it starts 1h before that sync instead of a year back;
 	// BTC failed, so it scans from syncSince again
@@ -713,7 +716,9 @@ func TestInterestEstimate_SyncResumesFromTheLastSuccessfulSync(t *testing.T) {
 	w.now = func() time.Time { return later }
 	n := len(history.syncs)
 	w.tick(context.Background())
-	assert.Equal(t, map[string]time.Time{"BTC": since, "USDT": testNow.Add(-time.Hour)}, syncStarts(history, n))
+	assert.Equal(t, map[string]time.Time{
+		"BNB": testNow.Add(-time.Hour), "BTC": since, "USDT": testNow.Add(-time.Hour),
+	}, syncStarts(history, n))
 
 	// once BTC syncs, it resumes the same way
 	delete(history.syncErr, "BTC")
@@ -797,4 +802,79 @@ func TestInterestEstimate_UnpricedRowIsIncomplete(t *testing.T) {
 	assert.InDelta(t, 0.00002, est.Realized.Assets["BTC"].Interest.Float64(), 1e-12)
 	assert.InDelta(t, 0.6, est.Realized.TotalUSDT.Float64(), 1e-6)
 	assert.False(t, est.Complete)
+}
+
+// bnbPaidRow is a valued hourly charge on borrowed paid in BNB at 600 USDT;
+// nominal is principal x daily rate / 24 in borrowed units
+func bnbPaidRow(borrowed, nominal, bnbInterest string, at time.Time) types.MarginInterestValuation {
+	row := valuedRow("BNB", bnbInterest, "600", at)
+	n := Number(nominal)
+	row.BorrowedAsset, row.Converted, row.BorrowedInterest = borrowed, true, &n
+	return row
+}
+
+func TestInterestEstimate_BNBPaidInterestCountsTowardTheBorrowedAsset(t *testing.T) {
+	account := newTestAccount(Number(10), debtBalance("USDT", fixedpoint.Zero, Number(1000)))
+	rates := &fakeRateService{rates: map[string]string{"USDT": "0.000001"}}
+	h := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	history := &fakeHistoryStore{rows: []types.MarginInterestValuation{
+		usdtRow(h, "0.001"),
+		bnbPaidRow("USDT", "0.001", "0.0000016", h.Add(time.Hour)),
+		// paid in BNB, borrowed outside the autoborrow assets
+		bnbPaidRow("ETH", "0.0000003", "0.0000015", h.Add(time.Hour)),
+	}}
+	w := newTestInterestWorker(t, account, rates, history, configured("USDT")...)
+
+	est := w.tick(context.Background())
+
+	usdt := est.Realized.Assets["USDT"]
+	assert.Equal(t, 2, usdt.Rows)
+	assert.InDelta(t, 0.002, usdt.Interest.Float64(), 1e-12)
+	assert.InDelta(t, 0.001, usdt.Charged["USDT"].Float64(), 1e-12)
+	assert.InDelta(t, 0.0000016, usdt.Charged["BNB"].Float64(), 1e-12)
+	// valued at the BNB charged: 0.0000016 x 600 = 0.00096
+	assert.InDelta(t, 0.00196, est.Realized.TotalUSDT.Float64(), 1e-8)
+	assert.NotContains(t, est.Realized.Assets, "BNB")
+	assert.Equal(t, []string{"ETH"}, est.Unconfigured)
+	assert.True(t, est.Complete)
+
+	assert.InDelta(t, 0.002, assetSeries(t, w, "autoborrow_interest_realized_amount")["USDT"], 1e-12)
+	charged := map[string]float64{}
+	for _, s := range gathered(t, "autoborrow_interest_realized_charged_amount") {
+		if s["session"] == w.session.Name {
+			charged[s["charged_asset"].(string)] = s["value"].(float64)
+		}
+	}
+	assert.InDelta(t, 0.001, charged["USDT"], 1e-12)
+	assert.InDelta(t, 0.0000016, charged["BNB"], 1e-12)
+}
+
+func TestInterestEstimate_FailedBNBSyncMarksEveryAssetIncomplete(t *testing.T) {
+	account := newTestAccount(Number(10), debtBalance("USDT", fixedpoint.Zero, Number(1000)))
+	rates := &fakeRateService{rates: map[string]string{"USDT": "0.000001"}}
+	history := &fakeHistoryStore{syncErr: map[string]error{"BNB": errors.New("timeout")}}
+	w := newTestInterestWorker(t, account, rates, history, configured("USDT")...)
+
+	est := w.tick(context.Background())
+
+	assert.Equal(t, []string{"BNB"}, est.SyncFailed)
+	assert.False(t, est.Complete)
+	assert.True(t, est.Assets["USDT"].MissingHistory)
+	assert.NotContains(t, est.Assets, "BNB")
+}
+
+func TestInterestEstimate_UnattributedRowIsIncomplete(t *testing.T) {
+	account := newTestAccount(Number(10), debtBalance("USDT", fixedpoint.Zero, Number(1000)))
+	rates := &fakeRateService{rates: map[string]string{"USDT": "0.000001"}}
+	row := bnbPaidRow("", "0", "0.0000016", time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC))
+	row.BorrowedInterest = nil
+	history := &fakeHistoryStore{rows: []types.MarginInterestValuation{row}}
+	w := newTestInterestWorker(t, account, rates, history, configured("USDT")...)
+
+	est := w.tick(context.Background())
+
+	assert.Equal(t, 1, est.Unattributed)
+	assert.Empty(t, est.Realized.Assets)
+	assert.False(t, est.Complete)
+	assert.Equal(t, 1.0, errorCount(t, w, "unattributed"))
 }

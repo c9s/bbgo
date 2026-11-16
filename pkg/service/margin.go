@@ -28,6 +28,17 @@ func ValidateMarginSessionName(session string) error {
 	return nil
 }
 
+// MarginInterestFeeAsset returns the asset ex can charge margin interest in
+// besides the borrowed asset, or an empty string if none. On Binance it is BNB: with BNB
+// deduction on, the interest rows are stored under BNB (the borrowed asset is in
+// raw_asset), and the API returns them only for asset=BNB.
+func MarginInterestFeeAsset(ex types.ExchangeName) string {
+	if ex == types.ExchangeBinance {
+		return "BNB"
+	}
+	return ""
+}
+
 // marginHistoryAPI returns the margin history service of ex, or nil if ex is not a margin exchange
 func marginHistoryAPI(ex types.Exchange) types.MarginHistoryService {
 	api, ok := ex.(types.MarginHistoryService)

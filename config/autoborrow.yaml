@@ -24,6 +24,7 @@ exchangeStrategies:
     # borrowed or not (a debt of another asset is not counted, only warned), in USDT, counted in hourly charges:
     # - the UTC calendar month: interest projected on the current principal until the month end,
     #   plus the interest already charged this month (synced into the database, needs a configured DB).
+    #   On Binance, interest paid with BNB deduction counts toward the borrowed asset, valued at the BNB charged.
     # - rolling months of 30 x 24 hours: the current principal projected over the next n x 720 hours.
     interestEstimate:
       interval: 5m

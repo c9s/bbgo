@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	bbgoEx "github.com/c9s/bbgo/pkg/exchange"
@@ -99,6 +100,10 @@ func (s *SyncService) SyncMarginHistory(
 		}
 	}
 
+	if err := s.syncMarginFeeAssetInterests(ctx, exchange, sessionName, startTime, assets); err != nil {
+		return err
+	}
+
 	// a row that cannot be priced now is stored unpriced and priced by a later
 	// sync, so a kline or market failure does not stop the startup sync
 	if s.MarginInterestValuationService != nil {
@@ -108,6 +113,27 @@ func (s *SyncService) SyncMarginHistory(
 	}
 
 	return nil
+}
+
+// syncMarginFeeAssetInterests syncs the interests of the fee asset (BNB on
+// Binance) when it is not one of assets: interest paid with BNB deduction is
+// stored under it, so without it the listed assets would miss those rows.
+// Only the interests are synced, not the loans and repays of the fee asset.
+func (s *SyncService) syncMarginFeeAssetInterests(
+	ctx context.Context, exchange types.Exchange, sessionName string, startTime time.Time, assets []string,
+) error {
+	fee := MarginInterestFeeAsset(exchange.Name())
+	if fee == "" || slices.Contains(assets, fee) {
+		return nil
+	}
+
+	// Sync already warned about a session name that is too long
+	if ValidateMarginSessionName(sessionName) != nil {
+		return nil
+	}
+
+	log.Infof("syncing %s margin interests paid in %s...", exchange.Name(), fee)
+	return s.MarginService.SyncInterests(ctx, exchange, sessionName, fee, startTime)
 }
 
 func (s *SyncService) SyncRewardHistory(ctx context.Context, exchange types.Exchange, startTime time.Time) error {
