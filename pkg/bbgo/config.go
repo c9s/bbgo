@@ -425,6 +425,9 @@ type Config struct {
 
 	Sessions map[string]*ExchangeSession `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 
+	// ChainSessions defines the on-chain sessions, see ChainSession
+	ChainSessions map[string]*ChainSession `json:"chainSessions,omitempty" yaml:"chainSessions,omitempty"`
+
 	Logging *LoggingConfig `json:"logging,omitempty"`
 
 	ExchangeStrategies      []ExchangeStrategyMount `json:"-" yaml:"-"`

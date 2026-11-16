@@ -508,3 +508,125 @@ var TradingService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "pkg/pb/bbgo.proto",
 }
+
+// CoreRPCServiceClient is the client API for CoreRPCService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type CoreRPCServiceClient interface {
+	ListMethods(ctx context.Context, in *ListMethodsRequest, opts ...grpc.CallOption) (*ListMethodsResponse, error)
+	Invoke(ctx context.Context, in *InvokeRequest, opts ...grpc.CallOption) (*InvokeResponse, error)
+}
+
+type coreRPCServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewCoreRPCServiceClient(cc grpc.ClientConnInterface) CoreRPCServiceClient {
+	return &coreRPCServiceClient{cc}
+}
+
+func (c *coreRPCServiceClient) ListMethods(ctx context.Context, in *ListMethodsRequest, opts ...grpc.CallOption) (*ListMethodsResponse, error) {
+	out := new(ListMethodsResponse)
+	err := c.cc.Invoke(ctx, "/bbgo.CoreRPCService/ListMethods", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreRPCServiceClient) Invoke(ctx context.Context, in *InvokeRequest, opts ...grpc.CallOption) (*InvokeResponse, error) {
+	out := new(InvokeResponse)
+	err := c.cc.Invoke(ctx, "/bbgo.CoreRPCService/Invoke", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CoreRPCServiceServer is the server API for CoreRPCService service.
+// All implementations must embed UnimplementedCoreRPCServiceServer
+// for forward compatibility
+type CoreRPCServiceServer interface {
+	ListMethods(context.Context, *ListMethodsRequest) (*ListMethodsResponse, error)
+	Invoke(context.Context, *InvokeRequest) (*InvokeResponse, error)
+	mustEmbedUnimplementedCoreRPCServiceServer()
+}
+
+// UnimplementedCoreRPCServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedCoreRPCServiceServer struct {
+}
+
+func (UnimplementedCoreRPCServiceServer) ListMethods(context.Context, *ListMethodsRequest) (*ListMethodsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListMethods not implemented")
+}
+func (UnimplementedCoreRPCServiceServer) Invoke(context.Context, *InvokeRequest) (*InvokeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Invoke not implemented")
+}
+func (UnimplementedCoreRPCServiceServer) mustEmbedUnimplementedCoreRPCServiceServer() {}
+
+// UnsafeCoreRPCServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to CoreRPCServiceServer will
+// result in compilation errors.
+type UnsafeCoreRPCServiceServer interface {
+	mustEmbedUnimplementedCoreRPCServiceServer()
+}
+
+func RegisterCoreRPCServiceServer(s grpc.ServiceRegistrar, srv CoreRPCServiceServer) {
+	s.RegisterService(&CoreRPCService_ServiceDesc, srv)
+}
+
+func _CoreRPCService_ListMethods_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMethodsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreRPCServiceServer).ListMethods(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/bbgo.CoreRPCService/ListMethods",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreRPCServiceServer).ListMethods(ctx, req.(*ListMethodsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreRPCService_Invoke_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InvokeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreRPCServiceServer).Invoke(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/bbgo.CoreRPCService/Invoke",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreRPCServiceServer).Invoke(ctx, req.(*InvokeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// CoreRPCService_ServiceDesc is the grpc.ServiceDesc for CoreRPCService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var CoreRPCService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "bbgo.CoreRPCService",
+	HandlerType: (*CoreRPCServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListMethods",
+			Handler:    _CoreRPCService_ListMethods_Handler,
+		},
+		{
+			MethodName: "Invoke",
+			Handler:    _CoreRPCService_Invoke_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "pkg/pb/bbgo.proto",
+}

@@ -31,8 +31,10 @@ var (
 	_ types.ExchangeOrderQueryService = &Exchange{}
 )
 
+const ID = types.ExchangeKucoin
+
 var log = logrus.WithFields(logrus.Fields{
-	"exchange": "kucoin",
+	"exchange": ID,
 })
 
 type Exchange struct {

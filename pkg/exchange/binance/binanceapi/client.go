@@ -129,6 +129,12 @@ func (c *RestClient) IsUsingEd25519Auth() bool {
 	return len(c.PrivateKey) > 0
 }
 
+// TimeOffset returns the local-minus-server clock offset in milliseconds,
+// as measured by SetTimeOffsetFromServer (zero if never measured).
+func (c *RestClient) TimeOffset() int64 {
+	return c.timeOffset
+}
+
 func (c *RestClient) SetTimeOffsetFromServer(ctx context.Context) error {
 	req, err := c.NewRequest(ctx, "GET", "/api/v3/time", nil, nil)
 	if err != nil {

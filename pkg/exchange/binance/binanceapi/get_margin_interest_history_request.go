@@ -25,8 +25,14 @@ const (
 
 // MarginInterest is the user margin interest record
 type MarginInterest struct {
-	IsolatedSymbol      string                     `json:"isolatedSymbol"`
-	Asset               string                     `json:"asset"`
+	// TxId is unique per charge: several charges can share the same accrual time and raw asset
+	TxId           uint64 `json:"txId"`
+	IsolatedSymbol string `json:"isolatedSymbol"`
+	Asset          string `json:"asset"`
+
+	// RawAsset is the borrowed asset; Asset is BNB when the interest is converted.
+	// Binance does not return it for isolated margin.
+	RawAsset            string                     `json:"rawAsset"`
 	Interest            fixedpoint.Value           `json:"interest"`
 	InterestAccuredTime types.MillisecondTimestamp `json:"interestAccuredTime"`
 	InterestRate        fixedpoint.Value           `json:"interestRate"`

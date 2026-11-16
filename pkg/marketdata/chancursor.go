@@ -154,8 +154,7 @@ func (c *ChanCursor) Next() bool {
 	select {
 	case ev, ok := <-c.ch:
 		if !ok {
-			c.cur = nil
-			return false
+			return c.end()
 		}
 		c.cur = ev
 		return true
@@ -165,25 +164,43 @@ func (c *ChanCursor) Next() bool {
 	select {
 	case ev, ok := <-c.ch:
 		if !ok {
-			c.cur = nil
-			return false
+			return c.end()
 		}
 		c.cur = ev
 		return true
 
 	case <-c.done:
-		c.cur = nil
-		return false
+		return c.end()
 
 	case <-c.ctx.Done():
+		return c.end()
+	}
+}
+
+// end ends the iteration. A done context is reported as the error even when the
+// producer finished cleanly: it may have finished just before the cancellation
+// or because of it (a gRPC stream ends with a Canceled status), and either way
+// the consumer cancelled before it saw the end. Checking the context here,
+// rather than racing a closed channel against ctx.Done() in a select, makes
+// that outcome deterministic. A cursor closed by the consumer reports no error.
+func (c *ChanCursor) end() bool {
+	c.cur = nil
+
+	select {
+	case <-c.done:
+		return false
+	default:
+	}
+
+	if err := c.ctx.Err(); err != nil {
 		c.mu.Lock()
 		if c.err == nil {
-			c.err = c.ctx.Err()
+			c.err = err
 		}
 		c.mu.Unlock()
-		c.cur = nil
-		return false
 	}
+
+	return false
 }
 
 func (c *ChanCursor) Event() *Event { return c.cur }

@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	ID = "bitget"
+	ID = types.ExchangeBitget
 
 	PlatformToken = "BGB"
 

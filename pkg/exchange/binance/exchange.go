@@ -83,8 +83,10 @@ var testNet = false
 
 var debugMode = false
 
+const ID = types.ExchangeBinance
+
 var log = logrus.WithFields(logrus.Fields{
-	"exchange": "binance",
+	"exchange": ID,
 })
 
 func debugDummy(msg string, args ...any) {}

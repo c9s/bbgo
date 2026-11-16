@@ -68,6 +68,29 @@ Two sub-packages provide reusable test utilities:
 
 CI uses **revive** for linting and **golangci-lint** with: staticcheck, bodyclose, contextcheck, dupword, decorder, goconst, govet, gosec, misspell. Format with `gofmt -s -w`.
 
+## Pull Request Title Convention
+
+PR titles follow `TYPE: [scope] short imperative description`:
+
+- `TYPE` is uppercase. Common values: `FIX`, `FEATURE`, `REFACTOR`, `CHORE`, `DOCS`, `UPGRADE`, `PORT`, `MISC`, `TEST`.
+- `[scope]` is the primary package or strategy touched, e.g. `[xmaker]`, `[autoborrow]`, `[indicator/v2]`, `[ci]`.
+- Description stays lowercase and concise (no trailing period).
+
+Examples from the repo: `FIX: [autoborrow] enforce Binance minimum borrow quantity`, `FEATURE: [xmaker] add connectionDelay config to delay connectivity establishment`, `REFACTOR: [xfundingv2] refactor round transfer handling and remove retry logic`.
+
+## Agent Tooling
+
+`agent/` holds material for coding agents: `agent/design/` has the design
+records (the why behind a workflow, and the dead ends not worth repeating), and
+`agent/scripts/` has the helper scripts, each documented in
+`agent/scripts/README.md`.
+
+- **Why did CI fail?** Run `./agent/scripts/ci-logs.sh <pr-number>` rather than
+  hand-rolling `gh` pipelines. It classifies the failure (code, flaky test,
+  dependency, or a GitHub outage) and prints the command to reproduce it. See
+  `agent/design/0002-ci-log-inspection.md`; `gh run view --log-failed` is
+  unusable on this repository and the record explains why.
+
 ## Code Generation
 
 Several generators produce committed files — re-run and commit when touching their inputs:
@@ -170,7 +193,72 @@ Three facts that are easy to get wrong:
 Exercise it with `bbgo marketdata download | dump | record` — no database and no
 API key needed.
 
+## DeFi / On-Chain Layer
+
+`pkg/chain/evm` is the EVM access layer for Ethereum, BSC and Polygon, and
+`pkg/bbgo/chainsession.go` defines `ChainSession` (one chain + one address, the
+on-chain counterpart of `ExchangeSession`). Read
+`doc/development/defi-chain-layer.md` before touching it or adding a protocol
+adapter under `pkg/defi/`.
+
+Two rules that are easy to get wrong:
+
+- **Raw amounts are `*big.Int`, never `fixedpoint.Value`.** The default build of
+  `fixedpoint` is an int64 with 8 decimal places, so wei overflows it. Convert
+  only at the strategy/display boundary, via the token decimals.
+- **Token decimals are read from the chain.** USDT and USDC are 6 decimals on
+  Ethereum and 18 on BSC. `pkg/chain/evm/token` resolves and caches metadata;
+  batch multi-contract reads through `pkg/chain/evm/multicall` (Multicall3 is at
+  the same address on all three chains).
+
+Transaction sending lives in the same package (`evm.Sender`): one transaction in
+flight per address, locally counted nonces, mandatory `eth_call` simulation,
+`eth_feeHistory` pricing with an absolute ceiling, automatic same-nonce fee
+bumping, and confirmation via the `finalized` tag with a confirmation-count
+fallback. `TxResult.GasCost` stays a raw wei `*big.Int`.
+
+Exercise it with `bbgo chain info | balance | allowance`, and the write commands
+`bbgo chain send | approve`, which simulate unless `--confirm` is passed — no
+database and no exchange API key needed.
+
+## DeFi Protocol Adapters
+
+Protocol adapters live in `pkg/defi/<protocol>/` and are shaped like the
+contracts they wrap; there is deliberately no protocol-agnostic
+`Quoter`/`Swapper` interface yet. It gets extracted once Uniswap, Curve and
+Balancer all exist, because those three swap shapes differ too much to abstract
+in advance (router+pool vs. int128 coin index vs. vault poolId).
+
+- **Aave v3** — `doc/development/defi-aave-v3.md`. Read it before touching
+  `pkg/defi/aave/v3`. Only the `PoolAddressesProvider` is hardcoded, one address
+  per chain; everything else is resolved from it. The units are the trap:
+  account amounts are USD with 8 decimals (not token units), the health factor
+  is WAD and is max uint256 when there is no debt, and the rates are RAY
+  per-second values.
+
+- **Uniswap v3** — `doc/development/defi-uniswap-v3.md`. Read it before touching
+  `pkg/defi/uniswap/v3`, which also covers the v3 forks (PancakeSwap). Pool
+  addresses come from `Factory.getPool`, never from the CREATE2 derivation,
+  whose init code hash differs per fork. `QuoterV2` is declared `view` in this
+  package's ABI although it is `nonpayable` on chain, so it can be quoted with
+  `eth_call`. The fee ladders differ: Uniswap has 0.3%, PancakeSwap has 0.25%.
+  `sqrtPriceX96` must be scaled by `10^(decimals0-decimals1)` or a WBTC/USDC
+  pool reads 1e-12 off.
+
+Exercise them with `bbgo aave market | account` and `bbgo uniswap pools | quote`,
+plus the write commands `bbgo aave supply | withdraw | borrow | repay` and
+`bbgo uniswap swap`, which all need `--confirm`.
+
 ## Strategy Development
+
+Read `doc/development/strategy-layer-design.md` before adding a non-trivial
+mechanism to a strategy or changing a core API. In short: new mechanisms start
+inside the strategy that needs them, and are promoted into the core API
+(`pkg/bbgo`, `pkg/types`, `pkg/core`, `pkg/indicator`) only once their shape has
+stopped changing — the way the Slack notification layer, `pkg/indicator` and
+`bbgo.GeneralOrderExecutor` arrived. Strategy code itself should stay as small
+and plain as possible; the long-term goal is that a strategy is the trading idea
+and nothing else.
 
 1. Create package under `pkg/strategy/<name>/`
 2. Implement `SingleExchangeStrategy` or `CrossExchangeStrategy` interface

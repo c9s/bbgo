@@ -94,7 +94,7 @@ jobs:
         # which collapses the sixteen near-identical upload steps this had into
         # the one line below — the asset names are exactly what `make dist`
         # writes, so they no longer have to be restated here and kept in sync.
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: BBGO ${{ env.VERSION }}
           tag_name: ${{ github.ref }}

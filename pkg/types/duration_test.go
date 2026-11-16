@@ -75,3 +75,16 @@ func TestSerialization(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, d, d2)
 }
+
+func TestDurationRejectsEmptyString(t *testing.T) {
+	for name, decode := range map[string]func([]byte, interface{}) error{
+		"json": json.Unmarshal,
+		"yaml": yaml.Unmarshal,
+	} {
+		t.Run(name, func(t *testing.T) {
+			d := Duration(time.Minute)
+			assert.Error(t, decode([]byte(`""`), &d))
+			assert.Equal(t, Duration(time.Minute), d)
+		})
+	}
+}

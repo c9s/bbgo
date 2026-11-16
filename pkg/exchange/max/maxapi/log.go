@@ -1,7 +1,11 @@
 package maxapi
 
-import "github.com/sirupsen/logrus"
+import (
+	"github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/types"
+)
 
 var logger = logrus.WithFields(logrus.Fields{
-	"exchange": "max",
+	"exchange": types.ExchangeMax,
 })

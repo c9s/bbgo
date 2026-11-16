@@ -12,16 +12,12 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const ID types.ExchangeName = "bitfinex"
+const ID = types.ExchangeBitfinex
 
 func init() {
 	_ = types.Exchange(&Exchange{})
 	_ = types.ExchangeTradeHistoryService(&Exchange{})
 	_ = types.ExchangeOrderQueryService(&Exchange{})
-
-	if types.ExchangeBitfinex != ID {
-		panic(fmt.Sprintf("exchange ID mismatch: expected %s, got %s", types.ExchangeBitfinex, ID))
-	}
 }
 
 type Exchange struct {

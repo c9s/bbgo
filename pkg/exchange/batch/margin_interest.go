@@ -25,8 +25,7 @@ func (e *MarginInterestBatchQuery) Query(ctx context.Context, asset string, star
 			return time.Time(obj.(types.MarginInterest).Time)
 		},
 		ID: func(obj interface{}) string {
-			interest := obj.(types.MarginInterest)
-			return interest.Time.String()
+			return obj.(types.MarginInterest).Key()
 		},
 	}
 

@@ -13,3 +13,20 @@ func TestOmega(t *testing.T) {
 	output := Omega(a)
 	assert.InDelta(t, output, 1, 0.0001)
 }
+
+func TestOmegaExplicitThreshold(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		returns   floats.Slice
+		threshold float64
+		want      float64
+	}{
+		{"more gains than losses", floats.Slice{-0.1, 0.2}, 0, 2},
+		{"more losses than gains", floats.Slice{-0.2, 0.1}, 0, 0.5},
+		{"nonzero threshold", floats.Slice{0, 0.3}, 0.1, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.InDelta(t, tc.want, Omega(&tc.returns, tc.threshold), 0.0001)
+		})
+	}
+}

@@ -27,6 +27,7 @@ import (
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/notifier/telegramnotifier"
+	"github.com/c9s/bbgo/pkg/rpcexport"
 	"github.com/c9s/bbgo/pkg/service"
 	googleservice "github.com/c9s/bbgo/pkg/service/google"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
@@ -129,6 +130,14 @@ type Environment struct {
 	environmentConfig *EnvironmentConfig
 
 	sessions map[string]*ExchangeSession
+
+	chainSessions ChainSessionMap
+
+	// rpcRegistry holds every method bbgo components have exported for
+	// remote invocation over gRPC. Lives on Environment (not Trader)
+	// since it's the more fundamental, earlier-constructed object other
+	// components naturally have access to.
+	rpcRegistry *rpcexport.Registry
 }
 
 func NewEnvironment() *Environment {
@@ -137,10 +146,19 @@ func NewEnvironment() *Environment {
 		// default trade scan time
 		syncStartTime: now.AddDate(-1, 0, 0), // defaults to sync from 1 year ago
 		sessions:      make(map[string]*ExchangeSession),
+		chainSessions: make(ChainSessionMap),
 		startTime:     now,
 
 		syncStatus: SyncNotStarted,
+
+		rpcRegistry: rpcexport.NewRegistry(),
 	}
+}
+
+// RPCRegistry returns the registry of methods bbgo components have
+// exported for remote invocation over gRPC. Always non-nil.
+func (environ *Environment) RPCRegistry() *rpcexport.Registry {
+	return environ.rpcRegistry
 }
 
 func (environ *Environment) Logger() log.FieldLogger {
@@ -177,6 +195,40 @@ func (environ *Environment) SelectSessions(names ...string) map[string]*Exchange
 	}
 
 	return sessions
+}
+
+// ChainSession returns the on-chain session by name.
+func (environ *Environment) ChainSession(name string) (*ChainSession, bool) {
+	s, ok := environ.chainSessions[name]
+	return s, ok
+}
+
+func (environ *Environment) ChainSessions() ChainSessionMap {
+	return environ.chainSessions
+}
+
+func (environ *Environment) AddChainSession(name string, session *ChainSession) {
+	environ.chainSessions[name] = session
+}
+
+// ConfigureChainSessions initializes the on-chain sessions defined in the
+// config. Each session dials its RPC endpoints and verifies the chain id, so a
+// misconfigured endpoint fails here instead of much later.
+func (environ *Environment) ConfigureChainSessions(ctx context.Context, userConfig *Config) error {
+	for name, session := range userConfig.ChainSessions {
+		if err := session.Init(ctx, name); err != nil {
+			return err
+		}
+
+		environ.AddChainSession(name, session)
+	}
+
+	return nil
+}
+
+// CloseChainSessions releases the RPC connections of all chain sessions.
+func (environ *Environment) CloseChainSessions() {
+	environ.chainSessions.Close()
 }
 
 func (environ *Environment) ConfigureDatabase(ctx context.Context, config *Config) error {
@@ -370,6 +422,12 @@ func (environ *Environment) StartTime() time.Time {
 func (environ *Environment) SetSyncStartTime(t time.Time) *Environment {
 	environ.syncStartTime = t
 	return environ
+}
+
+// SyncStartTime returns the start time of the sync: sync.since after the
+// startup sync, otherwise the default of one year ago.
+func (environ *Environment) SyncStartTime() time.Time {
+	return environ.syncStartTime
 }
 
 func (environ *Environment) BindSync(config *SyncConfig) {
@@ -600,6 +658,7 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 
 		if userConfig.Sync.MarginHistory {
 			if err := environ.SyncService.SyncMarginHistory(ctx, session.Exchange,
+				session.Name,
 				since,
 				userConfig.Sync.MarginAssets...); err != nil {
 				return err

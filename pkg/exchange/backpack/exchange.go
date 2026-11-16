@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	ID = "backpack"
+	ID = types.ExchangeBackpack
 
 	// PlatformToken is the platform currency of Backpack. Backpack has no exchange token, and
 	// every market is quoted in USDC, so USDC is the closest equivalent.

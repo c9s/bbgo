@@ -35,7 +35,7 @@ var (
 )
 
 const (
-	ID                = "coinbase"
+	ID                = types.ExchangeCoinBase
 	PlatformToken     = "COIN"
 	PaginationLimit   = 1000
 	DefaultKLineLimit = 300

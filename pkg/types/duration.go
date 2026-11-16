@@ -107,7 +107,7 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 	switch t := o.(type) {
 	case string:
 		sd, err := ParseSimpleDuration(t)
-		if err == nil {
+		if err == nil && sd != nil {
 			*d = sd.Duration
 			return nil
 		}
@@ -149,7 +149,7 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	switch t := o.(type) {
 	case string:
 		sd, err := ParseSimpleDuration(t)
-		if err == nil {
+		if err == nil && sd != nil {
 			*d = sd.Duration
 			return nil
 		}

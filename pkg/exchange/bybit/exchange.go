@@ -28,6 +28,8 @@ const (
 	maxHistoricalDataQueryPeriod = 2 * 365 * 24 * time.Hour
 )
 
+const ID = types.ExchangeBybit
+
 // https://bybit-exchange.github.io/docs/zh-TW/v5/rate-limit
 // GET/POST method (shared): 120 requests per second for 5 consecutive seconds
 var (
@@ -37,7 +39,7 @@ var (
 	sharedRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
 
 	log = logrus.WithFields(logrus.Fields{
-		"exchange": "bybit",
+		"exchange": ID,
 	})
 
 	_ types.ExchangeAccountService    = &Exchange{}

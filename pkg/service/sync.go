@@ -71,7 +71,7 @@ func (s *SyncService) SyncSessionSymbols(
 }
 
 func (s *SyncService) SyncMarginHistory(
-	ctx context.Context, exchange types.Exchange, startTime time.Time, assets ...string,
+	ctx context.Context, exchange types.Exchange, sessionName string, startTime time.Time, assets ...string,
 ) error {
 	if _, implemented := exchange.(types.MarginHistoryService); !implemented {
 		log.Debugf("exchange %T does not support types.MarginHistoryService", exchange)
@@ -91,7 +91,7 @@ func (s *SyncService) SyncMarginHistory(
 
 	log.Infof("syncing %s margin history: %v...", exchange.Name(), assets)
 	for _, asset := range assets {
-		if err := s.MarginService.Sync(ctx, exchange, asset, startTime); err != nil {
+		if err := s.MarginService.Sync(ctx, exchange, sessionName, asset, startTime); err != nil {
 			return err
 		}
 	}

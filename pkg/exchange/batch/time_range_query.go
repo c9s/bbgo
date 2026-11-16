@@ -137,7 +137,16 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 
 				idMap[id] = struct{}{}
 
-				cRef.Send(item)
+				// the consumer may stop reading (cancelled or failed); a plain Send would block forever
+				chosen, _, _ := reflect.Select([]reflect.SelectCase{
+					{Dir: reflect.SelectSend, Chan: cRef, Send: item},
+					{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ctx.Done())},
+				})
+				if chosen == 1 {
+					errC <- ctx.Err()
+					return
+				}
+
 				sentAny = true
 				startTime = entryTime
 			}

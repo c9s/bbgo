@@ -23,7 +23,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var log = logrus.WithField("exchange", "max")
+const ID = types.ExchangeMax
+
+var log = logrus.WithField("exchange", ID)
 
 func init() {
 	_ = types.ExchangeTradeHistoryService(&Exchange{})

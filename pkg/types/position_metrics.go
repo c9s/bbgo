@@ -28,3 +28,15 @@ var positionUnrealizedProfitMetrics = promauto.NewGaugeVec(
 		Name: "bbgo_position_unrealized_profit",
 		Help: "bbgo position unrealized profit metrics",
 	}, []string{"strategy_id", "strategy_type", "symbol"})
+
+var positionRealizedProfitMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "bbgo_position_realized_profit",
+		Help: "bbgo position cumulative realized profit (gross, before fees)",
+	}, []string{"strategy_id", "strategy_type", "symbol"})
+
+var positionRealizedNetProfitMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "bbgo_position_realized_net_profit",
+		Help: "bbgo position cumulative realized net profit (after fees)",
+	}, []string{"strategy_id", "strategy_type", "symbol"})

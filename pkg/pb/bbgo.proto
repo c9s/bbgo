@@ -22,6 +22,16 @@ service TradingService {
   rpc QueryTrades(QueryTradesRequest) returns (QueryTradesResponse) {}
 }
 
+// CoreRPCService lets a caller discover and invoke methods bbgo has
+// exported for remote control (see pkg/rpcexport, pkg/bbgo.CoreRPC).
+// Every RPC on this service requires a bearer token (see the grpc
+// server's auth interceptor); the other services above are
+// unauthenticated.
+service CoreRPCService {
+  rpc ListMethods(ListMethodsRequest) returns (ListMethodsResponse) {}
+  rpc Invoke(InvokeRequest) returns (InvokeResponse) {}
+}
+
 enum Event {
   UNKNOWN = 0;
   SUBSCRIBED = 1;
@@ -277,4 +287,35 @@ message KLine {
   int64 start_time = 10;
   int64 end_time = 11;
   bool closed = 12;
+}
+
+message ListMethodsRequest {}
+
+message ParamSchema {
+  string name = 1;
+  string type = 2;
+}
+
+message MethodInfo {
+  string name = 1;
+  string description = 2;
+  bool mutating = 3;
+  repeated ParamSchema params = 4;
+}
+
+message ListMethodsResponse {
+  repeated MethodInfo methods = 1;
+  Error error = 2;
+}
+
+message InvokeRequest {
+  string method = 1;
+  // JSON array of positional parameters, e.g. "[\"BTCUSDT\", 1.5]"
+  string params_json = 2;
+}
+
+message InvokeResponse {
+  // JSON-encoded result of the call, if any.
+  string result_json = 1;
+  Error error = 2;
 }

@@ -228,6 +228,7 @@ apps/frontend/node_modules:
 	cd apps/frontend && yarn install
 
 apps/frontend/out/index.html: apps/frontend/node_modules
+	mkdir -p output
 	cd apps/frontend && yarn export
 
 pkg/server/assets.go: apps/frontend/out/index.html

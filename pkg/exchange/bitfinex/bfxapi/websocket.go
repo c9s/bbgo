@@ -18,7 +18,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var log = logrus.WithFields(logrus.Fields{"exchange": "bitfinex", "module": "bfxapi"})
+var log = logrus.WithFields(logrus.Fields{"exchange": types.ExchangeBitfinex, "module": "bfxapi"})
 
 /*
 Public channels should use the domain:
