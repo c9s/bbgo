@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
@@ -59,14 +60,6 @@ func NewStream(client *okexapi.RestClient, exchange *Exchange) *Stream {
 	}
 
 	stream.SetLogger(log)
-	switch {
-	case exchange.IsFutures:
-		stream.SetName("futures")
-	case exchange.MarginSettings.IsMargin:
-		stream.SetName("margin")
-	default:
-		stream.SetName("spot")
-	}
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.createEndpoint)
@@ -299,6 +292,13 @@ func (s *Stream) handleMarketTradeEvent(data []MarketTradeEvent) {
 
 		s.EmitMarketTrade(trade)
 	}
+}
+
+// SetLogger sets the base logger of the stream and of its k-line stream, which adds the
+// "endpoint" field to tell its connection apart. It should be called before Connect.
+func (s *Stream) SetLogger(logger logrus.FieldLogger) {
+	s.StandardStream.SetLogger(logger)
+	s.kLineStream.SetLogger(logger.WithField("endpoint", "business"))
 }
 
 func (s *Stream) createEndpoint(ctx context.Context) (string, error) {

@@ -100,7 +100,6 @@ func NewStream(
 		marketInfoMap:       make(map[string]*api.MarketInfo),
 	}
 	s.SetLogger(s.logger)
-	s.SetName("spot")
 	s.SetParser(parseMessage)
 	s.SetDispatcher(s.dispatchEvent)
 	s.SetEndpointCreator(s.createEndpoint)

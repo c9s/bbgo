@@ -463,6 +463,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 	// override the default logger
 	session.logger = logger
+	session.setStreamLoggers()
 
 	// load markets first
 	logger.Infof("querying market info from %s...", session.Name)
@@ -1239,6 +1240,17 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	session.initializedSymbols = make(map[string]struct{})
 	session.logger = log.WithField("session", name)
 	return nil
+}
+
+// setStreamLoggers passes the session logger to the streams, so that the connection logs
+// (connected, disconnected, reconnecting...) tell which session they belong to.
+func (session *ExchangeSession) setStreamLoggers() {
+	logger := session.logger.WithField("exchange", session.ExchangeName.String())
+	for _, stream := range []types.Stream{session.UserDataStream, session.MarketDataStream} {
+		if setter, ok := stream.(types.StreamLoggerSetter); ok {
+			setter.SetLogger(logger)
+		}
+	}
 }
 
 func (session *ExchangeSession) MarginType() types.MarginType {

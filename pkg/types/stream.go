@@ -93,12 +93,8 @@ type StandardStream struct {
 
 	PublicOnly bool
 
-	// logger is the base logger of the stream logs, set by the exchange adapter (usually its
-	// package logger with the exchange field). nil uses the standard logger.
+	// logger is the base logger of the stream logs, see SetLogger. nil uses the standard logger.
 	logger log.FieldLogger
-
-	// name is the "stream_name" log field: the connection of the exchange adapter, e.g. "futures".
-	name string
 
 	// sg is used to wait until the previous routines are closed.
 	// only handle routines used internally, avoid including external callback func to prevent issues if they have
@@ -622,17 +618,23 @@ func (s *StandardStream) String() string {
 	return ss
 }
 
-// SetLogger sets the base logger of the stream logs; every log line adds the "stream" and
-// "stream_name" fields to it. Exchange adapters pass their package (or stream) logger so that the
-// logs carry the exchange. It should be called before Connect.
-func (s *StandardStream) SetLogger(logger log.FieldLogger) {
-	s.logger = logger
+// StreamLoggerSetter is implemented by the streams that take their logger from the owner.
+// StandardStream implements it, so every exchange stream embedding it does too.
+type StreamLoggerSetter interface {
+	SetLogger(logger log.FieldLogger)
 }
 
-// SetName sets the "stream_name" log field, which tells the connections of an exchange adapter
-// apart, e.g. "spot", "futures" or "futures_public" (snake_case). It should be called before Connect.
-func (s *StandardStream) SetName(name string) {
-	s.name = name
+// SetLogger sets the base logger of the stream logs. It carries the identity of the stream,
+// which the stream itself does not know: the exchange adapter passes its package logger (the
+// "exchange" field) and the owner of the stream, e.g. the exchange session, replaces it with a
+// logger that also has the "session" field. The stream only adds the "stream" field to it.
+//
+// A stream that opens more connections (side streams) should override SetLogger and pass the
+// logger on, with a field that tells the connections apart.
+//
+// It should be called before Connect.
+func (s *StandardStream) SetLogger(logger log.FieldLogger) {
+	s.logger = logger
 }
 
 // kind is the "stream" log field: "public" or "user_data".
@@ -649,11 +651,7 @@ func (s *StandardStream) getLogger() log.FieldLogger {
 		logger = s.logger
 	}
 
-	fields := log.Fields{"stream": s.kind()}
-	if s.name != "" {
-		fields["stream_name"] = s.name
-	}
-	return logger.WithFields(fields)
+	return logger.WithField("stream", s.kind())
 }
 
 // SetHeartBeat installs a custom heartbeat function executed before each ping.

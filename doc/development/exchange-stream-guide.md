@@ -524,6 +524,27 @@ Two established patterns for exchanges that split channels across endpoints:
   (`initFuturesAuxStream`) reusing the parent's parser and dispatcher, dialed from the
   parent's `handleConnect`. Cheaper when the event handling is identical.
 
+### Logging
+
+`StandardStream` logs its connection events (connected, closing, reconnecting, read errors)
+through the logger given to `SetLogger`, and adds one field of its own: `stream`, which is
+`public` or `user_data`. The stream does not know who it belongs to, so the identity comes
+from outside:
+
+- The adapter calls `stream.SetLogger(log)` in `NewStream` with its package logger, which
+  carries the `exchange` field. This is the fallback for streams created outside a session.
+- `ExchangeSession` then replaces it with the session logger (`session` and `exchange`
+  fields) on both of its streams, through the optional `types.StreamLoggerSetter` interface.
+
+Do not put the market or the account type (spot, margin, futures) into a stream log field;
+that is a property of the session, and the `session` field already identifies it.
+
+A stream that opens side connections must override `SetLogger` and pass the logger on with
+an `endpoint` field, so the connections can be told apart: okex tags its k-line stream
+`endpoint=business`, binance tags the futures aux stream `endpoint=public` and the account
+status stream `endpoint=ws_api`. The value is a fixed name, never taken from the dialed URL,
+which can contain a listen key.
+
 ---
 
 ## 8. Order book handling

@@ -35,7 +35,6 @@ func TestStandardStream_LoggerFields(t *testing.T) {
 
 	s := NewStandardStream()
 	s.SetLogger(logger.WithField("exchange", "test"))
-	s.SetName("futures_public")
 	s.SetEndpointCreator(func(ctx context.Context) (string, error) { return wsURL, nil })
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -47,16 +46,15 @@ func TestStandardStream_LoggerFields(t *testing.T) {
 	require.NotNil(t, connected, "no connected log entry in %v", messages(hook.AllEntries()))
 	assert.Equal(t, "test", connected.Data["exchange"])
 	assert.Equal(t, "user_data", connected.Data["stream"])
-	assert.Equal(t, "futures_public", connected.Data["stream_name"])
+	assert.NotContains(t, connected.Data, "stream_name")
 
 	closing := findEntry(hook.AllEntries(), "[websocket] closing user data stream...")
 	require.NotNil(t, closing, "no closing log entry in %v", messages(hook.AllEntries()))
 	assert.Equal(t, "test", closing.Data["exchange"])
 	assert.Equal(t, "user_data", closing.Data["stream"])
-	assert.Equal(t, "futures_public", closing.Data["stream_name"])
 }
 
-// without SetLogger and SetName: the standard logger, the stream field, and no stream_name
+// without SetLogger: the standard logger and the stream field
 func TestStandardStream_DefaultLogger(t *testing.T) {
 	hook := test.NewGlobal()
 	defer hook.Reset()
@@ -68,7 +66,6 @@ func TestStandardStream_DefaultLogger(t *testing.T) {
 	entry := hook.LastEntry()
 	require.NotNil(t, entry)
 	assert.Equal(t, "public", entry.Data["stream"])
-	assert.NotContains(t, entry.Data, "stream_name")
 }
 
 func findEntry(entries []*logrus.Entry, message string) *logrus.Entry {

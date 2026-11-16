@@ -80,7 +80,6 @@ func NewStream(key, secret string, userDataProvider StreamDataProvider) *Stream 
 	}
 
 	stream.SetLogger(log)
-	stream.SetName("spot")
 	stream.SetEndpointCreator(stream.createEndpoint)
 	stream.SetParser(stream.parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
