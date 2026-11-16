@@ -76,7 +76,7 @@ var interestEstimateCompleteMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpt
 
 var interestEstimateErrorsMetrics = prometheus.NewCounterVec(prometheus.CounterOpts{
 	Name: "autoborrow_interest_estimate_errors_total",
-	Help: "interest estimate errors by kind: account, rate, price, sync, query",
+	Help: "interest estimate errors by kind: account, rate, price, sync, value, query",
 }, []string{"session", "exchange", "kind"})
 
 var interestRollingProjectedAmountMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{

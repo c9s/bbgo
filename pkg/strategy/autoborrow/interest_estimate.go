@@ -113,9 +113,34 @@ func (c *InterestEstimateConfig) syncInterval() time.Duration {
 	return defaultInterestSyncInterval
 }
 
+// marginHistoryStore syncs the raw interest rows, values them in USDT and
+// queries the valued rows
 type marginHistoryStore interface {
 	SyncInterests(ctx context.Context, ex types.Exchange, session, asset string, startTime time.Time) error
-	QueryInterests(ctx context.Context, opts service.QueryMarginInterestOptions) ([]types.MarginInterest, error)
+	ValueInterests(ctx context.Context, ex types.Exchange, session string, since time.Time) error
+	QueryValuations(ctx context.Context, opts service.QueryMarginInterestValuationOptions) ([]types.MarginInterestValuation, error)
+}
+
+// marginHistory is the marginHistoryStore of the environment: margin_interests
+// holds the rows as the exchange returns them, margin_interest_valuations their
+// USDT value at charge time
+type marginHistory struct {
+	margin     *service.MarginService
+	valuations *service.MarginInterestValuationService
+}
+
+func (h *marginHistory) SyncInterests(ctx context.Context, ex types.Exchange, session, asset string, startTime time.Time) error {
+	return h.margin.SyncInterests(ctx, ex, session, asset, startTime)
+}
+
+func (h *marginHistory) ValueInterests(ctx context.Context, ex types.Exchange, session string, since time.Time) error {
+	return h.valuations.Sync(ctx, ex, session, since)
+}
+
+func (h *marginHistory) QueryValuations(
+	ctx context.Context, opts service.QueryMarginInterestValuationOptions,
+) ([]types.MarginInterestValuation, error) {
+	return h.valuations.Query(ctx, opts)
 }
 
 // sessionSyncLocks keeps two autoborrow instances from syncing the same session at once.
@@ -223,9 +248,12 @@ func newInterestEstimateWorker(s *Strategy, session *bbgo.ExchangeSession, confi
 		w.interestQueryService = service
 	}
 
-	// do not put a typed nil *MarginService into the interface
-	if s.Environment != nil && s.Environment.MarginService != nil {
-		w.history = s.Environment.MarginService
+	// do not put a marginHistory with nil services into the interface
+	if s.Environment != nil && s.Environment.MarginService != nil && s.Environment.MarginInterestValuationService != nil {
+		w.history = &marginHistory{
+			margin:     s.Environment.MarginService,
+			valuations: s.Environment.MarginInterestValuationService,
+		}
 		w.syncSince = s.Environment.SyncStartTime()
 	}
 
@@ -415,14 +443,14 @@ func (w *interestEstimateWorker) queryRealized(
 	// r ends after the current hour, so the charge at floor(now) and a borrow-time
 	// row stamped inside the current hour are realized
 
-	rows, err := w.history.QueryInterests(ctx, service.QueryMarginInterestOptions{
+	rows, err := w.history.QueryValuations(ctx, service.QueryMarginInterestValuationOptions{
 		Exchange: w.session.ExchangeName,
 		Session:  w.session.Name,
 		Since:    r.Start,
 		Until:    r.End,
 	})
 	if err != nil {
-		w.logger.WithError(err).Warnf("interest estimate: unable to query margin interests")
+		w.logger.WithError(err).Warnf("interest estimate: unable to query margin interest valuations")
 		w.countError("query")
 		return empty, false, nil
 	}
@@ -435,10 +463,10 @@ func (w *interestEstimateWorker) queryRealized(
 	counted := rows[:0:0]
 	others := map[string]struct{}{}
 	for _, row := range rows {
-		if _, ok := configured[row.Asset]; ok {
+		if _, ok := configured[row.PaidAsset]; ok {
 			counted = append(counted, row)
 		} else {
-			others[row.Asset] = struct{}{}
+			others[row.PaidAsset] = struct{}{}
 		}
 	}
 
@@ -472,6 +500,13 @@ func (w *interestEstimateWorker) syncHistory(ctx context.Context, now, rangeStar
 
 		delete(w.syncFailed, asset)
 		w.synced[asset] = now
+	}
+
+	// value the rows of the realized range; a row that cannot be priced yet is
+	// stored unpriced, marks its asset's price missing and is retried next sync
+	if err := w.history.ValueInterests(sctx, w.session.Exchange, w.session.Name, rangeStart); err != nil {
+		w.logger.WithError(err).Warnf("interest estimate: unable to value margin interests")
+		w.countError("value")
 	}
 }
 

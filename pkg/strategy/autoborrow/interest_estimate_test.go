@@ -50,8 +50,10 @@ type syncCall struct {
 type fakeHistoryStore struct {
 	syncs    []syncCall
 	syncErr  map[string]error
-	queries  []service.QueryMarginInterestOptions
-	rows     []types.MarginInterest
+	values   []syncCall
+	valueErr error
+	queries  []service.QueryMarginInterestValuationOptions
+	rows     []types.MarginInterestValuation
 	queryErr error
 }
 
@@ -60,14 +62,21 @@ func (f *fakeHistoryStore) SyncInterests(_ context.Context, _ types.Exchange, se
 	return f.syncErr[asset]
 }
 
-// QueryInterests returns the rows in [Since, Until), like MarginService
-func (f *fakeHistoryStore) QueryInterests(_ context.Context, opts service.QueryMarginInterestOptions) ([]types.MarginInterest, error) {
+func (f *fakeHistoryStore) ValueInterests(_ context.Context, _ types.Exchange, session string, since time.Time) error {
+	f.values = append(f.values, syncCall{session: session, start: since})
+	return f.valueErr
+}
+
+// QueryValuations returns the rows in [Since, Until), like MarginInterestValuationService
+func (f *fakeHistoryStore) QueryValuations(
+	_ context.Context, opts service.QueryMarginInterestValuationOptions,
+) ([]types.MarginInterestValuation, error) {
 	f.queries = append(f.queries, opts)
 	if f.queryErr != nil {
 		return nil, f.queryErr
 	}
 
-	var rows []types.MarginInterest
+	var rows []types.MarginInterestValuation
 	for _, row := range f.rows {
 		if t := row.Time.Time(); !t.Before(opts.Since) && t.Before(opts.Until) {
 			rows = append(rows, row)
@@ -187,8 +196,21 @@ func configured(assets ...string) []MarginAssetConfig {
 	return out
 }
 
-func usdtRow(at time.Time, interest string) types.MarginInterest {
-	return types.MarginInterest{Asset: "USDT", Interest: Number(interest), Time: types.Time(at)}
+func usdtRow(at time.Time, interest string) types.MarginInterestValuation {
+	return valuedRow("USDT", interest, "1", at)
+}
+
+// valuedRow is a valued interest row; priceInUSDT "" leaves it unpriced
+func valuedRow(asset, interest, priceInUSDT string, at time.Time) types.MarginInterestValuation {
+	row := types.MarginInterestValuation{
+		PaidAsset: asset, BorrowedAsset: asset, Interest: Number(interest), Time: types.Time(at),
+	}
+	if priceInUSDT != "" {
+		price := Number(priceInUSDT)
+		usdt := row.Interest.Mul(price)
+		row.PriceInUSDT, row.InterestUSDT = &price, &usdt
+	}
+	return row
 }
 
 func TestInterestEstimate_ProjectionAndRealized(t *testing.T) {
@@ -198,7 +220,7 @@ func TestInterestEstimate_ProjectionAndRealized(t *testing.T) {
 	)
 	// ETH is configured but not borrowed: its rate is reported, its interest is 0
 	rates := &fakeRateService{rates: map[string]string{"BTC": "0.00000417", "ETH": "0.000002", "USDT": "0.00000417"}}
-	history := &fakeHistoryStore{rows: []types.MarginInterest{
+	history := &fakeHistoryStore{rows: []types.MarginInterestValuation{
 		usdtRow(time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), "0.00417"),
 		// exactly at the current hour: realized, not projected
 		usdtRow(time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC), "0.00417"),
@@ -516,7 +538,7 @@ func TestInterestEstimate_RollingMonths(t *testing.T) {
 	)
 	rates := &fakeRateService{rates: map[string]string{"BTC": "0.000001", "USDT": "0.000002", "PEPE": "0.000001"}}
 	// realized rows do not count in a rolling projection
-	history := &fakeHistoryStore{rows: []types.MarginInterest{usdtRow(time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), "5")}}
+	history := &fakeHistoryStore{rows: []types.MarginInterestValuation{usdtRow(time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), "5")}}
 	w := newTestInterestWorker(t, account, rates, history, configured("BTC", "PEPE", "USDT")...)
 
 	est := w.tick(context.Background())
@@ -587,8 +609,8 @@ func TestInterestEstimate_ConfiguredAssetsAreSyncedWithoutDebt(t *testing.T) {
 	// nothing is borrowed now, but BTC was borrowed and repaid between two ticks
 	account := newTestAccount(Number(10))
 	rates := &fakeRateService{rates: map[string]string{"BTC": "0.000001", "USDT": "0.000002"}}
-	history := &fakeHistoryStore{rows: []types.MarginInterest{
-		{Asset: "BTC", Interest: Number("0.00001"), PriceInUSDT: Number(60000), Time: types.Time(time.Date(2026, 11, 15, 9, 0, 0, 0, time.UTC))},
+	history := &fakeHistoryStore{rows: []types.MarginInterestValuation{
+		valuedRow("BTC", "0.00001", "60000", time.Date(2026, 11, 15, 9, 0, 0, 0, time.UTC)),
 	}}
 	w := newTestInterestWorker(t, account, rates, history, configured("USDT", "BTC")...)
 
@@ -614,10 +636,10 @@ func TestInterestEstimate_UnconfiguredAssetsAreNotCounted(t *testing.T) {
 		debtBalance("DOGE", fixedpoint.Zero, Number(100)),
 	)
 	rates := &fakeRateService{rates: map[string]string{"USDT": "0.000001", "DOGE": "0.000001"}}
-	history := &fakeHistoryStore{rows: []types.MarginInterest{
+	history := &fakeHistoryStore{rows: []types.MarginInterestValuation{
 		usdtRow(time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC), "0.001"),
 		// synced by `bbgo sync`, e.g. sync.marginAssets
-		{Asset: "ETH", Interest: Number("0.001"), PriceInUSDT: Number(3000), Time: types.Time(time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC))},
+		valuedRow("ETH", "0.001", "3000", time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)),
 	}}
 	w := newTestInterestWorker(t, account, rates, history, configured("USDT")...)
 
@@ -648,7 +670,7 @@ func TestInterestEstimate_TopOfHourChargeIsRealizedOnly(t *testing.T) {
 	h10 := time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC)
 	account := newTestAccount(Number(10), debtBalance("USDT", fixedpoint.Zero, Number(1000)))
 	rates := &fakeRateService{rates: map[string]string{"USDT": "0.000001"}}
-	history := &fakeHistoryStore{rows: []types.MarginInterest{
+	history := &fakeHistoryStore{rows: []types.MarginInterestValuation{
 		usdtRow(h10, "0.001"),
 		// a charge the host has not reached yet, e.g. a clock behind Binance
 		usdtRow(h10.Add(time.Hour), "0.001"),
@@ -720,4 +742,59 @@ func TestInterestEstimate_RollingCompleteInTheLastHourOfTheMonth(t *testing.T) {
 	// the rolling windows still project PEPE, which has no price
 	assert.False(t, est.RollingComplete)
 	assert.Equal(t, map[string]float64{"720": 0, "2160": 0}, rollingSeries(t, w, "autoborrow_interest_rolling_projection_complete"))
+}
+
+func TestInterestEstimate_ValuesTheRealizedRangeAfterTheSync(t *testing.T) {
+	account := newTestAccount(Number(10), debtBalance("USDT", fixedpoint.Zero, Number(1000)))
+	rates := &fakeRateService{rates: map[string]string{"USDT": "0.000001"}}
+	history := &fakeHistoryStore{}
+	w := newTestInterestWorker(t, account, rates, history, configured("USDT")...)
+	w.syncSince = time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+
+	w.tick(context.Background())
+
+	// the raw rows sync from the full sync start, the valuation only covers the month
+	require.Len(t, history.values, 1)
+	assert.Equal(t, w.session.Name, history.values[0].session)
+	assert.Equal(t, time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), history.values[0].start)
+	assert.Equal(t, w.syncSince, history.syncs[0].start)
+
+	// not again before the sync interval
+	w.tick(context.Background())
+	assert.Len(t, history.values, 1)
+}
+
+func TestInterestEstimate_ValuationErrorIsCounted(t *testing.T) {
+	account := newTestAccount(Number(10), debtBalance("USDT", fixedpoint.Zero, Number(1000)))
+	rates := &fakeRateService{rates: map[string]string{"USDT": "0.000001"}}
+	history := &fakeHistoryStore{
+		valueErr: errors.New("kline api down"),
+		rows:     []types.MarginInterestValuation{usdtRow(time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC), "0.001")},
+	}
+	w := newTestInterestWorker(t, account, rates, history, configured("USDT")...)
+
+	est := w.tick(context.Background())
+
+	// the rows valued before still count; an unpriced one would mark the price missing
+	assert.Equal(t, 1.0, errorCount(t, w, "value"))
+	assert.InDelta(t, 0.001, est.Realized.TotalUSDT.Float64(), 1e-12)
+	assert.True(t, est.Complete)
+}
+
+func TestInterestEstimate_UnpricedRowIsIncomplete(t *testing.T) {
+	account := newTestAccount(Number(10))
+	rates := &fakeRateService{rates: map[string]string{"BTC": "0.000001"}}
+	history := &fakeHistoryStore{rows: []types.MarginInterestValuation{
+		valuedRow("BTC", "0.00001", "60000", time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)),
+		// its kline is not synced yet
+		valuedRow("BTC", "0.00001", "", time.Date(2026, 11, 2, 1, 0, 0, 0, time.UTC)),
+	}}
+	w := newTestInterestWorker(t, account, rates, history, configured("BTC")...)
+
+	est := w.tick(context.Background())
+
+	assert.Equal(t, []string{"BTC"}, est.Realized.MissingPrice)
+	assert.InDelta(t, 0.00002, est.Realized.Assets["BTC"].Interest.Float64(), 1e-12)
+	assert.InDelta(t, 0.6, est.Realized.TotalUSDT.Float64(), 1e-6)
+	assert.False(t, est.Complete)
 }
