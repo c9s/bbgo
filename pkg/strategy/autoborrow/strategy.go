@@ -89,6 +89,10 @@ type Strategy struct {
 	// and the projections over the next rolling months of 30 x 24 hours
 	InterestEstimate *InterestEstimateConfig `json:"interestEstimate,omitempty"`
 
+	// InterestBudgetAlert alerts when a budget of interestEstimate.budget is
+	// exceeded or projected to be exceeded. It needs a budget.
+	InterestBudgetAlert *InterestBudgetAlertConfig `json:"interestBudgetAlert,omitempty"`
+
 	ExchangeSession *bbgo.ExchangeSession
 
 	// Environment is injected; its MarginService provides the realized interest
@@ -110,14 +114,23 @@ func (s *Strategy) Defaults() error {
 	return nil
 }
 
-// Validate checks the interest estimate config, if set
+// Validate checks the interest estimate config and the interest budget alert, if set
 func (s *Strategy) Validate() error {
 	if s.InterestEstimate != nil {
 		if err := s.InterestEstimate.Validate(); err != nil {
 			return err
 		}
-		return s.InterestEstimate.validateBudgetAssets(s.getAssetStringSlice())
+
+		if err := s.InterestEstimate.validateBudgetAssets(s.getAssetStringSlice()); err != nil {
+			return err
+		}
 	}
+
+	// an alert needs a budget to watch: do not ignore it silently
+	if s.InterestBudgetAlert != nil && (s.InterestEstimate == nil || !s.InterestEstimate.hasBudget()) {
+		return fmt.Errorf("interestBudgetAlert is set but no interest budget is, set interestEstimate.budget")
+	}
+
 	return nil
 }
 

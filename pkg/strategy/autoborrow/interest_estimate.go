@@ -382,6 +382,9 @@ type interestEstimateWorker struct {
 	// only to log a status change once instead of on every tick. The key is the
 	// asset, or sessionBudgetKey for the budget of the session.
 	budgetStatus map[string]margininterest.BudgetStatus
+
+	// budgetAlerter raises the interest budget alert, nil when interestBudgetAlert is not set
+	budgetAlerter *interestBudgetAlerter
 }
 
 // sessionBudgetKey is the key of the session budget in budgetStatus; no asset has an empty name
@@ -399,6 +402,10 @@ func newInterestEstimateWorker(s *Strategy, session *bbgo.ExchangeSession, confi
 		labels:     make(map[*prometheus.GaugeVec]map[string][]string),
 
 		budgetStatus: make(map[string]margininterest.BudgetStatus),
+	}
+
+	if s.InterestBudgetAlert != nil && config.hasBudget() {
+		w.budgetAlerter = newInterestBudgetAlerter(session, s.InterestBudgetAlert)
 	}
 
 	w.feeAsset = service.MarginInterestFeeAsset(session.ExchangeName)
@@ -550,6 +557,9 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 
 	w.log(est, rates)
 	w.publish(est)
+	if w.budgetAlerter != nil {
+		w.budgetAlerter.update(est)
+	}
 	return est
 }
 
