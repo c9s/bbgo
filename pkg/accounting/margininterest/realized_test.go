@@ -11,6 +11,15 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// bnbPaid is a valued hourly charge on borrowed, paid in BNB: nominal is the
+// borrowed-asset interest, principal x daily rate / 24
+func bnbPaid(borrowed, nominal, bnbInterest, bnbPrice string, at time.Time) types.MarginInterestValuation {
+	row := interestRow("BNB", bnbInterest, bnbPrice, at)
+	n := Number(nominal)
+	row.BorrowedAsset, row.Converted, row.BorrowedInterest = borrowed, true, &n
+	return row
+}
+
 // interestRow is a valued row; priceInUSDT "" leaves it unpriced
 func interestRow(asset, interest, priceInUSDT string, at time.Time) types.MarginInterestValuation {
 	row := types.MarginInterestValuation{
@@ -19,6 +28,8 @@ func interestRow(asset, interest, priceInUSDT string, at time.Time) types.Margin
 		Interest:      Number(interest),
 		Time:          types.Time(at),
 	}
+	borrowed := row.Interest
+	row.BorrowedInterest = &borrowed
 	if priceInUSDT != "" {
 		price := Number(priceInUSDT)
 		usdt := row.Interest.Mul(price)
@@ -79,17 +90,63 @@ func TestSumRealized(t *testing.T) {
 			},
 		},
 		{
-			// the price of the paid asset, BNB, not of the borrowed one
-			name: "converted row is valued in the paid asset", mode: PriceModeCharged,
+			// one hour of BNB deduction: a row per borrowed asset, all paid in BNB
+			name: "bnb-paid rows count toward the borrowed asset", mode: PriceModeCharged,
+			rows: []types.MarginInterestValuation{
+				bnbPaid("BTC", "0.000005", "0.000003", "600", h10),
+				bnbPaid("ETH", "0.0001", "0.000001", "600", h10),
+			},
+			wantUSDT: 0.0024,
+			check: func(t *testing.T, r Realized) {
+				assert.NotContains(t, r.Assets, "BNB")
+				btc := r.Assets["BTC"]
+				assert.Equal(t, 1, btc.Rows)
+				assert.InDelta(t, 0.000005, btc.Interest.Float64(), tol)
+				assert.InDelta(t, 0.000003, btc.Charged["BNB"].Float64(), tol)
+				// valued at the BNB charged, not at the nominal BTC
+				assert.InDelta(t, 0.0018, btc.USDT.Float64(), tol)
+				assert.InDelta(t, 0.0001, r.Assets["ETH"].Interest.Float64(), tol)
+			},
+		},
+		{
+			// some hours paid in the asset, some in BNB: both charged amounts are kept apart
+			name: "mixed payment, current price", mode: PriceModeCurrent,
+			rows: []types.MarginInterestValuation{
+				interestRow("BTC", "0.00000209", "", h10),
+				bnbPaid("BTC", "0.000005", "0.000003", "", h11),
+			},
+			pricer:   fixedPrices(map[string]string{"BTC": "62000", "BNB": "600"}),
+			wantUSDT: 0.00000209*62000 + 0.0018,
+			check: func(t *testing.T, r Realized) {
+				btc := r.Assets["BTC"]
+				assert.InDelta(t, 0.00000209+0.000005, btc.Interest.Float64(), tol)
+				assert.InDelta(t, 0.00000209, btc.Charged["BTC"].Float64(), tol)
+				assert.InDelta(t, 0.000003, btc.Charged["BNB"].Float64(), tol)
+				assert.True(t, btc.PriceOK)
+			},
+		},
+		{
+			name: "current price of the paid asset unknown", mode: PriceModeCurrent,
+			rows:     []types.MarginInterestValuation{bnbPaid("BTC", "0.000005", "0.000003", "", h10)},
+			pricer:   btcPrice,
+			wantUSDT: 0, wantMissing: []string{"BTC"},
+		},
+		{
+			name: "unpriced bnb-paid row", mode: PriceModeCharged,
+			rows:     []types.MarginInterestValuation{bnbPaid("BTC", "0.000005", "0.000003", "", h10)},
+			wantUSDT: 0, wantMissing: []string{"BTC"},
+		},
+		{
+			// a converted row without rawAsset cannot be attributed
+			name: "unknown borrowed asset is left out", mode: PriceModeCharged,
 			rows: []types.MarginInterestValuation{func() types.MarginInterestValuation {
-				row := interestRow("BNB", "0.0001", "600", h10)
-				row.BorrowedAsset, row.Converted = "BTC", true
+				row := interestRow("BNB", "0.000003", "600", h10)
+				row.BorrowedAsset, row.Converted, row.BorrowedInterest = "", true, nil
 				return row
 			}()},
-			wantUSDT: 0.06,
+			wantUSDT: 0,
 			check: func(t *testing.T, r Realized) {
-				assert.Contains(t, r.Assets, "BNB")
-				assert.NotContains(t, r.Assets, "BTC")
+				assert.Empty(t, r.Assets)
 			},
 		},
 		{

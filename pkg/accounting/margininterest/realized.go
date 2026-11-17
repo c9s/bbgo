@@ -37,21 +37,29 @@ func (m PriceMode) OrDefault() PriceMode {
 	return m
 }
 
-// AssetRealized is the interest already charged on one asset in a range
+// AssetRealized is the interest already charged on one borrowed asset in a range
 type AssetRealized struct {
+	// Asset is the borrowed asset (MarginInterestValuation.BorrowedAsset)
 	Asset string
 
-	// Interest is the summed interest in asset units
+	// Interest is the summed interest in Asset units, however it was paid: a row
+	// paid in another asset (e.g. BNB) counts at its BorrowedInterest, the
+	// nominal principal x rate
 	Interest fixedpoint.Value
 
+	// Charged is what was actually charged, per paid asset: Asset itself, or
+	// e.g. BNB for interest paid with BNB deduction
+	Charged map[string]fixedpoint.Value
+
+	// USDT values Charged, so a discount of paying in another asset is included
 	USDT fixedpoint.Value
 	Rows int
 
-	// PriceOK is false if any row (charged) or the asset (current) could not be priced
+	// PriceOK is false if any row (charged) or any paid asset (current) could not be priced
 	PriceOK bool
 }
 
-// Realized is the interest already charged in a range, per asset and in total
+// Realized is the interest already charged in a range, per borrowed asset and in total
 type Realized struct {
 	Mode         PriceMode
 	Assets       map[string]AssetRealized
@@ -59,15 +67,19 @@ type Realized struct {
 	MissingPrice []string
 }
 
-// SumRealized sums the valued interest rows per paid asset and values them in USDT.
+// SumRealized sums the valued interest rows per borrowed asset and values them
+// in USDT. A row paid in another asset (e.g. BNB) counts toward its
+// BorrowedAsset. A row whose borrowed asset is unknown (BorrowedAsset empty or no
+// BorrowedInterest) cannot be attributed and is left out: the caller filters
+// and reports those.
 //
 // The rows are not deduplicated: there is one valuation per margin_interests
 // row, and margin_interests stores each charge once (its tx_id is unique).
 //
-// current: USDT = sum(interest) x pricer(asset).
-// charged: USDT = sum(row.InterestUSDT). A row without InterestUSDT is left out
-// of USDT (its Interest still counts) and marks the asset missing.
-// USDT always uses price 1.
+// current: USDT = sum over paid assets of Charged[paid] x pricer(paid).
+// charged: USDT = sum(row.InterestUSDT), the value of the paid asset when it
+// was charged. A row without InterestUSDT is left out of USDT (its amounts
+// still count) and marks the borrowed asset missing. USDT always uses price 1.
 func SumRealized(rows []types.MarginInterestValuation, mode PriceMode, pricer PriceFunc) Realized {
 	mode = mode.OrDefault()
 	r := Realized{
@@ -77,18 +89,33 @@ func SumRealized(rows []types.MarginInterestValuation, mode PriceMode, pricer Pr
 	}
 
 	for _, row := range rows {
-		asset := row.PaidAsset
-		ar, ok := r.Assets[asset]
-		if !ok {
-			ar = AssetRealized{Asset: asset, Interest: fixedpoint.Zero, USDT: fixedpoint.Zero, PriceOK: true}
+		asset := row.BorrowedAsset
+		if asset == "" || row.BorrowedInterest == nil {
+			continue
 		}
 
-		ar.Interest = ar.Interest.Add(row.Interest)
+		ar, ok := r.Assets[asset]
+		if !ok {
+			ar = AssetRealized{
+				Asset:    asset,
+				Interest: fixedpoint.Zero,
+				Charged:  make(map[string]fixedpoint.Value),
+				USDT:     fixedpoint.Zero,
+				PriceOK:  true,
+			}
+		}
+
+		ar.Interest = ar.Interest.Add(*row.BorrowedInterest)
+		charged, ok := ar.Charged[row.PaidAsset]
+		if !ok {
+			charged = fixedpoint.Zero
+		}
+		ar.Charged[row.PaidAsset] = charged.Add(row.Interest)
 		ar.Rows++
 
 		if mode == PriceModeCharged {
 			switch {
-			case asset == quoteCurrency:
+			case row.PaidAsset == quoteCurrency:
 				ar.USDT = ar.USDT.Add(row.Interest)
 			case row.InterestUSDT != nil:
 				ar.USDT = ar.USDT.Add(*row.InterestUSDT)
@@ -102,10 +129,12 @@ func SumRealized(rows []types.MarginInterestValuation, mode PriceMode, pricer Pr
 
 	for asset, ar := range r.Assets {
 		if mode == PriceModeCurrent {
-			if px, ok := priceOf(pricer, asset); ok {
-				ar.USDT = ar.Interest.Mul(px)
-			} else {
-				ar.PriceOK = false
+			for paid, amount := range ar.Charged {
+				if px, ok := priceOf(pricer, paid); ok {
+					ar.USDT = ar.USDT.Add(amount.Mul(px))
+				} else {
+					ar.PriceOK = false
+				}
 			}
 			r.Assets[asset] = ar
 		}

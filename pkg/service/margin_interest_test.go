@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -247,6 +248,17 @@ type fakeMarginExchange struct {
 	types.Exchange
 	interests    []types.MarginInterest
 	liquidations int
+
+	// interestAssets are the assets the interest history was queried for;
+	// the batch query calls it from its own goroutine
+	mu             sync.Mutex
+	interestAssets []string
+}
+
+func (f *fakeMarginExchange) queriedInterestAssets() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.interestAssets...)
 }
 
 func (f *fakeMarginExchange) Name() types.ExchangeName { return types.ExchangeBinance }
@@ -264,7 +276,10 @@ func (f *fakeMarginExchange) QueryRepayHistory(context.Context, string, *time.Ti
 	return nil, nil
 }
 
-func (f *fakeMarginExchange) QueryInterestHistory(context.Context, string, *time.Time, *time.Time) ([]types.MarginInterest, error) {
+func (f *fakeMarginExchange) QueryInterestHistory(_ context.Context, asset string, _, _ *time.Time) ([]types.MarginInterest, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.interestAssets = append(f.interestAssets, asset)
 	return f.interests, nil
 }
 
@@ -368,4 +383,60 @@ func TestMarginInterest_Key(t *testing.T) {
 	assert.Equal(t, legacy.Key(), types.MarginInterest{Asset: "BNB", Time: at}.Key())
 	assert.NotEqual(t, legacy.Key(), types.MarginInterest{Asset: "BNB", IsolatedSymbol: "BNBUSDT", Time: at}.Key())
 	assert.NotEqual(t, legacy.Key(), a.Key())
+}
+
+func TestSyncMarginHistory_SyncsTheFeeAssetInterests(t *testing.T) {
+	ctx := context.Background()
+	charged := time.Now().UTC().Truncate(time.Hour).Add(-3 * time.Hour)
+
+	t.Run("fee asset not listed", func(t *testing.T) {
+		syncer := &SyncService{MarginService: newTestMarginService(t)}
+		ex := &fakeMarginExchange{interests: []types.MarginInterest{{
+			Exchange: types.ExchangeBinance, TxID: txID(1), Asset: "BNB", RawAsset: "BTC", InterestType: "PERIODIC_CONVERTED",
+			Principal: Number(1), Interest: Number("0.0001"), Time: types.Time(charged),
+		}}}
+
+		require.NoError(t, syncer.SyncMarginHistory(ctx, ex, "a", charged.Add(-time.Hour), "BTC"))
+		assert.Contains(t, ex.queriedInterestAssets(), "BTC")
+		assert.Contains(t, ex.queriedInterestAssets(), "BNB")
+	})
+
+	t.Run("fee asset listed", func(t *testing.T) {
+		syncer := &SyncService{MarginService: newTestMarginService(t)}
+		ex := &fakeMarginExchange{}
+
+		require.NoError(t, syncer.SyncMarginHistory(ctx, ex, "a", charged.Add(-time.Hour), "BNB"))
+		queried := ex.queriedInterestAssets()
+		assert.NotEmpty(t, queried)
+		for _, asset := range queried {
+			assert.Equal(t, "BNB", asset)
+		}
+
+		// BNB went through Sync once, not again through the interest-only sync:
+		// a plain Sync of another session makes as many queries
+		require.NoError(t, syncer.MarginService.Sync(ctx, ex, "b", "BNB", charged.Add(-time.Hour)))
+		assert.Len(t, ex.queriedInterestAssets(), 2*len(queried))
+	})
+
+	t.Run("no fee asset", func(t *testing.T) {
+		syncer := &SyncService{MarginService: newTestMarginService(t)}
+		ex := &maxMarginExchange{fakeMarginExchange: &fakeMarginExchange{}}
+
+		require.NoError(t, syncer.SyncMarginHistory(ctx, ex, "a", charged.Add(-time.Hour), "BTC"))
+		queried := ex.queriedInterestAssets()
+		assert.NotEmpty(t, queried)
+		for _, asset := range queried {
+			assert.Equal(t, "BTC", asset)
+		}
+	})
+}
+
+// maxMarginExchange is fakeMarginExchange named MAX, which has no fee asset
+type maxMarginExchange struct{ *fakeMarginExchange }
+
+func (maxMarginExchange) Name() types.ExchangeName { return types.ExchangeMax }
+
+func TestMarginInterestFeeAsset(t *testing.T) {
+	assert.Equal(t, "BNB", MarginInterestFeeAsset(types.ExchangeBinance))
+	assert.Equal(t, "", MarginInterestFeeAsset(types.ExchangeMax))
 }
