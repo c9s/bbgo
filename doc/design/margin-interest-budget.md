@@ -1,10 +1,8 @@
 # ADR: Margin Interest Budget
 
-- Status: Step 1 (the estimate) is accepted and implemented: #2742,
-  #2743, #2744, #2798, #2745 and #2734 are merged, and #2755 (interest
-  paid in another asset) is in review. Step 2 (the budget, per session
-  and per asset) is implemented and in review. Steps 3 and 4 are
-  planned, not designed.
+- Status: Steps 1 and 2 (the estimate, and the budget per session and
+  per asset) are implemented and merged. Step 3 (the alert) is
+  implemented and in review. Step 4 is planned, not designed.
 - Scope: `pkg/strategy/autoborrow`, `pkg/accounting/margininterest`,
   `pkg/service`, `pkg/bbgo` (session names), and the
   `margin_interests` and `margin_interest_valuations` tables
@@ -322,16 +320,52 @@ Two cases are deliberately left as they are:
   with the debt it leaves behind is a follow-up.
 
 Step 2 only computes the status. Steps 3 and 4 decide what each status
-does, including whether "unknown" blocks borrowing.
+does.
 
-### Steps 3 and 4 (planned)
+### The alert (step 3)
 
-- **Step 3** alerts on a status change, with a cooldown while it stays
-  exceeded, and takes no action by itself.
-- **Step 4** has to choose between blocking new borrows and clamping
-  them to the remaining budget, and has to reach the strategies that
-  borrow implicitly through orders. With a budget per asset it can
-  act on the one asset that is over, not on the whole session.
+The alert tells an operator that a budget is over. It takes no action:
+the operator repays or changes the strategy settings by hand.
+
+```mermaid
+stateDiagram-v2
+    [*] --> quiet
+    quiet --> open: a budget is exceeded<br/>or projected exceeded
+    open --> open: every tick, the message is updated;<br/>a status change is commented once
+    open --> quiet: no budget is over any more<br/>(resolved)
+    open --> quiet: a new month starts<br/>(the old message keeps its last state)
+```
+
+- **One live message per session,** updated in place, like the other
+  autoborrow alerts. It lists every budget of the session with its
+  status, so one glance shows which asset is over and how the session
+  stands. Several messages would arrive together whenever one borrow
+  pushes an asset and the session over at once.
+- **Exceeded and projected exceeded raise it. Unknown does not.** An
+  incomplete estimate is in the log and the metrics, and one failed
+  sync should not call anyone.
+- **Unknown does not resolve it either.** When a query or a sync fails
+  the realized interest is missing, and a budget that was over reads
+  "unknown". That is not the budget being fine again, so the alert
+  stays open until the budget is ok.
+- **In-place updates replace a cooldown.** The message follows every
+  tick without a new notification, people are mentioned once when it
+  opens, and a thread comment is added only when a status changes. So
+  there is nothing to rate-limit.
+- **A new month is a new alert.** The message of the past month keeps
+  its final state as the record of that month.
+- **An alert needs a budget.** One configured without a budget is an
+  error, not a silent no-op.
+- **Its state is in memory.** After a restart a session that is still
+  over is alerted again, in a new message.
+
+### Step 4 (planned)
+
+Step 4 has to choose between blocking new borrows and clamping them to
+the remaining budget, and has to reach the strategies that borrow
+implicitly through orders. With a budget per asset it can act on the
+one asset that is over, not on the whole session. It also has to
+decide whether "unknown" blocks borrowing.
 
 ## Follow-ups
 
@@ -381,6 +415,15 @@ does, including whether "unknown" blocks borrowing.
   with it, but they cannot be added up or compared with the session
   budget, and interest paid in another asset has no single amount in
   the borrowed asset's units other than the nominal one.
+- **One alert message per budget.** Easier to follow one asset, but a
+  single borrow often pushes an asset and the session over together,
+  and the operator needs both to decide what to repay.
+- **Alerting on "unknown", or only on "exceeded".** The first calls
+  someone for a failed sync. The second gives no warning while a repay
+  could still keep the month within the budget.
+- **The alert configured inside the budget block.** Put at the top
+  level of the strategy instead, next to the other autoborrow alerts,
+  where an operator already looks for them.
 - **Persisting the estimate or the budget state.** Not needed while
   every tick recomputes from the database.
 - **Enforcing in the first version.** Deferred to step 4. Repaying

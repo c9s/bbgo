@@ -62,6 +62,17 @@ exchangeStrategies:
         - '<@USER_ID>'
         - '<!subteam^TEAM_ID>'
 
+    # interestBudgetAlert posts one live Slack message per session when a budget of
+    # interestEstimate.budget is exceeded or projected to be exceeded. The message lists every budget
+    # with its status and is updated in place; it is resolved when no budget is over any more.
+    # It only tells you: nothing is repaid, and borrowing does not change. It needs a budget.
+    # interestBudgetAlert:
+    #   slack:
+    #     channel: "channel_id"
+    #     mentions:
+    #     - '<@USER_ID>'
+    #     - '<!subteam^TEAM_ID>'
+
     marginLevelAlert:
       interval: 5m
       minMargin: 2.0
