@@ -177,6 +177,13 @@ var BacktestCmd = &cobra.Command{
 				userConfig.Backtest.CsvSource.Market,
 				userConfig.Backtest.CsvSource.Granularity,
 			)
+
+			// mark the run as a backtest before the bootstrap, so that it does not
+			// create the exchange sessions of the config: the backtest adds its own
+			// simulated sessions under the same names below
+			environ.BacktestService = backtestService
+			bbgo.SetBackTesting(backtestService)
+
 			if err := bbgo.BootstrapEnvironmentLightweight(ctx, environ, userConfig); err != nil {
 				return err
 			}

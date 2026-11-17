@@ -345,7 +345,18 @@ func (environ *Environment) ConfigureProfiling(config *ProfilingConfig) (err err
 	return nil
 }
 
+// ConfigureExchangeSessions creates the exchange sessions of the config, or
+// the ones found in the environment variables when the config defines none.
+//
+// In a backtest it creates none. A backtest does not run on the live
+// sessions: it adds a simulated session under the name of each live session it
+// stands in for.
 func (environ *Environment) ConfigureExchangeSessions(userConfig *Config) error {
+	if IsBackTesting {
+		log.Warnf("backtesting: the exchange sessions of the config are not created, the backtest adds its own")
+		return nil
+	}
+
 	// if sessions are not defined, we detect the sessions automatically
 	if len(userConfig.Sessions) == 0 {
 		return environ.AddExchangesByViperKeys()
