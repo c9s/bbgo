@@ -113,7 +113,10 @@ func (s *Strategy) Defaults() error {
 // Validate checks the interest estimate config, if set
 func (s *Strategy) Validate() error {
 	if s.InterestEstimate != nil {
-		return s.InterestEstimate.Validate()
+		if err := s.InterestEstimate.Validate(); err != nil {
+			return err
+		}
+		return s.InterestEstimate.validateBudgetAssets(s.getAssetStringSlice())
 	}
 	return nil
 }

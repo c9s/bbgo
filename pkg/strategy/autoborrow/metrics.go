@@ -139,6 +139,36 @@ var interestBudgetStatusMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 	Help: "1 on the current budget status of the session, 0 on the others: exceeded, projected_exceeded, unknown (within the budget but the estimate is incomplete) or ok",
 }, []string{"session", "exchange", "status"})
 
+var interestAssetBudgetInUSDTMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_asset_budget_in_usdt",
+	Help: "margin interest budget of the asset per UTC calendar month, in USDT; absent without a budget for the asset",
+}, assetLabels)
+
+var interestAssetBudgetRemainingInUSDTMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_asset_budget_remaining_in_usdt",
+	Help: "asset budget minus the realized plus projected margin interest of the asset in the UTC calendar month, in USDT; negative when over the budget",
+}, assetLabels)
+
+var interestAssetBudgetUsedRatioMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_asset_budget_used_ratio",
+	Help: "realized plus projected margin interest of the asset in the UTC calendar month divided by its budget",
+}, assetLabels)
+
+var interestAssetBudgetExceededMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_asset_budget_exceeded",
+	Help: "1 if the margin interest of the asset already charged this UTC calendar month is over its budget, otherwise 0",
+}, assetLabels)
+
+var interestAssetBudgetProjectedExceededMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_asset_budget_projected_exceeded",
+	Help: "1 if the realized plus projected margin interest of the asset in the UTC calendar month is over its budget, otherwise 0",
+}, assetLabels)
+
+var interestAssetBudgetStatusMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_asset_budget_status",
+	Help: "1 on the current budget status of the asset, 0 on the others: exceeded, projected_exceeded, unknown (within the budget but the estimate of the asset is incomplete) or ok",
+}, []string{"session", "exchange", "asset", "status"})
+
 func init() {
 	prometheus.MustRegister(
 		interestProjectedInUSDTMetrics,
@@ -166,5 +196,11 @@ func init() {
 		interestBudgetExceededMetrics,
 		interestBudgetProjectedExceededMetrics,
 		interestBudgetStatusMetrics,
+		interestAssetBudgetInUSDTMetrics,
+		interestAssetBudgetRemainingInUSDTMetrics,
+		interestAssetBudgetUsedRatioMetrics,
+		interestAssetBudgetExceededMetrics,
+		interestAssetBudgetProjectedExceededMetrics,
+		interestAssetBudgetStatusMetrics,
 	)
 }
