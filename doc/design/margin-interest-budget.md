@@ -2,8 +2,9 @@
 
 - Status: Step 1 (the estimate) is accepted and implemented: #2742,
   #2743, #2744, #2798, #2745 and #2734 are merged, and #2755 (interest
-  paid in another asset) is in review. Step 2 (the budget) is accepted
-  and not built yet. Steps 3 and 4 are planned, not designed.
+  paid in another asset) is in review. Step 2 (the budget, per session
+  and per asset) is implemented and in review. Steps 3 and 4 are
+  planned, not designed.
 - Scope: `pkg/strategy/autoborrow`, `pkg/accounting/margininterest`,
   `pkg/service`, `pkg/bbgo` (session names), and the
   `margin_interests` and `margin_interest_valuations` tables
@@ -40,8 +41,8 @@ Two facts about the exchange shape the design:
 - **Debt cannot be attributed to a strategy.** The exchange reports
   one borrowed amount per asset. Autoborrow borrows explicitly, but
   every order with a margin side effect borrows implicitly, and
-  repays are fungible. So the smallest unit a budget can honestly
-  cover is the session.
+  repays are fungible. So a budget can honestly cover a session, or
+  one asset within it, but never a strategy.
 
 One decision about bbgo itself shapes it as well:
 
@@ -72,8 +73,8 @@ flowchart LR
 
 1. **Estimate.** Compute the realized and the projected interest and
    report them.
-2. **Budget.** Give each session a monthly budget and report the
-   estimate against it.
+2. **Budget.** Give each session, and each asset in it, a monthly
+   budget and report the estimate against it.
 3. **Alert.** Tell an operator when the budget is exceeded. The
    operator repays or changes strategy settings by hand.
 4. **Enforce.** Keep borrowing under the budget, in autoborrow and in
@@ -253,29 +254,56 @@ Renaming a session is a change of identity: the rows under the old
 name are no longer read, and the history is fetched again under the
 new one.
 
-### The budget (step 2, accepted, not built)
+### The budget (step 2)
 
-The budget is one USDT amount per session and per UTC calendar month,
-summed over all configured assets. It is part of the estimate's
-config, because it is meaningless without the estimate: a budget with
-the estimate off is an error, not a silent no-op.
+A budget is a USDT amount per UTC calendar month. A session can have
+one for the whole session, summed over all configured assets, and one
+for each asset. They are part of the estimate's config, because a
+budget is meaningless without the estimate: a budget with the estimate
+off, or on a session the estimate cannot run on, is an error, not a
+silent no-op.
 
-| Status | Condition | Meaning |
-|---|---|---|
-| exceeded | realized > budget | already true, and final for the month |
-| projected exceeded | month total > budget | a forecast; repaying can still avoid it |
-| ok | neither, and the estimate is complete | |
-| unknown | neither, and the estimate is incomplete | the true figure may be higher |
+```mermaid
+flowchart TD
+    r{"realized > budget?"}
+    m{"month total > budget?"}
+    c{"estimate complete?"}
+    r -- yes --> exceeded["exceeded:<br/>already true, final for the month"]
+    r -- no --> m
+    m -- yes --> projected["projected exceeded:<br/>a forecast, repaying can still avoid it"]
+    m -- no --> c
+    c -- yes --> ok["ok"]
+    c -- no --> unknown["unknown:<br/>the true figure may be higher"]
+```
 
-- **One budget per session.** A second autoborrow instance that sets a
-  budget on the same session is rejected at startup: two budgets on
-  one bill cannot both be right, and step 4's caps would conflict.
-- **The budget always compares what was charged,** whichever price
+- **The session and the asset budgets are independent.** Each is
+  optional, and the asset budgets do not have to add up to the session
+  budget. One answers "how much may this account cost", the other "how
+  much may this one borrow cost"; forcing them to agree would only add
+  a way to misconfigure.
+- **An asset budget is in USDT too,** so the budgets can be compared
+  and added up, and so interest paid in another asset has one value.
+  It counts toward the asset that was borrowed.
+- **A budgeted asset has to be a configured asset.** The estimate
+  covers no other asset, so the budget could never be assessed.
+- **One instance budgets a session.** A second autoborrow instance
+  that sets a budget on the same session is rejected at startup: two
+  budgets on one bill cannot both be right, and step 4's caps would
+  conflict.
+- **A budget always compares what was charged,** whichever price
   mode the estimate reports in. A budget is about money already spent.
   The projected part is still at the current price, so a price move
   can flip "projected exceeded". That is accepted.
 - **Incomplete is never ok.** An incomplete estimate is a lower bound:
   over budget still counts, under budget is "unknown".
+- **Completeness is per asset.** A failed sync or a missing rate of one
+  asset makes that asset unknown, not the others. What may hide a
+  charge of any asset, such as a failed sync of the fee asset or a
+  charge that cannot be attributed, makes every asset unknown.
+- **The status is reported as such,** not only as "exceeded" and
+  "projected exceeded" flags. Both flags are off for "ok" and for
+  "unknown" alike, so a dashboard reading only them would take an
+  incomplete estimate for a pass.
 - **Landing exactly on the budget is within it.**
 - **No budget is not a zero budget.** With none configured, nothing is
   reported at all, so it cannot read as zero or as exceeded.
@@ -302,8 +330,8 @@ does, including whether "unknown" blocks borrowing.
   exceeded, and takes no action by itself.
 - **Step 4** has to choose between blocking new borrows and clamping
   them to the remaining budget, and has to reach the strategies that
-  borrow implicitly through orders. The estimate is already computed
-  per asset, for a later per-asset budget.
+  borrow implicitly through orders. With a budget per asset it can
+  act on the one asset that is over, not on the whole session.
 
 ## Follow-ups
 
@@ -346,6 +374,13 @@ does, including whether "unknown" blocks borrowing.
   hour range, with the month as a helper on top.
 - **A run rate as "the month".** Kept as the rolling projection, but
   the budget uses the calendar month.
+- **The asset budget on each asset entry,** next to the asset's other
+  limits. Dropped for one budget block: the budget settings stay in
+  one place, and the session budget would have lived apart from them.
+- **Asset budgets in asset units.** They need no price and do not move
+  with it, but they cannot be added up or compared with the session
+  budget, and interest paid in another asset has no single amount in
+  the borrowed asset's units other than the nominal one.
 - **Persisting the estimate or the budget state.** Not needed while
   every tick recomputes from the database.
 - **Enforcing in the first version.** Deferred to step 4. Repaying
