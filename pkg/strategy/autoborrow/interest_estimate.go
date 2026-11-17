@@ -57,6 +57,8 @@ var defaultProjectionMonths = []int{1, 3}
 //     syncInterval: 1h
 //     realizedPriceMode: charged # or current
 //     projectionMonths: [1, 3]   # default
+//     budget:
+//     monthlyUSDT: 1000        # 0 or not set: no budget
 type InterestEstimateConfig struct {
 	// Interval is the estimate interval, 0 turns the estimate off
 	Interval types.Duration `json:"interval"`
@@ -72,12 +74,39 @@ type InterestEstimateConfig struct {
 	// ProjectionMonths are the rolling months (30 x 24 hours each) to project the
 	// current principal over, from now. Not set means [1, 3], an empty list means none.
 	ProjectionMonths []int `json:"projectionMonths,omitempty"`
+
+	// Budget is the interest budget of the session, compared against the
+	// estimate on every tick. Not set means no budget.
+	Budget *InterestBudgetConfig `json:"budget,omitempty"`
 }
 
-// Validate checks the price mode and the projection months
+// InterestBudgetConfig is the margin interest budget of one session.
+//
+// The budget only reports: a status in the log and in the metrics. It does not
+// alert and does not change how autoborrow borrows or repays.
+//
+// It always compares what was charged, at the price when it was charged,
+// whatever realizedPriceMode is: a budget is about money already spent. The
+// projected part is at the current price.
+type InterestBudgetConfig struct {
+	// MonthlyUSDT is the budget per UTC calendar month, summed over the
+	// autoborrow assets, in USDT. 0 means no budget.
+	MonthlyUSDT fixedpoint.Value `json:"monthlyUSDT"`
+}
+
+// Validate checks the price mode, the projection months and the budget
 func (c *InterestEstimateConfig) Validate() error {
 	if err := c.RealizedPriceMode.Validate(); err != nil {
 		return err
+	}
+
+	if c.Budget != nil && c.Budget.MonthlyUSDT.Sign() < 0 {
+		return fmt.Errorf("invalid interest budget monthlyUSDT %s, expected a positive number, or 0 for no budget", c.Budget.MonthlyUSDT.String())
+	}
+
+	// a budget needs the estimate: do not ignore it silently
+	if c.hasBudget() && c.Interval.Duration() <= 0 {
+		return fmt.Errorf("interest budget is set but the interest estimate is off, set interestEstimate.interval")
 	}
 
 	for _, n := range c.ProjectionMonths {
@@ -109,6 +138,11 @@ func (c *InterestEstimateConfig) projectionHours() []int {
 	}
 	sort.Ints(hours)
 	return hours
+}
+
+// hasBudget reports whether a budget is set: no budget is not a zero budget
+func (c *InterestEstimateConfig) hasBudget() bool {
+	return c.Budget != nil && c.Budget.MonthlyUSDT.Sign() > 0
 }
 
 func (c *InterestEstimateConfig) syncInterval() time.Duration {
@@ -167,6 +201,34 @@ func sessionSyncLock(key string) *sync.Mutex {
 	return mu
 }
 
+// budgetedSessions holds the sessions that have an interest budget. A session
+// has one bill, so it has at most one budget.
+var budgetedSessions = struct {
+	sync.Mutex
+	m map[string]struct{}
+}{m: make(map[string]struct{})}
+
+// claimInterestBudget makes session the owner of its interest budget and
+// returns the function that gives it up. It fails when another autoborrow
+// instance already budgets the session: two budgets on one bill cannot both be right.
+func claimInterestBudget(session *bbgo.ExchangeSession) (release func(), err error) {
+	key := session.ExchangeName.String() + "/" + session.Name
+
+	budgetedSessions.Lock()
+	defer budgetedSessions.Unlock()
+
+	if _, taken := budgetedSessions.m[key]; taken {
+		return nil, fmt.Errorf("session %s already has an interest budget, set by another autoborrow instance: a session has at most one", session.Name)
+	}
+
+	budgetedSessions.m[key] = struct{}{}
+	return func() {
+		budgetedSessions.Lock()
+		defer budgetedSessions.Unlock()
+		delete(budgetedSessions.m, key)
+	}, nil
+}
+
 // interestEstimate is the result of one estimate tick
 type interestEstimate struct {
 	// Month, RemainingHours, Projection, Realized and Assets are the calendar month
@@ -200,6 +262,11 @@ type interestEstimate struct {
 	// borrowed asset had a rate and a price. Each one is checked on its own hours,
 	// because a zero-hour calendar projection needs no price.
 	RollingComplete bool
+
+	// Budget compares the calendar month against the budget of the session, nil
+	// without a budget. Its realized part is always at the price when charged,
+	// so in the current price mode its figures differ from Realized and MonthTotalUSDT.
+	Budget *margininterest.BudgetEvaluation
 }
 
 // interestEstimateWorker estimates the margin interest of one session.
@@ -247,6 +314,10 @@ type interestEstimateWorker struct {
 	// labels holds the label values (after session and exchange) each vec was set
 	// with on the last tick, keyed by their joined form
 	labels map[*prometheus.GaugeVec]map[string][]string
+
+	// budgetStatus is the budget status of the last tick, kept in memory only to
+	// log a status change once instead of on every tick
+	budgetStatus margininterest.BudgetStatus
 }
 
 func newInterestEstimateWorker(s *Strategy, session *bbgo.ExchangeSession, config *InterestEstimateConfig) *interestEstimateWorker {
@@ -292,14 +363,38 @@ func newInterestEstimateWorker(s *Strategy, session *bbgo.ExchangeSession, confi
 	return w
 }
 
-func (w *interestEstimateWorker) Run(ctx context.Context) {
+// disabledReason says why the estimate cannot run on the session, empty if it can
+func (w *interestEstimateWorker) disabledReason() string {
 	if w.session.IsolatedMargin {
-		w.logger.Warnf("interest estimate: isolated margin is not supported, worker disabled")
-		return
+		return "isolated margin is not supported"
 	}
 
 	if len(w.assets) == 0 {
-		w.logger.Warnf("interest estimate: no autoborrow assets configured, worker disabled")
+		return "no autoborrow assets configured"
+	}
+
+	return ""
+}
+
+// claimBudget claims the interest budget of the session, if one is set, and
+// returns the function that gives it up. It fails when the estimate cannot run
+// on the session, because a budget must not be ignored silently, and when
+// another autoborrow instance already budgets the session.
+func (w *interestEstimateWorker) claimBudget() (release func(), err error) {
+	if !w.config.hasBudget() {
+		return func() {}, nil
+	}
+
+	if reason := w.disabledReason(); reason != "" {
+		return nil, fmt.Errorf("interest budget is set on session %s but the interest estimate cannot run: %s", w.session.Name, reason)
+	}
+
+	return claimInterestBudget(w.session)
+}
+
+func (w *interestEstimateWorker) Run(ctx context.Context) {
+	if reason := w.disabledReason(); reason != "" {
+		w.logger.Warnf("interest estimate: %s, worker disabled", reason)
 		return
 	}
 
@@ -343,7 +438,7 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 		w.countError("price")
 	}
 
-	realized, realizedOK, unconfiguredRows, unattributed := w.queryRealized(ctx, now, realizedRange)
+	realized, charged, realizedOK, unconfiguredRows, unattributed := w.queryRealized(ctx, now, realizedRange)
 
 	var rolling []margininterest.Projection
 	for _, h := range w.config.projectionHours() {
@@ -380,6 +475,14 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 	for asset, m := range est.Assets {
 		m.MissingHistory = !realizedOK || w.historyFailed(asset)
 		est.Assets[asset] = m
+	}
+
+	if w.config.hasBudget() {
+		// the budget compares what was charged, in every price mode
+		complete := w.interestQueryService != nil && projection.Complete() && !missingHistory && len(charged.MissingPrice) == 0
+		budget := margininterest.EvaluateBudget(
+			w.config.Budget.MonthlyUSDT, charged.TotalUSDT, charged.TotalUSDT.Add(projection.TotalUSDT), complete)
+		est.Budget = &budget
 	}
 
 	w.log(est, rates)
@@ -447,16 +550,19 @@ func (w *interestEstimateWorker) queryRates(ctx context.Context) types.MarginNex
 }
 
 // queryRealized syncs the interest history when due and sums the rows of the
-// autoborrow assets in the hours r, by borrowed asset. unconfigured lists the
-// other borrowed assets that have rows, e.g. synced by `bbgo sync` or before the
-// asset was removed. unattributed counts the rows whose borrowed asset is unknown.
+// autoborrow assets in the hours r, by borrowed asset. realized is valued in
+// the configured price mode, charged always at the price when charged: it is
+// what the budget compares. unconfigured lists the other borrowed assets that
+// have rows, e.g. synced by `bbgo sync` or before the asset was removed.
+// unattributed counts the rows whose borrowed asset is unknown.
 func (w *interestEstimateWorker) queryRealized(
 	ctx context.Context, now time.Time, r margininterest.HourRange,
-) (realized margininterest.Realized, ok bool, unconfigured []string, unattributed int) {
+) (realized, charged margininterest.Realized, ok bool, unconfigured []string, unattributed int) {
 	mode := w.config.RealizedPriceMode.OrDefault()
 	empty := margininterest.Realized{Mode: mode, TotalUSDT: fixedpoint.Zero}
+	emptyCharged := margininterest.Realized{Mode: margininterest.PriceModeCharged, TotalUSDT: fixedpoint.Zero}
 	if w.history == nil {
-		return empty, false, nil, 0
+		return empty, emptyCharged, false, nil, 0
 	}
 
 	if w.lastSync.IsZero() || now.Sub(w.lastSync) >= w.config.syncInterval() {
@@ -476,7 +582,7 @@ func (w *interestEstimateWorker) queryRealized(
 	if err != nil {
 		w.logger.WithError(err).Warnf("interest estimate: unable to query margin interest valuations")
 		w.countError("query")
-		return empty, false, nil, 0
+		return empty, emptyCharged, false, nil, 0
 	}
 
 	configured := make(map[string]struct{}, len(w.assets))
@@ -510,7 +616,13 @@ func (w *interestEstimateWorker) queryRealized(
 	}
 	sort.Strings(unconfigured)
 
-	return margininterest.SumRealized(counted, mode, w.pricer), true, unconfigured, unattributed
+	realized = margininterest.SumRealized(counted, mode, w.pricer)
+	charged = realized
+	if mode != margininterest.PriceModeCharged {
+		charged = margininterest.SumRealized(counted, margininterest.PriceModeCharged, w.pricer)
+	}
+
+	return realized, charged, true, unconfigured, unattributed
 }
 
 // syncHistory syncs the interest rows of every autoborrow asset, borrowed or
@@ -606,6 +718,8 @@ func (w *interestEstimateWorker) log(est *interestEstimate, rates types.MarginNe
 			w.session.Name, p.Hours, p.Hours/margininterest.RollingMonthHours, p.TotalUSDT.String(), w.interestQueryService != nil && p.Complete())
 	}
 
+	w.logBudget(est)
+
 	for _, asset := range estimateAssets(est) {
 		p := est.Projection.Assets[asset]
 		m := est.Assets[asset]
@@ -622,6 +736,76 @@ func (w *interestEstimateWorker) log(est *interestEstimate, rates types.MarginNe
 			m.Total.String(), m.TotalUSDT.String(),
 			m.Complete(), m.MissingRate, m.MissingPrice, m.MissingHistory,
 		)
+	}
+}
+
+// logBudget logs the budget of the tick, and a status change once: a warning
+// when the session is over or may be over its budget, an info line when it is ok again
+func (w *interestEstimateWorker) logBudget(est *interestEstimate) {
+	b := est.Budget
+	if b == nil {
+		return
+	}
+
+	status := b.Status()
+	w.logger.Infof("interest budget: session=%s month=%s budget_usdt=%s realized_usdt=%s month_total_usdt=%s remaining_usdt=%s used_ratio=%s status=%s complete=%t",
+		w.session.Name,
+		est.Month.Format("2006-01"),
+		b.BudgetUSDT.String(),
+		b.RealizedUSDT.String(),
+		b.MonthUSDT.String(),
+		b.RemainingUSDT.String(),
+		b.UsedRatio.String(),
+		status,
+		b.Complete,
+	)
+
+	previous := w.budgetStatus
+	w.budgetStatus = status
+	if status == previous {
+		return
+	}
+
+	// previous is empty on the first tick: starting ok is not a change worth a line
+	was := ""
+	if previous != "" {
+		was = fmt.Sprintf(" (was %s)", previous)
+	}
+
+	switch {
+	case status != margininterest.BudgetStatusOK:
+		w.logger.Warnf("interest budget: session %s is %s%s: budget %s USDT, realized %s USDT, month total %s USDT",
+			w.session.Name, status, was, b.BudgetUSDT.String(), b.RealizedUSDT.String(), b.MonthUSDT.String())
+	case previous != "":
+		w.logger.Infof("interest budget: session %s is %s again%s", w.session.Name, status, was)
+	}
+}
+
+// publishBudget sets the budget gauges. Without a budget they are not set at
+// all, so no budget cannot read as a zero budget or as an exceeded one.
+func (w *interestEstimateWorker) publishBudget(est *interestEstimate) {
+	b := est.Budget
+	if b == nil {
+		return
+	}
+
+	session, exchange := w.session.Name, w.session.ExchangeName.String()
+	flag := func(on bool) float64 {
+		if on {
+			return 1
+		}
+		return 0
+	}
+
+	interestBudgetInUSDTMetrics.WithLabelValues(session, exchange).Set(b.BudgetUSDT.Float64())
+	interestBudgetRemainingInUSDTMetrics.WithLabelValues(session, exchange).Set(b.RemainingUSDT.Float64())
+	interestBudgetUsedRatioMetrics.WithLabelValues(session, exchange).Set(b.UsedRatio.Float64())
+	interestBudgetExceededMetrics.WithLabelValues(session, exchange).Set(flag(b.Exceeded))
+	interestBudgetProjectedExceededMetrics.WithLabelValues(session, exchange).Set(flag(b.ProjectedExceeded))
+
+	status := b.Status()
+	for _, s := range margininterest.BudgetStatuses {
+		interestBudgetStatusMetrics.WithLabelValues(session, exchange, string(s)).Set(flag(s == status))
 	}
 }
 
@@ -699,6 +883,7 @@ func (w *interestEstimateWorker) publish(est *interestEstimate) {
 	interestEstimateCompleteMetrics.WithLabelValues(session, exchange).Set(complete)
 
 	w.publishRolling(est)
+	w.publishBudget(est)
 }
 
 func (w *interestEstimateWorker) publishRolling(est *interestEstimate) {

@@ -661,7 +661,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	if cfg := s.InterestEstimate; cfg != nil && cfg.Interval.Duration() > 0 {
-		go newInterestEstimateWorker(s, session, cfg).Run(ctx)
+		worker := newInterestEstimateWorker(s, session, cfg)
+		release, err := worker.claimBudget()
+		if err != nil {
+			return err
+		}
+
+		go func() {
+			defer release()
+			worker.Run(ctx)
+		}()
 	}
 
 	go s.run(ctx, s.Interval.Duration())

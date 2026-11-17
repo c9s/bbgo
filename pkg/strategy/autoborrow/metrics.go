@@ -107,6 +107,38 @@ var interestRollingProjectionCompleteMetrics = prometheus.NewGaugeVec(prometheus
 	Help: "1 if every debt asset had a rate and a price for the projection over the next `hours` hourly charges, otherwise 0",
 }, rollingLabels)
 
+var interestBudgetInUSDTMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_budget_in_usdt",
+	Help: "margin interest budget of the session per UTC calendar month, in USDT; absent without a budget",
+}, sessionLabels)
+
+var interestBudgetRemainingInUSDTMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_budget_remaining_in_usdt",
+	Help: "budget minus the realized plus projected margin interest of the UTC calendar month, in USDT; negative when over the budget",
+}, sessionLabels)
+
+var interestBudgetUsedRatioMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_budget_used_ratio",
+	Help: "realized plus projected margin interest of the UTC calendar month divided by the budget",
+}, sessionLabels)
+
+var interestBudgetExceededMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_budget_exceeded",
+	Help: "1 if the margin interest already charged this UTC calendar month is over the budget, otherwise 0",
+}, sessionLabels)
+
+var interestBudgetProjectedExceededMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_budget_projected_exceeded",
+	Help: "1 if the realized plus projected margin interest of the UTC calendar month is over the budget, otherwise 0",
+}, sessionLabels)
+
+// status is exceeded, projected_exceeded, unknown or ok. 0 on both exceeded
+// gauges is not ok by itself: with an incomplete estimate the status is unknown.
+var interestBudgetStatusMetrics = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "autoborrow_interest_budget_status",
+	Help: "1 on the current budget status of the session, 0 on the others: exceeded, projected_exceeded, unknown (within the budget but the estimate is incomplete) or ok",
+}, []string{"session", "exchange", "status"})
+
 func init() {
 	prometheus.MustRegister(
 		interestProjectedInUSDTMetrics,
@@ -128,5 +160,11 @@ func init() {
 		interestRollingProjectedInUSDTMetrics,
 		interestRollingProjectedTotalInUSDTMetrics,
 		interestRollingProjectionCompleteMetrics,
+		interestBudgetInUSDTMetrics,
+		interestBudgetRemainingInUSDTMetrics,
+		interestBudgetUsedRatioMetrics,
+		interestBudgetExceededMetrics,
+		interestBudgetProjectedExceededMetrics,
+		interestBudgetStatusMetrics,
 	)
 }

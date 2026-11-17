@@ -34,6 +34,14 @@ exchangeStrategies:
       realizedPriceMode: charged
       # rolling months to project, 1 and 3 by default (720 and 2160 hours)
       projectionMonths: [1, 3]
+      # budget: the interest budget of the session per UTC calendar month, in USDT, over all `assets`.
+      # It only reports a status (log and Prometheus): exceeded (already charged more), projected_exceeded
+      # (will be over at the month end if nothing changes), ok, or unknown (within the budget, but the
+      # estimate is incomplete). It does not alert and does not change how autoborrow borrows or repays.
+      # It compares what was charged, at the price when charged, whatever realizedPriceMode is.
+      # A session has at most one budget. 0 or not set: no budget.
+      # budget:
+      #   monthlyUSDT: 1000
 
     marginRepayAlert:
       slack:
