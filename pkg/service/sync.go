@@ -124,6 +124,10 @@ func (s *SyncService) syncMarginFeeAssetInterests(
 ) error {
 	fee := MarginInterestFeeAsset(exchange.Name())
 	if fee == "" || slices.Contains(assets, fee) {
+		log.Warnf(
+			"[MarginService] fee asset %q is not included in interest payments for exchange session %s, margin assets: %v",
+			fee, sessionName, assets,
+		)
 		return nil
 	}
 
@@ -132,7 +136,7 @@ func (s *SyncService) syncMarginFeeAssetInterests(
 		return nil
 	}
 
-	log.Infof("syncing %s margin interests paid in %s...", exchange.Name(), fee)
+	log.Infof("[MarginService] syncing %s margin interests paid in %s...", exchange.Name(), fee)
 	return s.MarginService.SyncInterests(ctx, exchange, sessionName, fee, startTime)
 }
 
