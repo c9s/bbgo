@@ -127,8 +127,23 @@ on the tip. The two concerns are separate:
 - **`https://bitcoin-rpc.publicnode.com`** (Core 32, txindex) answers
   `getblock` verbosity 3, `gettxout`, the mempool calls and batches, but
   `scantxoutset` fails with `-32701 broker: node error`. `CoreSource` and
-  `bbgo btc watch --seed` therefore need a self-hosted node, and have only
-  been tested against a fake RPC.
+  `bbgo btc watch --seed` therefore need a self-hosted node; they are
+  exercised against a throwaway regtest node (`pkg/chain/btc/regtest`).
+- **`UTXO.Mature` matches consensus, and the wallet is one block stricter.**
+  On regtest the node's mempool rejects a coinbase spend with
+  `bad-txns-premature-spend-of-coinbase` at 99 confirmations and accepts it
+  at 100, exactly where `Mature(tip)` flips. Core's wallet waits for 101
+  (`COINBASE_MATURITY + 1`) before listing the output as spendable, so its
+  `getbalances` "immature" is one block of coinbase larger than
+  `balance.Compute`'s. Neither is wrong; compare totals, not the split.
+- **A ranged descriptor scan has no addresses.** `scantxoutset` with
+  `wpkh(tpub.../0/*)` returns each match with its script and the derived key
+  in `desc`, not an address, so `Compute` keys those balances by script hex.
+  The totals match the wallet's exactly; per-address figures need `addr()`
+  descriptors (what plain address arguments become).
+- **Regtest wallets pick any output.** `sendtoaddress` may fund itself from
+  a watched address's output, so a test that wants a specific spend must
+  make it first (`sendall` with explicit `inputs`) or use coin control.
 - **Esplora has no coinbase flag.** F2Pool's payout address
   `1AfCc4F9c4VTYSE31PUe2kUEKs6ZxiDjxm` holds coinbase outputs from the last
   100 blocks that cannot be spent yet; `EsploraSource` counts them as
@@ -209,7 +224,8 @@ Recorded so the next change knows where the edges are.
   are matched by script hex only.
 - **Descriptors are only understood by `scantxoutset`.** The watcher cannot
   watch an xpub range (`wpkh(xpub.../0/*)`), and there is no gap-limit
-  derivation.
+  derivation. Balances of a ranged descriptor scan are keyed by script, not
+  address (see Findings).
 - **No address validation** or network check (mainnet vs testnet prefixes)
   before a watch starts.
 

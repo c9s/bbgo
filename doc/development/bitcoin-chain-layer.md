@@ -161,6 +161,9 @@ chain tip. `pkg/chain/btc/balance` separates the two concerns.
   `Confirmed` (at least `minConfirmations`), `Pending` (fewer, mempool
   included) and `Immature` (coinbase outputs younger than 100 blocks,
   whatever `minConfirmations` is). `Sum` and `Of` total and look up.
+- **Descriptors.** A ranged descriptor (`wpkh(xpub.../0/*)`) scanned by
+  `CoreSource` yields balances keyed by script hex: `scantxoutset` reports
+  no address for its matches. Pass addresses to get per-address rows.
 - **Sources** produce the snapshot:
 
   | Source | Sees | Caveats |
@@ -212,3 +215,42 @@ BTC_RPC_ENDPOINT=https://bitcoin-rpc.publicnode.com go test ./pkg/chain/btc/stre
 ```
 
 streams the last three blocks with full transactions and checks they chain.
+
+## Regtest
+
+`pkg/chain/btc/regtest` runs a throwaway `bitcoind -regtest` with a wallet,
+so the parts that need your own node (`scantxoutset`, `CoreSource`, seeding)
+and the cases a public chain only produces by luck (coinbase maturity,
+reorgs) are tested exactly. `regtest.Start(t)` picks a free RPC port, uses a
+temporary data directory and the cookie file, and stops the node when the
+test ends; it skips the test when no `bitcoind` is found.
+
+```
+BITCOIND=/path/to/bitcoin-32.1/bin/bitcoind go test ./pkg/chain/btc/regtest -v
+```
+
+- `TestCoinbaseMaturity`: `UTXO.Mature` flips at the same height where the
+  node's mempool stops rejecting the coinbase spend.
+- `TestCoreSourceMatchesWallet`: `CoreSource` over the wallet's descriptors
+  totals what `getbalances` reports; prevout-derived fees equal what the
+  wallet paid.
+- `TestWatcherFollowsReorgs`: a watcher seeded from `scantxoutset` follows a
+  spend of the seeded output, a same-height reorg and a two-block reorg, and
+  ends on the same UTXOs as a fresh scan.
+
+Release binaries are at `https://bitcoincore.org/bin/`; check the tarball
+against `SHA256SUMS` and that file's signatures (`SHA256SUMS.asc`, builder
+keys in `bitcoin-core/guix.sigs`). Regtest needs no sync and a few MB of disk.
+
+For the CLI, run a node by hand and mine on demand:
+
+```
+bitcoind -regtest -daemon -datadir=/tmp/rt -rpcport=18443 -fallbackfee=0.0001
+bitcoin-cli -regtest -datadir=/tmp/rt createwallet demo
+bitcoin-cli -regtest -datadir=/tmp/rt generatetoaddress 101 "$(bitcoin-cli -regtest -datadir=/tmp/rt getnewaddress)"
+bbgo btc balance <address> --rpc http://127.0.0.1:18443 --rpc-cookie /tmp/rt/regtest/.cookie
+bbgo btc watch <address> --seed --chain regtest --poll 500ms --rpc ... --rpc-cookie ...
+```
+
+Coinbase outputs of a block mined at height h count as `Immature` until the
+tip reaches h + 99.
