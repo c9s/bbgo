@@ -9,6 +9,7 @@ import (
 	stdlog "log"
 	"math/rand"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -310,13 +311,31 @@ func (environ *Environment) ConfigureDatabaseDriver(
 	return nil
 }
 
-// AddExchangeSession adds the existing exchange session or pre-created exchange session
+// AddExchangeSession adds the existing exchange session or pre-created exchange session.
+//
+// Within one environment a session name refers to exactly one session, so it
+// panics when the name is already taken: adding two sessions under one name is
+// a mistake in the calling code, and silently replacing the first one would
+// hide it. Use Session to look a name up first when it may exist.
 func (environ *Environment) AddExchangeSession(name string, session *ExchangeSession) *ExchangeSession {
-	environ.sessions[name] = session
+	if err := environ.addSession(name, session); err != nil {
+		panic(err)
+	}
 	return session
 }
 
-// AddExchange adds the given exchange with the session name, this is the default
+// addSession adds session under name, or returns an error when the name is taken
+func (environ *Environment) addSession(name string, session *ExchangeSession) error {
+	if _, exists := environ.sessions[name]; exists {
+		return fmt.Errorf("session %q is already defined", name)
+	}
+
+	environ.sessions[name] = session
+	return nil
+}
+
+// AddExchange adds the given exchange with the session name, this is the default.
+// Like AddExchangeSession, it panics when the name is already taken.
 func (environ *Environment) AddExchange(name string, exchange types.Exchange) (session *ExchangeSession) {
 	session = NewExchangeSession(name, exchange)
 	return environ.AddExchangeSession(name, session)
@@ -350,7 +369,7 @@ func (environ *Environment) ConfigureProfiling(config *ProfilingConfig) (err err
 //
 // In a backtest it creates none. A backtest does not run on the live
 // sessions: it adds a simulated session under the name of each live session it
-// stands in for.
+// stands in for, and a session name refers to one session.
 func (environ *Environment) ConfigureExchangeSessions(userConfig *Config) error {
 	if IsBackTesting {
 		log.Warnf("backtesting: the exchange sessions of the config are not created, the backtest adds its own")
@@ -374,7 +393,9 @@ func (environ *Environment) AddExchangesByViperKeys() error {
 			}
 
 			if ex, ok := exMinimal.(types.Exchange); ok {
-				environ.AddExchange(n.String(), ex)
+				if err := environ.addSession(n.String(), NewExchangeSession(n.String(), ex)); err != nil {
+					return err
+				}
 			} else {
 				log.Errorf("exchange %T does not implement types.Exchange", exMinimal)
 			}
@@ -385,12 +406,53 @@ func (environ *Environment) AddExchangesByViperKeys() error {
 }
 
 func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]*ExchangeSession) error {
+	if err := environ.validateSessionNames(sessions); err != nil {
+		return err
+	}
+
 	for sessionName, session := range sessions {
 		if err := session.InitExchange(sessionName, nil); err != nil {
 			return err
 		}
 
-		environ.AddExchangeSession(sessionName, session)
+		if err := environ.addSession(sessionName, session); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateSessionNames checks the configured session names before any of them
+// is created:
+//
+//   - every name is an identifier (types.ValidateIdentifier)
+//   - no name is already taken by a session of the environment
+//
+// The name identifies the session outside the process too, e.g. as a key of
+// the rows synced for it, so a bad or a duplicate name stops bbgo here, before
+// any row is written under it. Every problem is reported, not only the first.
+func (environ *Environment) validateSessionNames(sessions map[string]*ExchangeSession) error {
+	names := make([]string, 0, len(sessions))
+	for name := range sessions {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	var problems []string
+	for _, name := range names {
+		if err := types.ValidateIdentifier(name); err != nil {
+			problems = append(problems, err.Error())
+			continue
+		}
+
+		if _, exists := environ.sessions[name]; exists {
+			problems = append(problems, fmt.Sprintf("session %q is already defined", name))
+		}
+	}
+
+	if len(problems) > 0 {
+		return fmt.Errorf("invalid session name: %s", strings.Join(problems, "; "))
 	}
 
 	return nil

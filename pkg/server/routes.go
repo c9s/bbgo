@@ -199,6 +199,14 @@ func (s *Server) newEngine(ctx context.Context) *gin.Engine {
 			return
 		}
 
+		// the session is named after its exchange, and a name refers to one session
+		if _, exists := s.Environ.Session(session.ExchangeName.String()); exists {
+			c.JSON(http.StatusConflict, gin.H{
+				"error": fmt.Sprintf("session %s is already defined", session.ExchangeName),
+			})
+			return
+		}
+
 		if err := session.InitExchange(session.ExchangeName.String(), nil); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
