@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 
@@ -131,9 +132,8 @@ func (s *SyncService) syncMarginFeeAssetInterests(
 		return nil
 	}
 
-	// Sync already warned about a session name that is too long
-	if ValidateMarginSessionName(sessionName) != nil {
-		return nil
+	if err := ValidateMarginSessionName(sessionName); err != nil {
+		return fmt.Errorf("invalid margin session name: %w", err)
 	}
 
 	log.Infof("[MarginService] syncing %s margin interests paid in %s...", exchange.Name(), fee)
