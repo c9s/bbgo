@@ -43,6 +43,12 @@ crossExchangeStrategies:
 
       circuitBreakLossThreshold: 10
 
+      ## profitFixer re-plays the trade history to rebuild the position and the profit stats
+      # profitFixer:
+      #   enabled: true
+      #   apply: true
+      #   tradesSince: "2026-11-01T00:00:00.000+08:00"
+
       inventorySkew:
         inventoryRangeMultiplier: 1.0
         targetBaseRatio: 0.5
