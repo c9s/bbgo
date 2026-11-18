@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 
@@ -124,15 +125,18 @@ func (s *SyncService) syncMarginFeeAssetInterests(
 ) error {
 	fee := MarginInterestFeeAsset(exchange.Name())
 	if fee == "" || slices.Contains(assets, fee) {
+		log.Warnf(
+			"[MarginService] fee asset %q is not included in interest payments for exchange session %s, margin assets: %v",
+			fee, sessionName, assets,
+		)
 		return nil
 	}
 
-	// Sync already warned about a session name that is too long
-	if ValidateMarginSessionName(sessionName) != nil {
-		return nil
+	if err := ValidateMarginSessionName(sessionName); err != nil {
+		return fmt.Errorf("invalid margin session name: %w", err)
 	}
 
-	log.Infof("syncing %s margin interests paid in %s...", exchange.Name(), fee)
+	log.Infof("[MarginService] syncing %s margin interests paid in %s...", exchange.Name(), fee)
 	return s.MarginService.SyncInterests(ctx, exchange, sessionName, fee, startTime)
 }
 
