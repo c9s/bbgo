@@ -124,6 +124,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	s.Strategy.Initialize(ctx, s.Environment, tradingSession, s.market, ID, s.InstanceID())
 
+	// Initialize sets the strategy IDs that the position metrics are labelled with,
+	// so publish the loaded (or fixed) position now instead of waiting for the next trade
+	s.Position.UpdateMetrics(nil)
+
 	s.orderPriceRiskControl = riskcontrol.NewOrderPriceRiskControl(
 		referenceSession.Indicators(s.Symbol).EMA(s.ReferencePriceEMA),
 		s.OrderPriceLossThreshold,
