@@ -25,6 +25,7 @@ func init() {
 // Fixed spread market making strategy
 type Strategy struct {
 	*common.Strategy
+	common.StrategyProfitFixer
 
 	Environment *bbgo.Environment
 
@@ -116,7 +117,16 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 	s.market = market
 
+	// fix the position and profit stats before Initialize binds them to the order executor
+	if err := s.fixProfit(ctx, tradingSession); err != nil {
+		log.WithError(err).Error("profit fixer failure")
+	}
+
 	s.Strategy.Initialize(ctx, s.Environment, tradingSession, s.market, ID, s.InstanceID())
+
+	// Initialize sets the strategy IDs that the position metrics are labelled with,
+	// so publish the loaded (or fixed) position now instead of waiting for the next trade
+	s.Position.UpdateMetrics(nil)
 
 	s.orderPriceRiskControl = riskcontrol.NewOrderPriceRiskControl(
 		referenceSession.Indicators(s.Symbol).EMA(s.ReferencePriceEMA),
@@ -157,6 +167,40 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		_ = s.OrderExecutor.GracefulCancel(ctx)
 		bbgo.Sync(ctx, s)
 	})
+	return nil
+}
+
+func (s *Strategy) fixProfit(ctx context.Context, tradingSession *bbgo.ExchangeSession) error {
+	if !s.StrategyProfitFixer.NeedsProfitFixing() {
+		return nil
+	}
+
+	log.Infof("running profit fixing with config: %+v", s.ProfitFixerConfig)
+	bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)
+
+	oriPosition := s.Position
+	if oriPosition == nil {
+		oriPosition = types.NewPositionFromMarket(s.market)
+	}
+
+	position, profitStats, err := s.StrategyProfitFixer.Fix(
+		ctx, s.Environment,
+		nil,
+		s.market,
+		[]*bbgo.ExchangeSession{tradingSession},
+		oriPosition,
+	)
+	if err != nil {
+		return err
+	}
+
+	bbgo.Notify("Fixed %s position", s.Symbol, position)
+	bbgo.Notify("Fixed %s profitStats", s.Symbol, profitStats)
+
+	if s.ProfitFixerConfig.Apply {
+		s.Position = position
+		s.ProfitStats = profitStats
+	}
 	return nil
 }
 
