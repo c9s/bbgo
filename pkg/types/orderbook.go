@@ -12,6 +12,12 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+var logger = logrus.WithFields(
+	logrus.Fields{
+		"component": "orderbook",
+	},
+)
+
 type OrderBook interface {
 	Spread() (fixedpoint.Value, bool)
 	BestAsk() (PriceVolume, bool)
@@ -45,6 +51,8 @@ func NewMutexOrderBook(symbol string, exchangeName ExchangeName) *MutexOrderBook
 	if v, _ := strconv.ParseBool(os.Getenv("ENABLE_SKIPLIST_ORDERBOOK")); v {
 		book = NewSkipListOrderBook(symbol)
 	}
+
+	logger.Infof("%s order book type: %T", symbol, book)
 
 	return &MutexOrderBook{
 		Symbol:    symbol,
