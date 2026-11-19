@@ -2,7 +2,9 @@ package indicator
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -66,5 +68,30 @@ func Test_calculateRSI(t *testing.T) {
 				assert.InDelta(t, v, tt.want[i], Delta)
 			}
 		})
+	}
+}
+
+func TestRSI_FlatPricesAreNeutral(t *testing.T) {
+	const window = 14
+	const count = window + 5
+
+	var kLines []types.KLine
+	for i := 0; i < count; i++ {
+		price := fixedpoint.NewFromFloat(100)
+		kLines = append(kLines, types.KLine{
+			High:    price,
+			Low:     price,
+			Close:   price,
+			EndTime: types.Time(time.Now().Add(time.Duration(i) * time.Minute)),
+		})
+	}
+
+	rsi := RSI{IntervalWindow: types.IntervalWindow{Window: window}}
+	rsi.CalculateAndUpdate(kLines)
+
+	assert.Len(t, rsi.Values, count-window)
+	for _, v := range rsi.Values {
+		assert.False(t, math.IsNaN(v), "RSI on flat prices must not be NaN")
+		assert.InDelta(t, 50.0, v, Delta)
 	}
 }

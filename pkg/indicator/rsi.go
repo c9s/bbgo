@@ -57,8 +57,15 @@ func (inc *RSI) Update(price float64) {
 		avgLoss = (inc.PreviousAvgLoss*13 + currentLoss) / float64(inc.Window)
 	}
 
-	rs := avgGain / avgLoss
-	rsi := 100 - (100 / (1 + rs))
+	var rsi float64
+	if avgGain == 0 && avgLoss == 0 {
+		// Flat prices have neither gains nor losses. 0/0 would be NaN and
+		// poison every downstream comparison, so report a neutral reading.
+		rsi = 50.0
+	} else {
+		rs := avgGain / avgLoss
+		rsi = 100 - (100 / (1 + rs))
+	}
 	inc.Values.Push(rsi)
 
 	inc.PreviousAvgGain = avgGain
