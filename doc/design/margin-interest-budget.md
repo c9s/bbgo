@@ -235,18 +235,9 @@ does not.
 ### Session names are identifiers
 
 The session name is now a key in the database, so it has to be a
-well-formed, stable identifier, which bbgo does not check today.
-
-- **The rule:** `[a-z0-9_]`, 1 to 64 characters. Lowercase only, so
-  two names cannot differ by case alone, which a case-insensitive
-  database collation would merge.
-- **Where:** at the application level, when the environment loads the
-  sessions. A bad name stops bbgo at startup, before any strategy or
-  sync has written a row under it.
-- **How:** one general validator, not a session-specific check. Any
-  config value that is an identifier should go through it. bbgo has no
-  identifier type yet; the function comes first and the type can
-  follow.
+well-formed, stable identifier. Its form, the scope it is unique in,
+where bbgo checks it and what bbgo assumes around it are in
+`doc/design/identifiers.md`.
 
 Renaming a session is a change of identity: the rows under the old
 name are no longer read, and the history is fetched again under the
@@ -369,8 +360,6 @@ decide whether "unknown" blocks borrowing.
 
 ## Follow-ups
 
-- **The identifier validator** described above, and its use on session
-  names.
 - **Repay when an asset is dropped.** When an asset leaves the
   autoborrow config while it still has debt, bbgo may want to repay
   it, so that it does not keep accruing interest that the budget no
