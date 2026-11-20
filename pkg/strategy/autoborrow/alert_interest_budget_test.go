@@ -13,6 +13,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/accounting/margininterest"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/livenote"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/types"
@@ -157,6 +158,51 @@ func TestInterestBudgetAlert_ListsEveryBudget(t *testing.T) {
 	assert.Equal(t, "ok: 23.56 / 100.00 USDT, realized 12.00", values["Session budget"])
 	assert.Equal(t, "projected_exceeded: 23.19 / 20.00 USDT, realized 12.00", values["ETH budget"])
 	assert.Equal(t, "ok: 0.37 / 600.00 USDT, realized 0.00", values["USDT budget"])
+	assert.Equal(t, "💸 1 of 3 interest budgets are over (2026-11)\nUpdated at 2026-11-15 10:20:00 UTC", attachment.Text)
+}
+
+// The message is edited in place and keeps the time of its first post, so it
+// says when its figures were last updated: the time of each tick
+func TestInterestBudgetAlert_SaysWhenItWasUpdated(t *testing.T) {
+	// 0.373 USDT is projected
+	w := newBudgetWorker(t, "0.2", &fakeHistoryStore{})
+	notifier := withBudgetAlerter(w)
+	now := testNow
+	w.now = func() time.Time { return now }
+
+	w.tick(context.Background())
+	now = testNow.Add(5 * time.Minute)
+	w.tick(context.Background())
+
+	require.Len(t, notifier.updates, 2)
+	assert.Equal(t, testNow, notifier.updates[0].UpdatedAt)
+	assert.Equal(t, now, notifier.updates[1].UpdatedAt)
+	assert.Contains(t, notifier.updates[0].SlackAttachment().Text, "\nUpdated at 2026-11-15 10:20:00 UTC")
+	assert.Contains(t, notifier.updates[1].SlackAttachment().Text, "\nUpdated at 2026-11-15 10:25:00 UTC")
+
+	// the update is not a status change: nothing more is said in the thread
+	require.Len(t, notifier.comments, 1)
+}
+
+// The notifier comments every changed field of a compared object in the
+// thread, and the update time changes on every tick: the alert is not compared
+func TestInterestBudgetAlert_UpdateDoesNotCompareTheObject(t *testing.T) {
+	n := &liveNoteBudgetNotifier{slack: &slackalert.SlackAlert{Channel: "C1", Mentions: []string{"<@U1>"}, Pin: true}}
+
+	opts := n.updateOptions()
+
+	require.Len(t, opts, 3)
+	for _, opt := range opts {
+		_, compares := opt.(*livenote.OptionCompare)
+		assert.False(t, compares)
+	}
+	assert.Empty(t, (&liveNoteBudgetNotifier{}).updateOptions())
+}
+
+// An alert without an update time does not claim one
+func TestInterestBudgetAlert_TextWithoutUpdateTime(t *testing.T) {
+	alert := &InterestBudgetAlert{SessionName: "s", Month: testNow}
+	assert.NotContains(t, alert.SlackAttachment().Text, "Updated at")
 }
 
 func TestInterestBudgetAlert_AttachmentColor(t *testing.T) {

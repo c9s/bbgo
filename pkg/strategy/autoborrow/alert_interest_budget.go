@@ -20,8 +20,9 @@ import (
 //
 // The alert is one live message per session, updated in place. It is raised
 // when a budget is exceeded or projected to be exceeded, and it lists every
-// budget of the session with its status. It only tells an operator: nothing is
-// repaid and borrowing does not change.
+// budget of the session with its status. Below its title it says when its
+// figures were last updated. It only tells an operator: nothing is repaid and
+// borrowing does not change.
 //
 //	interestBudgetAlert:
 //	  slack:
@@ -51,9 +52,18 @@ type InterestBudgetAlert struct {
 	// Month is the start of the UTC calendar month the budgets cover
 	Month time.Time
 
+	// UpdatedAt is when the tick the alert was built on started: the debts are
+	// read then, while realized interest is as of the last sync. The message is
+	// edited in place and keeps the time it was first posted, so without it a
+	// reader cannot tell a message that is still updated from one that is not.
+	UpdatedAt time.Time
+
 	// Budgets lists the session budget first, then the asset budgets by asset
 	Budgets []interestBudgetLine
 }
+
+// interestBudgetAlertTimeLayout formats the update time of the alert, in UTC like its month
+const interestBudgetAlertTimeLayout = "2006-01-02 15:04:05 UTC"
 
 func (a *InterestBudgetAlert) ObjectID() string {
 	return a.AlertID
@@ -114,6 +124,11 @@ func (a *InterestBudgetAlert) SlackAttachment() slack.Attachment {
 		})
 	}
 
+	// the update time is right below the title: every line of the message is from that tick
+	if !a.UpdatedAt.IsZero() {
+		text += "\nUpdated at " + a.UpdatedAt.UTC().Format(interestBudgetAlertTimeLayout)
+	}
+
 	return slack.Attachment{
 		Color:      color,
 		Title:      fmt.Sprintf("Interest Budget Alert: %s session", a.SessionName),
@@ -141,15 +156,22 @@ type liveNoteBudgetNotifier struct {
 }
 
 func (n *liveNoteBudgetNotifier) Update(alert *InterestBudgetAlert) {
-	opts := []livenote.Option{livenote.CompareObject(true)}
+	bbgo.PostLiveNote(alert, n.updateOptions()...)
+}
+
+// updateOptions returns the options the alert is posted and updated with.
+// Unlike the other autoborrow alerts there is no livenote.CompareObject: it
+// comments every changed field in the thread, and UpdatedAt changes on every
+// tick. The alerter comments the status changes itself.
+func (n *liveNoteBudgetNotifier) updateOptions() []livenote.Option {
+	var opts []livenote.Option
 	if n.slack != nil {
 		opts = append(opts, livenote.Channel(n.slack.Channel), livenote.OneTimeMention(n.slack.Mentions...))
 		if n.slack.Pin {
 			opts = append(opts, livenote.Pin(true))
 		}
 	}
-
-	bbgo.PostLiveNote(alert, opts...)
+	return opts
 }
 
 func (n *liveNoteBudgetNotifier) Comment(alert *InterestBudgetAlert, message string) {
@@ -211,6 +233,7 @@ func (a *interestBudgetAlerter) build(est *interestEstimate) *InterestBudgetAler
 		SessionName:  a.session.Name,
 		Exchange:     a.session.ExchangeName,
 		Month:        est.Month,
+		UpdatedAt:    est.Time,
 	}
 
 	if est.Budget != nil {
