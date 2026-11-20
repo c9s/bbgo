@@ -146,7 +146,7 @@ func (e *GeneralOrderExecutor) BindTradeStats(tradeStats *types.TradeStats) {
 			return
 		}
 
-		tradeStats.Add(profit)
+		tradeStats.AddProfit(profit)
 	})
 }
 
@@ -157,7 +157,7 @@ func (e *GeneralOrderExecutor) BindProfitStats(profitStats *types.ProfitStats) {
 			return
 		}
 
-		profitStats.AddProfit(*profit)
+		profitStats.AddProfit(profit)
 
 		if !e.disableNotify {
 			Notify(profit)
