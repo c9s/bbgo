@@ -38,9 +38,9 @@ exchangeStrategies:
       # `assets`), and one per asset. Each is optional, and they are independent of each other.
       # A budget only reports a status (log and Prometheus): exceeded (already charged more),
       # projected_exceeded (will be over at the month end if nothing changes), ok, or unknown (within the
-      # budget, but the estimate is incomplete). It does not alert and does not change how autoborrow
-      # borrows or repays. It compares what was charged, at the price when charged, whatever
-      # realizedPriceMode is. A session has its budgets in one autoborrow instance only.
+      # budget, but the estimate is incomplete). It does not change how autoborrow borrows or repays;
+      # interestBudgetAlert below alerts on it. It compares what was charged, at the price when charged,
+      # whatever realizedPriceMode is. A session has its budgets in one autoborrow instance only.
       # budget:
       #   monthlyUSDT: 1000   # the whole session; 0 or not set: no budget
       #   assets:             # per asset, each has to be one of the `assets` below

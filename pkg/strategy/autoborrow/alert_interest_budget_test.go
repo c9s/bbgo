@@ -13,6 +13,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/accounting/margininterest"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/livenote"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/types"
@@ -181,6 +182,21 @@ func TestInterestBudgetAlert_SaysWhenItWasUpdated(t *testing.T) {
 
 	// the update is not a status change: nothing more is said in the thread
 	require.Len(t, notifier.comments, 1)
+}
+
+// The notifier comments every changed field of a compared object in the
+// thread, and the update time changes on every tick: the alert is not compared
+func TestInterestBudgetAlert_UpdateDoesNotCompareTheObject(t *testing.T) {
+	n := &liveNoteBudgetNotifier{slack: &slackalert.SlackAlert{Channel: "C1", Mentions: []string{"<@U1>"}, Pin: true}}
+
+	opts := n.updateOptions()
+
+	require.Len(t, opts, 3)
+	for _, opt := range opts {
+		_, compares := opt.(*livenote.OptionCompare)
+		assert.False(t, compares)
+	}
+	assert.Empty(t, (&liveNoteBudgetNotifier{}).updateOptions())
 }
 
 // An alert without an update time does not claim one
