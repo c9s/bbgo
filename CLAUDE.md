@@ -267,6 +267,14 @@ and `bbgo curve pools | pool | quote`, plus the write commands
 `bbgo aave supply | withdraw | borrow | repay`, `bbgo uniswap swap` and
 `bbgo curve swap`, which all need `--confirm`.
 
+## Bitcoin Layer
+
+`pkg/chain/btc` is a Bitcoin Core JSON-RPC client whose types mirror the RPC
+JSON. Read `doc/development/bitcoin-chain-layer.md` before building on it: the
+UTXO model has no sender field and no balances, `Hash` is stored in wire byte
+order (the RPC shows it reversed), and `Amount` is int64 satoshis parsed from
+the JSON literal, never through float64.
+
 ## Strategy Development
 
 Read `doc/development/strategy-layer-design.md` before adding a non-trivial
