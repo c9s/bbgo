@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/chain/evm"
+	"github.com/c9s/bbgo/pkg/chain/evm/stream"
 	"github.com/c9s/bbgo/pkg/chain/evm/token"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -75,7 +76,9 @@ type ChainSession struct {
 	// are read from <SESSION>_RPC_ENDPOINTS or <CHAIN>_RPC_ENDPOINTS.
 	RPCEndpoints []string `json:"rpcEndpoints,omitempty" yaml:"rpcEndpoints,omitempty"`
 
-	// WSEndpoint is reserved for the log subscription stream.
+	// WSEndpoint is the WebSocket endpoint of the block stream's head
+	// subscription. When empty it is read from <SESSION>_WS_ENDPOINT or
+	// <CHAIN>_WS_ENDPOINT; without one the stream polls the RPC endpoints.
 	WSEndpoint string `json:"wsEndpoint,omitempty" yaml:"wsEndpoint,omitempty"`
 
 	// PrivateKeyVar overrides the name of the environment variable holding the
@@ -208,6 +211,41 @@ func (s *ChainSession) resolveEndpoints() []string {
 	}
 
 	return nil
+}
+
+// resolveWSEndpoint falls back to the environment when the config has none.
+func (s *ChainSession) resolveWSEndpoint() string {
+	if v := strings.TrimSpace(s.WSEndpoint); v != "" {
+		return v
+	}
+
+	candidates := []string{s.envVarName("WS_ENDPOINT")}
+	if s.chain != nil {
+		candidates = append(candidates, envVarName(s.chain.Name, "WS_ENDPOINT"))
+	}
+
+	for _, name := range candidates {
+		if v, ok := os.LookupEnv(name); ok && strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+
+	return ""
+}
+
+// NewStream creates a block stream on this session's RPC endpoints. The
+// session's WebSocket endpoint is used unless config names another one. The
+// stream does nothing until its Run is called.
+func (s *ChainSession) NewStream(config stream.Config) (*stream.Stream, error) {
+	if !s.initialized {
+		return nil, fmt.Errorf("chain session %s is not initialized", s.Name)
+	}
+
+	if config.WSEndpoint == "" {
+		config.WSEndpoint = s.resolveWSEndpoint()
+	}
+
+	return stream.New(s.client, config), nil
 }
 
 func (s *ChainSession) loadSigner() error {

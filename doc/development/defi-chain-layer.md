@@ -12,6 +12,7 @@ Uniswap, Curve and Balancer are all implemented and the common shape is known.
 pkg/chain/evm/              chain registry, endpoint pool, client, signer
 pkg/chain/evm/token/        ERC20 metadata, balances, amount conversion
 pkg/chain/evm/multicall/    Multicall3 batched reads
+pkg/chain/evm/stream/       block stream: WebSocket heads, backfill, reorgs
 pkg/bbgo/chainsession.go    ChainSession: one chain + one address
 ```
 
@@ -217,10 +218,85 @@ bbgo chain approve --session eth --token USDT --spender 0x... --unlimited --conf
 A dry run is a real check: it runs the same `eth_call` and `eth_estimateGas` the
 sender would, so a revert fails the command.
 
+`chain stream` follows the chain and prints every block, optionally with its
+transactions and the matching logs. It runs until interrupted:
+
+```bash
+bbgo chain stream --session bsc
+bbgo chain stream --session bsc --full-tx
+bbgo chain stream --session eth --address USDT --event 'Transfer(address,address,uint256)'
+bbgo chain stream --session eth --from-block 21000000 --confirmations 3
+```
+
+## Block stream
+
+`pkg/chain/evm/stream` delivers the blocks of one chain in order, each with the
+logs matching a `LogFilter` and, optionally, its full transactions. It is the
+layer to build on-chain watchers on (large transfers, pool events, deposits);
+it knows nothing about what is being watched.
+
+```go
+s, err := session.NewStream(stream.Config{
+	Logs: &stream.LogFilter{
+		Addresses: []common.Address{usdt},
+		Topics:    [][]common.Hash{{transferTopic}},
+	},
+})
+s.OnBlock(func(b *stream.Block) { /* b.Logs, b.Transactions */ })
+s.OnReorg(func(r stream.Reorg) { /* drop what came from r.Removed */ })
+err = s.Run(ctx)
+```
+
+It is driven by **block heads, not by a log subscription**. The WebSocket
+`newHeads` subscription only says the chain moved; every block is then read
+over the HTTP endpoint pool, and its logs are queried by block hash. That one
+path covers what `eth_subscribe("logs")` handles badly:
+
+- **No lost blocks.** The stream reads every block from its cursor to the head,
+  so whatever was produced while the socket was down is backfilled. A
+  subscription that goes quiet without an error is reconnected after
+  `StallTimeout`, and `PollInterval` polls `eth_blockNumber` as a safety net.
+- **No WebSocket needed.** Without `wsEndpoint` the poll drives the stream at
+  the block time. The session reads the endpoint from `wsEndpoint`,
+  `<SESSION>_WS_ENDPOINT` or `<CHAIN>_WS_ENDPOINT`.
+- **Reorgs.** Each block's parent hash is checked against the last delivered
+  block. A mismatch walks back the window of `MaxReorgDepth` delivered blocks to
+  the common ancestor, emits `Reorg` with the removed blocks (newest first), and
+  resumes after the ancestor. A reorg deeper than the window stops `Run` with
+  `ErrReorgTooDeep`. `Confirmations` keeps the stream that many blocks behind
+  the head, trading latency for fewer reorgs.
+
+Things that are easy to get wrong here:
+
+- **An empty log result is not proof of no logs.** Load-balanced providers
+  (publicnode, for one) route `eth_getLogs` to a backend that may not have
+  indexed the newest block, and answer a query by an unknown block hash with
+  `[]` instead of an error. The stream trusts an empty answer only when the
+  header's logs bloom rules a match out; otherwise it asks again by block
+  number, which a lagging backend fails explicitly and is retried.
+- **Block hashes come from the node, not from go-ethereum.** `evm.Block` is
+  decoded from the raw RPC result, so its `Hash` is the reported one. A hash
+  recomputed from the header fields is wrong as soon as a chain adds a field
+  go-ethereum does not know, and that would break the parent-hash check.
+  Transactions of a type go-ethereum cannot decode (the Polygon state-sync
+  transaction) are counted in `SkippedTransactions` rather than failing the
+  block. `Transaction.From` is the sender the node reports.
+- **Some public endpoints disable `eth_getLogs`** (`bsc-dataseed` answers
+  "limit exceeded"). The stream keeps retrying; use an endpoint that serves logs.
+- **Callbacks are synchronous.** They run on the `Run` goroutine in chain order;
+  a slow callback slows the stream down, it does not drop blocks. Register them
+  before `Run`.
+
+Nothing is persisted. To resume after a restart, store `Cursor().Number + 1`
+and pass it as `FromBlock`.
+
 ## Testing
 
 `go test ./pkg/chain/...` runs entirely on fakes: `fakeTxClient` drives the whole
 lifecycle (bumping, reorg, confirmation fallback, serialization) with no node.
+The block stream tests use an in-memory `fakeChain` for backfill, reorgs and
+lagging endpoints, and go-ethereum's own `rpc.Server` as a WebSocket node for
+the subscription and reconnect path.
 
 Two integration tests are skipped unless you opt in:
 
@@ -239,7 +315,8 @@ the chain registry applies, and they use the standard anvil account #0.
 
 - Private (MEV-protected) submission: the hook exists, the transport does not.
 - Permit2 and signature-based approvals.
-- A WebSocket log subscription stream, which is what a protocol adapter will
-  want for watching pool events rather than polling.
+- Pending (mempool) transactions. The block stream only sees sealed blocks.
+- Anything built on the block stream: large-transfer detection, notifications,
+  cursor persistence.
 - Notifications and Prometheus metrics for the transaction lifecycle; today it
   only logs.
