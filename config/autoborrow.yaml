@@ -20,8 +20,9 @@ exchangeStrategies:
     # if the margin ratio is high enough, we don't have the urge to repay
     maxMarginLevel: 20.0
 
-    # interestEstimate logs and exports (Prometheus) the margin interest of the `assets` below,
-    # borrowed or not (a debt of another asset is not counted, only warned), in USDT, counted in hourly charges:
+    # interestEstimate logs and exports (Prometheus) the margin interest of the session: of the `assets`
+    # below, borrowed or not, and of any other asset the session has debt in or was charged for this
+    # month. In USDT, counted in hourly charges:
     # - the UTC calendar month: interest projected on the current principal until the month end,
     #   plus the interest already charged this month (synced into the database, needs a configured DB).
     #   On Binance, interest paid with BNB deduction counts toward the borrowed asset, valued at the BNB charged.
@@ -34,8 +35,8 @@ exchangeStrategies:
       realizedPriceMode: charged
       # rolling months to project, 1 and 3 by default (720 and 2160 hours)
       projectionMonths: [1, 3]
-      # budget: interest budgets per UTC calendar month, in USDT: one for the whole session (over all
-      # `assets`), and one per asset. Each is optional, and they are independent of each other.
+      # budget: interest budgets per UTC calendar month, in USDT: one for the whole session (over every
+      # asset), and one per asset. Each is optional, and they are independent of each other.
       # A budget only reports a status (log and Prometheus): exceeded (already charged more),
       # projected_exceeded (will be over at the month end if nothing changes), ok, or unknown (within the
       # budget, but the estimate is incomplete). It does not change how autoborrow borrows or repays;
@@ -43,7 +44,7 @@ exchangeStrategies:
       # whatever realizedPriceMode is. A session has its budgets in one autoborrow instance only.
       # budget:
       #   monthlyUSDT: 1000   # the whole session; 0 or not set: no budget
-      #   assets:             # per asset, each has to be one of the `assets` below
+      #   assets:             # per asset: any asset of the exchange, it does not have to be one of the `assets` below
       #     USDT: 600
       #     ETH: 300
 

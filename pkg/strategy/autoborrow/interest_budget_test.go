@@ -373,7 +373,8 @@ func TestInterestBudget_ResyncDoesNotChangeTheStatus(t *testing.T) {
 	w.lastSync = time.Time{}
 	second := w.tick(context.Background())
 
-	assert.Greater(t, len(history.syncs), len(w.syncAssets))
+	// BNB and USDT, twice
+	assert.Len(t, history.syncs, 4)
 	assert.Equal(t, first.Budget.Status(), second.Budget.Status())
 	assert.Equal(t, first.Budget.RealizedUSDT, second.Budget.RealizedUSDT)
 	assert.Equal(t, first.Budget.RemainingUSDT, second.Budget.RemainingUSDT)
@@ -459,16 +460,17 @@ func TestInterestBudget_BudgetOnADisabledEstimateFails(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "isolated margin")
 
+	// no autoborrow asset does not disable it: the estimate covers what the session borrowed
 	noAssets := newBudgetWorker(t, "10", &fakeHistoryStore{})
-	noAssets.assets = nil
-	_, err = noAssets.claimBudget()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no autoborrow assets")
+	noAssets.configAssets = func() []string { return nil }
+	release, err := noAssets.claimBudget()
+	require.NoError(t, err)
+	release()
 
 	// without a budget the estimate is only disabled, as before
 	plain := newBudgetWorker(t, "", &fakeHistoryStore{})
 	plain.session.IsolatedMargin = true
-	release, err := plain.claimBudget()
+	release, err = plain.claimBudget()
 	require.NoError(t, err)
 	release()
 }
@@ -796,23 +798,101 @@ func TestInterestAssetBudgetConfig_Validate(t *testing.T) {
 	// an asset budget with the estimate off is an error, like a session budget
 	assert.Error(t, (&InterestEstimateConfig{Budget: assets(map[string]string{"USDT": "600"})}).Validate())
 
-	// a budgeted asset has to be an autoborrow asset: the estimate covers no other
+	// a budgeted asset does not have to be an autoborrow asset: the asset list
+	// can change while the budget stays. It is only reported.
 	s := &Strategy{
 		Assets:           configured("USDT"),
-		InterestEstimate: &InterestEstimateConfig{Interval: interval, Budget: assets(map[string]string{"USDT": "600", "ETH": "10"})},
+		InterestEstimate: &InterestEstimateConfig{Interval: interval, Budget: assets(map[string]string{"USDT": "600", "ETH": "10", "DOGE": "0"})},
 	}
-	err = s.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "ETH")
-	assert.Contains(t, err.Error(), "not in the autoborrow assets")
+	assert.NoError(t, s.Validate())
+	assert.Equal(t, []string{"ETH"}, s.InterestEstimate.budgetAssetsOutside(s.getAssetStringSlice()))
+	assert.Empty(t, s.InterestEstimate.budgetAssetsOutside([]string{"USDT", "ETH"}))
+}
 
+// The budget of an asset that is not an autoborrow asset is assessed like any
+// other: on the debt and the charges the session has in the asset
+func TestInterestAssetBudget_OfAnAssetOutsideTheConfig(t *testing.T) {
+	account := newTestAccount(Number(10), debtBalance("ETH", fixedpoint.Zero, Number(10)))
+	rates := &fakeRateService{rates: map[string]string{"ETH": "0.000001"}}
+	history := &fakeHistoryStore{rows: []types.MarginInterestValuation{ethRow(2, "0.004")}}
+	w := newTestInterestWorker(t, account, rates, history, configured("USDT")...)
+	w.config.Budget = &InterestBudgetConfig{Assets: map[string]fixedpoint.Value{"ETH": Number(20), "BTC": Number(5)}}
+
+	est := w.tick(context.Background())
+
+	// ETH: 12 realized + 373 hours x 0.000001 x 10 ETH x 3000 = 11.19 projected, of 20
+	eth := est.AssetBudgets["ETH"]
+	assert.InDelta(t, 12, eth.RealizedUSDT.Float64(), 1e-8)
+	assert.InDelta(t, 23.19, eth.MonthUSDT.Float64(), 1e-6)
+	assert.Equal(t, margininterest.BudgetStatusProjectedExceeded, eth.Status())
+
+	// BTC has no debt and no charge: within its budget, and known to be
+	assert.Equal(t, margininterest.BudgetStatusOK, est.AssetBudgets["BTC"].Status())
+	assert.Contains(t, syncedAssets(history, 0), "BTC")
+}
+
+// A budget for an asset that is not an autoborrow asset is valid, but worth
+// knowing about: it is reported once, and again when the list changes
+func TestInterestAssetBudget_OutsideTheConfigIsReportedWhenItChanges(t *testing.T) {
+	account := newTestAccount(Number(10))
+	s := newTestStrategy(t, account, newFakeMarginBorrowRepayService(nil), configured("USDT")...)
+	w := newTestInterestWorkerOf(t, s, &fakeRateService{}, &fakeHistoryStore{})
+	w.config.Budget = &InterestBudgetConfig{Assets: map[string]fixedpoint.Value{"USDT": Number(600), "ETH": Number(20)}}
+	logger, hook := logrustest.NewNullLogger()
+	w.logger = logger
+
+	reports := func() []string {
+		var out []string
+		for _, e := range hook.AllEntries() {
+			if strings.Contains(e.Message, "are not autoborrow assets") {
+				out = append(out, e.Message)
+			}
+		}
+		return out
+	}
+
+	w.tick(context.Background())
+	require.Len(t, reports(), 1)
+	assert.Contains(t, reports()[0], "[ETH]")
+
+	// not on every tick
+	w.tick(context.Background())
+	assert.Len(t, reports(), 1)
+
+	// the list changes while bbgo runs: USDT is taken off
+	s.Assets = configured("BTC")
+	w.tick(context.Background())
+	require.Len(t, reports(), 2)
+	assert.Contains(t, reports()[1], "[ETH USDT]")
+
+	// and nothing more to say once every budgeted asset is listed
 	s.Assets = configured("USDT", "ETH")
-	assert.NoError(t, s.Validate())
+	w.tick(context.Background())
+	assert.Len(t, reports(), 2)
+}
 
-	// a zero budget of an asset outside the list is no budget, so no error
-	s.Assets = configured("USDT")
-	s.InterestEstimate.Budget = assets(map[string]string{"USDT": "600", "ETH": "0"})
-	assert.NoError(t, s.Validate())
+// A budget for a name the exchange does not know would never see a debt or a
+// charge and read ok forever: it does not start
+func TestInterestAssetBudget_OfAnUnknownAssetFails(t *testing.T) {
+	w := newAssetBudgetWorker(t, &fakeHistoryStore{}, map[string]string{"USDT": "600", "ETH": "20", "BTC": "5", "ETHH": "20"})
+
+	// a session without markets cannot tell
+	release, err := w.claimBudget()
+	require.NoError(t, err)
+	release()
+
+	// BTC is not an autoborrow asset, but it is an asset of the exchange
+	w.session.SetMarkets(types.MarketMap{"ETHUSDT": Market("ETHUSDT"), "BTCUSDT": Market("BTCUSDT")})
+	assert.Equal(t, []string{"ETHH"}, w.unknownBudgetAssets())
+	_, err = w.claimBudget()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ETHH")
+	assert.NotContains(t, err.Error(), "BTC")
+
+	delete(w.config.Budget.Assets, "ETHH")
+	release, err = w.claimBudget()
+	require.NoError(t, err)
+	release()
 }
 
 // An instance with only asset budgets also takes the budget of the session
