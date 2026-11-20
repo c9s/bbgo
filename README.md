@@ -19,8 +19,10 @@ A modern crypto trading bot framework written in Go.
 ## Community
 
 [![Telegram Global](https://img.shields.io/badge/telegram-global-blue.svg)](https://t.me/bbgo_intl)
-[![Telegram Taiwan](https://img.shields.io/badge/telegram-tw-blue.svg)](https://t.me/bbgocrypto)
+[![Telegram Taiwan](https://img.shields.io/badge/telegram-tw-blue.svg)](https://t.me/bbgotrading)
 [![Twitter](https://img.shields.io/twitter/follow/bbgotrading?label=Follow&style=social)](https://twitter.com/bbgotrading)
+
+> ⚠️ **Scam warning:** our Taiwan Telegram group has moved to [@bbgotrading](https://t.me/bbgotrading). The old `bbgocrypto` handle is no longer ours — it was taken over by scammers. Do not trust any message, investment offer, airdrop or link posted there, and never send funds or share your API keys or seed phrase.
 
 ## What You Can Do With BBGO
 
@@ -692,8 +694,10 @@ The cost is 10 ETH. If you're interested in it, DM me in telegram <https://t.me/
 ## Community
 
 - Telegram Group <https://t.me/bbgo_intl>
-- Telegram Group (Taiwan) <https://t.me/bbgocrypto>
+- Telegram Group (Taiwan) <https://t.me/bbgotrading>
 - X/Twitter <https://x.com/bbgotrading>
+
+> ⚠️ **Scam warning:** our Taiwan Telegram group has moved to [@bbgotrading](https://t.me/bbgotrading). The old `bbgocrypto` handle is no longer ours — it was taken over by scammers. Do not trust any message, investment offer, airdrop or link posted there, and never send funds or share your API keys or seed phrase.
 
 ## Contributing
 

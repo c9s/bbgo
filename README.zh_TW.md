@@ -20,8 +20,10 @@ A modern crypto trading bot framework written in Go.
 ## 社群
 
 [![Telegram Global](https://img.shields.io/badge/telegram-global-blue.svg)](https://t.me/bbgo_intl)
-[![Telegram Taiwan](https://img.shields.io/badge/telegram-tw-blue.svg)](https://t.me/bbgocrypto)
+[![Telegram Taiwan](https://img.shields.io/badge/telegram-tw-blue.svg)](https://t.me/bbgotrading)
 [![Twitter](https://img.shields.io/twitter/follow/bbgotrading?label=Follow&style=social)](https://twitter.com/bbgotrading)
+
+> ⚠️ **詐騙提醒：**台灣社群已搬遷至 [@bbgotrading](https://t.me/bbgotrading)。舊的 `bbgocrypto` 帳號已不屬於我們，已被詐騙集團接手。請勿相信該頻道的任何訊息、投資邀約、空投或連結，也切勿匯款或提供 API key、助記詞。
 
 ## 你可以用 BBGO 做什麼
 ### 交易機器人用戶 💁‍♀️ 💁‍♂️
@@ -604,8 +606,10 @@ make embed && go run -tags web ./cmd/bbgo-lorca
 ## 社群
 
 - Telegram <https://t.me/bbgo_intl>
-- Telegram (台灣社群) <https://t.me/bbgocrypto>
+- Telegram (台灣社群) <https://t.me/bbgotrading>
 - Twitter <https://twitter.com/bbgotrading>
+
+> ⚠️ **詐騙提醒：**台灣社群已搬遷至 [@bbgotrading](https://t.me/bbgotrading)。舊的 `bbgocrypto` 帳號已不屬於我們，已被詐騙集團接手。請勿相信該頻道的任何訊息、投資邀約、空投或連結，也切勿匯款或提供 API key、助記詞。
 
 ## 貢獻
 

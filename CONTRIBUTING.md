@@ -76,5 +76,7 @@ For further request, please contact us: <https://t.me/c123456789s>
 You can join our telegram channels:
 
 - BBGO International <https://t.me/bbgo_intl>
-- BBGO Taiwan <https://t.me/bbgocrypto>
+- BBGO Taiwan <https://t.me/bbgotrading>
+
+> ⚠️ **Scam warning:** our Taiwan Telegram group has moved to [@bbgotrading](https://t.me/bbgotrading). The old `bbgocrypto` handle is no longer ours — it was taken over by scammers. Do not trust any message, investment offer, airdrop or link posted there, and never send funds or share your API keys or seed phrase.
 
