@@ -491,6 +491,13 @@ func (v *Value) Scan(src interface{}) error {
 	case float64:
 		*v = NewFromFloat(d)
 		return nil
+	case string:
+		value, err := NewFromString(d)
+		if err != nil {
+			return err
+		}
+		*v = value
+		return nil
 	case []byte:
 		*v, err = NewFromString(string(d))
 		if err != nil {
