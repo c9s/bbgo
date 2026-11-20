@@ -341,6 +341,10 @@ stateDiagram-v2
   status, so one glance shows which asset is over and how the session
   stands. Several messages would arrive together whenever one borrow
   pushes an asset and the session over at once.
+- **The message says when its figures are from,** below its title. All
+  lines are from the same tick, and an edited message keeps the time
+  of its first post, so a reader could not otherwise tell fresh
+  figures from stale ones.
 - **Exceeded and projected exceeded raise it. Unknown does not.** An
   incomplete estimate is in the log and the metrics, and one failed
   sync should not call anyone.

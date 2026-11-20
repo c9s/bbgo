@@ -64,7 +64,8 @@ exchangeStrategies:
 
     # interestBudgetAlert posts one live Slack message per session when a budget of
     # interestEstimate.budget is exceeded or projected to be exceeded. The message lists every budget
-    # with its status and is updated in place; it is resolved when no budget is over any more.
+    # with its status and is updated in place (it says when, below the title); it is resolved when
+    # no budget is over any more.
     # It only tells you: nothing is repaid, and borrowing does not change. It needs a budget.
     # interestBudgetAlert:
     #   slack:
