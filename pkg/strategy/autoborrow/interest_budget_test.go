@@ -831,6 +831,46 @@ func TestInterestAssetBudget_OfAnAssetOutsideTheConfig(t *testing.T) {
 	assert.Contains(t, syncedAssets(history, 0), "BTC")
 }
 
+// A budget for an asset that is not an autoborrow asset is valid, but worth
+// knowing about: it is reported once, and again when the list changes
+func TestInterestAssetBudget_OutsideTheConfigIsReportedWhenItChanges(t *testing.T) {
+	account := newTestAccount(Number(10))
+	s := newTestStrategy(t, account, newFakeMarginBorrowRepayService(nil), configured("USDT")...)
+	w := newTestInterestWorkerOf(t, s, &fakeRateService{}, &fakeHistoryStore{})
+	w.config.Budget = &InterestBudgetConfig{Assets: map[string]fixedpoint.Value{"USDT": Number(600), "ETH": Number(20)}}
+	logger, hook := logrustest.NewNullLogger()
+	w.logger = logger
+
+	reports := func() []string {
+		var out []string
+		for _, e := range hook.AllEntries() {
+			if strings.Contains(e.Message, "are not autoborrow assets") {
+				out = append(out, e.Message)
+			}
+		}
+		return out
+	}
+
+	w.tick(context.Background())
+	require.Len(t, reports(), 1)
+	assert.Contains(t, reports()[0], "[ETH]")
+
+	// not on every tick
+	w.tick(context.Background())
+	assert.Len(t, reports(), 1)
+
+	// the list changes while bbgo runs: USDT is taken off
+	s.Assets = configured("BTC")
+	w.tick(context.Background())
+	require.Len(t, reports(), 2)
+	assert.Contains(t, reports()[1], "[ETH USDT]")
+
+	// and nothing more to say once every budgeted asset is listed
+	s.Assets = configured("USDT", "ETH")
+	w.tick(context.Background())
+	assert.Len(t, reports(), 2)
+}
+
 // A budget for a name the exchange does not know would never see a debt or a
 // charge and read ok forever: it does not start
 func TestInterestAssetBudget_OfAnUnknownAssetFails(t *testing.T) {

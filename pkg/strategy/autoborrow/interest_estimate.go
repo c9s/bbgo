@@ -107,7 +107,8 @@ type InterestBudgetConfig struct {
 	MonthlyUSDT fixedpoint.Value `json:"monthlyUSDT"`
 
 	// Assets are the budgets per asset and UTC calendar month, in USDT. An asset
-	// here has to be an asset of the exchange, but not an autoborrow asset.
+	// here has to be an asset of the exchange. It does not have to be an
+	// autoborrow asset.
 	// Interest paid in another asset (e.g. BNB) counts toward the asset that was
 	// borrowed. 0 means no budget for the asset.
 	Assets map[string]fixedpoint.Value `json:"assets,omitempty"`
@@ -320,9 +321,16 @@ type interestEstimate struct {
 	Unattributed int
 
 	// MissingHistory reports whether the realized interest may be incomplete:
-	// it could not be read, a sync failed, an asset was not synced yet, or a row
-	// could not be attributed
+	// it could not be read, a sync or the valuation failed, an asset was not
+	// synced yet, or a row could not be attributed
 	MissingHistory bool
+
+	// StalePrice are the assets whose current price could not be queried on this
+	// tick: what is valued at it uses the last price the session has.
+	// StaleDebtPrice are the ones with debt, whose projection that is. Either
+	// makes the estimate incomplete.
+	StalePrice     []string
+	StaleDebtPrice []string
 
 	// Assets is the month interest of each asset, the input of a per-asset budget
 	Assets map[string]margininterest.AssetMonth
@@ -380,9 +388,10 @@ type interestEstimateWorker struct {
 	history              marginHistoryStore
 	pricer               margininterest.PriceFunc
 
-	// queryPrice queries the current price of asset into what pricer reads. The
-	// session only follows the prices of the markets a strategy subscribed to at
-	// startup, and the estimate covers assets nobody subscribed to.
+	// queryPrice queries the current price of asset into what pricer reads, and
+	// fails when it could not. The session only follows the prices of the markets
+	// a strategy subscribed to at startup, and the estimate covers assets nobody
+	// subscribed to.
 	queryPrice func(ctx context.Context, asset string) error
 	logger     logrus.FieldLogger
 	now        func() time.Time
@@ -398,9 +407,16 @@ type interestEstimateWorker struct {
 	// syncFailed is the error of the latest sync of an asset, cleared by its next successful sync
 	syncFailed map[string]error
 
-	// valueFailed says the last valuation pass failed: rows that were synced may
-	// have no value yet, and those are not read
-	valueFailed bool
+	// valuationFailed says the last valuation pass failed: rows that were synced
+	// may have no value yet, and those are not read
+	valuationFailed bool
+
+	// priceFailed are the assets whose price query failed on this tick
+	priceFailed map[string]struct{}
+
+	// budgetOutside is the last reported list of budgeted assets that are not
+	// autoborrow assets, joined: it is reported when it changes, not on every tick
+	budgetOutside string
 
 	// synced maps an asset to the time its last successful sync started. Every row
 	// before it is stored, so the next sync starts from there (less syncedOverlap)
@@ -468,14 +484,27 @@ func newInterestEstimateWorker(s *Strategy, session *bbgo.ExchangeSession, confi
 		return session.GetPriceSolver().ResolvePrice(asset, currency.USDT)
 	}
 
+	// Not SimplePriceSolver.UpdateFromTickers: it skips a market it does not know
+	// and a ticker without a price silently, and the worker has to know when a
+	// price was not refreshed.
 	w.queryPrice = func(ctx context.Context, asset string) error {
-		// an asset without a USDT market is left to the prices the session has
 		market, ok := session.Markets().FindPair(asset, currency.USDT)
 		if !ok {
-			return nil
+			return fmt.Errorf("%s has no %s market", asset, currency.USDT)
 		}
 
-		return session.GetPriceSolver().UpdateFromTickers(ctx, session.Exchange, market.Symbol)
+		ticker, err := session.Exchange.QueryTicker(ctx, market.Symbol)
+		if err != nil {
+			return err
+		}
+
+		price := ticker.GetValidPrice()
+		if price.IsZero() {
+			return fmt.Errorf("the %s ticker has no price", market.Symbol)
+		}
+
+		session.GetPriceSolver().Update(market.Symbol, price)
+		return nil
 	}
 
 	return w
@@ -520,19 +549,11 @@ func (w *interestEstimateWorker) unknownBudgetAssets() []string {
 		return nil
 	}
 
-	known := make(map[string]struct{}, len(markets))
+	currencies := make([]string, 0, 2*len(markets))
 	for _, market := range markets {
-		known[market.BaseCurrency] = struct{}{}
-		known[market.QuoteCurrency] = struct{}{}
+		currencies = append(currencies, market.BaseCurrency, market.QuoteCurrency)
 	}
-
-	var unknown []string
-	for _, asset := range sortedKeys(w.config.assetBudgets()) {
-		if _, ok := known[asset]; !ok {
-			unknown = append(unknown, asset)
-		}
-	}
-	return unknown
+	return w.config.budgetAssetsOutside(currencies)
 }
 
 func (w *interestEstimateWorker) Run(ctx context.Context) {
@@ -547,10 +568,6 @@ func (w *interestEstimateWorker) Run(ctx context.Context) {
 
 	if w.history == nil {
 		w.logger.Infof("interest estimate: no database configured, realized interest is disabled")
-	}
-
-	if outside := w.config.budgetAssetsOutside(w.configAssets()); len(outside) > 0 {
-		w.logger.Warnf("interest budget: %v have a budget but are not autoborrow assets: such a budget only counts the debt and the interest the session has in the asset", outside)
 	}
 
 	interval := w.config.Interval.Duration()
@@ -568,6 +585,22 @@ func (w *interestEstimateWorker) Run(ctx context.Context) {
 	}
 }
 
+// reportBudgetAssetsOutside warns about the budgeted assets that are not
+// autoborrow assets: such a budget is valid, but worth knowing about. It is
+// said once, and again when the list changes, not on every tick.
+func (w *interestEstimateWorker) reportBudgetAssetsOutside(configured []string) {
+	outside := w.config.budgetAssetsOutside(configured)
+	key := strings.Join(outside, ",")
+	if key == w.budgetOutside {
+		return
+	}
+
+	w.budgetOutside = key
+	if len(outside) > 0 {
+		w.logger.Warnf("interest budget: %v have a budget but are not autoborrow assets: such a budget only counts the debt and the interest the session has in the asset", outside)
+	}
+}
+
 func (w *interestEstimateWorker) countError(kind string) {
 	interestEstimateErrorsMetrics.WithLabelValues(w.session.Name, w.session.ExchangeName.String(), kind).Inc()
 }
@@ -581,6 +614,7 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 	debts := w.loadDebts(ctx)
 	borrowed := sortedKeys(debts)
 	configured := w.configAssets()
+	w.reportBudgetAssetsOutside(configured)
 
 	w.startMonth(month.Start)
 	w.cover(configured)
@@ -588,7 +622,7 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 	w.cover(borrowed)
 	w.debtAssets = borrowed
 
-	w.refreshPrices(ctx, w.pricedAssets(borrowed))
+	w.refreshPrices(ctx, w.assetsToPrice(borrowed))
 
 	realized, charged, realizedOK, unattributed := w.queryRealized(ctx, now, realizedRange, w.coveredAssets())
 
@@ -610,35 +644,45 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 	}
 
 	est := &interestEstimate{
-		Time:            now,
-		Month:           month.Start,
-		RemainingHours:  hours,
-		Projection:      projection,
-		Realized:        realized,
-		RealizedOK:      realizedOK,
-		MonthTotalUSDT:  realized.TotalUSDT.Add(projection.TotalUSDT),
-		Rolling:         rolling,
-		RollingComplete: w.interestQueryService != nil && allComplete(rolling),
-		Unattributed:    unattributed,
+		Time:           now,
+		Month:          month.Start,
+		RemainingHours: hours,
+		Projection:     projection,
+		Realized:       realized,
+		RealizedOK:     realizedOK,
+		MonthTotalUSDT: realized.TotalUSDT.Add(projection.TotalUSDT),
+		Rolling:        rolling,
+		Unattributed:   unattributed,
+		StalePrice:     sortedKeys(w.priceFailed),
 	}
+
+	for _, asset := range est.StalePrice {
+		if _, ok := debts[asset]; ok {
+			est.StaleDebtPrice = append(est.StaleDebtPrice, asset)
+		}
+	}
+	est.RollingComplete = w.interestQueryService != nil && allComplete(rolling) && len(est.StaleDebtPrice) == 0
 
 	for asset := range w.syncFailed {
 		est.SyncFailed = append(est.SyncFailed, asset)
 	}
 	sort.Strings(est.SyncFailed)
 
+	est.MissingHistory = w.sessionHistoryMissing(est) || len(w.syncFailed) > 0
 	// every asset of the estimate is listed, borrowed or not
-	est.MissingHistory = w.uncounted(est) || len(w.syncFailed) > 0
 	est.Assets = margininterest.MonthByAsset(projection, realized)
 	for asset, m := range est.Assets {
-		m.MissingHistory = w.historyMissing(est, asset)
+		m.MissingHistory = w.assetHistoryMissing(est, asset)
 		if m.MissingHistory {
 			est.MissingHistory = true
 		}
+		_, m.StalePrice = w.priceFailed[asset]
 		est.Assets[asset] = m
 	}
 
-	est.Complete = w.complete(est, realized)
+	// realized is valued at the current price in the current price mode, so there
+	// every stale price counts
+	est.Complete = w.complete(est, realized) && len(est.StalePrice) == 0
 
 	w.evaluateBudgets(est, charged)
 
@@ -663,7 +707,9 @@ func (w *interestEstimateWorker) evaluateBudgets(est *interestEstimate, charged 
 	projection := est.Projection
 
 	if budget, ok := w.config.sessionBudget(); ok {
-		e := margininterest.EvaluateBudget(budget, charged.TotalUSDT, charged.TotalUSDT.Add(projection.TotalUSDT), w.complete(est, charged))
+		// charged is valued when charged: only the price of a debt can be stale
+		complete := w.complete(est, charged) && len(est.StaleDebtPrice) == 0
+		e := margininterest.EvaluateBudget(budget, charged.TotalUSDT, charged.TotalUSDT.Add(projection.TotalUSDT), complete)
 		est.Budget = &e
 	}
 
@@ -686,7 +732,8 @@ func (w *interestEstimateWorker) evaluateBudgets(est *interestEstimate, charged 
 			projectedUSDT = ap.USDT
 		}
 
-		complete := w.interestQueryService != nil && projected && ap.PriceOK && !w.historyMissing(est, asset) && realizedPriceOK
+		_, stalePrice := w.priceFailed[asset]
+		complete := w.interestQueryService != nil && projected && ap.PriceOK && !stalePrice && !w.assetHistoryMissing(est, asset) && realizedPriceOK
 
 		est.AssetBudgets[asset] = margininterest.EvaluateBudget(budget, realizedUSDT, realizedUSDT.Add(projectedUSDT), complete)
 	}
@@ -758,11 +805,11 @@ func (w *interestEstimateWorker) queryRates(ctx context.Context, assets []string
 	return rates
 }
 
-// pricedAssets returns the assets the estimate needs the current price of: the
+// assetsToPrice returns the assets the estimate needs the current price of: the
 // borrowed ones, to value their projection. In the current price mode also
 // every covered asset and the fee asset, to value what was charged and what it
 // was paid in.
-func (w *interestEstimateWorker) pricedAssets(borrowed []string) []string {
+func (w *interestEstimateWorker) assetsToPrice(borrowed []string) []string {
 	if w.config.RealizedPriceMode.OrDefault() != margininterest.PriceModeCurrent {
 		return borrowed
 	}
@@ -775,12 +822,14 @@ func (w *interestEstimateWorker) pricedAssets(borrowed []string) []string {
 }
 
 // refreshPrices queries the current price of assets. A price that cannot be
-// queried keeps its last value, or stays missing.
+// queried keeps its last value, or stays missing, and its asset is in
+// priceFailed until a tick queries it: an old price must not pass for a current one.
 func (w *interestEstimateWorker) refreshPrices(ctx context.Context, assets []string) {
-	// one slow ticker must not hold the tick back
+	// one slow ticker must not hold the tick back; the queries after the timeout fail
 	pctx, cancel := context.WithTimeout(ctx, priceQueryTimeout)
 	defer cancel()
 
+	w.priceFailed = make(map[string]struct{})
 	for _, asset := range assets {
 		if asset == currency.USDT {
 			continue
@@ -789,15 +838,15 @@ func (w *interestEstimateWorker) refreshPrices(ctx context.Context, assets []str
 		if err := w.queryPrice(pctx, asset); err != nil {
 			w.logger.WithError(err).Warnf("interest estimate: unable to query the price of %s", asset)
 			w.countError("price_query")
+			w.priceFailed[asset] = struct{}{}
 		}
 	}
 }
 
 // queryRealized syncs the interest history of assets when due, values the rows
 // that have no value yet, and sums every row of the session in the hours r, by
-// borrowed asset: a charge counts
-// whichever asset it is for, so the month total never loses what was already
-// charged. realized is valued in the configured price mode, charged always at
+// borrowed asset: a charge counts whichever asset it is for, so the month total
+// never loses what was already charged. realized is valued in the configured price mode, charged always at
 // the price when charged: it is what the budget compares. unattributed counts
 // the rows whose borrowed asset is unknown.
 func (w *interestEstimateWorker) queryRealized(
@@ -870,16 +919,8 @@ func (w *interestEstimateWorker) syncDueAssets(ctx context.Context, now, rangeSt
 	for _, asset := range assets {
 		wanted[asset] = struct{}{}
 	}
-	for asset := range w.syncFailed {
-		if _, ok := wanted[asset]; !ok {
-			delete(w.syncFailed, asset)
-		}
-	}
-	for asset := range w.synced {
-		if _, ok := wanted[asset]; !ok {
-			delete(w.synced, asset)
-		}
-	}
+	keepOnly(w.syncFailed, wanted)
+	keepOnly(w.synced, wanted)
 
 	due := w.lastSync.IsZero() || now.Sub(w.lastSync) >= w.config.syncInterval()
 	if !due {
@@ -916,9 +957,7 @@ func (w *interestEstimateWorker) unsynced(asset string) bool {
 // realized range starting at rangeStart is covered. A charge of an asset
 // borrowed and repaid between two syncs is synced too.
 func (w *interestEstimateWorker) syncHistory(ctx context.Context, now, rangeStart time.Time, assets []string) {
-	mu := sessionSyncLock(w.session.ExchangeName.String() + "/" + w.session.Name)
-	mu.Lock()
-	defer mu.Unlock()
+	defer w.lockSync()()
 
 	// rows inserted before the timeout are kept, and the next sync resumes from them
 	sctx, cancel := context.WithTimeout(ctx, w.config.Interval.Duration())
@@ -943,9 +982,7 @@ func (w *interestEstimateWorker) syncHistory(ctx context.Context, now, rangeStar
 // whose kline was not available is tried again on the next tick. A row that
 // cannot be priced is stored unpriced and marks its asset's price missing.
 func (w *interestEstimateWorker) valueHistory(ctx context.Context, rangeStart time.Time) {
-	mu := sessionSyncLock(w.session.ExchangeName.String() + "/" + w.session.Name)
-	mu.Lock()
-	defer mu.Unlock()
+	defer w.lockSync()()
 
 	vctx, cancel := context.WithTimeout(ctx, valuationTimeout)
 	defer cancel()
@@ -953,25 +990,33 @@ func (w *interestEstimateWorker) valueHistory(ctx context.Context, rangeStart ti
 	if err := w.history.ValueInterests(vctx, w.session.Exchange, w.session.Name, rangeStart); err != nil {
 		w.logger.WithError(err).Warnf("interest estimate: unable to value margin interests")
 		w.countError("value")
-		w.valueFailed = true
+		w.valuationFailed = true
 		return
 	}
 
-	w.valueFailed = false
+	w.valuationFailed = false
 }
 
-// uncounted reports whether charges may be missing from the realized interest
-// of est whichever asset they are for: the rows could not be read or valued, or
-// one could not be attributed and may belong to any asset
-func (w *interestEstimateWorker) uncounted(est *interestEstimate) bool {
-	return !est.RealizedOK || est.Unattributed > 0 || w.valueFailed
+// lockSync keeps two autoborrow instances from syncing or valuing the same
+// session at once, and returns the unlock
+func (w *interestEstimateWorker) lockSync() (unlock func()) {
+	mu := sessionSyncLock(w.session.ExchangeName.String() + "/" + w.session.Name)
+	mu.Lock()
+	return mu.Unlock
 }
 
-// historyMissing reports whether the realized interest of asset in est may be
-// incomplete: charges may be uncounted for every asset, or the asset, or the
+// sessionHistoryMissing reports whether charges may be missing from the
+// realized interest of est whichever asset they are for: the rows could not be
+// read or valued, or one could not be attributed and may belong to any asset
+func (w *interestEstimateWorker) sessionHistoryMissing(est *interestEstimate) bool {
+	return !est.RealizedOK || est.Unattributed > 0 || w.valuationFailed
+}
+
+// assetHistoryMissing reports whether the realized interest of asset in est may
+// be incomplete: charges may be missing for every asset, or the asset, or the
 // fee asset its interest may be paid in, was never synced or its latest sync failed
-func (w *interestEstimateWorker) historyMissing(est *interestEstimate, asset string) bool {
-	if w.uncounted(est) || w.unsynced(asset) {
+func (w *interestEstimateWorker) assetHistoryMissing(est *interestEstimate, asset string) bool {
+	if w.sessionHistoryMissing(est) || w.unsynced(asset) {
 		return true
 	}
 	return w.feeAsset != "" && w.unsynced(w.feeAsset)
@@ -1002,7 +1047,7 @@ func (w *interestEstimateWorker) syncStart(rangeStart time.Time) time.Time {
 func (w *interestEstimateWorker) log(est *interestEstimate, rates types.MarginNextHourlyInterestRateMap) {
 	missingPrice := unionSorted(est.Projection.MissingPrice, est.Realized.MissingPrice)
 
-	w.logger.Infof("interest estimate: session=%s month=%s remaining_hours=%d projected_usdt=%s realized_usdt=%s realized_mode=%s month_total_usdt=%s complete=%t missing_rate=%v missing_price=%v missing_history=%t sync_failed=%v unattributed=%d",
+	w.logger.Infof("interest estimate: session=%s month=%s remaining_hours=%d projected_usdt=%s realized_usdt=%s realized_mode=%s month_total_usdt=%s complete=%t missing_rate=%v missing_price=%v stale_price=%v missing_history=%t sync_failed=%v unattributed=%d",
 		w.session.Name,
 		est.Month.Format("2006-01"),
 		est.RemainingHours,
@@ -1013,6 +1058,7 @@ func (w *interestEstimateWorker) log(est *interestEstimate, rates types.MarginNe
 		est.Complete,
 		est.Projection.MissingRate,
 		missingPrice,
+		est.StalePrice,
 		est.MissingHistory,
 		est.SyncFailed,
 		est.Unattributed,
@@ -1020,7 +1066,7 @@ func (w *interestEstimateWorker) log(est *interestEstimate, rates types.MarginNe
 
 	for _, p := range est.Rolling {
 		w.logger.Infof("interest projection: session=%s hours=%d rolling_months=%d projected_usdt=%s complete=%t",
-			w.session.Name, p.Hours, p.Hours/margininterest.RollingMonthHours, p.TotalUSDT.String(), w.interestQueryService != nil && p.Complete())
+			w.session.Name, p.Hours, p.Hours/margininterest.RollingMonthHours, p.TotalUSDT.String(), w.rollingComplete(est, p))
 	}
 
 	w.logBudget(est)
@@ -1033,13 +1079,13 @@ func (w *interestEstimateWorker) log(est *interestEstimate, rates types.MarginNe
 			hourlyRate = rate.HourlyRate
 		}
 
-		w.logger.Debugf("interest estimate asset: session=%s asset=%s principal=%s hourly_rate=%s hours=%d projected=%s projected_usdt=%s realized=%s realized_usdt=%s month_total=%s month_total_usdt=%s complete=%t missing_rate=%t missing_price=%t missing_history=%t",
+		w.logger.Debugf("interest estimate asset: session=%s asset=%s principal=%s hourly_rate=%s hours=%d projected=%s projected_usdt=%s realized=%s realized_usdt=%s month_total=%s month_total_usdt=%s complete=%t missing_rate=%t missing_price=%t stale_price=%t missing_history=%t",
 			w.session.Name, asset,
 			p.Principal.String(), hourlyRate.String(), p.Hours,
 			m.Projected.String(), m.ProjectedUSDT.String(),
 			m.Realized.String(), m.RealizedUSDT.String(),
 			m.Total.String(), m.TotalUSDT.String(),
-			m.Complete(), m.MissingRate, m.MissingPrice, m.MissingHistory,
+			m.Complete(), m.MissingRate, m.MissingPrice, m.StalePrice, m.MissingHistory,
 		)
 	}
 }
@@ -1230,13 +1276,19 @@ func (w *interestEstimateWorker) publish(est *interestEstimate) {
 	w.publishBudget(est)
 }
 
+// rollingComplete reports whether the rolling projection p of est had a rate
+// and a current price for every borrowed asset
+func (w *interestEstimateWorker) rollingComplete(est *interestEstimate, p margininterest.Projection) bool {
+	return w.interestQueryService != nil && p.Complete() && len(est.StaleDebtPrice) == 0
+}
+
 func (w *interestEstimateWorker) publishRolling(est *interestEstimate) {
 	var amount, usdt, total, complete []gaugeSample
 
 	for _, p := range est.Rolling {
 		hours := strconv.Itoa(p.Hours)
 		rollingComplete := 0.0
-		if w.interestQueryService != nil && p.Complete() {
+		if w.rollingComplete(est, p) {
 			rollingComplete = 1.0
 		}
 
@@ -1332,6 +1384,15 @@ func sortedKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// keepOnly deletes the keys of m that are not in wanted
+func keepOnly[V any](m map[string]V, wanted map[string]struct{}) {
+	for key := range m {
+		if _, ok := wanted[key]; !ok {
+			delete(m, key)
+		}
+	}
 }
 
 func sortedDistinct(a []string) []string {

@@ -54,9 +54,11 @@ type fakeHistoryStore struct {
 	syncErr  map[string]error
 	values   []syncCall
 	valueErr error
-	queries  []service.QueryMarginInterestValuationOptions
-	rows     []types.MarginInterestValuation
-	queryErr error
+	// valueTimeouts is how long each ValueInterests call was given
+	valueTimeouts []time.Duration
+	queries       []service.QueryMarginInterestValuationOptions
+	rows          []types.MarginInterestValuation
+	queryErr      error
 }
 
 func (f *fakeHistoryStore) SyncInterests(_ context.Context, _ types.Exchange, session, asset string, start time.Time) error {
@@ -64,9 +66,19 @@ func (f *fakeHistoryStore) SyncInterests(_ context.Context, _ types.Exchange, se
 	return f.syncErr[asset]
 }
 
-func (f *fakeHistoryStore) ValueInterests(_ context.Context, _ types.Exchange, session string, since time.Time) error {
+func (f *fakeHistoryStore) ValueInterests(ctx context.Context, _ types.Exchange, session string, since time.Time) error {
 	f.values = append(f.values, syncCall{session: session, start: since})
+	f.valueTimeouts = append(f.valueTimeouts, timeLeft(ctx))
 	return f.valueErr
+}
+
+// timeLeft returns how long ctx has until its deadline, 0 without one
+func timeLeft(ctx context.Context) time.Duration {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return 0
+	}
+	return time.Until(deadline)
 }
 
 // QueryValuations returns the rows in [Since, Until), like MarginInterestValuationService
@@ -857,12 +869,21 @@ func TestInterestEstimate_FollowsTheAssetListAtRuntime(t *testing.T) {
 	assert.Equal(t, []string{"ETH"}, syncedAssets(history, n))
 	assert.True(t, est.Complete)
 
-	// an asset taken off the list stays until the month ends: what it was
-	// charged this month still counts, and a failed sync of it is still tried
+	// an asset taken off the list stays until the month ends
 	s.Assets = configured("ETH")
 	now = testNow.Add(10 * time.Minute)
 	est = w.tick(context.Background())
 	assert.ElementsMatch(t, []string{"ETH", "USDT"}, keysOfMonths(est.Assets))
+
+	// it is still synced, and a failed sync of it still makes the estimate incomplete
+	history.syncErr = map[string]error{"USDT": errors.New("timeout")}
+	now = testNow.Add(time.Hour)
+	n = len(history.syncs)
+	est = w.tick(context.Background())
+	assert.Equal(t, []string{"BNB", "ETH", "USDT"}, syncedAssets(history, n))
+	assert.Equal(t, []string{"USDT"}, est.SyncFailed)
+	assert.False(t, est.Complete)
+	history.syncErr = nil
 
 	now = testNow.AddDate(0, 1, 0)
 	est = w.tick(context.Background())
@@ -990,6 +1011,12 @@ func TestInterestEstimate_ValuesTheRealizedRangeOnEveryTick(t *testing.T) {
 	w.tick(context.Background())
 	assert.Len(t, history.values, 2)
 	assert.Len(t, history.syncs, n)
+
+	// each pass has its own time, whatever the sync before it used
+	for _, left := range history.valueTimeouts {
+		assert.Greater(t, left, valuationTimeout-5*time.Second)
+		assert.LessOrEqual(t, left, valuationTimeout)
+	}
 }
 
 func TestInterestEstimate_ValuationErrorIsCounted(t *testing.T) {
@@ -1154,6 +1181,7 @@ func TestInterestEstimate_QueriesThePricesItNeeds(t *testing.T) {
 		assert.InDelta(t, 0.00373, est.Projection.Assets["DOGE"].USDT.Float64(), 1e-8)
 		// a price that cannot be queried is a missing price, not an error of the tick
 		assert.Equal(t, []string{"XYZ"}, est.Projection.MissingPrice)
+		assert.Equal(t, []string{"XYZ"}, est.StalePrice)
 		assert.False(t, est.Complete)
 
 		// and again on the next tick: a price is not kept from the first query
@@ -1178,11 +1206,12 @@ func TestInterestEstimate_QueriedPriceReachesTheSession(t *testing.T) {
 	session := s.ExchangeSession
 	session.Name = fmt.Sprintf("test-%d", sessionSeq.Add(1))
 	session.ExchangeName = types.ExchangeBinance
-	session.SetMarkets(types.MarketMap{"ETHUSDT": Market("ETHUSDT")})
+	session.SetMarkets(types.MarketMap{"ETHUSDT": Market("ETHUSDT"), "BTCUSDT": Market("BTCUSDT")})
 
 	ticker := Ticker("ETHUSDT")
 	exchange := session.Exchange.(*mocks.MockExchange)
 	exchange.EXPECT().QueryTicker(gomock.Any(), "ETHUSDT").Return(&ticker, nil).Times(1)
+	exchange.EXPECT().QueryTicker(gomock.Any(), "BTCUSDT").Return(&types.Ticker{}, nil).Times(1)
 
 	w := newInterestEstimateWorker(s, session, &InterestEstimateConfig{Interval: types.Duration(5 * time.Minute)})
 
@@ -1194,6 +1223,72 @@ func TestInterestEstimate_QueriedPriceReachesTheSession(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, ticker.GetValidPrice().String(), price.String())
 
-	// an asset without a USDT market is not queried
-	assert.NoError(t, w.queryPrice(context.Background(), "XYZ"))
+	// the worker has to know when a price was not refreshed: a ticker without a
+	// price and an asset without a USDT market are errors, not silence
+	assert.ErrorContains(t, w.queryPrice(context.Background(), "BTC"), "no price")
+	_, ok = w.pricer("BTC")
+	assert.False(t, ok)
+	assert.ErrorContains(t, w.queryPrice(context.Background(), "XYZ"), "no USDT market")
+}
+
+// A price that could not be queried on this tick is an old one. The figures
+// still use it, which is better than nothing, but the estimate and the budgets
+// on it do not pass for complete.
+func TestInterestEstimate_StalePriceIsIncomplete(t *testing.T) {
+	account := newTestAccount(Number(10),
+		debtBalance("USDT", fixedpoint.Zero, Number(1000)),
+		debtBalance("DOGE", fixedpoint.Zero, Number(100)),
+	)
+	rates := &fakeRateService{rates: map[string]string{"USDT": "0.000001", "DOGE": "0.000001"}}
+	w := newTestInterestWorker(t, account, rates, &fakeHistoryStore{}, configured("USDT")...)
+	w.pricer = testPrices(map[string]string{"DOGE": "0.1"})
+	w.config.Budget = &InterestBudgetConfig{
+		MonthlyUSDT: Number(100),
+		Assets:      map[string]fixedpoint.Value{"DOGE": Number(10), "USDT": Number(10)},
+	}
+
+	var queryErr error
+	var timeouts []time.Duration
+	w.queryPrice = func(ctx context.Context, _ string) error {
+		timeouts = append(timeouts, timeLeft(ctx))
+		return queryErr
+	}
+
+	est := w.tick(context.Background())
+	assert.Empty(t, est.StalePrice)
+	assert.True(t, est.Complete)
+	assert.Equal(t, margininterest.BudgetStatusOK, est.Budget.Status())
+
+	queryErr = errors.New("ticker api down")
+	est = w.tick(context.Background())
+
+	// still projected, at the price the session has: 373 hours x 0.000001 x 100 DOGE x 0.1
+	assert.InDelta(t, 0.00373, est.Projection.Assets["DOGE"].USDT.Float64(), 1e-8)
+	assert.Empty(t, est.Projection.MissingPrice)
+	assert.Equal(t, []string{"DOGE"}, est.StalePrice)
+	assert.Equal(t, []string{"DOGE"}, est.StaleDebtPrice)
+	assert.True(t, est.Assets["DOGE"].StalePrice)
+	assert.False(t, est.Assets["DOGE"].Complete())
+	assert.True(t, est.Assets["USDT"].Complete())
+	assert.False(t, est.Complete)
+	assert.False(t, est.RollingComplete)
+	assert.Equal(t, 0.0, sessionGauge(t, w, "autoborrow_interest_estimate_complete"))
+	assert.Equal(t, 1.0, errorCount(t, w, "price_query"))
+
+	// within the budgets, but not known to be: only where the stale price is used
+	assert.Equal(t, margininterest.BudgetStatusUnknown, est.Budget.Status())
+	assert.Equal(t, margininterest.BudgetStatusUnknown, est.AssetBudgets["DOGE"].Status())
+	assert.Equal(t, margininterest.BudgetStatusOK, est.AssetBudgets["USDT"].Status())
+
+	// queried again on the next tick
+	queryErr = nil
+	est = w.tick(context.Background())
+	assert.Empty(t, est.StalePrice)
+	assert.True(t, est.Complete)
+
+	// the queries of a tick share one bounded time
+	for _, left := range timeouts {
+		assert.Greater(t, left, priceQueryTimeout-5*time.Second)
+		assert.LessOrEqual(t, left, priceQueryTimeout)
+	}
 }

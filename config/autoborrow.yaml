@@ -44,7 +44,7 @@ exchangeStrategies:
       # whatever realizedPriceMode is. A session has its budgets in one autoborrow instance only.
       # budget:
       #   monthlyUSDT: 1000   # the whole session; 0 or not set: no budget
-      #   assets:             # per asset; it has to be an asset of the exchange, but not one of the `assets` below
+      #   assets:             # per asset: any asset of the exchange, it does not have to be one of the `assets` below
       #     USDT: 600
       #     ETH: 300
 

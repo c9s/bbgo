@@ -199,7 +199,7 @@ flowchart TD
   the price pairs.
 - **The valuation runs on every tick,** after the sync if one is due.
   It is one query when no row is waiting, so a row whose kline was not
-  available is tried again five minutes later, not a sync interval
+  available is tried again on the next tick, not a sync interval
   later. It has its own timeout, so a sync that used all of its time
   does not leave the new rows unvalued. If it fails, the rows just
   synced may have no value and are not read, so the estimate is
@@ -213,10 +213,16 @@ flowchart TD
   is valued at the current price. A session only follows the prices of
   the markets a strategy subscribed to when it started, and the
   estimate covers assets nobody subscribed to. In the current price
-  mode the fee asset is queried too. A price that cannot be queried
-  keeps its last value or stays missing. The prices go into the price
+  mode the fee asset is queried too. The prices go into the price
   solver of the session, so the other autoborrow alerts that value a
   debt see them too.
+- **A price that could not be queried is stale, and says so.** The
+  figures still use the last price the session has, which is better
+  than leaving the debt out, but the estimate is incomplete and a
+  budget that depends on that price is "unknown", not "ok". A ticker
+  without a price and an asset without a USDT market count as not
+  queried. The queries of a tick share one timeout, so one slow ticker
+  cannot hold the tick back.
 
 ### Interest paid in another asset
 
@@ -280,11 +286,13 @@ flowchart LR
   tick.** They are charged at the first hour of the month, also when
   they are repaid before its first tick. Every other asset has to come
   in again.
-- **An asset new to the estimate is synced on the tick it shows up,**
-  and a failed sync is tried again on the next tick. Between two full
-  syncs only those assets are synced. Until an asset has been synced
-  its history counts as missing. An asset that left with a month and
-  comes back is new again.
+- **An asset new to the estimate is synced at once,** and a failed sync
+  is tried again on the next tick. An asset that comes in with a debt,
+  a budget or the asset list is synced on the tick it shows up. One
+  that is first known from its rows is counted on that tick and synced
+  on the next. Between two full syncs only those assets are synced.
+  Until an asset has been synced its history counts as missing. An
+  asset that left with a month and comes back is new again.
 
 ### Session names are identifiers
 
@@ -338,7 +346,8 @@ flowchart TD
   It counts toward the asset that was borrowed.
 - **A budgeted asset does not have to be an autoborrow asset.** The
   asset list can change while the budget stays, so that is not an
-  error; startup only reports it. It does have to be an asset of the
+  error. It is reported once, and again when the list of such assets
+  changes. It does have to be an asset of the
   exchange: a misspelled name would never see a debt or a charge and
   would read "ok" forever, so bbgo does not start with one.
 - **One instance budgets a session.** A second autoborrow instance
