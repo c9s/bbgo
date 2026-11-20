@@ -29,11 +29,16 @@ const defaultInterestSyncInterval = time.Hour
 // sync starts, for a charge published after that sync
 const syncedOverlap = time.Hour
 
-// priceQueryTimeout bounds the price queries of one tick
-const priceQueryTimeout = 30 * time.Second
+// priceQueryTimeout bounds the price queries of one tick: one ticker request
+// per asset, one after the other. It is long enough for a rate-limited or slow
+// exchange to answer all of them, since a price that is not queried in time is
+// stale and makes the estimate incomplete.
+const priceQueryTimeout = 2 * time.Minute
 
-// valuationTimeout bounds the valuation pass of one tick
-const valuationTimeout = time.Minute
+// valuationTimeout bounds the valuation pass of one tick. The first pass after
+// a start values the rows of the whole month and syncs the klines of every
+// price pair, so it gets as long as a tick usually is.
+const valuationTimeout = 5 * time.Minute
 
 // defaultProjectionMonths are the rolling months (30 days each) projected when
 // projectionMonths is not set
