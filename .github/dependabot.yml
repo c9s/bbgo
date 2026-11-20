@@ -1,27 +1,109 @@
 version: 2
+
 updates:
+  # ---------------------------------------------------------------------------
+  # GitHub Actions — keep workflow actions current, one grouped PR per week.
+  # ---------------------------------------------------------------------------
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "Asia/Taipei"
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: "dep"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    open-pull-requests-limit: 3
+    groups:
+      github-actions:
+        patterns:
+          - "*"
 
+  # ---------------------------------------------------------------------------
+  # Go modules — version-update PRs are disabled (open-pull-requests-limit: 0);
+  # Dependabot still opens security updates, which are grouped into one PR.
+  # ---------------------------------------------------------------------------
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "Asia/Taipei"
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: "dep"
-    # Create pull requests only for security updates
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "go"
     open-pull-requests-limit: 0
+    groups:
+      gomod-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
 
+  # ---------------------------------------------------------------------------
+  # npm (web dashboard, backtest report, solidity contracts) — security only.
+  # ---------------------------------------------------------------------------
   - package-ecosystem: "npm"
     directories:
       - "/apps/backtest-report"
       - "/apps/frontend"
+      - "/contracts"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "Asia/Taipei"
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: "dep"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "javascript"
     open-pull-requests-limit: 0
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # ---------------------------------------------------------------------------
+  # Docker — base images in the release Dockerfile. Patch/minor bumps only;
+  # major base-image jumps (golang 1.x -> 2.x, alpine 3 -> 4) stay manual.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "Asia/Taipei"
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: "dep"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+    groups:
+      docker:
+        patterns:
+          - "*"
