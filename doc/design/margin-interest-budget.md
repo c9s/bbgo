@@ -1,8 +1,8 @@
 # ADR: Margin Interest Budget
 
-- Status: Steps 1 and 2 (the estimate, and the budget per session and
-  per asset) are implemented and merged. Step 3 (the alert) is
-  implemented and in review. Step 4 is planned, not designed.
+- Status: Steps 1 to 3 (the estimate, the budget per session and per
+  asset, and the alert) are implemented and merged. Step 4 is planned,
+  not designed.
 - Scope: `pkg/strategy/autoborrow`, `pkg/accounting/margininterest`,
   `pkg/service`, `pkg/bbgo` (session names), and the
   `margin_interests` and `margin_interest_valuations` tables
@@ -98,9 +98,10 @@ more than once.
 4. **Accounting is pure.** It takes rows, rates and a price function,
    and never touches a database or an exchange, so it can be tested
    with hand-computed numbers.
-5. **The autoborrow config is the asset list.** Every configured asset
-   is reported, borrowed or not. Anything else is warned about and not
-   counted.
+5. **The estimate covers the session, not a list.** Every interest the
+   session is charged counts, whichever asset it is for and whoever
+   opened the debt. The autoborrow assets are reported as well,
+   borrowed or not.
 6. **An incomplete figure is a lower bound, and says so.** A total that
    is missing a rate, a price or some history is still published, with
    a flag. No consumer may read "incomplete and under budget" as "ok".
@@ -193,13 +194,29 @@ flowchart TD
 - **Both the asset paid and the asset borrowed are valued,** at the
   same kline. They differ only when the interest was paid in another
   asset.
-- **The interest sync owns the klines it needs.** A live bbgo does not
-  otherwise store klines, so the same pass that syncs interest also
-  syncs the price pairs. A missing kline is retried on the next pass.
+- **The valuation owns the klines it needs.** A live bbgo does not
+  otherwise store klines, so the pass that values the rows also syncs
+  the price pairs.
+- **The valuation runs on every tick,** after the sync if one is due.
+  It is one query when no row is waiting, so a row whose kline was not
+  available is tried again five minutes later, not a sync interval
+  later. It has its own timeout, so a sync that used all of its time
+  does not leave the new rows unvalued. If it fails, the rows just
+  synced may have no value and are not read, so the estimate is
+  incomplete until it succeeds.
 - **Two price modes for realized interest.** "Charged" (the default)
   is what the interest cost when it was paid. "Current" revalues the
   amounts at today's price. The projection is always at the current
   price.
+- **The estimate queries the current prices it needs,** on every tick:
+  of every asset with debt, and of every asset when realized interest
+  is valued at the current price. A session only follows the prices of
+  the markets a strategy subscribed to when it started, and the
+  estimate covers assets nobody subscribed to. In the current price
+  mode the fee asset is queried too. A price that cannot be queried
+  keeps its last value or stays missing. The prices go into the price
+  solver of the session, so the other autoborrow alerts that value a
+  debt see them too.
 
 ### Interest paid in another asset
 
@@ -222,15 +239,52 @@ only, never under the asset that was borrowed.
 ### Where it runs
 
 The estimate runs inside autoborrow, one worker per session, because
-autoborrow is the one strategy that needs it and already owns the
-asset list. Only the pure accounting is shared. This follows
-`doc/development/strategy-layer-design.md`.
+autoborrow is the one strategy that needs it. Only the pure accounting
+is shared. This follows `doc/development/strategy-layer-design.md`.
 
 The projection is live on every tick. Realized interest lags by the
 sync interval, and that lag does not make the estimate incomplete. A
-missing rate or price, a failed sync and an unattributed charge do. A
-debt or a charge in an asset outside the config is warned about and
-does not.
+missing rate or price, a failed sync, an asset that was not synced yet
+and an unattributed charge do.
+
+### Which assets it covers
+
+The first version covered the autoborrow assets and nothing else. That
+left out most of what a session can pay: the asset list is edited
+between restarts and can be changed while bbgo runs (the core RPC
+export, `doc/design/core-rpc-export.md`, is the path for that), and a
+debt can be opened outside autoborrow. An asset taken off the list
+took the interest it was already charged out of the month total.
+
+```mermaid
+flowchart LR
+    C["autoborrow assets<br/>(read on every tick)"] --> S
+    B["assets with a budget"] --> S
+    D["assets with debt now"] --> S
+    R["assets charged<br/>this month"] --> S
+    P["assets with debt on the<br/>last tick of the month before"] --> S
+    S["assets of the estimate,<br/>covered until the month ends"]
+```
+
+- **Realized is every charge of the session in the month.** No asset
+  filter: what was charged stays in the total, so a budget that is
+  exceeded cannot stop being exceeded because a list changed.
+- **Projected is every debt the session has now.**
+- **The autoborrow assets are read on every tick,** the way the borrow
+  loop reads them, so the estimate follows a list changed at runtime.
+- **An asset stays covered until the month ends,** however it came in.
+  It keeps being synced after it is repaid or taken off the list, so
+  its last hourly charges arrive, and a failed sync of it keeps the
+  estimate incomplete instead of being forgotten.
+- **A new month starts with the assets that had debt on the last
+  tick.** They are charged at the first hour of the month, also when
+  they are repaid before its first tick. Every other asset has to come
+  in again.
+- **An asset new to the estimate is synced on the tick it shows up,**
+  and a failed sync is tried again on the next tick. Between two full
+  syncs only those assets are synced. Until an asset has been synced
+  its history counts as missing. An asset that left with a month and
+  comes back is new again.
 
 ### Session names are identifiers
 
@@ -255,8 +309,8 @@ new one.
 ### The budget (step 2)
 
 A budget is a USDT amount per UTC calendar month. A session can have
-one for the whole session, summed over all configured assets, and one
-for each asset. They are part of the estimate's config, because a
+one for the whole session, summed over every asset of the estimate,
+and one for each asset. They are part of the estimate's config, because a
 budget is meaningless without the estimate: a budget with the estimate
 off, or on a session the estimate cannot run on, is an error, not a
 silent no-op.
@@ -282,8 +336,11 @@ flowchart TD
 - **An asset budget is in USDT too,** so the budgets can be compared
   and added up, and so interest paid in another asset has one value.
   It counts toward the asset that was borrowed.
-- **A budgeted asset has to be a configured asset.** The estimate
-  covers no other asset, so the budget could never be assessed.
+- **A budgeted asset does not have to be an autoborrow asset.** The
+  asset list can change while the budget stays, so that is not an
+  error; startup only reports it. It does have to be an asset of the
+  exchange: a misspelled name would never see a debt or a charge and
+  would read "ok" forever, so bbgo does not start with one.
 - **One instance budgets a session.** A second autoborrow instance
   that sets a budget on the same session is rejected at startup: two
   budgets on one bill cannot both be right, and step 4's caps would
@@ -314,10 +371,9 @@ Two cases are deliberately left as they are:
   no rate API. The status is never "ok", and there is no startup
   warning: the status already says it on every tick. Worth revisiting
   once the estimate is used on such an exchange.
-- **An asset removed from the config mid-month.** Its earlier charges
-  drop out of the month total while the estimate still reads complete;
-  only the warning about an unconfigured debt shows it. What to do
-  with the debt it leaves behind is a follow-up.
+- **An asset removed from the config mid-month.** It stays in the
+  estimate until the month ends, with its charges and its debt. What
+  to do with the debt it leaves behind is a follow-up.
 
 Step 2 only computes the status. Steps 3 and 4 decide what each status
 does.
@@ -382,9 +438,9 @@ decide whether "unknown" blocks borrowing.
 - **The identifier validator** described above, and its use on session
   names.
 - **Repay when an asset is dropped.** When an asset leaves the
-  autoborrow config while it still has debt, bbgo may want to repay
-  it, so that it does not keep accruing interest that the budget no
-  longer counts.
+  autoborrow config while it still has debt, nothing repays it. The
+  estimate keeps counting its interest, so the budget shows it, but
+  bbgo may want to repay it.
 
 ## Alternatives considered
 
@@ -411,9 +467,15 @@ decide whether "unknown" blocks borrowing.
   of price movement on one row.
 - **Reusing the profit fixer's price lookup.** It prices at the
   previous day's close, which is too coarse for an hourly charge.
-- **Driving the loop from current debts,** with a retention window for
-  repaid assets. Replaced by the configured asset list, which also
-  closes the gap of a borrow opened and repaid between two syncs.
+- **The configured asset list as the whole scope.** The first version:
+  only the autoborrow assets were counted, anything else was warned
+  about. Dropped: the list does not have to match what a session
+  borrows, and when it does not, the estimate and any budget on it
+  miss most of the interest.
+- **Current debts as the whole scope,** with a retention window for
+  repaid assets. Not enough alone: an autoborrow asset borrowed and
+  repaid between two ticks would never be seen. Kept as one part of
+  the scope, with the month as the retention window.
 - **Month-based APIs and a general time-range layer.** Replaced by the
   hour range, with the month as a helper on top.
 - **A run rate as "the month".** Kept as the rolling projection, but
@@ -454,8 +516,24 @@ decide whether "unknown" blocks borrowing.
   now writes 1h klines for the price pairs.
 - Negative: the first sync after the migration fetches the history
   again per session.
+- Negative: the estimate now needs a rate and a price for every asset
+  the session borrows, not only the autoborrow assets: one more rate
+  in the query and one ticker request per borrowed asset on every tick.
+- Negative: an asset whose interest is all paid in the fee asset has no
+  rows of its own to resume from, so its first sync after a start scans
+  the whole sync range again, about a minute per asset on Binance. With
+  more assets covered, the estimate stays incomplete for longer after
+  a start. A failed sync is retried on the next tick, so it catches up
+  within a few ticks.
 - Accepted limits: one session per margin account is the user's to
-  keep, and is not checked. Only Binance has a rate API, so elsewhere
+  keep, and is not checked. An asset outside the autoborrow assets
+  that is borrowed and repaid entirely between two ticks, or while
+  bbgo is not running, is never seen. The estimate reads the autoborrow
+  assets without a lock, as the borrow loop does: whatever changes the
+  list at runtime has to guard both. An asset whose sync keeps failing
+  is tried on every tick, with no backoff. In the current price mode
+  an asset first known from its rows has no price until the next tick,
+  and is reported so. Only Binance has a rate API, so elsewhere
   the estimate is never complete. Isolated margin and portfolio margin
   are unverified. A single market's close carries that market's
   spread, and differs slightly from the rate the exchange converted

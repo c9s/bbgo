@@ -120,10 +120,6 @@ func (s *Strategy) Validate() error {
 		if err := s.InterestEstimate.Validate(); err != nil {
 			return err
 		}
-
-		if err := s.InterestEstimate.validateBudgetAssets(s.getAssetStringSlice()); err != nil {
-			return err
-		}
 	}
 
 	// an alert needs a budget to watch: do not ignore it silently
