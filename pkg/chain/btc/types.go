@@ -3,6 +3,8 @@ package btc
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 // The types in this file mirror the JSON of Bitcoin Core's RPC, field for
@@ -57,6 +59,26 @@ type Outpoint struct {
 
 func (o Outpoint) String() string {
 	return fmt.Sprintf("%s:%d", o.TxID, o.Vout)
+}
+
+// ParseOutpoint parses the "txid:vout" form of Outpoint.String.
+func ParseOutpoint(s string) (Outpoint, error) {
+	txid, vout, ok := strings.Cut(s, ":")
+	if !ok {
+		return Outpoint{}, fmt.Errorf("btc: outpoint %q must be txid:vout", s)
+	}
+
+	hash, err := NewHashFromString(txid)
+	if err != nil {
+		return Outpoint{}, err
+	}
+
+	n, err := strconv.ParseUint(vout, 10, 32)
+	if err != nil {
+		return Outpoint{}, fmt.Errorf("btc: invalid output index in outpoint %q: %w", s, err)
+	}
+
+	return Outpoint{TxID: hash, Vout: uint32(n)}, nil
 }
 
 // Prevout is the output an input spends, as Core reports it with
