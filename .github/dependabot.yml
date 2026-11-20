@@ -2,20 +2,18 @@ version: 2
 
 updates:
   # ---------------------------------------------------------------------------
-  # GitHub Actions — keep workflow actions current, one grouped PR per week.
+  # GitHub Actions — keep workflow actions current, grouped into one PR per run.
   # ---------------------------------------------------------------------------
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "02:00"
+      interval: "cron"
+      cronjob: "0 2 * * MON,THU"
       timezone: "Asia/Taipei"
     cooldown:
       default-days: 3
     commit-message:
-      prefix: "dep"
-      include: "scope"
+      prefix: "DEP"
     labels:
       - "dependencies"
       - "github-actions"
@@ -32,15 +30,13 @@ updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "02:00"
+      interval: "cron"
+      cronjob: "0 2 * * MON,THU"
       timezone: "Asia/Taipei"
     cooldown:
       default-days: 3
     commit-message:
-      prefix: "dep"
-      include: "scope"
+      prefix: "DEP"
     labels:
       - "dependencies"
       - "go"
@@ -60,15 +56,13 @@ updates:
       - "/apps/frontend"
       - "/contracts"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "02:00"
+      interval: "cron"
+      cronjob: "0 2 * * MON,THU"
       timezone: "Asia/Taipei"
     cooldown:
       default-days: 3
     commit-message:
-      prefix: "dep"
-      include: "scope"
+      prefix: "DEP"
     labels:
       - "dependencies"
       - "javascript"
@@ -86,15 +80,13 @@ updates:
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "02:00"
+      interval: "cron"
+      cronjob: "0 2 * * MON,THU"
       timezone: "Asia/Taipei"
     cooldown:
       default-days: 3
     commit-message:
-      prefix: "dep"
-      include: "scope"
+      prefix: "DEP"
     labels:
       - "dependencies"
       - "docker"
