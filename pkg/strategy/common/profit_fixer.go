@@ -96,6 +96,7 @@ type ProfitFixerConfig struct {
 	Period            types.Duration `json:"period,omitempty"`
 	Patch             string         `json:"patch,omitempty"`
 	UseDatabaseTrades bool           `json:"useDatabaseTrades,omitempty"`
+	UseSimpleReset    bool           `json:"useSimpleReset,omitempty"`
 	ProfitCurrency    string         `json:"profitCurrency,omitempty"` // the currency to calculate profit in
 	FeeCurrencies     []string       `json:"feeCurrencies,omitempty"`  // list of fee currencies to consider for fee price conversion
 	// ExtraSymbolSelectors is a list of symbol selectors to include in profit fixing
@@ -111,6 +112,7 @@ func NewProfitFixer(config ProfitFixerConfig, environment *bbgo.Environment) *Pr
 	}
 	fixer.profitCurrency = config.ProfitCurrency
 	fixer.useDatabaseTrades = config.UseDatabaseTrades
+	fixer.useSimpleReset = config.UseSimpleReset
 	fixer.extraSymbolSelectors = config.ExtraSymbolSelectors
 	for _, feeCurrency := range config.FeeCurrencies {
 		fixer.addFeeCurrency(feeCurrency)
@@ -123,6 +125,7 @@ func (c ProfitFixerConfig) Equal(other ProfitFixerConfig) bool {
 		c.Period == other.Period &&
 		c.Patch == other.Patch &&
 		c.UseDatabaseTrades == other.UseDatabaseTrades &&
+		c.UseSimpleReset == other.UseSimpleReset &&
 		c.ProfitCurrency == other.ProfitCurrency &&
 		c.Apply == other.Apply
 }
@@ -137,6 +140,7 @@ type ProfitFixer struct {
 	*bbgo.Environment
 
 	useDatabaseTrades    bool
+	useSimpleReset       bool
 	extraSymbolSelectors []string
 }
 
@@ -344,6 +348,14 @@ func (f *ProfitFixer) Fix(
 	if f.profitCurrency == "" {
 		return fmt.Errorf("quote currency is empty for profit fixing")
 	}
+
+	if f.useSimpleReset {
+		logger.Infof("resetting position and profit stats for symbol %s", symbol)
+		position.Reset()
+		stats.ResetToday(until)
+		return nil
+	}
+
 	logger.Infof("start profit fixing with time range %s <=> %s", since, until)
 	var allTrades []types.Trade
 	var err error
