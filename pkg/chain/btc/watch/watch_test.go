@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/c9s/bbgo/pkg/chain/btc"
+	"github.com/c9s/bbgo/pkg/chain/btc/balance"
 	"github.com/c9s/bbgo/pkg/chain/btc/stream"
 )
 
@@ -164,8 +165,8 @@ func TestSeed(t *testing.T) {
 	w := New(Config{Addresses: []string{alice}})
 	r := record(w)
 
-	seeded := UTXO{Outpoint: btc.Outpoint{TxID: hashOf('x', 9), Vout: 3}, Address: alice, Value: 777, Height: 4}
-	w.Seed([]UTXO{seeded})
+	seeded := btc.UTXO{Outpoint: btc.Outpoint{TxID: hashOf('x', 9), Vout: 3}, Address: alice, Value: 777, Height: 4}
+	w.Seed([]btc.UTXO{seeded})
 	assert.Equal(t, map[string]btc.Amount{alice: 777}, w.Balances())
 
 	require.NoError(t, w.ProcessBlock(block(5, 'a',
@@ -253,7 +254,7 @@ func TestCoinbaseMaturity(t *testing.T) {
 	assert.False(t, utxos[0].Mature(198))
 	assert.True(t, utxos[0].Mature(199), "spendable in block 200, 100 blocks later")
 
-	plain := UTXO{Height: 100}
+	plain := btc.UTXO{Height: 100}
 	assert.True(t, plain.Mature(100))
 }
 
@@ -270,4 +271,19 @@ func TestAttachNeedsFullTransactions(t *testing.T) {
 	assert.Error(t, w.Attach(stream.New(nil, stream.Config{})))
 	assert.NoError(t, w.Attach(stream.New(nil, stream.Config{FullTransactions: true, MaxReorgDepth: 10})))
 	assert.Equal(t, 10, w.maxReorgDepth)
+}
+
+func TestSnapshot(t *testing.T) {
+	w := New(Config{Addresses: []string{alice}})
+	require.NoError(t, w.ProcessBlock(block(100, 'a', coinbase(1, out(0, alice, 5000)))))
+	require.NoError(t, w.ProcessBlock(block(101, 'a', coinbase(2, out(0, bob, 1)),
+		tx(3, []btc.TxIn{in(hashOf('x', 1), 0, "", 0)}, out(0, alice, 700)))))
+
+	s := w.Snapshot()
+	assert.Equal(t, int64(101), s.Height)
+	require.Len(t, s.UTXOs, 2)
+
+	b := balance.Of(balance.Compute(s, 1), alice)
+	assert.Equal(t, btc.Amount(700), b.Confirmed)
+	assert.Equal(t, btc.Amount(5000), b.Immature, "a coinbase output 2 blocks deep")
 }
