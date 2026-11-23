@@ -34,6 +34,11 @@ type AssetMonth struct {
 	// MissingHistory: the realized rows of the asset may be incomplete;
 	// set by the caller, which knows the sync state
 	MissingHistory bool
+
+	// StalePrice: the current price of the asset could not be refreshed, so a
+	// USDT part valued at it uses an older price; set by the caller, which
+	// knows where the prices come from
+	StalePrice bool
 }
 
 // NewAssetMonth returns an AssetMonth with zero interest.
@@ -56,7 +61,7 @@ func (a AssetMonth) AmountComplete() bool {
 
 // Complete reports whether both Total and TotalUSDT are the full month figures.
 func (a AssetMonth) Complete() bool {
-	return a.AmountComplete() && !a.MissingPrice
+	return a.AmountComplete() && !a.MissingPrice && !a.StalePrice
 }
 
 // MonthByAsset combines the projection and the realized interest per asset.
