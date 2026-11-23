@@ -290,6 +290,9 @@ func claimInterestBudget(session *bbgo.ExchangeSession) (release func(), err err
 
 // interestEstimate is the result of one estimate tick
 type interestEstimate struct {
+	// Time is when the estimate was made
+	Time time.Time
+
 	// Month, RemainingHours, Projection, Realized and Assets are the calendar month
 	Month          time.Time
 	RemainingHours int
@@ -522,6 +525,7 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 	}
 
 	est := &interestEstimate{
+		Time:            now,
 		Month:           month.Start,
 		RemainingHours:  hours,
 		Projection:      projection,

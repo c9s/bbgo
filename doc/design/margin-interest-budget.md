@@ -332,6 +332,16 @@ stateDiagram-v2
   status, so one glance shows which asset is over and how the session
   stands. Several messages would arrive together whenever one borrow
   pushes an asset and the session over at once.
+- **The message says when it was last updated,** below its title. An
+  edited message keeps the time of its first post, so a reader could
+  not otherwise tell a message that is still updated from one that is
+  not. All lines are from the same tick, and the time is when that tick
+  started: the debts are read then, while realized interest is as of
+  the last sync.
+- **The message is not compared field by field.** The other autoborrow
+  alerts let the notifier comment every changed field in the thread.
+  Here the update time changes on every tick, so that would comment
+  every tick. The alert comments a status change itself.
 - **Exceeded and projected exceeded raise it. Unknown does not.** An
   incomplete estimate is in the log and the metrics, and one failed
   sync should not call anyone.
