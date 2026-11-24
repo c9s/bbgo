@@ -289,7 +289,9 @@ pending / immature coinbase); the UTXOs come from `scantxoutset`, an Esplora
 indexer (`pkg/chain/btc/esplora`) or the watcher. See "Balances" in the guide.
 
 Exercise it with `bbgo btc info | block | tx | utxo | scan | stream | watch | balance` and
-`--rpc` or `BTC_RPC_ENDPOINT` — no config file needed.
+`--rpc` or `BTC_RPC_ENDPOINT` — no config file needed. `pkg/chain/btc/regtest`
+starts a throwaway regtest bitcoind for integration tests (set `BITCOIND`;
+they skip without it); see "Regtest" in the guide.
 
 ## Strategy Development
 
