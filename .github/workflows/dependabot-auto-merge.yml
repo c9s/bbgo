@@ -1,0 +1,154 @@
+name: Dependabot Auto-merge
+
+# Dependabot itself is not an Action — it is configured in
+# .github/dependabot.yml and has been opening pull requests here for a long
+# time. What was missing is the other half: every one of those pull requests
+# had to be merged by hand. This workflow does that merge, but only for the
+# updates the required status checks actually cover.
+#
+# It never merges anything directly, and it never approves anything either. It
+# asks GitHub to enable auto-merge, so the pull request still has to satisfy the
+# whole branch ruleset on main before it goes in: the required "lint" and
+# "build (6.2, 1.27)" checks, and one approving review. The review stays a human
+# one on purpose — this removes the step of coming back to press merge once the
+# checks are green, not the step of looking at the bump. If a bump breaks the
+# build, or nobody approves it, the pull request simply stays open.
+
+# Restricted to pull requests against main on purpose. The ruleset that
+# supplies the required checks only covers the default branch, so on any other
+# target "enable auto-merge" would find nothing to wait for and merge at once.
+on:
+  pull_request:
+    branches: [ main ]
+
+# Dependabot-triggered runs get a read-only GITHUB_TOKEN by default; this
+# `permissions` block is what raises it. Note that only GITHUB_TOKEN is
+# available to these runs — repository secrets are not, which is why nothing
+# here needs one.
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    # Matching on the pull request author rather than github.actor: a human
+    # re-running this workflow changes the actor but not the author, and the
+    # policy below should not depend on who pressed the button.
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+
+    steps:
+    - name: Fetch Dependabot metadata
+      id: meta
+      uses: dependabot/fetch-metadata@v3
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Apply the auto-merge policy
+      id: policy
+      env:
+        UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
+        ECOSYSTEM: ${{ steps.meta.outputs.package-ecosystem }}
+        DEPENDENCY_NAMES: ${{ steps.meta.outputs.dependency-names }}
+      run: |
+        set -euo pipefail
+
+        # Actions that appear ONLY in workflows which never run on a pull
+        # request: docker.yml (push to main and v* tags), release.yml (tags)
+        # and release-chart.yml. A major bump to any of these can turn the
+        # required checks green and still break the release or image pipeline
+        # the first time it runs on main, so it stays a human decision.
+        #
+        # Keep this list in step with the `uses:` lines in those three
+        # workflows.
+        UNGATED_PREFIXES="docker/ helm/ softprops/"
+
+        eligible=no
+        reason="update type ${UPDATE_TYPE:-unknown} is not covered by the auto-merge policy"
+
+        case "$UPDATE_TYPE" in
+        version-update:semver-patch|version-update:semver-minor)
+          eligible=yes
+          reason="patch and minor updates are gated by the required checks"
+          ;;
+
+        version-update:semver-major)
+          # GitHub Actions are tagged by major version only, so routine
+          # maintenance bumps (actions/checkout v6 -> v7) are all reported as
+          # major. Treating them like a major library upgrade would mean this
+          # workflow never fires for the one ecosystem that actually opens
+          # pull requests on this repository.
+          #
+          # The ecosystem is spelled github_actions in Dependabot's own
+          # metadata and github-actions in dependabot.yml; accept both rather
+          # than depend on which one fetch-metadata happens to emit.
+          case "$ECOSYSTEM" in
+          github_actions|github-actions)
+            eligible=yes
+            reason="github-actions major bumps are exercised by the required checks"
+
+            # dependency-names is comma separated, e.g.
+            # "docker/login-action,docker/build-push-action". Split on commas
+            # rather than reading into an array: action names never contain
+            # whitespace, and this behaves the same under every bash the
+            # runners have shipped.
+            for name in $(printf '%s' "$DEPENDENCY_NAMES" | tr ',' ' '); do
+              for prefix in $UNGATED_PREFIXES; do
+                case "$name" in
+                "$prefix"*)
+                  eligible=no
+                  reason="$name is only used in workflows that no pull request check runs"
+                  ;;
+                esac
+              done
+            done
+            ;;
+          *)
+            reason="major updates outside github-actions need a human review"
+            ;;
+          esac
+          ;;
+        esac
+
+        echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+        echo "reason=$reason" >> "$GITHUB_OUTPUT"
+
+        {
+          echo "### Dependabot auto-merge"
+          echo
+          echo "| | |"
+          echo "|---|---|"
+          echo "| Dependencies | \`${DEPENDENCY_NAMES:-?}\` |"
+          echo "| Ecosystem | \`${ECOSYSTEM:-?}\` |"
+          echo "| Update type | \`${UPDATE_TYPE:-?}\` |"
+          echo "| Auto-merge | **$eligible** |"
+          echo "| Reason | $reason |"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Enable auto-merge
+      if: steps.policy.outputs.eligible == 'yes'
+      env:
+        PR_URL: ${{ github.event.pull_request.html_url }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # --merge, not --squash or --rebase: those two merge methods are disabled
+      # on this repository, and gh fails outright if asked for one of them.
+      #
+      # No `gh pr review --approve` step, and that is a decision rather than an
+      # omission. The ruleset on main requires one approving review, and
+      # github-actions[bot] is allowed to give it here, so adding that step
+      # would make these pull requests merge with no human having looked at
+      # them. Without it, enabling auto-merge means the merge happens the
+      # moment a maintainer approves and the checks are green.
+      run: gh pr merge --auto --merge "$PR_URL"
+
+    - name: Leave this one for a human
+      if: steps.policy.outputs.eligible != 'yes'
+      env:
+        REASON: ${{ steps.policy.outputs.reason }}
+      run: echo "Not enabling auto-merge - $REASON"
