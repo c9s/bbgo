@@ -74,3 +74,13 @@ func Volumes(source KLineSubscription) *PriceStream {
 func HLC3(source KLineSubscription) *PriceStream {
 	return Price(source, types.KLineHLC3Mapper)
 }
+
+// HL2 returns the mid price stream, (high + low) / 2
+func HL2(source KLineSubscription) *PriceStream {
+	return Price(source, types.KLineHL2Mapper)
+}
+
+// CloseSubOpen returns the kline body stream, close - open
+func CloseSubOpen(source KLineSubscription) *PriceStream {
+	return Price(source, types.KLineCloseSubOpenMapper)
+}
