@@ -230,6 +230,24 @@ func (r *recorder) nextReorg(t *testing.T) Reorg {
 	return Reorg{}
 }
 
+// nextLogs waits for n logs. The stream emits a block before its logs, so
+// receiving a block does not mean its logs have been delivered yet.
+func (r *recorder) nextLogs(t *testing.T, n int) []ethtypes.Log {
+	t.Helper()
+
+	out := make([]ethtypes.Log, 0, n)
+	for len(out) < n {
+		select {
+		case l := <-r.logs:
+			out = append(out, l)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timed out after %d of %d logs", len(out), n)
+		}
+	}
+
+	return out
+}
+
 func (r *recorder) assertQuiet(t *testing.T) {
 	t.Helper()
 
@@ -301,7 +319,10 @@ func TestStream_BackfillsFromBlockWithLogs(t *testing.T) {
 		assert.Equal(t, chain.block(b.Number()).Hash, b.Hash)
 	}
 
-	assert.Len(t, r.logs, 7)
+	logs := r.nextLogs(t, 7)
+	for i, l := range logs {
+		assert.Equal(t, blocks[i].Hash, l.BlockHash)
+	}
 
 	cursor, ok := s.Cursor()
 	require.True(t, ok)
