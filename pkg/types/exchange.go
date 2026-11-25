@@ -173,6 +173,14 @@ type ExchangeMarketDataService interface {
 	QueryKLines(ctx context.Context, symbol string, interval Interval, options KLineQueryOptions) ([]KLine, error)
 }
 
+// ExchangeDepthQueryService is implemented by exchanges that can fetch a
+// full order book depth snapshot via REST (e.g. binance, okex, kucoin,
+// backpack, bitfinex). It's used as a polling fallback when a websocket
+// order book stream's update frequency drops too low, see StreamBookMonitor.
+type ExchangeDepthQueryService interface {
+	QueryDepth(ctx context.Context, symbol string) (snapshot SliceOrderBook, finalUpdateID int64, err error)
+}
+
 type OTCExchange interface {
 	RequestForQuote(
 		ctx context.Context, symbol string, side SideType, quantity fixedpoint.Value,
