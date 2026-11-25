@@ -216,6 +216,10 @@ func (h *SplitHedge) initializeHedgeMarkets(sessions map[string]*bbgo.ExchangeSe
 
 		h.hedgeMarketInstances[name] = hedgeMarket
 
+		if strategy.SourceBookUpdateMonitor != nil && strategy.SourceBookUpdateMonitor.Enabled {
+			hedgeMarket.BindBookUpdateMonitor(cloneBookUpdateMonitor(strategy.SourceBookUpdateMonitor))
+		}
+
 		hedgeMarket.Position.StrategyInstanceID = strategy.InstanceID()
 
 		// complex hedge needs to trigger the strategy position close

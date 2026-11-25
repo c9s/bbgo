@@ -174,6 +174,135 @@ func TestHedgeMarket_GetQuotePriceBySessionBalances(t *testing.T) {
 	assert.InEpsilon(t, 10010.0, ask.Float64(), 1e-9)
 }
 
+// fakeDepthQueryExchange wraps a mock exchange and additionally implements
+// types.ExchangeDepthQueryService, so GetQuotePrice/GetQuotePriceBySessionBalances's
+// refreshBookIfStale REST-poll fallback can be exercised in tests.
+type fakeDepthQueryExchange struct {
+	*mocks.MockExchangeExtended
+	snapshot      types.SliceOrderBook
+	queryDepthErr error
+	queryDepthN   int
+}
+
+func (f *fakeDepthQueryExchange) QueryDepth(_ context.Context, _ string) (types.SliceOrderBook, int64, error) {
+	f.queryDepthN++
+	return f.snapshot, 0, f.queryDepthErr
+}
+
+func TestHedgeMarket_BindBookUpdateMonitor_PollsWhenStale(t *testing.T) {
+	ctx := context.Background()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	market := Market("BTCUSDT")
+	_, mockMarketDataStream := newMockMarketDataStream(mockCtrl, ctx, market.Symbol)
+	_, mockUserDataStream := newMockUserDataStream(mockCtrl)
+
+	mockEx := mocks.NewMockExchangeExtended(mockCtrl)
+	mockEx.EXPECT().NewStream().Return(mockMarketDataStream)
+	mockEx.EXPECT().Name().Return(types.ExchangeBinance)
+
+	fakeEx := &fakeDepthQueryExchange{
+		MockExchangeExtended: mockEx,
+		snapshot: types.SliceOrderBook{
+			Symbol: market.Symbol,
+			Bids:   types.PriceVolumeSlice{{Price: Number(20000), Volume: Number(1)}},
+			Asks:   types.PriceVolumeSlice{{Price: Number(20010), Volume: Number(1)}},
+		},
+	}
+
+	account := types.NewAccount()
+	account.UpdateBalances(types.BalanceMap{
+		"USDT": types.NewBalance("USDT", Number(200000)),
+		"BTC":  types.NewBalance("BTC", Number(10)),
+	})
+
+	session := &bbgo.ExchangeSession{
+		MarketDataStream: mockMarketDataStream,
+		UserDataStream:   mockUserDataStream,
+		Exchange:         fakeEx,
+		Account:          account,
+	}
+
+	hm := NewHedgeMarket(&HedgeMarketConfig{
+		SymbolSelector: "BTCUSDT",
+		HedgeInterval:  hedgeInterval,
+		QuotingDepth:   Number(1.0),
+	}, session, market)
+
+	hm.BindBookUpdateMonitor(&types.StreamBookMonitor{
+		Enabled:        true,
+		StaleThreshold: types.Duration(time.Hour),
+	})
+
+	err := hm.stream.Connect(ctx)
+	assert.NoError(t, err)
+
+	// no snapshot/update has ever arrived on the websocket stream, so the
+	// book is stale by definition (see types.StreamBookMonitor.IsStale).
+	bid, ask := hm.GetQuotePrice()
+
+	assert.Equal(t, 1, fakeEx.queryDepthN, "expected a REST poll since the book never received a stream event")
+	assert.InEpsilon(t, 20000.0, bid.Float64(), 1e-9)
+	assert.InEpsilon(t, 20010.0, ask.Float64(), 1e-9)
+}
+
+func TestHedgeMarket_BindBookUpdateMonitor_NoPollWhenFresh(t *testing.T) {
+	ctx := context.Background()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	market := Market("BTCUSDT")
+	session, marketDataStream, _ := newMockSession(mockCtrl, ctx, market.Symbol)
+
+	hm := NewHedgeMarket(&HedgeMarketConfig{
+		SymbolSelector: "BTCUSDT",
+		HedgeInterval:  hedgeInterval,
+		QuotingDepth:   Number(1.0),
+	}, session, market)
+
+	hm.BindBookUpdateMonitor(&types.StreamBookMonitor{
+		Enabled:        true,
+		StaleThreshold: types.Duration(time.Hour),
+	})
+
+	err := hm.stream.Connect(ctx)
+	assert.NoError(t, err)
+
+	marketDataStream.EmitBookSnapshot(types.SliceOrderBook{
+		Symbol: market.Symbol,
+		Bids:   types.PriceVolumeSlice{{Price: Number(10000), Volume: Number(100)}},
+		Asks:   types.PriceVolumeSlice{{Price: Number(10010), Volume: Number(100)}},
+	})
+
+	// session.Exchange here (from newMockSession) does not implement
+	// types.ExchangeDepthQueryService, so refreshBookIfStale is a no-op
+	// regardless of staleness. This call mainly asserts GetQuotePrice still
+	// behaves normally (reads the fresh snapshot) when bound to a monitor.
+	bid, ask := hm.GetQuotePrice()
+	assert.InEpsilon(t, 10000.0, bid.Float64(), 1e-9)
+	assert.InEpsilon(t, 10010.0, ask.Float64(), 1e-9)
+}
+
+func TestCloneBookUpdateMonitor(t *testing.T) {
+	template := &types.StreamBookMonitor{
+		Enabled:        true,
+		StaleThreshold: types.Duration(5 * time.Second),
+	}
+
+	clone1 := cloneBookUpdateMonitor(template)
+	clone2 := cloneBookUpdateMonitor(template)
+
+	// SplitHedge/SyntheticHedge clone this template once per HedgeMarket;
+	// each must get its own instance since StreamBookMonitor.Bind holds
+	// per-book mutable state (lastEventTime, the bound staleMetric).
+	assert.NotSame(t, clone1, clone2)
+	assert.Equal(t, template.Enabled, clone1.Enabled)
+	assert.Equal(t, template.StaleThreshold, clone1.StaleThreshold)
+	assert.Equal(t, template.Enabled, clone2.Enabled)
+	assert.Equal(t, template.StaleThreshold, clone2.StaleThreshold)
+}
+
 func TestHedgeMarket_RedispatchPositionAfterFailure(t *testing.T) {
 	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)

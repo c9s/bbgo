@@ -196,6 +196,10 @@ type HedgeMarket struct {
 	book      *types.StreamOrderBook
 	depthBook *types.DepthBook
 
+	// bookUpdateMonitor, when bound via BindBookUpdateMonitor, polls a fresh
+	// snapshot of book via REST when its update frequency drops too low.
+	bookUpdateMonitor *types.StreamBookMonitor
+
 	quotingPrice         *types.Ticker
 	bidPricer, askPricer pricer.Pricer
 
@@ -477,6 +481,52 @@ func (m *HedgeMarket) isAvailable() bool {
 	return true
 }
 
+// cloneBookUpdateMonitor copies the Enabled/StaleThreshold settings from a
+// shared template into a fresh, independent StreamBookMonitor — each
+// HedgeMarket needs its own instance because StreamBookMonitor.Bind holds
+// per-book mutable state.
+func cloneBookUpdateMonitor(template *types.StreamBookMonitor) *types.StreamBookMonitor {
+	return &types.StreamBookMonitor{
+		Enabled:        template.Enabled,
+		StaleThreshold: template.StaleThreshold,
+	}
+}
+
+// BindBookUpdateMonitor binds monitor to this market's own order book, so
+// GetQuotePrice/GetQuotePriceBySessionBalances can poll a fresh snapshot via
+// REST when the book goes stale.
+func (m *HedgeMarket) BindBookUpdateMonitor(monitor *types.StreamBookMonitor) {
+	m.bookUpdateMonitor = monitor
+	monitor.Bind(m.book)
+}
+
+// refreshBookIfStale polls a fresh order book snapshot via REST if
+// bookUpdateMonitor reports the book stale. Best-effort: failures are
+// logged, not propagated, so a price read never blocks on a REST error.
+func (m *HedgeMarket) refreshBookIfStale() {
+	if m.bookUpdateMonitor == nil || !m.bookUpdateMonitor.Enabled {
+		return
+	}
+	if !m.bookUpdateMonitor.IsStale(time.Now()) {
+		return
+	}
+
+	depthService, ok := m.session.Exchange.(types.ExchangeDepthQueryService)
+	if !ok {
+		return
+	}
+
+	ctx := m.tradingCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	m.logger.Warnf("hedge market (%s) book is stale, attempting to poll via REST", m.SymbolSelector)
+	if err := m.bookUpdateMonitor.PollUpdate(ctx, depthService); err != nil {
+		m.logger.WithError(err).Warnf("unable to poll hedge market order book via REST")
+	}
+}
+
 func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitOrder) (*types.Order, error) {
 	submitOrder.Market = m.market
 	submitOrder.Symbol = m.market.Symbol
@@ -532,6 +582,8 @@ func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitO
 // - Else if QuotingDepth is configured, delegate to GetQuotePriceByBaseAmount.
 // - Else, fall back to best bid/ask with fee application.
 func (m *HedgeMarket) GetQuotePrice() (bid, ask fixedpoint.Value) {
+	m.refreshBookIfStale()
+
 	// Prefer configured quoting depth helpers when available to avoid code duplication.
 	if m.QuotingDepthInQuote.Sign() > 0 {
 		return m.GetQuotePriceByQuoteAmount(m.QuotingDepthInQuote)
@@ -620,6 +672,8 @@ func (m *HedgeMarket) GetBaseQuoteAvailableBalances() (baseAvailable, quoteAvail
 // Prices are then adjusted by the configured fee mode and stored into
 // m.quotingPrice as a snapshot.
 func (m *HedgeMarket) GetQuotePriceBySessionBalances() (bid, ask fixedpoint.Value) {
+	m.refreshBookIfStale()
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
