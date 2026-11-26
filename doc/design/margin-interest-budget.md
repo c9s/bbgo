@@ -236,7 +236,7 @@ stateDiagram-v2
 - **Editing one message replaces the need for a cooldown.** Updating the message on every tick does not send a new notification. People are mentioned only once when the alert opens, and thread comments appear only when a status changes. Because of that, there is nothing to rate-limit.
 - **A new month starts a new alert.** The previous month's message stays untouched in its final state as a record of that month.
 - **An alert requires a budget.** Configuring an alert without a budget causes a startup error instead of silently doing nothing.
-- **The message notes when budgets are limiting borrowing**, so a reader immediately knows why `autoborrow` stopped borrowing.
+- **While the alert is open, the message notes when budgets are limiting borrowing**, so a reader immediately knows why `autoborrow` stopped borrowing.
 - **Alert state lives in memory.** If `bbgo` restarts while a session is still over budget, it opens a new alert message.
 
 ### The borrow limit
@@ -270,11 +270,13 @@ What the borrow limit controls:
 - **It only limits the size of a borrow.** It never repays debt. Taking on less debt never lowers your margin level, so the borrow limit cannot interfere with the protection for the margin level, which runs before it.
 - **It only limits what `autoborrow` borrows.** An order that borrows on its own still goes through. Keeping those strategies off the account is the user's responsibility (see "What the user is responsible for"). If such an order does happen, the new debt counts against the budgets as soon as the account shows it, so `autoborrow` will borrow less afterward.
 - **The limit belongs to the session, just like the budget.** Every `autoborrow` instance running on that session obeys the limit, even an instance that has no budget of its own. The limiter is stored per session, not on an individual strategy instance.
+- **The estimate learns another instance's assets when that instance asks for a limit.** The estimate runs in the instance that sets the budget, and it does not know the asset list of any other instance. The first time another instance wants to borrow an asset, the limit has no rate or price for it, so that borrow is refused as "unknown". From the next tick on, the estimate fetches the rate and the price of that asset too.
 
 How `bbgo` calculates how much fits:
 
 - **A borrow is reduced to fit, rather than blocked outright.** The limit is the largest amount whose interest still fits in the remaining budget. Blocking a borrow completely is just the case where that amount is zero. If the reduced amount falls below the minimum amount the exchange lets you borrow, `bbgo` skips the borrow, just like any other borrow that is too small.
 - **The cost of a new borrow uses today's rate and price.** It counts one immediate charge at the moment of the borrow (counted as a full hour) plus every hourly charge left in the month.
+- **The limit keeps counting a borrow's immediate charge until the history shows it.** The interest history is synced once per sync interval, so the "already charged" number does not yet include the immediate charge of a borrow made since the last sync. The limiter remembers those charges itself and subtracts them from the remaining budget, until a sync that started at least one hour after the borrow. Without this, every borrow in the last hour of a month would see the same remaining budget, because such a borrow pays nothing except its immediate charge. For up to one sync interval a charge can be counted twice, which errs on the safe side.
 - **A borrow must fit within what is left of the calendar month.** That remaining room is the budget, minus what has already been charged, minus what existing debts will be charged if held until the end of the month. Because of this, a month with low charges early on leaves more room to borrow later. The budget is a total for the month, not a fixed hourly rate.
 - **The limit does not look at next month.** Near the end of a month, a new borrow only pays a few hourly charges before the month ends, so the remaining budget may allow a large debt. That debt can start the next month already projected over next month's budget. Nothing repays it automatically; instead, the alert notifies the operator, and `autoborrow` borrows nothing more under that budget while it stays over.
 - **Both the asset budget and the session budget apply**, and the smaller limit wins. If an asset has no budget of its own, it still follows the session budget. If neither budget applies to an asset, that asset is not limited.
@@ -290,9 +292,9 @@ How the limit behaves when numbers are missing:
 
 How the limit runs:
 
-- **The limit is calculated right when a borrow happens**, using the latest estimate and the live account state at that moment. Each estimate tick hands over what each budget has been charged, the current rates, and how many hours are left. Right before borrowing, `bbgo` reads the current debts directly from the account. This means the borrow loop never has to wait for the estimate (which can take minutes after startup), and any debt opened since the last tick is still counted, no matter what opened it.
+- **The limit is calculated right when a borrow happens**, using the latest estimate and the account state the borrow loop holds. Each estimate tick hands over what each budget has been charged, the current rates, and how many hours are left. The debts come from the account the borrow loop read at the start of its run, and read again after each borrow it made. This means the borrow loop never has to wait for the estimate (which can take minutes after startup), and any debt opened since the last tick is still counted, no matter what opened it.
 - **When a borrow limit is active, `bbgo` fetches prices for all `autoborrow` assets on every tick.** Normally, the estimate only fetches prices for assets that already have debt. With a borrow limit, `bbgo` must calculate the cost of a borrow before the asset has any debt. If one of those price requests fails, the price is treated as stale like any other: the asset cannot be borrowed, and the estimate is marked incomplete.
-- **Every limited borrow is logged and counted by reason.** When a borrow is refused because the limit could not be calculated, `bbgo` logs a warning because that points to a problem with the estimate. `bbgo` does not send a separate alert for each refused borrow, since the borrow loop would repeat that alert on every run. Instead, the main alert message for the budget notes that borrowing is being limited.
+- **Every limited borrow is counted by reason, and logged when the limit changes.** The borrow loop tries again on every run, so the counter goes up on every run, while the log reports a limit once: when it starts, when its reason changes, and when it ends. When a borrow is refused because the limit could not be calculated, the log line is a warning, because that points to a problem with the estimate. `bbgo` does not send a notification for a limited borrow. A borrow that was reduced to fit leaves the budget just within its limit, so no alert is open at that point: the log and the counter are where it shows.
 
 ## Follow-ups
 
@@ -371,6 +373,8 @@ How the limit runs:
 - On an account that pays interest in BNB, the borrow limit calculates costs using the nominal rate. As a result, the limit is slightly stricter than necessary, by roughly the amount of the BNB discount.
 - If an `autoborrow` instance without a budget starts before the instance that owns the session's budget, that first instance makes its initial run without a limit.
 - If two `autoborrow` instances borrow at the exact same moment, each one reads the account state before the other's borrow has been recorded.
+- The first borrow of an asset by an `autoborrow` instance that does not own the session's budget is refused as "unknown", and has to wait for the next estimate tick.
+- A borrow's immediate charge can be counted twice for up to one sync interval, so the limit is slightly stricter than necessary during that time.
 
 ## References
 
