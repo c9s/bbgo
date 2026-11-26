@@ -8,7 +8,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 type SnapshotFetcher func() (snapshot types.SliceOrderBook, finalUpdateID int64, err error)
@@ -32,9 +31,10 @@ type Buffer struct {
 	readyCallbacks []func(snapshot types.SliceOrderBook, updates []Update)
 	pushCallbacks  []func(update Update)
 
-	fetchC chan struct{}
-	mu     sync.Mutex
-	once   util.Reonce
+	fetchC     chan struct{}
+	mu         sync.Mutex
+	fetching   bool
+	generation uint64
 
 	// updateTimeout the timeout duration when not receiving update messages
 	updateTimeout time.Duration
@@ -73,6 +73,15 @@ func (b *Buffer) resetSnapshot() {
 	b.logger.Debug("resetting the snapshot")
 	b.snapshot = nil
 	b.finalUpdateID = 0
+	b.generation++
+}
+
+func (b *Buffer) startFetchLocked() {
+	if b.fetching {
+		return
+	}
+	b.fetching = true
+	go b.tryFetch()
 }
 
 // emitFetch emits the fetch signal, and in the next call of AddUpdate, the buffer will try to fetch the snapshot
@@ -88,6 +97,7 @@ func (b *Buffer) emitFetch() {
 func (b *Buffer) Reset() {
 	b.logger.Debug("resetting this buffer")
 	b.mu.Lock()
+	b.buffer = nil
 	b.resetSnapshot()
 	b.emitFetch()
 	b.mu.Unlock()
@@ -109,14 +119,21 @@ func (b *Buffer) SetSnapshot(snapshot types.SliceOrderBook, firstUpdateID int64,
 	}
 
 	b.logger.Debug("setting the snapshot")
+	select {
+	case <-b.fetchC:
+	default:
+	}
+	b.buffer = nil
+	b.generation++
+
 	// set the final update ID so that we will know if there is an update missing
 	b.finalUpdateID = finalUpdateID
 
 	// set the snapshot
 	b.snapshot = &snapshot
-	b.EmitReady(snapshot, nil)
-
 	b.mu.Unlock()
+
+	b.EmitReady(snapshot, nil)
 
 	return nil
 }
@@ -148,12 +165,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 		b.logger.Debug("fetch signal received")
 		b.buffer = append(b.buffer, u)
 		b.resetSnapshot()
-		b.once.Reset()
-		b.once.Do(func() {
-			b.logger.Debug("try fetching the snapshot due to fetch signal received")
-
-			go b.tryFetch()
-		})
+		b.startFetchLocked()
 		b.mu.Unlock()
 		return nil
 	default:
@@ -163,10 +175,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 	// we need to buffer the message
 	if b.snapshot == nil {
 		b.buffer = append(b.buffer, u)
-		b.once.Do(func() {
-			b.logger.Debug("try fetching the snapshot due to no snapshot")
-			go b.tryFetch()
-		})
+		b.startFetchLocked()
 		b.mu.Unlock()
 		return nil
 	}
@@ -192,11 +201,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 			// drop the prior updates in the buffer since it's corrupted
 			b.buffer = []Update{u}
 			b.resetSnapshot()
-			b.once.Reset()
-			b.once.Do(func() {
-				b.logger.Debug("try fetching the snapshot due to missing update")
-				go b.tryFetch()
-			})
+			b.startFetchLocked()
 
 			b.mu.Unlock()
 			b.EmitReset()
@@ -209,11 +214,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 			// drop the prior updates in the buffer since it's corrupted
 			b.buffer = []Update{u}
 			b.resetSnapshot()
-			b.once.Reset()
-			b.once.Do(func() {
-				b.logger.Debug("try fetching the snapshot due to missing update")
-				go b.tryFetch()
-			})
+			b.startFetchLocked()
 
 			b.mu.Unlock()
 			b.EmitReset()
@@ -225,9 +226,9 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 
 	b.logger.Debugf("depth update id %d -> %d", b.finalUpdateID, u.FinalUpdateID)
 	b.finalUpdateID = u.FinalUpdateID
-	b.EmitPush(u)
-
 	b.mu.Unlock()
+
+	b.EmitPush(u)
 
 	return nil
 }
@@ -248,12 +249,31 @@ func (b *Buffer) tryFetch() {
 }
 
 func (b *Buffer) fetchAndPush() error {
+	b.mu.Lock()
+	if b.snapshot != nil {
+		b.fetching = false
+		b.mu.Unlock()
+		return nil
+	}
+	gen := b.generation
+	b.mu.Unlock()
+
 	book, finalUpdateID, err := b.fetcher()
 	if err != nil {
 		return err
 	}
 
 	b.mu.Lock()
+	if b.snapshot != nil {
+		b.fetching = false
+		b.mu.Unlock()
+		return nil
+	}
+	if b.generation != gen {
+		b.mu.Unlock()
+		return fmt.Errorf("depth snapshot invalidated by buffer reset")
+	}
+
 	b.logger.Debugf("fetched depth snapshot, final update id %d", finalUpdateID)
 
 	if len(b.buffer) > 0 {
@@ -292,9 +312,10 @@ func (b *Buffer) fetchAndPush() error {
 
 	// set the snapshot
 	b.snapshot = &book
-	b.EmitReady(book, pushUpdates)
-
+	b.fetching = false
 	b.mu.Unlock()
+
+	b.EmitReady(book, pushUpdates)
 
 	return nil
 }
