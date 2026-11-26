@@ -160,6 +160,10 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 		// update strategy instance ID for the source market
 		s.sourceMarket.Position.StrategyInstanceID = strategy.InstanceID()
 		s.sourceMarket.positionExposure.OnClose(strategy.positionExposure.Close)
+
+		if strategy.SourceBookUpdateMonitor != nil && strategy.SourceBookUpdateMonitor.Enabled {
+			s.sourceMarket.BindBookUpdateMonitor(cloneBookUpdateMonitor(strategy.SourceBookUpdateMonitor))
+		}
 	} else {
 		// the split hedge binds the position exposure and the redispatch callbacks to the strategy,
 		// but the source trades are handled by the synthetic hedge instead of the strategy trade collector.
@@ -181,6 +185,10 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 	s.fiatMarket.SetLogger(s.logger)
 	s.fiatMarket.dryRun = strategy.DryRun
 	s.fiatMarket.Position.StrategyInstanceID = strategy.InstanceID()
+
+	if strategy.SourceBookUpdateMonitor != nil && strategy.SourceBookUpdateMonitor.Enabled {
+		s.fiatMarket.BindBookUpdateMonitor(cloneBookUpdateMonitor(strategy.SourceBookUpdateMonitor))
+	}
 
 	if err := s.initialize(strategy); err != nil {
 		return err
