@@ -432,6 +432,14 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 			}
 		}
 
+		// the interest budgets of the session, when they limit borrowing: checked
+		// before the exchange is asked, a refused borrow needs no query. The account
+		// is read again after every borrow, so the debts of this run are counted.
+		toBorrow = s.limitBorrowToBudget(marginAsset.Asset, toBorrow, account.Balances().Debts())
+		if toBorrow.IsZero() {
+			continue
+		}
+
 		maxBorrowable, err2 := s.marginBorrowRepay.QueryMarginAssetMaxBorrowable(ctx, marginAsset.Asset)
 		if err2 != nil {
 			s.logger.WithError(err2).Warnf("max borrowable query error")
@@ -489,6 +497,11 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 			continue
 		}
 
+		// the borrow is charged once right away, and the budgets count that charge
+		if limiter := interestBudgetLimiterOf(s.ExchangeSession); limiter != nil {
+			limiter.borrowed(marginAsset.Asset, toBorrow)
+		}
+
 		// debt is changed, we need to update account
 		account, err = s.ExchangeSession.UpdateAccount(ctx)
 		if err != nil {
@@ -496,6 +509,55 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 			return
 		}
 	}
+}
+
+// limitBorrowToBudget returns how much of quantity of asset the interest
+// budgets of the session allow to borrow, given the debts the account has now.
+// It is quantity when the session has no budget that limits borrowing.
+func (s *Strategy) limitBorrowToBudget(asset string, quantity fixedpoint.Value, debts types.BalanceMap) fixedpoint.Value {
+	limiter := interestBudgetLimiterOf(s.ExchangeSession)
+	if limiter == nil {
+		return quantity
+	}
+
+	allowed, limit := limiter.limit(asset, quantity, debts)
+
+	// the borrow loop asks again on every run: the counter counts every time, the
+	// log says a limit once, when it changes
+	changed := limiter.changed(asset, limit)
+	if !limit.limited() {
+		if changed {
+			s.logger.WithField("asset", asset).Info("borrow is no longer limited by the interest budget")
+		}
+		return allowed
+	}
+
+	interestBudgetBorrowLimitedMetrics.WithLabelValues(
+		s.ExchangeSession.Name, s.ExchangeSession.ExchangeName.String(), asset, string(limit.Reason),
+	).Inc()
+
+	if !changed {
+		return allowed
+	}
+
+	entry := s.logger.WithFields(logrus.Fields{
+		"asset":   asset,
+		"amount":  quantity.String(),
+		"allowed": allowed.String(),
+		"reason":  string(limit.Reason),
+		"budget":  limit.Budget,
+	})
+
+	// a budget that is used up is the limit doing its job. A limit that cannot
+	// be computed is a fault of the estimate, and it stops every borrow under it.
+	switch limit.Reason {
+	case borrowLimitUnknown, borrowLimitNoEstimate:
+		entry.Warn("borrow refused: the interest budget is not known")
+	default:
+		entry.Info("borrow limited by the interest budget")
+	}
+
+	return allowed
 }
 
 func (s *Strategy) run(ctx context.Context, interval time.Duration) {

@@ -21,8 +21,9 @@ import (
 // The alert is one live message per session, updated in place. It is raised
 // when a budget is exceeded or projected to be exceeded, and it lists every
 // budget of the session with its status. Below its title it says when its
-// figures were last updated. It only tells an operator: nothing is repaid and
-// borrowing does not change.
+// figures were last updated. It only tells an operator: the alert repays
+// nothing and does not change borrowing. Whether the budgets limit borrowing
+// is set with interestEstimate.budget.limitBorrow, and the message says so.
 //
 //	interestBudgetAlert:
 //	  slack:
@@ -60,6 +61,10 @@ type InterestBudgetAlert struct {
 
 	// Budgets lists the session budget first, then the asset budgets by asset
 	Budgets []interestBudgetLine
+
+	// LimitsBorrow says the budgets limit what autoborrow borrows
+	// (budget.limitBorrow), so a reader knows why a borrow was not made
+	LimitsBorrow bool
 }
 
 // interestBudgetAlertTimeLayout formats the update time of the alert, in UTC like its month
@@ -127,6 +132,10 @@ func (a *InterestBudgetAlert) SlackAttachment() slack.Attachment {
 	// the update time is right below the title: every line of the message is from that tick
 	if !a.UpdatedAt.IsZero() {
 		text += "\nUpdated at " + a.UpdatedAt.UTC().Format(interestBudgetAlertTimeLayout)
+	}
+
+	if a.LimitsBorrow {
+		text += "\nAutoborrow borrows only what these budgets can still pay for. Nothing is repaid."
 	}
 
 	return slack.Attachment{
@@ -206,6 +215,9 @@ type interestBudgetAlerter struct {
 	// wasOver holds the budgets that went over while the alert is open and are
 	// not ok again yet
 	wasOver map[string]struct{}
+
+	// limitsBorrow says the budgets limit what autoborrow borrows
+	limitsBorrow bool
 }
 
 func newInterestBudgetAlerter(session *bbgo.ExchangeSession, config *InterestBudgetAlertConfig) *interestBudgetAlerter {
@@ -234,6 +246,7 @@ func (a *interestBudgetAlerter) build(est *interestEstimate) *InterestBudgetAler
 		Exchange:     a.session.ExchangeName,
 		Month:        est.Month,
 		UpdatedAt:    est.Time,
+		LimitsBorrow: a.limitsBorrow,
 	}
 
 	if est.Budget != nil {
