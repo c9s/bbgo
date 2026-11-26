@@ -1040,6 +1040,18 @@ func (s *Strategy) allowMarginHedge(
 }
 
 func (s *Strategy) updateQuote(ctx context.Context) error {
+	// In dry-run mode we never place maker orders, so there is nothing to cancel;
+	// skip the cancel call entirely to avoid touching the exchange.
+	if !s.DryRun {
+		cancelMakerOrdersProfile := timeprofile.Start("cancelMakerOrders")
+		if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
+			s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
+			s.activeMakerOrders.Print()
+			return nil
+		}
+		s.cancelOrderDurationMetrics.Observe(float64(cancelMakerOrdersProfile.Stop().Milliseconds()))
+	}
+
 	// no-borrowable cooldown gate: cooldownAt is the start time of an active
 	// cooldown (zero = not cooling down). While cooling down, skip quoting
 	// entirely; once the window elapses, reset and resume this cycle.
@@ -1064,20 +1076,6 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		s.logger.Warnf("maker session is disconnected, skipping update quote")
 		return nil
 	}
-
-	cancelMakerOrdersProfile := timeprofile.Start("cancelMakerOrders")
-
-	// In dry-run mode we never place maker orders, so there is nothing to cancel;
-	// skip the cancel call entirely to avoid touching the exchange.
-	if !s.DryRun {
-		if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
-			s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
-			s.activeMakerOrders.Print()
-			return nil
-		}
-	}
-
-	s.cancelOrderDurationMetrics.Observe(float64(cancelMakerOrdersProfile.Stop().Milliseconds()))
 
 	if s.activeMakerOrders.NumOfOrders() > 0 {
 		s.logger.Warnf("unable to cancel all %s orders, skipping placing maker orders", s.Symbol)
