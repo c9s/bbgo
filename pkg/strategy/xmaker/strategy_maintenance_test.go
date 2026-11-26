@@ -8,10 +8,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/mocks"
 )
 
 func TestStrategy_updateQuote_MaintenanceSkip(t *testing.T) {
@@ -21,7 +23,12 @@ func TestStrategy_updateQuote_MaintenanceSkip(t *testing.T) {
 	symbol := "BTCUSDT"
 	market := Market(symbol)
 
-	hedgeSession := &bbgo.ExchangeSession{}
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+	mockEx := mocks.NewMockExchange(ctrl)
+	mockEx.EXPECT().CancelOrders(gomock.Any()).Return(nil).AnyTimes()
+
+	hedgeSession := &bbgo.ExchangeSession{Exchange: mockEx}
 	s := &Strategy{
 		Symbol:            symbol,
 		hedgeSession:      hedgeSession,
@@ -58,11 +65,14 @@ func TestStrategy_updateQuote_SplitHedge_NoAvailableMarket(t *testing.T) {
 
 	s := &Strategy{
 		logger: logrus.New(),
-		SplitHedge: &SplitHedge{
-			Enabled: true,
-			hedgeMarketInstances: map[string]*HedgeMarket{
-				"m1": {session: &bbgo.ExchangeSession{Maintenance: newMaintenanceWindow(time.Now())}},
-				"m2": {session: &bbgo.ExchangeSession{Maintenance: newMaintenanceWindow(time.Now())}},
+		StrategyConfig: StrategyConfig{
+			DryRun: true,
+			SplitHedge: &SplitHedge{
+				Enabled: true,
+				hedgeMarketInstances: map[string]*HedgeMarket{
+					"m1": {session: &bbgo.ExchangeSession{Maintenance: newMaintenanceWindow(time.Now())}},
+					"m2": {session: &bbgo.ExchangeSession{Maintenance: newMaintenanceWindow(time.Now())}},
+				},
 			},
 		},
 	}
@@ -76,10 +86,13 @@ func TestStrategy_updateQuote_SyntheticHedge_NoAvailableMarket(t *testing.T) {
 
 	s := &Strategy{
 		logger: logrus.New(),
-		SyntheticHedge: &SyntheticHedge{
-			Enabled:      true,
-			sourceMarket: &HedgeMarket{session: &bbgo.ExchangeSession{Maintenance: newMaintenanceWindow(time.Now())}},
-			fiatMarket:   &HedgeMarket{session: &bbgo.ExchangeSession{}},
+		StrategyConfig: StrategyConfig{
+			DryRun: true,
+			SyntheticHedge: &SyntheticHedge{
+				Enabled:      true,
+				sourceMarket: &HedgeMarket{session: &bbgo.ExchangeSession{Maintenance: newMaintenanceWindow(time.Now())}},
+				fiatMarket:   &HedgeMarket{session: &bbgo.ExchangeSession{}},
+			},
 		},
 	}
 
