@@ -160,6 +160,10 @@ type StrategyConfig struct {
 	// the fixed UpdateInterval is used.
 	AdaptiveQuoteInterval *AdaptiveQuoteInterval `json:"adaptiveQuoteInterval,omitempty"`
 
+	// SourceBookUpdateMonitor tracks the source order book's update frequency
+	// and polls a fresh snapshot via REST when it drops too low.
+	SourceBookUpdateMonitor *types.StreamBookMonitor `json:"sourceBookUpdateMonitor,omitempty"`
+
 	EnableSignalMargin bool `json:"enableSignalMargin"`
 
 	// Direction-divergence (D2) control — optional risk widener driven by signal direction conflicts
@@ -1159,6 +1163,15 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		}
 
 	} else {
+		if s.SourceBookUpdateMonitor != nil && s.SourceBookUpdateMonitor.Enabled && s.SourceBookUpdateMonitor.IsStale(now) {
+			s.logger.Warnf("source book (%s) is stale, attempting to poll via REST", s.hedgeSession.Name)
+			if depthService, ok := s.hedgeSession.Exchange.(types.ExchangeDepthQueryService); ok {
+				if err := s.SourceBookUpdateMonitor.PollUpdate(ctx, depthService); err != nil {
+					s.logger.WithError(err).Warnf("unable to poll source order book via REST")
+				}
+			}
+		}
+
 		bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
 		if !hasPrice {
 			s.logger.Warnf("no valid price, skip quoting")
@@ -2487,6 +2500,12 @@ func (s *Strategy) Defaults() error {
 		}
 	}
 
+	if s.SourceBookUpdateMonitor != nil && s.SourceBookUpdateMonitor.Enabled {
+		if err := s.SourceBookUpdateMonitor.Defaults(); err != nil {
+			return err
+		}
+	}
+
 	if s.HedgeInterval == 0 {
 		s.HedgeInterval = types.Duration(10 * time.Second)
 	}
@@ -2647,6 +2666,12 @@ func (s *Strategy) Validate() error {
 
 	if s.AdaptiveQuoteInterval != nil && s.AdaptiveQuoteInterval.Enabled {
 		if err := s.AdaptiveQuoteInterval.Validate(); err != nil {
+			return err
+		}
+	}
+
+	if s.SourceBookUpdateMonitor != nil && s.SourceBookUpdateMonitor.Enabled {
+		if err := s.SourceBookUpdateMonitor.Validate(); err != nil {
 			return err
 		}
 	}
@@ -3141,6 +3166,10 @@ func (s *Strategy) CrossRun(
 	s.sourceBook = types.NewStreamBook(s.SourceSymbol, s.hedgeSession.ExchangeName)
 	s.sourceBook.BindStream(s.sourceBookStream)
 	s.depthSourceBook = types.NewDepthBook(s.sourceBook)
+
+	if s.SourceBookUpdateMonitor != nil && s.SourceBookUpdateMonitor.Enabled {
+		s.SourceBookUpdateMonitor.Bind(s.sourceBook)
+	}
 
 	s.CircuitBreaker.OnPanic(
 		func() {
