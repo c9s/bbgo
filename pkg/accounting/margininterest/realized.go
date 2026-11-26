@@ -130,7 +130,7 @@ func SumRealized(rows []types.MarginInterestValuation, mode PriceMode, pricer Pr
 	for asset, ar := range r.Assets {
 		if mode == PriceModeCurrent {
 			for paid, amount := range ar.Charged {
-				if px, ok := priceOf(pricer, paid); ok {
+				if px, ok := PriceOf(pricer, paid); ok {
 					ar.USDT = ar.USDT.Add(amount.Mul(px))
 				} else {
 					ar.PriceOK = false
