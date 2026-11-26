@@ -12,9 +12,9 @@ const quoteCurrency = "USDT"
 // PriceFunc resolves the USDT price of an asset. ok is false when the price is unknown.
 type PriceFunc func(asset string) (price fixedpoint.Value, ok bool)
 
-// priceOf returns 1 for USDT and otherwise asks pricer. A nil pricer or a
+// PriceOf returns 1 for USDT and otherwise asks pricer. A nil pricer or a
 // non-positive price counts as unknown.
-func priceOf(pricer PriceFunc, asset string) (fixedpoint.Value, bool) {
+func PriceOf(pricer PriceFunc, asset string) (fixedpoint.Value, bool) {
 	if asset == quoteCurrency {
 		return fixedpoint.One, true
 	}
@@ -141,7 +141,7 @@ func ProjectAssets(
 
 		if ap.Interest.IsZero() {
 			ap.PriceOK = true
-		} else if px, ok := priceOf(pricer, asset); ok {
+		} else if px, ok := PriceOf(pricer, asset); ok {
 			ap.USDT = ap.Interest.Mul(px)
 			ap.PriceOK = true
 			p.TotalUSDT = p.TotalUSDT.Add(ap.USDT)

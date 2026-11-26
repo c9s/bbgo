@@ -169,6 +169,14 @@ var interestAssetBudgetStatusMetrics = prometheus.NewGaugeVec(prometheus.GaugeOp
 	Help: "1 on the current budget status of the asset, 0 on the others: exceeded, projected_exceeded, unknown (within the budget but the estimate of the asset is incomplete) or ok",
 }, []string{"session", "exchange", "asset", "status"})
 
+// reason is why the borrow was reduced or refused: clamped (a part fits the
+// budget), over_budget (nothing is left), unknown (the estimate is incomplete)
+// or no_estimate (there is no current estimate)
+var interestBudgetBorrowLimitedMetrics = prometheus.NewCounterVec(prometheus.CounterOpts{
+	Name: "autoborrow_interest_budget_borrow_limited_total",
+	Help: "number of times the margin interest budgets reduced or refused a borrow, by reason; the borrow loop tries again on every run; only with budget.limitBorrow",
+}, []string{"session", "exchange", "asset", "reason"})
+
 func init() {
 	prometheus.MustRegister(
 		interestProjectedInUSDTMetrics,
@@ -202,5 +210,6 @@ func init() {
 		interestAssetBudgetExceededMetrics,
 		interestAssetBudgetProjectedExceededMetrics,
 		interestAssetBudgetStatusMetrics,
+		interestBudgetBorrowLimitedMetrics,
 	)
 }

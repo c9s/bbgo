@@ -39,14 +39,29 @@ exchangeStrategies:
       # asset), and one per asset. Each is optional, and they are independent of each other.
       # A budget only reports a status (log and Prometheus): exceeded (already charged more),
       # projected_exceeded (will be over at the month end if nothing changes), ok, or unknown (within the
-      # budget, but the estimate is incomplete). It does not change how autoborrow borrows or repays;
-      # interestBudgetAlert below alerts on it. It compares what was charged, at the price when charged,
-      # whatever realizedPriceMode is. A session has its budgets in one autoborrow instance only.
+      # budget, but the estimate is incomplete). interestBudgetAlert below alerts on it. It compares what
+      # was charged, at the price when charged, whatever realizedPriceMode is. A session has its budgets
+      # in one autoborrow instance only.
+      # It does not change how autoborrow borrows unless limitBorrow is set, and it never repays.
+      # limitBorrow: autoborrow borrows only what the budgets can still pay for, on this session. A borrow
+      # is reduced to the part whose interest, to the month end at the current rate, fits what is left of
+      # the budget of its asset and of the budget of the session: the budget, less what was charged, less
+      # what the current debts will still be charged this month. The next month is not looked at. It is
+      # refused when nothing is left, and when the estimate is incomplete, which it is for a while after
+      # a start.
+      # It needs a configured database and an exchange with an hourly interest rate API (Binance).
+      # Only what autoborrow borrows is limited. Do not run a strategy whose orders borrow by themselves
+      # (margin side effect) on the same account: those orders are not limited, and bbgo does not check it.
+      # Of the built-in strategies these are xmaker (on its hedge session), supertrend, linregmaker,
+      # pivotshort, emacross, elliottwave, drift, example/rsicross, and support when its
+      # marginOrderSideEffect borrows. An order sent by hand with a borrowing margin side effect is not
+      # limited either. See "What the user is responsible for" in doc/design/margin-interest-budget.md.
       # budget:
       #   monthlyUSDT: 1000   # the whole session; 0 or not set: no budget
       #   assets:             # per asset: any asset of the exchange, it does not have to be one of the `assets` below
       #     USDT: 600
       #     ETH: 300
+      #   limitBorrow: true   # default false: the budgets only report
 
     marginRepayAlert:
       slack:
@@ -67,7 +82,8 @@ exchangeStrategies:
     # interestEstimate.budget is exceeded or projected to be exceeded. The message lists every budget
     # with its status and is updated in place (it says when, below the title); it is resolved when
     # no budget is over any more.
-    # It only tells you: nothing is repaid, and borrowing does not change. It needs a budget.
+    # It only tells you: the alert repays nothing and does not change borrowing. With
+    # interestEstimate.budget.limitBorrow the message says that borrowing is limited. It needs a budget.
     # interestBudgetAlert:
     #   slack:
     #     channel: "channel_id"

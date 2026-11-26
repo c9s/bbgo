@@ -75,6 +75,7 @@ var defaultProjectionMonths = []int{1, 3}
 //     monthlyUSDT: 1000        # the whole session; 0 or not set: no budget
 //     assets:                  # per asset
 //     USDT: 600
+//     limitBorrow: true        # borrow only what the budgets can still pay for
 type InterestEstimateConfig struct {
 	// Interval is the estimate interval, 0 turns the estimate off
 	Interval types.Duration `json:"interval"`
@@ -100,8 +101,9 @@ type InterestEstimateConfig struct {
 // for the whole session, and one per asset. Each is optional and independent:
 // the asset budgets do not have to add up to the session budget.
 //
-// A budget only reports: a status in the log and in the metrics. It does not
-// alert and does not change how autoborrow borrows or repays.
+// A budget reports: a status in the log and in the metrics. It does not alert,
+// and it does not change how autoborrow borrows unless limitBorrow is set. It
+// never repays.
 //
 // It always compares what was charged, at the price when it was charged,
 // whatever realizedPriceMode is: a budget is about money already spent. The
@@ -117,6 +119,13 @@ type InterestBudgetConfig struct {
 	// Interest paid in another asset (e.g. BNB) counts toward the asset that was
 	// borrowed. 0 means no budget for the asset.
 	Assets map[string]fixedpoint.Value `json:"assets,omitempty"`
+
+	// LimitBorrow makes autoborrow borrow only what the budgets can still pay
+	// for: a borrow is reduced to the part whose interest fits the budget of its
+	// asset and the budget of the session, and refused when nothing fits or when
+	// the estimate is incomplete. Nothing is repaid. Off by default: the budgets
+	// then only report.
+	LimitBorrow bool `json:"limitBorrow,omitempty"`
 }
 
 // Validate checks the price mode, the projection months and the budget
@@ -135,6 +144,11 @@ func (c *InterestEstimateConfig) Validate() error {
 				return fmt.Errorf("invalid interest budget %s of asset %s, expected a positive number, or 0 for no budget", budget.String(), asset)
 			}
 		}
+	}
+
+	// a borrow limit needs a budget to limit to: do not ignore it silently
+	if c.limitsBorrow() && !c.hasBudget() {
+		return fmt.Errorf("interest budget limitBorrow is set but no budget is, set monthlyUSDT or assets")
 	}
 
 	// a budget needs the estimate: do not ignore it silently
@@ -177,6 +191,11 @@ func (c *InterestEstimateConfig) projectionHours() []int {
 func (c *InterestEstimateConfig) hasBudget() bool {
 	_, session := c.sessionBudget()
 	return session || len(c.assetBudgets()) > 0
+}
+
+// limitsBorrow reports whether the budgets limit what autoborrow borrows
+func (c *InterestEstimateConfig) limitsBorrow() bool {
+	return c.Budget != nil && c.Budget.LimitBorrow
 }
 
 // sessionBudget returns the budget of the whole session. ok is false without
@@ -277,18 +296,24 @@ func sessionSyncLock(key string) *sync.Mutex {
 	return mu
 }
 
-// budgetedSessions holds the sessions that have an interest budget. A session
-// has one bill, so it has at most one budget.
+// budgetedSessions holds the sessions that have an interest budget, with the
+// limiter of the budget, nil when the budget does not limit borrowing. A
+// session has one bill, so it has at most one budget.
 var budgetedSessions = struct {
 	sync.Mutex
-	m map[string]struct{}
-}{m: make(map[string]struct{})}
+	m map[string]*interestBudgetLimiter
+}{m: make(map[string]*interestBudgetLimiter)}
+
+func budgetedSessionKey(session *bbgo.ExchangeSession) string {
+	return session.ExchangeName.String() + "/" + session.Name
+}
 
 // claimInterestBudget makes session the owner of its interest budget and
 // returns the function that gives it up. It fails when another autoborrow
 // instance already budgets the session: two budgets on one bill cannot both be right.
-func claimInterestBudget(session *bbgo.ExchangeSession) (release func(), err error) {
-	key := session.ExchangeName.String() + "/" + session.Name
+// limiter is the borrow limit of the budget, nil without one.
+func claimInterestBudget(session *bbgo.ExchangeSession, limiter *interestBudgetLimiter) (release func(), err error) {
+	key := budgetedSessionKey(session)
 
 	budgetedSessions.Lock()
 	defer budgetedSessions.Unlock()
@@ -297,7 +322,7 @@ func claimInterestBudget(session *bbgo.ExchangeSession) (release func(), err err
 		return nil, fmt.Errorf("session %s already has an interest budget, set by another autoborrow instance: a session has at most one", session.Name)
 	}
 
-	budgetedSessions.m[key] = struct{}{}
+	budgetedSessions.m[key] = limiter
 	return func() {
 		budgetedSessions.Lock()
 		defer budgetedSessions.Unlock()
@@ -440,6 +465,10 @@ type interestEstimateWorker struct {
 
 	// budgetAlerter raises the interest budget alert, nil when interestBudgetAlert is not set
 	budgetAlerter *interestBudgetAlerter
+
+	// limiter limits what autoborrow borrows to the budgets, nil unless
+	// budget.limitBorrow is set. It is given the figures of every tick.
+	limiter *interestBudgetLimiter
 }
 
 // sessionBudgetKey is the key of the session budget in budgetStatus; no asset has an empty name
@@ -463,6 +492,7 @@ func newInterestEstimateWorker(s *Strategy, session *bbgo.ExchangeSession, confi
 
 	if s.InterestBudgetAlert != nil && config.hasBudget() {
 		w.budgetAlerter = newInterestBudgetAlerter(session, s.InterestBudgetAlert)
+		w.budgetAlerter.limitsBorrow = config.limitsBorrow()
 	}
 
 	w.feeAsset = service.MarginInterestFeeAsset(session.ExchangeName)
@@ -487,6 +517,10 @@ func newInterestEstimateWorker(s *Strategy, session *bbgo.ExchangeSession, confi
 
 	w.pricer = func(asset string) (fixedpoint.Value, bool) {
 		return session.GetPriceSolver().ResolvePrice(asset, currency.USDT)
+	}
+
+	if config.limitsBorrow() {
+		w.limiter = newInterestBudgetLimiter(config, w.pricer)
 	}
 
 	// Not SimplePriceSolver.UpdateFromTickers: it skips a market it does not know
@@ -541,7 +575,27 @@ func (w *interestEstimateWorker) claimBudget() (release func(), err error) {
 		return nil, fmt.Errorf("interest budget is set on session %s for %v, which are not assets of %s: check the names", w.session.Name, unknown, w.session.ExchangeName)
 	}
 
-	return claimInterestBudget(w.session)
+	if w.limiter != nil {
+		if reason := w.neverCompleteReason(); reason != "" {
+			return nil, fmt.Errorf("interest budget limitBorrow is set on session %s but %s: the budgets would stay unknown and nothing would be borrowed", w.session.Name, reason)
+		}
+	}
+
+	return claimInterestBudget(w.session, w.limiter)
+}
+
+// neverCompleteReason says why the estimate of the session can never be
+// complete, empty if it can. A budget on such an estimate is never ok, which a
+// budget that only reports says on every tick. One that limits borrowing would
+// silently stop it, so it must not start.
+func (w *interestEstimateWorker) neverCompleteReason() string {
+	switch {
+	case w.interestQueryService == nil:
+		return fmt.Sprintf("exchange %s has no hourly interest rate API", w.session.ExchangeName)
+	case w.history == nil:
+		return "the interest history cannot be read (it needs a configured database and a valid session name)"
+	}
+	return ""
 }
 
 // unknownBudgetAssets returns the assets with a budget that no market of the
@@ -627,7 +681,9 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 	w.cover(borrowed)
 	w.debtAssets = borrowed
 
-	w.refreshPrices(ctx, w.assetsToPrice(borrowed))
+	// with a borrow limit, a borrow is valued before its asset has any debt
+	borrowable := w.borrowableAssets(configured)
+	w.refreshPrices(ctx, w.assetsToPrice(borrowed, borrowable))
 
 	realized, charged, realizedOK, unattributed := w.queryRealized(ctx, now, realizedRange, w.coveredAssets())
 
@@ -636,8 +692,9 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 	w.cover(sortedKeys(realized.Assets))
 	assets := w.coveredAssets()
 
-	// a rate is needed to project a debt, and reported for every autoborrow asset
-	rates := w.queryRates(ctx, unionSorted(configured, borrowed))
+	// a rate is needed to project a debt and to value a borrow, and is reported
+	// for every autoborrow asset
+	rates := w.queryRates(ctx, unionSorted(unionSorted(configured, borrowable), borrowed))
 	projection := margininterest.ProjectAssets(assets, debts, rates, w.pricer, hours)
 	for range projection.MissingPrice {
 		w.countError("price")
@@ -690,6 +747,9 @@ func (w *interestEstimateWorker) tick(ctx context.Context) *interestEstimate {
 	est.Complete = w.complete(est, realized) && len(est.StalePrice) == 0
 
 	w.evaluateBudgets(est, charged)
+	if w.limiter != nil {
+		w.limiter.set(w.budgetBasis(est, charged, rates))
+	}
 
 	w.log(est, rates)
 	w.publish(est)
@@ -712,9 +772,10 @@ func (w *interestEstimateWorker) evaluateBudgets(est *interestEstimate, charged 
 	projection := est.Projection
 
 	if budget, ok := w.config.sessionBudget(); ok {
+		c := chargedOfSession(est, charged)
 		// charged is valued when charged: only the price of a debt can be stale
-		complete := w.complete(est, charged) && len(est.StaleDebtPrice) == 0
-		e := margininterest.EvaluateBudget(budget, charged.TotalUSDT, charged.TotalUSDT.Add(projection.TotalUSDT), complete)
+		complete := w.interestQueryService != nil && projection.Complete() && c.Complete && len(est.StaleDebtPrice) == 0
+		e := margininterest.EvaluateBudget(budget, c.USDT, c.USDT.Add(projection.TotalUSDT), complete)
 		est.Budget = &e
 	}
 
@@ -725,10 +786,7 @@ func (w *interestEstimateWorker) evaluateBudgets(est *interestEstimate, charged 
 
 	est.AssetBudgets = make(map[string]margininterest.BudgetEvaluation, len(budgets))
 	for asset, budget := range budgets {
-		realizedUSDT, realizedPriceOK := fixedpoint.Zero, true
-		if ar, ok := charged.Assets[asset]; ok {
-			realizedUSDT, realizedPriceOK = ar.USDT, ar.PriceOK
-		}
+		c := w.chargedOfAsset(est, charged, asset)
 
 		// an asset with principal but no rate is not projected at all
 		projectedUSDT := fixedpoint.Zero
@@ -738,10 +796,63 @@ func (w *interestEstimateWorker) evaluateBudgets(est *interestEstimate, charged 
 		}
 
 		_, stalePrice := w.priceFailed[asset]
-		complete := w.interestQueryService != nil && projected && ap.PriceOK && !stalePrice && !w.assetHistoryMissing(est, asset) && realizedPriceOK
+		complete := w.interestQueryService != nil && projected && ap.PriceOK && !stalePrice && c.Complete
 
-		est.AssetBudgets[asset] = margininterest.EvaluateBudget(budget, realizedUSDT, realizedUSDT.Add(projectedUSDT), complete)
+		est.AssetBudgets[asset] = margininterest.EvaluateBudget(budget, c.USDT, c.USDT.Add(projectedUSDT), complete)
 	}
+}
+
+// chargedOfSession returns what the session was charged this month, and
+// whether that is every charge, each with its value
+func chargedOfSession(est *interestEstimate, charged margininterest.Realized) chargedInterest {
+	return chargedInterest{
+		USDT:     charged.TotalUSDT,
+		Complete: !est.MissingHistory && len(charged.MissingPrice) == 0,
+	}
+}
+
+// chargedOfAsset returns what the session was charged this month for asset,
+// and whether that is every charge, each with its value
+func (w *interestEstimateWorker) chargedOfAsset(est *interestEstimate, charged margininterest.Realized, asset string) chargedInterest {
+	usdt, priceOK := fixedpoint.Zero, true
+	if ar, ok := charged.Assets[asset]; ok {
+		usdt, priceOK = ar.USDT, ar.PriceOK
+	}
+
+	return chargedInterest{USDT: usdt, Complete: priceOK && !w.assetHistoryMissing(est, asset)}
+}
+
+// budgetBasis returns what the tick of est knows about the budgets, for the
+// borrow limit: what each budget was charged, and the rates and the remaining
+// hours to project a debt with. The debts are not in it, the limit reads them
+// when a borrow is about to be made.
+func (w *interestEstimateWorker) budgetBasis(
+	est *interestEstimate, charged margininterest.Realized, rates types.MarginNextHourlyInterestRateMap,
+) *interestBudgetBasis {
+	basis := &interestBudgetBasis{
+		Month:      est.Month,
+		Hours:      est.RemainingHours,
+		SyncedAt:   w.lastSync,
+		Rates:      rates,
+		StalePrice: make(map[string]struct{}, len(w.priceFailed)),
+		Assets:     make(map[string]chargedInterest),
+	}
+
+	// a copy: the borrow loop reads the basis while the worker goes on
+	for asset := range w.priceFailed {
+		basis.StalePrice[asset] = struct{}{}
+	}
+
+	if _, ok := w.config.sessionBudget(); ok {
+		c := chargedOfSession(est, charged)
+		basis.Session = &c
+	}
+
+	for asset := range w.config.assetBudgets() {
+		basis.Assets[asset] = w.chargedOfAsset(est, charged, asset)
+	}
+
+	return basis
 }
 
 func (w *interestEstimateWorker) loadDebts(ctx context.Context) types.BalanceMap {
@@ -810,16 +921,31 @@ func (w *interestEstimateWorker) queryRates(ctx context.Context, assets []string
 	return rates
 }
 
+// borrowableAssets returns the assets a borrow limit has to value a borrow of,
+// nil without one: the autoborrow assets of this instance, and the assets a
+// limit was asked for. Another autoborrow instance on the session borrows under
+// the same budgets, and its assets are only known once it asks. Its first
+// borrow of an asset is refused as unknown, and the next tick has the rate and
+// the price.
+func (w *interestEstimateWorker) borrowableAssets(configured []string) []string {
+	if w.limiter == nil {
+		return nil
+	}
+	return unionSorted(configured, w.limiter.askedAssets())
+}
+
 // assetsToPrice returns the assets the estimate needs the current price of: the
-// borrowed ones, to value their projection. In the current price mode also
-// every covered asset and the fee asset, to value what was charged and what it
-// was paid in.
-func (w *interestEstimateWorker) assetsToPrice(borrowed []string) []string {
+// borrowed ones, to value their projection, and the borrowable ones of a
+// borrow limit. In the current price mode also every covered asset and the fee
+// asset, to value what was charged and what it was paid in.
+func (w *interestEstimateWorker) assetsToPrice(borrowed, borrowable []string) []string {
+	assets := unionSorted(borrowed, borrowable)
+
 	if w.config.RealizedPriceMode.OrDefault() != margininterest.PriceModeCurrent {
-		return borrowed
+		return assets
 	}
 
-	assets := unionSorted(borrowed, w.coveredAssets())
+	assets = unionSorted(assets, w.coveredAssets())
 	if w.feeAsset != "" {
 		assets = unionSorted(assets, []string{w.feeAsset})
 	}
