@@ -36,9 +36,6 @@ type Buffer struct {
 	fetching   bool
 	generation uint64
 
-	// updateTimeout the timeout duration when not receiving update messages
-	updateTimeout time.Duration
-
 	// bufferingPeriod is used to buffer the update message before we get the full depth
 	bufferingPeriod time.Duration
 
@@ -59,10 +56,6 @@ func NewBuffer(fetcher SnapshotFetcher, bufferingPeriod time.Duration) *Buffer {
 
 func (b *Buffer) SetLogger(logger *logrus.Entry) {
 	b.logger = logger
-}
-
-func (b *Buffer) SetUpdateTimeout(d time.Duration) {
-	b.updateTimeout = d
 }
 
 func (b *Buffer) CheckPreviousID() {
