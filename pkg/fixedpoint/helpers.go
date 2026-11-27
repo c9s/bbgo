@@ -13,3 +13,12 @@ func Avg(values []Value) (avg Value) {
 	avg = s.Div(NewFromInt(int64(len(values))))
 	return avg
 }
+
+// ApproxEqual reports whether a and b are within a relative tolerance of each
+// other. maxDiff is the tolerance expressed as a fraction of |a|; for example
+// 0.01 compares a and b with a 1% tolerance.
+func ApproxEqual(a, b Value, maxDiff float64) bool {
+	diff := a.Sub(b).Abs()
+	tolerance := a.Abs().Mul(NewFromFloat(maxDiff))
+	return diff.Compare(tolerance) <= 0
+}
