@@ -32,6 +32,8 @@ type SpreadMaker struct {
 	// orderStore stores the history maker orders
 	orderStore *core.OrderStore
 
+	orderTimingTracker *types.OrderTimingTracker
+
 	session *bbgo.ExchangeSession
 
 	market types.Market
@@ -167,6 +169,7 @@ func (c *SpreadMaker) cancelOrder(ctx context.Context) error {
 	}
 
 	if order, ok := c.getOrder(); ok {
+		recordSendCancelOrders(c.orderTimingTracker, time.Now(), order)
 		return retry.CancelOrdersUntilSuccessful(ctx, c.session.Exchange, order)
 	}
 
@@ -191,6 +194,8 @@ func (c *SpreadMaker) cancelAndQueryOrder(ctx context.Context) (*types.Order, er
 		return nil, err
 	}
 
+	recordOrderTimingUpdate(c.orderTimingTracker, *finalOrder)
+
 	c.order = nil
 	return finalOrder, nil
 }
@@ -214,6 +219,7 @@ func (c *SpreadMaker) placeOrder(ctx context.Context, submitOrder *types.SubmitO
 		return nil, nil
 	}
 
+	sendAt := time.Now()
 	createdOrder, err := c.session.Exchange.SubmitOrder(ctx, *submitOrder)
 	if err != nil {
 		return nil, err
@@ -225,6 +231,7 @@ func (c *SpreadMaker) placeOrder(ctx context.Context, submitOrder *types.SubmitO
 
 	if createdOrder != nil {
 		c.orderStore.Add(*createdOrder)
+		c.orderTimingTracker.RecordOrder(*createdOrder, sendAt)
 	}
 
 	return createdOrder, nil
@@ -236,5 +243,8 @@ func (c *SpreadMaker) Bind(ctx context.Context, session *bbgo.ExchangeSession, s
 	c.session = session
 	c.market, _ = c.session.Market(symbol)
 	c.orderQueryService = c.session.Exchange.(types.ExchangeOrderQueryService)
+
+	c.orderTimingTracker = types.NewOrderTimingTracker(types.OttWithSymbol(symbol))
+	c.orderTimingTracker.StartPruning(ctx, 0)
 	return nil
 }

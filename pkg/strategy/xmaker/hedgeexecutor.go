@@ -3,6 +3,7 @@ package xmaker
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -212,6 +213,7 @@ func (m *CounterpartyHedgeExecutor) Clear(ctx context.Context) error {
 			m.logger.Infof("[dryRun] skip canceling existing hedge order: %+v", m.hedgeOrder)
 		} else {
 			m.logger.Infof("cancelling existing hedge order: %+v", m.hedgeOrder)
+			recordSendCancelOrders(m.orderTimingTracker, time.Now(), *m.hedgeOrder)
 			if err := m.session.Exchange.CancelOrders(ctx, *m.hedgeOrder); err != nil {
 				m.logger.WithError(err).Errorf("failed to cancel order: %+v", m.hedgeOrder)
 			}

@@ -3,6 +3,7 @@ package xmaker
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -153,10 +154,16 @@ func (c *FastCancel) executeFastCancel(ctx context.Context, symbol string, side 
 
 	c.logger.Infof("FastCancel: cancelling %s %s", c.makerSymbol, side.String())
 
+	buyOrders, sellOrders := c.activeMakerOrders.Orders().SeparateBySide()
+	ordersForSide := buyOrders
+	if side == types.SideTypeSell {
+		ordersForSide = sellOrders
+	}
+	recordSendCancelOrders(c.strategy.orderTimingTracker, time.Now(), ordersForSide...)
+
 	if service, ok := c.makerExchange.(cancelOrdersBySymbolSide); ok {
 		_, err = service.CancelOrdersBySymbolSide(ctx, symbol, side)
 	} else {
-		buyOrders, sellOrders := c.activeMakerOrders.Orders().SeparateBySide()
 		switch side {
 		case types.SideTypeBuy:
 			if len(buyOrders) == 0 {

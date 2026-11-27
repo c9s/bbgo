@@ -217,6 +217,8 @@ type HedgeMarket struct {
 	tradeCollector    *core.TradeCollector
 	activeMakerOrders *bbgo.ActiveOrderBook
 
+	orderTimingTracker *types.OrderTimingTracker
+
 	logger logrus.FieldLogger
 
 	// dryRun, when true, skips real order submission in submitOrder and only logs the intended order.
@@ -280,6 +282,13 @@ func NewHedgeMarket(
 	})
 
 	activeMakerOrders := bbgo.NewActiveOrderBook(symbol)
+
+	// more than one HedgeMarket can exist for the same symbol (different sessions under
+	// SplitHedge), so the metrics label needs the session name to stay unique.
+	orderTimingTracker := types.NewOrderTimingTracker(
+		types.OttWithSymbol(strings.Join([]string{session.Name, symbol}, "-")),
+	)
+
 	session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 		if symbol != "" && order.Symbol != symbol {
 			return
@@ -296,6 +305,7 @@ func NewHedgeMarket(
 
 		orderStore.HandleOrderUpdate(order)
 		activeMakerOrders.OrderUpdateHandler(order)
+		recordOrderTimingUpdate(orderTimingTracker, order)
 	})
 
 	// default logger
@@ -330,6 +340,8 @@ func NewHedgeMarket(
 		orderStore:        orderStore,
 		tradeCollector:    tradeCollector,
 		activeMakerOrders: activeMakerOrders,
+
+		orderTimingTracker: orderTimingTracker,
 
 		hedgedC: make(chan struct{}, 2),
 		doneC:   make(chan struct{}),
@@ -559,8 +571,13 @@ func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitO
 
 	defer m.tradeCollector.Process()
 
+	sendAt := time.Now()
+
 	createdOrders, _, err := bbgo.BatchPlaceOrder(
-		ctx, m.session.Exchange, orderCreateCallback, submitOrders...,
+		ctx, m.session.Exchange, func(createdOrder types.Order) {
+			orderCreateCallback(createdOrder)
+			m.orderTimingTracker.RecordOrder(createdOrder, sendAt)
+		}, submitOrders...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to submit order: %w, order: %+v", err, submitOrder)
@@ -1017,6 +1034,7 @@ func (m *HedgeMarket) Start(ctx context.Context) error {
 	}
 
 	m.tradingCtx, m.cancelTrading = context.WithCancel(ctx)
+	m.orderTimingTracker.StartPruning(m.tradingCtx, 0)
 
 	m.logger.Infof("waiting for %s hedge market connectivity...", m.SymbolSelector)
 	select {

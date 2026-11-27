@@ -315,6 +315,8 @@ type Strategy struct {
 
 	activeMakerOrders *bbgo.ActiveOrderBook
 
+	orderTimingTracker *types.OrderTimingTracker
+
 	hedgeErrorLimiter         *rate.Limiter
 	hedgeErrorRateReservation *rate.Reservation
 
@@ -1048,10 +1050,15 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	// skip the cancel call entirely to avoid touching the exchange.
 	if !s.DryRun {
 		cancelMakerOrdersProfile := timeprofile.Start("cancelMakerOrders")
+		activeOrders := s.activeMakerOrders.Orders()
+		recordSendCancelOrders(s.orderTimingTracker, time.Now(), activeOrders...)
 		if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 			s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
 			s.activeMakerOrders.Print()
 			return nil
+		}
+		for _, order := range activeOrders {
+			s.logger.Infof("active order canceled before quoting: %v", order.AsQuery())
 		}
 		s.cancelOrderDurationMetrics.Observe(float64(cancelMakerOrdersProfile.Stop().Milliseconds()))
 	}
@@ -1864,9 +1871,14 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	makerOrderPlacementProfile := timeprofile.Start("makerOrderPlacement")
 
+	sendAt := time.Now()
+
 	// we don't retry here, so errIdx is not used, if the order placement fails, we just skip this round
 	createdOrders, _, err := bbgo.BatchPlaceOrder(
-		ctx, s.makerSession.Exchange, s.makerOrderCreateCallback, formattedOrders...,
+		ctx, s.makerSession.Exchange, func(createdOrder types.Order) {
+			s.makerOrderCreateCallback(createdOrder)
+			s.orderTimingTracker.RecordOrder(createdOrder, sendAt)
+		}, formattedOrders...,
 	)
 
 	if err != nil {
@@ -2705,6 +2717,7 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 		if s.DryRun {
 			return
 		}
+		recordSendCancelOrders(s.orderTimingTracker, time.Now(), s.activeMakerOrders.Orders()...)
 		if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 			s.logger.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
 		}
@@ -3234,6 +3247,18 @@ func (s *Strategy) CrossRun(
 
 	s.activeMakerOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
+
+	s.orderTimingTracker = types.NewOrderTimingTracker(
+		types.OttWithSymbol(s.Symbol),
+		types.OttWithLogger(s.logger),
+	)
+	s.orderTimingTracker.StartPruning(s.tradingCtx, 0)
+	s.makerSession.UserDataStream.OnOrderUpdate(func(order types.Order) {
+		if order.Symbol != s.Symbol {
+			return
+		}
+		recordOrderTimingUpdate(s.orderTimingTracker, order)
+	})
 
 	s.orderStore = core.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(s.makerSession.UserDataStream)
